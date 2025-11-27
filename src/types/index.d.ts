@@ -680,6 +680,22 @@ export interface ConvexPanelProps {
   deployKey: string;
 }
 
+export interface Team {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  slug: string;
+  teamId: string;
+}
+
+export type EnvType = 'development' | 'preview' | 'production';
+export type DeploymentKind = 'cloud' | 'local' | 'self-hosted';
+
 declare const ConvexPanel: FC<ConvexPanelProps>;
 
 export default ConvexPanel;

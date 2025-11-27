@@ -11,19 +11,7 @@ import { extractProjectName } from './utils/api';
 import { getStorageItem, setStorageItem } from './utils/storage';
 import { STORAGE_KEYS } from './utils/constants';
 import { TabId } from './types/tabs';
-
-export interface Team {
-  id: string;
-  name: string;
-  slug: string;
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  slug: string;
-  teamId: string;
-}
+import { Team, Project } from './types';
 
 export interface ConvexPanelProps {
   convex?: ConvexReactClient | any;
@@ -70,7 +58,6 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
     }
     return 'health';
   });
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   let convexFromContext: any;
   try {
@@ -92,27 +79,14 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
   }, [mockup]); // Only recalculate if mockup changes
   
   const oauthConfig = providedOAuthConfig || envOAuthConfig;
-  
-  // Debug logging (only once on mount)
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !mockup && !providedOAuthConfig && envOAuthConfig) {
-    }
-  }, []); // Only run once on mount
-  const accessToken = providedAccessToken;
-  const deployKey = providedDeployKey;
 
   // OAuth authentication (skip if mockup mode)
   const oauth = useOAuth(mockup ? null : (oauthConfig || null));
   
   // Determine which token to use (OAuth or manual)
   // In mockup mode, skip authentication
-  const effectiveAccessToken = mockup ? undefined : (oauth.token?.access_token || accessToken || undefined);
-  const hasAuth = mockup ? true : (oauth.isAuthenticated || !!accessToken);
-
-  // Update authenticated state when auth status changes
-  useEffect(() => {
-    setIsAuthenticated(hasAuth);
-  }, [hasAuth]);
+  const effectiveAccessToken = mockup ? undefined : (oauth.token?.access_token || providedAccessToken || undefined);
+  const isAuthenticated = mockup ? true : (oauth.isAuthenticated || !!providedAccessToken);
 
   // Set mounted state
   useEffect(() => {
@@ -120,26 +94,25 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
   }, []);
 
   // Create admin client - use OAuth token or deployKey
-  const convexUrl = deployUrl;
   const adminClient = useMemo(() => {
     if (!isMounted) return null;
     // Create adminClient if we have a URL and either deployKey or OAuth token
-    if (convexUrl && (deployKey || effectiveAccessToken)) {
-      return new ConvexClient(convexUrl);
+    if (deployUrl && (providedDeployKey || effectiveAccessToken)) {
+      return new ConvexClient(deployUrl);
     }
     return null;
-  }, [convexUrl, deployKey, effectiveAccessToken, isMounted]);
+  }, [deployUrl, providedDeployKey, effectiveAccessToken, isMounted]);
 
   // Set admin auth - prefer deployKey, fall back to OAuth token
   useEffect(() => {
     if (!isMounted || !adminClient) return;
     
     // Use deployKey if available, otherwise use OAuth token
-    const authToken = deployKey || effectiveAccessToken;
+    const authToken = providedDeployKey || effectiveAccessToken;
     if (authToken) {
       (adminClient as any).setAdminAuth(authToken);
     }
-  }, [adminClient, deployKey, effectiveAccessToken, isMounted]);
+  }, [adminClient, providedDeployKey, effectiveAccessToken, isMounted]);
 
   // Save activeTab to localStorage whenever it changes
   useEffect(() => {
@@ -155,9 +128,9 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
 
   const toggleOpen = useCallback(() => {
     // Don't allow expansion if not authenticated
-    if (!hasAuth) return;
+    if (!isAuthenticated) return;
     setIsOpen(prev => !prev);
-  }, [hasAuth]);
+  }, [isAuthenticated]);
 
   const handleConnect = useCallback(async () => {
     if (!oauthConfig) {
@@ -180,11 +153,11 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
       <BottomSheet 
         isOpen={isAuthenticated ? isOpen : false} 
         onClose={toggleOpen}
-        projectName={convexUrl ? extractProjectName(convexUrl) : undefined}
-        deploymentUrl={convexUrl}
+        projectName={deployUrl ? extractProjectName(deployUrl) : undefined}
+        deploymentUrl={deployUrl}
         environment="development"
         isAuthenticated={isAuthenticated}
-        oauthConfig={oauthConfig || undefined}
+        oauthConfig={oauthConfig}
         onConnect={handleConnect}
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -205,15 +178,15 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
         ) : (
           <MainViews
             activeTab={activeTab}
-              containerProps={{
-                convex: convex,
-                accessToken: effectiveAccessToken || '',
-                deployUrl: deployUrl,
-                baseUrl: convexUrl,
-                adminClient: adminClient,
-                useMockData: mockup || useMockData || !effectiveAccessToken,
-                ...props
-              }}
+            containerProps={{
+              convex: convex,
+              accessToken: effectiveAccessToken || '',
+              deployUrl: deployUrl,
+              baseUrl: deployUrl,
+              adminClient: adminClient,
+              useMockData: mockup || useMockData || !effectiveAccessToken,
+              ...props
+            }}
           />
         )}
       </BottomSheet>

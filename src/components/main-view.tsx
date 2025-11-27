@@ -2,6 +2,7 @@ import React from 'react';
 import { HealthView } from '../views/health/health-view';
 import { DataView } from '../views/data/data-view';
 import { FunctionsView } from '../views/functions';
+import { SchedulesView } from '../views/schedules';
 import { TabId } from '../types/tabs';
 
 interface MainViewsProps {
@@ -53,7 +54,13 @@ const tabRenderers: Record<TabId, TabRenderer> = {
     />
   ),
   files: createComingSoonRenderer('Files'),
-  schedules: createComingSoonRenderer('Schedules'),
+  schedules: ({ adminClient, accessToken, useMockData }) => (
+    <SchedulesView
+      adminClient={adminClient}
+      accessToken={accessToken}
+      useMockData={useMockData}
+    />
+  ),
   logs: createComingSoonRenderer('Logs'),
   settings: createComingSoonRenderer('Settings'),
 };
