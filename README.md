@@ -73,13 +73,101 @@ more %USERPROFILE%\.convex\config.json  # On Windows
 
 ### Next.js Setup (Recommended)
 
-Create a provider component in your app (e.g., `app/providers.tsx`):
+#### Option A: OAuth Authentication (Recommended)
+
+For OAuth authentication, you'll need to create a server-side endpoint to handle token exchange. See [OAUTH_SETUP.md](./OAUTH_SETUP.md) for detailed instructions.
+
+1. **Create the OAuth callback endpoint** (`app/api/convex/callback/route.ts`):
+
+```typescript
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function GET(request: NextRequest) {
+  const code = request.nextUrl.searchParams.get('code');
+  
+  if (!code) {
+    return NextResponse.redirect(new URL('/?error=no_code', request.url));
+  }
+
+  // Exchange code for token
+  const tokenResponse = await fetch('https://api.convex.dev/oauth/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      client_id: process.env.CONVEX_CLIENT_ID!,
+      client_secret: process.env.CONVEX_CLIENT_SECRET!,
+      grant_type: 'authorization_code',
+      redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/convex/callback`,
+      code,
+    }),
+  });
+
+  if (!tokenResponse.ok) {
+    return NextResponse.redirect(new URL('/?error=oauth_failed', request.url));
+  }
+
+  const token = await tokenResponse.json();
+  
+  // Store token in cookie or session
+  const response = NextResponse.redirect(new URL('/', request.url));
+  response.cookies.set('convex_oauth_token', token.access_token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+  });
+  
+  return response;
+}
+```
+
+2. **Create the token exchange endpoint** (`app/api/convex/exchange/route.ts`):
+
+```typescript
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function POST(request: NextRequest) {
+  const { code, codeVerifier, redirectUri } = await request.json();
+  
+  if (!code) {
+    return NextResponse.json({ error: 'No code provided' }, { status: 400 });
+  }
+
+  const body = new URLSearchParams({
+    client_id: process.env.CONVEX_CLIENT_ID!,
+    client_secret: process.env.CONVEX_CLIENT_SECRET!,
+    grant_type: 'authorization_code',
+    redirect_uri: redirectUri || process.env.NEXT_PUBLIC_APP_URL!,
+    code,
+    ...(codeVerifier && { code_verifier: codeVerifier }),
+  });
+
+  const tokenResponse = await fetch('https://api.convex.dev/oauth/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: body.toString(),
+  });
+
+  if (!tokenResponse.ok) {
+    const error = await tokenResponse.text();
+    return NextResponse.json({ error }, { status: tokenResponse.status });
+  }
+
+  const token = await tokenResponse.json();
+  return NextResponse.json(token);
+}
+```
+
+3. **Use the component with OAuth**:
 
 ```tsx
 "use client";
 
 import { ConvexReactClient } from "convex/react";
-import { ConvexAuthNextjsProvider } from "@convex-dev/auth/nextjs";
+import { ConvexProvider } from "convex/react";
 import { ReactNode } from "react";
 import dynamic from 'next/dynamic';
 import type { ComponentProps } from 'react';
@@ -95,54 +183,178 @@ const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL! as stri
 
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
   return (
-    <ConvexAuthNextjsProvider client={convex}>
+    <ConvexProvider client={convex}>
+      {children}
+      <ConvexPanel
+        oauthConfig={{
+          clientId: process.env.NEXT_PUBLIC_CONVEX_CLIENT_ID!,
+          redirectUri: typeof window !== 'undefined' ? window.location.origin : '',
+          scope: 'project',
+          tokenExchangeUrl: '/api/convex/exchange', // Your server endpoint
+        }}
+        convex={convex}
+      />
+    </ConvexProvider>
+  )
+}
+```
+
+#### Option B: Manual Tokens (Fallback)
+
+If you prefer not to use OAuth, you can use manual tokens:
+
+```tsx
+"use client";
+
+import { ConvexReactClient } from "convex/react";
+import { ConvexProvider } from "convex/react";
+import { ReactNode } from "react";
+import dynamic from 'next/dynamic';
+import type { ComponentProps } from 'react';
+
+import type ConvexPanelType from "convex-panel";
+
+const ConvexPanel = dynamic<ComponentProps<typeof ConvexPanelType>>(() => import("convex-panel"), {
+  ssr: false
+});
+
+const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL! as string);
+
+export function ConvexClientProvider({ children }: { children: ReactNode }) {
+  return (
+    <ConvexProvider client={convex}>
       {children}
       <ConvexPanel
         accessToken={process.env.NEXT_PUBLIC_ACCESS_TOKEN!}
         deployKey={process.env.NEXT_PUBLIC_DEPLOY_KEY!}
+        convex={convex}
       />
-    </ConvexAuthNextjsProvider>
+    </ConvexProvider>
   )
 }
 ```
 
 ### React Setup (Alternative)
 
-For non-Next.js React applications:
+For non-Next.js React applications, you'll need to set up a server endpoint for OAuth token exchange. Here are options:
+
+#### Option A: OAuth with Express/Node.js Server
+
+1. **Create a server endpoint** (e.g., using Express):
+
+```javascript
+// server.js or your API server
+app.post('/api/convex/exchange', async (req, res) => {
+  const { code, codeVerifier, redirectUri } = req.body;
+  
+  const tokenResponse = await fetch('https://api.convex.dev/oauth/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      client_id: process.env.CONVEX_CLIENT_ID,
+      client_secret: process.env.CONVEX_CLIENT_SECRET,
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUri,
+      code,
+      ...(codeVerifier && { code_verifier: codeVerifier }),
+    }),
+  });
+
+  const token = await tokenResponse.json();
+  res.json(token);
+});
+```
+
+2. **Use the component**:
 
 ```tsx
 import { ConvexPanel } from 'convex-panel';
-import { ConvexReactClient } from "convex/react";
+import { ConvexReactClient, ConvexProvider } from "convex/react";
 
 export default function YourComponent() {
   const convex = new ConvexReactClient(process.env.REACT_APP_CONVEX_URL);
 
   return (
-    <>
+    <ConvexProvider client={convex}>
       {/* Your app content */}
       <ConvexPanel
-        accessToken={REACT_APP_ACCESS_TOKEN}
-        deployUrl={process.env.REACT_APP_CONVEX_DEPLOYMENT}
+        oauthConfig={{
+          clientId: process.env.REACT_APP_CONVEX_CLIENT_ID!,
+          redirectUri: window.location.origin,
+          scope: 'project',
+          tokenExchangeUrl: 'http://localhost:3001/api/convex/exchange', // Your server
+        }}
+        convex={convex}
       />
-    </>
+    </ConvexProvider>
+  );
+}
+```
+
+#### Option B: Manual Tokens (No OAuth)
+
+```tsx
+import { ConvexPanel } from 'convex-panel';
+import { ConvexReactClient, ConvexProvider } from "convex/react";
+
+export default function YourComponent() {
+  const convex = new ConvexReactClient(process.env.REACT_APP_CONVEX_URL);
+
+  return (
+    <ConvexProvider client={convex}>
+      {/* Your app content */}
+      <ConvexPanel
+        accessToken={process.env.REACT_APP_ACCESS_TOKEN}
+        deployUrl={process.env.REACT_APP_CONVEX_DEPLOYMENT}
+        convex={convex}
+      />
+    </ConvexProvider>
   );
 }
 ```
 
 ## Configuration
 
+### Authentication
+
+The component supports two authentication methods:
+
+1. **OAuth (Recommended)**: Provide `oauthConfig` with `tokenExchangeUrl` pointing to your server endpoint
+2. **Manual Tokens**: Provide `accessToken` (and optionally `deployKey`)
+
+See [USAGE_GUIDE.md](./USAGE_GUIDE.md) for detailed setup instructions.
+
 ### Required Props
+
+**Either:**
+- `oauthConfig` + `tokenExchangeUrl` (OAuth authentication)
+- `accessToken` (Manual token authentication)
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `deployKey` | string | undefined | Convex deployment key for admin-level access. Enables additional admin capabilities. |
-| `accessToken` | string | Your Convex access token (from `~/.convex/config.json`). Required for API access. |
+| `oauthConfig` | OAuthConfig | OAuth configuration object (see below) |
+| `tokenExchangeUrl` | string | Server endpoint URL for OAuth token exchange (required if using OAuth) |
+| `accessToken` | string | Your Convex access token (from `~/.convex/config.json`). Required if not using OAuth. |
+| `deployKey` | string | Optional. Convex deployment key for admin-level access. Enables additional admin capabilities. |
+
+### OAuth Configuration
+
+```typescript
+interface OAuthConfig {
+  clientId: string;              // Your OAuth application's client ID
+  redirectUri: string;            // Must match OAuth app settings
+  scope?: 'project' | 'team';     // OAuth scope
+  tokenExchangeUrl?: string;      // Your server endpoint for token exchange
+}
+```
 
 ### Optional Props
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `convex` | ConvexReactClient | Initialized Convex client instance for API communication. |
+| `convex` | ConvexReactClient | Required | Initialized Convex client instance for API communication. |
 | `deployUrl` | string | process.env.NEXT_PUBLIC_CONVEX_URL | Your Convex deployment URL. |
 | `theme` | ThemeClasses | {} | Custom theme options (see Theme Customization below). |
 | `initialLimit` | number | 100 | Initial number of logs to fetch and display. |
@@ -246,12 +458,21 @@ Advanced log filtering and management capabilities:
 
 ## Troubleshooting
 
+For detailed troubleshooting and setup instructions, see [USAGE_GUIDE.md](./USAGE_GUIDE.md).
+
 ### Common Errors
 
 1. **"Convex authentication required"**:
-   - Ensure valid `accessToken` is provided
+   - Ensure valid `accessToken` is provided (manual auth), or
+   - Ensure `oauthConfig` and `tokenExchangeUrl` are properly configured (OAuth)
    - Check `.env.local` file configuration
    - Verify Convex login status
+
+2. **"CORS error" or "Token exchange failed"**:
+   - Make sure your server endpoint is running and accessible
+   - Verify that `tokenExchangeUrl` points to the correct endpoint
+   - Check that `CONVEX_CLIENT_SECRET` is set in your server environment
+   - See [USAGE_GUIDE.md](./USAGE_GUIDE.md) for server endpoint examples
 
 2. **No logs appearing**:
    - Verify `deployKey` and `CONVEX_DEPLOYMENT` settings

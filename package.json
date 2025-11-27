@@ -17,17 +17,26 @@
       "import": "./dist/utils/getConvexToken.js",
       "require": "./dist/utils/getConvexToken.js",
       "default": "./dist/utils/getConvexToken.js"
+    },
+    "./vite": {
+      "import": "./vite.config.ts",
+      "require": "./vite.config.ts",
+      "default": "./vite.config.ts"
     }
   },
   "files": [
     "dist",
     "examples",
+    "vite.config.ts",
     "README.md"
   ],
   "scripts": {
     "copy-src": "node copy-src.js",
     "build": "npm run copy-src && rollup -c",
     "dev": "npm run copy-src && rollup -c -w",
+    "dev:live": "vite --config dev/vite.config.ts",
+    "dev:server": "node dev/server.js",
+    "dev:all": "npm run dev:server & npm run dev:live",
     "clean": "rimraf dist",
     "prepublishOnly": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -62,6 +71,7 @@
     "react-use": "^17.6.0",
     "react-window": "^1.8.11",
     "recharts": "^2.15.1",
+    "sonner": "^2.0.7",
     "swr": "^2.3.3"
   },
   "devDependencies": {
@@ -75,8 +85,12 @@
     "@types/react": "^18.2.21",
     "@types/react-dom": "^18.2.7",
     "@types/react-window": "^1.8.8",
+    "@vitejs/plugin-react": "^4.3.1",
     "convex": "^1.21.0",
     "copyfiles": "^2.4.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
     "monaco-editor-webpack-plugin": "^7.1.0",
     "next": "^13.4.19",
     "react": "^18.2.0",
@@ -86,7 +100,8 @@
     "rollup-plugin-peer-deps-external": "^2.2.4",
     "rollup-plugin-url": "^3.0.1",
     "tslib": "^2.8.1",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "vite": "^5.4.0"
   },
   "repository": {
     "type": "git",

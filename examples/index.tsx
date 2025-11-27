@@ -1,39 +1,28 @@
-"use client";
+import React from "react";
+import { ConvexReactClient, ConvexProvider } from "convex/react";
+import ConvexPanel from "convex-panel";
 
-import { ConvexReactClient } from "convex/react";
-import { ConvexAuthNextjsProvider } from "@convex-dev/auth/nextjs";
-import { ReactNode, useEffect, useState } from "react";
-import dynamic from 'next/dynamic';
-import type { ComponentProps } from 'react';
-import type ConvexPanelType from "convex-panel";
+// ConvexPanel auto-detects configuration from environment variables
+// Just provide the Convex client if you have one
+const getConvexUrl = () => {
+  if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_CONVEX_URL) {
+    return process.env.NEXT_PUBLIC_CONVEX_URL;
+  }
+  if (typeof window !== 'undefined' && (window as any).__CONVEX_URL__) {
+    return (window as any).__CONVEX_URL__;
+  }
+  return "https://your-deployment.convex.cloud";
+};
 
-// Use dynamic import to avoid SSR issues
-const ConvexPanel = dynamic<ComponentProps<typeof ConvexPanelType>>(() => import("convex-panel"), {
-  ssr: false
-});
+const convex = new ConvexReactClient(getConvexUrl());
 
-// Initialize the Convex client
-const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL! as string);
-
-export function ConvexClientProvider({ children }: { children: ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Only render ConvexPanel on the client side
+function App() {
   return (
-    <ConvexAuthNextjsProvider client={convex}>
-      {children}
-      {mounted && (
-        <ConvexPanel
-          accessToken={process.env.NEXT_PUBLIC_ACCESS_TOKEN!}
-          deployKey={process.env.NEXT_PUBLIC_DEPLOY_KEY!}
-          convex={convex}
-          useMockData={!process.env.NEXT_PUBLIC_CONVEX_URL}
-        />
-      )}
-    </ConvexAuthNextjsProvider>
+    <ConvexProvider client={convex}>
+      <ConvexPanel />
+    </ConvexProvider>
   );
 }
+
+export default App;
+

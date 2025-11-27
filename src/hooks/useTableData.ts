@@ -66,6 +66,8 @@ export const useTableData = ({
   const prevTableRef = useRef<string | null>(null);
   // Add a ref to track the current filters
   const filtersRef = useRef<FilterExpression>({ clauses: [] });
+  // Add a ref to track the last table we cleared/fetched for to prevent infinite loops
+  const lastClearedTableRef = useRef<string | null>(null);
   
   const [tables, setTables] = useState<TableDefinition>({});
   const [selectedTable, setSelectedTableState] = useState<string>('');
@@ -161,10 +163,19 @@ export const useTableData = ({
             adminClient
           });
 
-      console.log('tableData', tableData);
-
       setTables(tableData);
-      setSelectedTable(newSelectedTable);
+      // Set selected table - always ensure we have one selected if tables exist
+      if (newSelectedTable) {
+        setSelectedTable(newSelectedTable);
+      } else if (Object.keys(tableData).length > 0) {
+        // If no table was returned but we have tables, select the first one
+        // This ensures we always have a table selected to fetch data for
+        const firstTable = Object.keys(tableData)[0];
+        if (firstTable) {
+          console.log('[useTableData] fetchTables: No selected table returned, selecting first table:', firstTable);
+          setSelectedTable(firstTable);
+        }
+      }
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
@@ -181,10 +192,14 @@ export const useTableData = ({
    * Fetch table data
    */
   const fetchTableData = useCallback(async (tableName: string, cursor: string | null = null) => {
-    if (!tableName) return;
+    if (!tableName) {
+      return;
+    }
     
     // For real data, we need adminClient
-    if (!useMockData && !adminClient) return;
+    if (!useMockData && !adminClient) {
+      return;
+    }
     
     // Clean up expired cache entries
     cleanupCacheRef.current(requestCacheRef.current);
@@ -359,12 +374,14 @@ export const useTableData = ({
         setDocuments(newDocuments);
       } else {
         // For pagination, we need to make sure the new documents are also sorted correctly
-        const combinedDocuments = [...documents, ...newDocuments];
-        const sortedCombined = sortConfig 
-          ? sortDocuments(combinedDocuments, sortConfig)
-          : combinedDocuments;
-        
-        setDocuments(sortedCombined);
+        // Use functional update to avoid depending on documents in the callback
+        setDocuments((prevDocuments) => {
+          const combinedDocuments = [...prevDocuments, ...newDocuments];
+          const sortedCombined = sortConfig 
+            ? sortDocuments(combinedDocuments, sortConfig)
+            : combinedDocuments;
+          return sortedCombined;
+        });
       }
       
       setContinueCursor(result.continueCursor || null);
@@ -385,7 +402,7 @@ export const useTableData = ({
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [adminClient, convexUrl, onError, documents, useMockData, sortConfig]);
+  }, [adminClient, convexUrl, onError, useMockData, sortConfig]);
 
   /**
    * Helper to debounce a table fetch
@@ -587,23 +604,21 @@ export const useTableData = ({
   }, [filters]);
 
   /**
-   * Load saved filters when selected table changes
+   * Handle table selection: reset state and load saved filters
+   * This effect runs when the table changes and prepares for a fresh fetch
    */
   useEffect(() => {
     if (selectedTable) {
-      setContinueCursor(null);
-      setHasMore(true);
-      setDocuments([]);
+      const isTableChange = prevTableRef.current !== selectedTable;
       
-      // Only reset filters when changing tables
-      if (prevTableRef.current !== selectedTable) {
-        // Only reset filters if they're not already empty
+      if (isTableChange) {
+        // Reset filters if they're not already empty
         if (filtersRef.current.clauses.length > 0) {
           setFilters({ clauses: [] });
         }
         prevTableRef.current = selectedTable;
         
-        // Only load filters from storage if we haven't already loaded them for this table
+        // Load filters from storage if we haven't already loaded them for this table
         if (!filtersLoadedRef.current[selectedTable]) {
           const savedFilters = getTableFilters(selectedTable);
           
@@ -623,41 +638,54 @@ export const useTableData = ({
   }, [selectedTable]);
   
   /**
-   * Fetch data when selected table or filters change
+   * Fetch data when selected table changes
+   * This effect always fetches fresh data when a table is selected,
+   * even if it's the same table (e.g., when clicking back to it)
+   * It clears documents and fetches in one atomic operation to avoid flickering
    */
   useEffect(() => {
-    if (selectedTable) {      
-      // For mock data, fetch immediately
-      if (useMockData) {
-        fetchTableData(selectedTable, null);
-      } else {
-        // For real data, use a short timeout for better responsiveness
-        const timeoutId = setTimeout(() => {
+    if (selectedTable && lastClearedTableRef.current !== selectedTable) {
+      // Mark this table as being processed to prevent infinite loops
+      lastClearedTableRef.current = selectedTable;
+      
+      // Reset lastFetchRef to ensure fresh fetch happens
+      // This prevents deduplication from blocking the fetch when returning to a table
+      lastFetchRef.current = {
+        tableName: null,
+        filters: null,
+        cursor: null,
+        sortConfig: null
+      };
+      
+      // Clear documents and fetch in one operation to prevent flickering
+      // This ensures documents are cleared right before the fetch starts
+      setContinueCursor(null);
+      setHasMore(true);
+      setDocuments([]);
+      
+      // Fetch data immediately after clearing
+      // Use a microtask to ensure state updates are batched and prevent flickering
+      Promise.resolve().then(() => {
+        // For mock data, fetch immediately
+        if (useMockData) {
           fetchTableData(selectedTable, null);
-        }, 50);
-        
-        return () => clearTimeout(timeoutId);
-      }
+        } else {
+          fetchTableData(selectedTable, null);
+        }
+      });
     }
   }, [selectedTable, fetchTableData, useMockData]);
 
   /**
    * Add a dedicated effect to handle filter changes and fetch data
    * Separating the filter effect from the table selection effect to avoid duplicate fetches
+   * NOTE: This effect is now primarily for filter/sort changes, not table selection
+   * Table selection is handled by the effect above
    */
   useEffect(() => {
-    if (selectedTable && !filtersRef.current.clauses.length && !sortConfig) {
-      // For initial table load, we'll use a single approach
-      // Using a ref to track the most recent request to prevent duplicates
-      const lastFetch = lastFetchRef.current;
-      
-      // Don't fetch if we've already fetched this table with no filters
-      if (lastFetch.tableName === selectedTable && 
-          (!lastFetch.filters || lastFetch.filters.clauses.length === 0) &&
-          !lastFetch.sortConfig) {
-        return;
-      }
-      
+    // This effect should only run when filters or sort change, not when table changes
+    // Table changes are handled by the effect at line 641-655
+    if (selectedTable && (filtersRef.current.clauses.length > 0 || sortConfig)) {
       // For mock data, fetch immediately
       if (useMockData) {
         fetchTableData(selectedTable, null);
@@ -666,7 +694,7 @@ export const useTableData = ({
         debouncedFetchTableData(selectedTable, null);
       }
     }
-  }, [selectedTable, fetchTableData, debouncedFetchTableData, useMockData, sortConfig]);
+  }, [filters, sortConfig, selectedTable, fetchTableData, debouncedFetchTableData, useMockData]);
 
   /**
    * Dedicated effect for sort config changes

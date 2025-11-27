@@ -7,10 +7,6 @@ import {
   EditorProps,
 } from "@monaco-editor/react";
 
-/**
- * Logs
- */
-// Convex log schema
 export interface LogEntry {
   timestamp: number;
   topic: string;
@@ -40,10 +36,6 @@ export interface LogEntry {
   raw: any;
 }
 
-/**
- * Theme interface
- */
-// Theme interface
 export interface ThemeClasses {
   container?: string;
   header?: string;
@@ -59,13 +51,16 @@ export interface ThemeClasses {
   warningText?: string;
 }
 
-// Button position type
 export type ButtonPosition = 'bottom-left' | 'bottom-center' | 'bottom-right' | 'right-center' | 'top-right';
 
-/**
- * ConvexPanel component props
- */
-// Button props
+export interface OAuthConfig {
+  clientId: string;
+  clientSecret?: string;
+  redirectUri: string;
+  scope?: 'team' | 'project';
+  tokenExchangeUrl?: string;
+}
+
 export type ButtonProps = {
   convexUrl?: string;
   initialLimit?: number;
@@ -76,17 +71,14 @@ export type ButtonProps = {
   theme?: ThemeClasses | undefined;
   maxStoredLogs?: number;
   convex?: ConvexReactClient;
-  deployKey: string;
-  accessToken: string;
+  oauthConfig?: OAuthConfig;
+  deployKey?: string;
+  accessToken?: string;
   deployUrl?: string;
   buttonPosition?: ButtonPosition;
   useMockData?: boolean;
 }
 
-/**
- * Container props
- */
-// Logs container props
 export interface ContainerProps {
   isOpen: boolean;
   toggleOpen: () => void;
@@ -111,7 +103,6 @@ export interface ContainerProps {
   useMockData?: boolean;
 }
 
-// LogsContainer props
 export interface LogsContainerProps {
   mergedTheme: ThemeClasses;
   isPaused: boolean;
@@ -147,7 +138,6 @@ export interface LogsContainerProps {
   settings?: ConvexPanelSettings;
 }
 
-// LogsToolbar props
 export interface LogsToolbarProps {
   mergedTheme: ThemeClasses;
   isPaused: boolean;
@@ -173,7 +163,6 @@ export interface LogsToolbarProps {
   settings?: ConvexPanelSettings;
 }
 
-// LogsTable props
 export interface LogsTableProps {
   mergedTheme: ThemeClasses;
   filteredLogs: LogEntry[];
@@ -189,23 +178,18 @@ export interface LogsTableProps {
   onLogRowMouseLeave?: () => void;
 }
 
-// LogRow props
 export interface LogRowProps {
   index: number;
   style: React.CSSProperties;
   data: LogRowItemData;
 }
 
-// LogDetailPanel props
 export interface LogDetailPanelProps {
   selectedLog: LogEntry;
   mergedTheme: ThemeClasses;
   setIsDetailPanelOpen: (isOpen: boolean) => void;
 }
 
-/**
- * Data Table
- */
 export interface DataTableProps {
   convexUrl: string;
   accessToken: string;
@@ -218,7 +202,6 @@ export interface DataTableProps {
   useMockData?: boolean;
 }
 
-// Table Field Props
 export interface TableField {
   fieldName: string;
   optional: boolean;
@@ -236,25 +219,21 @@ export interface TableField {
   };
 }
 
-// Table Schema Props
 export interface TableSchema {
   type: string;
   fields: TableField[];
 }
 
-// Table Definition Props
 export interface TableDefinition {
   [key: string]: TableSchema;
 }
 
-// Table Document Props
 export interface TableDocument {
   _id: string;
   [key: string]: any;
   _initialEditMode?: boolean;
 }
 
-// Page Args Props
 export interface PageArgs {
   paginationOpts: PaginationOptions;
   table: string;
@@ -262,16 +241,12 @@ export interface PageArgs {
   componentId?: string | null;
 }
 
-// Pagination Options Props
 export interface PaginationOptions {
   cursor: string | null;
   numItems: number;
   id?: number;
 }
 
-/**
- * Filter Menu
- */
 export interface FilterMenuState {
   isOpen: boolean;
   position: MenuPosition;
@@ -279,7 +254,6 @@ export interface FilterMenuState {
   field?: string;
 }
 
-// Filter Clause Props
 export interface FilterClause {
   field: string;
   op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'isType' | 'isNotType';
@@ -287,18 +261,15 @@ export interface FilterClause {
   enabled: boolean;
 }
 
-// Filter Expression Props
 export interface FilterExpression {
   clauses: FilterClause[];
 }
 
-// Menu Position Props
 export interface MenuPosition {
   top: number;
   left: number;
 }
 
-// Filter Menu Props
 export interface FilterMenuProps {
   field: string;
   position: MenuPosition;
@@ -308,13 +279,11 @@ export interface FilterMenuProps {
   theme?: ThemeClasses;
 }
 
-// Filter Debug Props
 export interface FilterDebugProps {
   filters: FilterExpression;
   selectedTable: string;
 }
 
-// Active Filters Props
 export interface ActiveFiltersProps {
   filters: FilterExpression;
   onRemove: (field: string) => void;
@@ -324,7 +293,6 @@ export interface ActiveFiltersProps {
   onEdit?: (e: React.MouseEvent, field: string) => void;
 }
 
-// Data Table Sidebar Props
 export interface RecentlyViewedTable {
   name: string;
   timestamp: number;
@@ -352,7 +320,6 @@ export interface ConvexPanelSettings {
   showSuccessCheckbox: boolean;
 }
 
-// Data Table Content Props
 export interface DataTableContentProps {
   documents: TableDocument[];
   columnHeaders: string[];
@@ -374,23 +341,15 @@ export interface DataTableContentProps {
   sortConfig?: SortConfig | null;
   onSort?: (field: string) => void;
   adminClient?: ConvexClient | null;
-  /**
-   * Callback function to update the documents array.
-   * Called when a document is updated or deleted.
-   */
   setDocuments: React.Dispatch<React.SetStateAction<TableDocument[]>>;
 }
 
-// Storage Debug Props
 export interface StorageDebugProps {
   visible?: boolean;
   selectedTable?: string;
   filters?: FilterExpression;
 }
 
-/**
- * Use Filters
- */
 export interface UseFiltersProps {
   onFilterApply: (filter: FilterClause) => void;
   onFilterRemove: (field: string) => void;
@@ -411,10 +370,6 @@ export interface UseFiltersReturn {
   setFilters: React.Dispatch<React.SetStateAction<FilterExpression>>;
 }
 
-/**
- * Use Table Data
- */
-// Use Table Data Props
 export interface UseTableDataProps {
   convexUrl: string;
   accessToken: string;
@@ -424,7 +379,6 @@ export interface UseTableDataProps {
   useMockData?: boolean;
 }
 
-// Use Table Data Return
 export interface UseTableDataReturn {
   tables: TableDefinition;
   selectedTable: string;
@@ -451,9 +405,6 @@ export interface UseTableDataReturn {
   setSortConfig: React.Dispatch<React.SetStateAction<SortConfig | null>>;
 }
 
-/**
- * Fetch Options and Responses
- */
 export interface FetchLogsOptions {
   cursor: number | string;
   convexUrl: string;
@@ -478,10 +429,6 @@ export interface FetchTablesResponse {
   selectedTable: string;
 }
 
-/**
- * Health
- */
-// Health Container Props
 export interface HealthContainerProps {
   deploymentUrl: string;
   authToken: string;
@@ -489,13 +436,11 @@ export interface HealthContainerProps {
   useMockData?: boolean;
 }
 
-// Cache Hit Data
 export interface CacheHitData {
   timestamp: string;
   values: Record<string, number | null>;
 }
 
-// Cache Hit Rate Chart Props
 export interface CacheHitRateChartProps {
   deploymentUrl: string;
   authToken: string;
@@ -504,19 +449,16 @@ export interface CacheHitRateChartProps {
   useMockData?: boolean;
 }
 
-// Timestamp
 export interface TimeStamp {
   secs_since_epoch: number;
   nanos_since_epoch: number;
 }
 
-// Failure Data
 export interface FailureData {
   timestamp: string;
   values: Record<string, number | null>;
 }
 
-// Failure Rate Chart Props
 export interface FailureRateChartProps {
   deploymentUrl: string;
   authToken: string;
@@ -524,7 +466,6 @@ export interface FailureRateChartProps {
   useMockData?: boolean;
 }
 
-// Scheduler Lag Chart Props
 export interface SchedulerLagChartProps {
   deploymentUrl: string;
   authToken: string;
@@ -533,17 +474,14 @@ export interface SchedulerLagChartProps {
   useMockData?: boolean;
 }
 
-// Scheduler Status Props
 export interface SchedulerStatusProps {
   status: 'on_time' | 'delayed' | 'error';
   message: string;
 }
 
-// Types
 export type TimeSeriesData = [TimeStamp, number | null][];
 export type APIResponse = [string, TimeSeriesData][];
 
-// Update the LogRow itemData interface
 export interface LogRowItemData {
   logs: LogEntry[];
   isDetailPanelOpen: boolean;
@@ -553,9 +491,6 @@ export interface LogRowItemData {
   onLogRowMouseLeave?: () => void;
 }
 
-/**
- * Network Panel Types
- */
 export interface NetworkCall {
   id: string;
   url: string;
@@ -612,9 +547,6 @@ export interface NetworkPanelProps {
   containerSize: { width: number; height: number };
 }
 
-/**
- * Sort direction for table columns
- */
 export type SortDirection = 'asc' | 'desc';
 
 export interface SortConfig {
@@ -622,9 +554,6 @@ export interface SortConfig {
   direction: SortDirection;
 }
 
-/**
- * Functions
- */
 export type UdfType = 'query' | 'mutation' | 'action' | 'httpaction';
 
 export type Visibility = {

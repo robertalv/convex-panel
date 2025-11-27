@@ -14,15 +14,18 @@ if (!fs.existsSync(stylesDir)) {
   fs.mkdirSync(stylesDir, { recursive: true });
 }
 
-// Copy CSS files to dist/styles
-const cssFiles = fs.readdirSync(path.join(__dirname, 'src', 'styles'))
-  .filter(file => file.endsWith('.css'));
+// Copy CSS files to dist/styles (if src/styles exists)
+const srcStylesDir = path.join(__dirname, 'src', 'styles');
+if (fs.existsSync(srcStylesDir)) {
+  const cssFiles = fs.readdirSync(srcStylesDir)
+    .filter(file => file.endsWith('.css'));
 
-cssFiles.forEach(file => {
-  const srcPath = path.join(__dirname, 'src', 'styles', file);
-  const destPath = path.join(stylesDir, file);
-  fs.copyFileSync(srcPath, destPath);
-});
+  cssFiles.forEach(file => {
+    const srcPath = path.join(srcStylesDir, file);
+    const destPath = path.join(stylesDir, file);
+    fs.copyFileSync(srcPath, destPath);
+  });
+}
 
 // Custom plugin to handle CSS imports as strings
 const cssImport = () => ({

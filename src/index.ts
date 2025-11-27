@@ -1,6 +1,5 @@
 import ConvexPanel from './ConvexPanel';
-import './styles/context-menu.css';
-export { default as LogsToolbar } from './logs/components/LogsToolbar';
+
 export type {
   ButtonProps,
   ThemeClasses,
@@ -64,9 +63,26 @@ export type {
   File,
   Folder,
   FileOrFolder,
-  ProjectEnvVarConfig
+  ProjectEnvVarConfig,
 } from './types';
 export { LogType } from './utils/constants';
 
+// OAuth exports
+export { useOAuth } from './hooks/useOAuth';
+export type { UseOAuthReturn } from './hooks/useOAuth';
+export type { OAuthConfig, OAuthToken, TokenScope } from './utils/oauth';
+export {
+  buildAuthorizationUrl,
+  exchangeCodeForToken,
+  handleOAuthCallback,
+  getStoredToken,
+  storeToken,
+  clearToken,
+} from './utils/oauth';
+
+// Component exports
 export { ConvexPanel };
+export { BottomSheet } from './components/bottom-sheet';
+export { AuthPanel } from './components/auth-panel';
+
 export default ConvexPanel;

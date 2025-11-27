@@ -1,3 +1,5 @@
+import { toast as sonnerToast } from 'sonner';
+
 type ToastType = "success" | "error" | "info" | "warning";
 
 /**
@@ -6,7 +8,20 @@ type ToastType = "success" | "error" | "info" | "warning";
  * @param message The message to display
  */
 export const toast = (type: ToastType, message: string) => {
-  // For now, just console.log the message
-  // You can replace this with your preferred toast library implementation
-  console.log(`[${type.toUpperCase()}] ${message}`);
+  switch (type) {
+    case 'success':
+      sonnerToast.success(message);
+      break;
+    case 'error':
+      sonnerToast.error(message);
+      break;
+    case 'info':
+      sonnerToast.info(message);
+      break;
+    case 'warning':
+      sonnerToast.warning(message);
+      break;
+    default:
+      sonnerToast(message);
+  }
 }; 

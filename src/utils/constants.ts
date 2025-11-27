@@ -19,6 +19,7 @@ export const STORAGE_KEYS: Record<string, string> = {
   RECENTLY_VIEWED_TABLES: `${STORAGE_PREFIX}:recently-viewed-tables`,
   DETAIL_PANEL_WIDTH: `${STORAGE_PREFIX}:detail-panel-width`,
   SELECTED_FUNCTION: `${STORAGE_PREFIX}:selected-function`,
+  PANEL_HIDDEN: `${STORAGE_PREFIX}:panel-hidden`,
 }
 
 // Default UI measurements
@@ -109,6 +110,8 @@ export const ROUTES = {
   CONVEX_CHANGELOG: 'https://github.com/get-convex/convex-js/blob/main/CHANGELOG.md',
   UDF_RATE: '/api/app_metrics/udf_rate',
   LATENCY_PERCENTILES: '/api/app_metrics/latency_percentiles',
+  LAST_PUSH_EVENT: '/api/system/deployment_events/last_push_event',
+  GET_VERSION: '/api/system/get_version',
 } as const;
 
 // Filter types

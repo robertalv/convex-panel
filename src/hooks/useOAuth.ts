@@ -1,0 +1,128 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  OAuthConfig,
+  OAuthToken,
+  buildAuthorizationUrl,
+  handleOAuthCallback,
+  getStoredToken,
+  clearToken,
+  generateState,
+  storeToken,
+} from '../utils/oauth';
+
+export interface UseOAuthReturn {
+  token: OAuthToken | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+  authenticate: () => Promise<void>;
+  logout: () => void;
+}
+
+/**
+ * React hook for Convex OAuth authentication
+ */
+export function useOAuth(config: OAuthConfig | null): UseOAuthReturn {
+  const [token, setToken] = useState<OAuthToken | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Use ref to track if we've already processed this config to prevent infinite loops
+  const configRef = useRef<string | null>(null);
+  const hasProcessedRef = useRef(false);
+
+  // Check for stored token on mount
+  useEffect(() => {
+    if (!config) {
+      setIsLoading(false);
+      return;
+    }
+
+    // Create a stable key from config to detect actual changes
+    const configKey = JSON.stringify({
+      clientId: config.clientId,
+      redirectUri: config.redirectUri,
+      tokenExchangeUrl: config.tokenExchangeUrl,
+      scope: config.scope,
+    });
+
+    // Only process if config actually changed or we haven't processed yet
+    if (configRef.current === configKey && hasProcessedRef.current) {
+      return;
+    }
+
+    configRef.current = configKey;
+
+    // Check for OAuth callback
+    const checkCallback = async () => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('code')) {
+          // Handle OAuth callback
+          const newToken = await handleOAuthCallback(config);
+          if (newToken) {
+            setToken(newToken);
+            setError(null);
+          }
+        } else {
+          // Check for stored token
+          const storedToken = getStoredToken();
+          if (storedToken) {
+            setToken(storedToken);
+            setError(null);
+          }
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Authentication failed');
+      } finally {
+        setIsLoading(false);
+        hasProcessedRef.current = true;
+      }
+    };
+
+    checkCallback();
+  }, [config]);
+
+  // Authenticate function
+  const authenticate = useCallback(async () => {
+    if (!config) {
+      setError('OAuth configuration not provided');
+      return;
+    }
+
+    try {
+      setError(null);
+      setIsLoading(true);
+      
+      // Generate state for CSRF protection
+      const state = generateState();
+      sessionStorage.setItem('convex-panel-oauth-state', state);
+      
+      // Build authorization URL
+      const authUrl = await buildAuthorizationUrl(config, state);
+      
+      // Redirect to Convex authorization page
+      window.location.href = authUrl;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to start authentication');
+      setIsLoading(false);
+    }
+  }, [config]);
+
+  // Logout function
+  const logout = useCallback(() => {
+    clearToken();
+    setToken(null);
+    setError(null);
+  }, []);
+
+  return {
+    token,
+    isAuthenticated: !!token,
+    isLoading,
+    error,
+    authenticate,
+    logout,
+  };
+}
+
