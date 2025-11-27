@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, Search } from 'lucide-react';
 
 export interface SearchableDropdownOption<T> {
   key: string;
-  label: string;
+  label: string | React.ReactNode;
   value: T;
   icon?: React.ReactNode;
   searchValue?: string;
@@ -68,7 +68,8 @@ export function SearchableDropdown<T>({
 
     const normalizedQuery = searchQuery.toLowerCase();
     return options.filter(option => {
-      const searchableText = option.searchValue || option.label;
+      // Use searchValue if provided, otherwise use label as string
+      const searchableText = option.searchValue || (typeof option.label === 'string' ? option.label : '');
       return searchableText.toLowerCase().includes(normalizedQuery);
     });
   }, [options, searchQuery]);
@@ -96,33 +97,33 @@ export function SearchableDropdown<T>({
           width: '-webkit-fill-available',
           height: '36px',
           padding: '0 12px',
-          backgroundColor: '#16181D',
-          border: isOpen ? '1px solid #3B82F6' : '1px solid #2D313A',
+          backgroundColor: 'var(--color-panel-bg-secondary)',
+          border: isOpen ? '1px solid var(--color-panel-accent)' : '1px solid var(--color-panel-border)',
           borderRadius: '4px',
           cursor: 'pointer',
           transition: 'border-color 0.2s',
         }}
         onMouseEnter={(e) => {
           if (!isOpen) {
-            e.currentTarget.style.borderColor = '#999';
+            e.currentTarget.style.borderColor = 'var(--color-panel-text-muted)';
           }
         }}
         onMouseLeave={(e) => {
           if (!isOpen) {
-            e.currentTarget.style.borderColor = '#2D313A';
+            e.currentTarget.style.borderColor = 'var(--color-panel-border)';
           }
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#e5e7eb' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'var(--color-panel-text)' }}>
           {triggerIcon ? (
-            <span style={{ color: '#999', display: 'flex', alignItems: 'center' }}>{triggerIcon}</span>
+            <span style={{ color: 'var(--color-panel-text-muted)', display: 'flex', alignItems: 'center' }}>{triggerIcon}</span>
           ) : null}
-          <span>{displayLabel}</span>
+          {typeof displayLabel === 'string' ? <span>{displayLabel}</span> : displayLabel}
         </div>
         {isOpen ? (
-          <ChevronUp style={{ width: '14px', height: '14px', color: '#999' }} />
+          <ChevronUp style={{ width: '14px', height: '14px', color: 'var(--color-panel-text-muted)' }} />
         ) : (
-          <ChevronDown style={{ width: '14px', height: '14px', color: '#999' }} />
+          <ChevronDown style={{ width: '14px', height: '14px', color: 'var(--color-panel-text-muted)' }} />
         )}
       </div>
 
@@ -134,10 +135,10 @@ export function SearchableDropdown<T>({
             left: 0,
             right: 0,
             marginTop: '4px',
-            backgroundColor: '#0F1115',
-            border: '1px solid #2D313A',
+            backgroundColor: 'var(--color-panel-bg)',
+            border: '1px solid var(--color-panel-border)',
             borderRadius: '6px',
-            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5)',
+            boxShadow: '0 4px 16px var(--color-panel-shadow)',
             zIndex: 1000,
             maxHeight: `${listMaxHeight}px`,
             overflow: 'hidden',
@@ -146,7 +147,7 @@ export function SearchableDropdown<T>({
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div style={{ padding: '8px', borderBottom: '1px solid #2D313A' }}>
+          <div style={{ padding: '8px', borderBottom: '1px solid var(--color-panel-border)' }}>
             <div style={{ position: 'relative' }}>
               <Search
                 size={12}
@@ -155,7 +156,7 @@ export function SearchableDropdown<T>({
                   left: '8px',
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  color: '#6b7280',
+                  color: 'var(--color-panel-text-muted)',
                   pointerEvents: 'none',
                 }}
               />
@@ -172,21 +173,21 @@ export function SearchableDropdown<T>({
                 autoFocus
                 style={{
                   width: '-webkit-fill-available',
-                  backgroundColor: '#16181D',
-                  border: '1px solid #2D313A',
+                  backgroundColor: 'var(--color-panel-bg-secondary)',
+                  border: '1px solid var(--color-panel-border)',
                   borderRadius: '4px',
                   height: '28px',
                   paddingLeft: '28px',
                   paddingRight: '8px',
                   fontSize: '12px',
-                  color: '#fff',
+                  color: 'var(--color-panel-text)',
                   outline: 'none',
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#3B82F6';
+                  e.currentTarget.style.borderColor = 'var(--color-panel-accent)';
                 }}
                 onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#2D313A';
+                  e.currentTarget.style.borderColor = 'var(--color-panel-border)';
                 }}
               />
             </div>
@@ -213,8 +214,8 @@ export function SearchableDropdown<T>({
                     style={{
                       padding: '8px 12px',
                       fontSize: '14px',
-                      color: isSelected ? '#fff' : '#d1d5db',
-                      backgroundColor: isSelected ? '#2D313A' : 'transparent',
+                      color: isSelected ? 'var(--color-panel-text)' : 'var(--color-panel-text-secondary)',
+                      backgroundColor: isSelected ? 'var(--color-panel-active)' : 'transparent',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -222,7 +223,7 @@ export function SearchableDropdown<T>({
                     }}
                     onMouseEnter={(e) => {
                       if (!isSelected) {
-                        e.currentTarget.style.backgroundColor = '#1C1F26';
+                        e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
                       }
                     }}
                     onMouseLeave={(e) => {
@@ -243,7 +244,7 @@ export function SearchableDropdown<T>({
                 style={{
                   padding: '12px',
                   fontSize: '12px',
-                  color: '#9ca3af',
+                  color: 'var(--color-panel-text-secondary)',
                   textAlign: 'center',
                 }}
               >

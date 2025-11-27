@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Editor, { BeforeMount, OnMount } from '@monaco-editor/react';
 import { executeCustomQuery, FunctionResult } from '../utils/functionExecution';
+import { useThemeSafe } from './useTheme';
 
 interface UseFunctionEditorProps {
   adminClient: any;
@@ -50,6 +51,7 @@ export function useFunctionEditor({
   runHistoryItem,
   onResult,
 }: UseFunctionEditorProps): UseFunctionEditorReturn {
+  const { theme } = useThemeSafe();
   const [code, setCode] = useState<string>('');
   const [isInFlight, setIsInFlight] = useState(false);
   const [result, setResult] = useState<FunctionResult | undefined>();
@@ -152,19 +154,62 @@ export function useFunctionEditor({
       strict: true,
     });
 
+    // Helper to get theme color from CSS variable
+    const getThemeColor = (varName: string, fallback: string = '#0F1115') => {
+      // Try to find an element with the theme class
+      const themeElement = document.querySelector('.cp-theme-dark, .cp-theme-light') || document.documentElement;
+      const color = getComputedStyle(themeElement).getPropertyValue(varName).trim();
+      return color || fallback;
+    };
+
+    // Helper to convert hex to Monaco format (without #)
+    const toMonacoColor = (hex: string) => hex.replace('#', '');
+
     // Define dark theme
     monacoInstance.editor.defineTheme('convex-dark', {
       base: 'vs-dark',
       inherit: true,
       rules: [
-        { token: 'comment', foreground: '6b7280', fontStyle: 'italic' },
+        { token: 'comment', foreground: toMonacoColor(getThemeColor('--color-panel-text-muted', '#6b7280')), fontStyle: 'italic' },
         { token: 'keyword', foreground: 'c084fc' },
         { token: 'string', foreground: 'fbbf24' },
         { token: 'number', foreground: 'fb923c' },
       ],
       colors: {
-        'editor.background': '#0F1115',
-        'editor.foreground': '#d1d5db',
+        'editor.background': getThemeColor('--color-panel-bg', '#0F1115'),
+        'editor.foreground': getThemeColor('--color-panel-text', '#d1d5db'),
+        'editor.lineHighlightBackground': getThemeColor('--color-panel-bg-secondary', '#16181D'),
+        'editor.selectionBackground': getThemeColor('--color-panel-active', 'rgba(255, 255, 255, 0.1)'),
+        'editorCursor.foreground': getThemeColor('--color-panel-text', '#d1d5db'),
+        'editorLineNumber.foreground': getThemeColor('--color-panel-text-muted', '#6b7280'),
+        'editorLineNumber.activeForeground': getThemeColor('--color-panel-text', '#d1d5db'),
+        'editorIndentGuide.background': getThemeColor('--color-panel-border', '#2D313A'),
+        'editorIndentGuide.activeBackground': getThemeColor('--color-panel-text-muted', '#6b7280'),
+        'editorWhitespace.foreground': getThemeColor('--color-panel-border', '#2D313A'),
+      },
+    });
+
+    // Define light theme
+    monacoInstance.editor.defineTheme('convex-light', {
+      base: 'vs',
+      inherit: true,
+      rules: [
+        { token: 'comment', foreground: toMonacoColor(getThemeColor('--color-panel-text-muted', '#9ca3af')), fontStyle: 'italic' },
+        { token: 'keyword', foreground: '7c3aed' },
+        { token: 'string', foreground: 'd97706' },
+        { token: 'number', foreground: 'ea580c' },
+      ],
+      colors: {
+        'editor.background': getThemeColor('--color-panel-bg', '#ffffff'),
+        'editor.foreground': getThemeColor('--color-panel-text', '#111827'),
+        'editor.lineHighlightBackground': getThemeColor('--color-panel-bg-secondary', '#f9fafb'),
+        'editor.selectionBackground': getThemeColor('--color-panel-active', 'rgba(0, 0, 0, 0.1)'),
+        'editorCursor.foreground': getThemeColor('--color-panel-text', '#111827'),
+        'editorLineNumber.foreground': getThemeColor('--color-panel-text-muted', '#9ca3af'),
+        'editorLineNumber.activeForeground': getThemeColor('--color-panel-text', '#111827'),
+        'editorIndentGuide.background': getThemeColor('--color-panel-border', '#e5e7eb'),
+        'editorIndentGuide.activeBackground': getThemeColor('--color-panel-text-muted', '#9ca3af'),
+        'editorWhitespace.foreground': getThemeColor('--color-panel-border', '#e5e7eb'),
       },
     });
   };
@@ -185,6 +230,16 @@ export function useFunctionEditor({
     });
   };
 
+  // Update Monaco theme when theme changes
+  useEffect(() => {
+    if (monaco) {
+      const monacoTheme = theme === 'light' ? 'convex-light' : 'convex-dark';
+      monaco.editor.setTheme(monacoTheme);
+    }
+  }, [theme, monaco]);
+
+  const monacoTheme = theme === 'light' ? 'convex-light' : 'convex-dark';
+
   const queryEditor = (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <div
@@ -193,10 +248,10 @@ export function useFunctionEditor({
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '8px 12px',
-          borderBottom: '1px solid #2D313A',
+          borderBottom: '1px solid var(--color-panel-border)',
         }}
       >
-        <span style={{ fontSize: '12px', fontWeight: 500, color: '#9ca3af' }}>
+        <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-panel-text-secondary)' }}>
           Custom Query
         </span>
       </div>
@@ -204,11 +259,15 @@ export function useFunctionEditor({
         <Editor
           height="100%"
           defaultLanguage="typescript"
-          theme="convex-dark"
+          theme={monacoTheme}
           value={code}
           beforeMount={handleEditorWillMount}
           onMount={handleEditorDidMount}
-          onChange={(value) => value && setCode(value)}
+          onChange={(value) => {
+            if (value !== null && value !== undefined) {
+              setCode(value);
+            }
+          }}
           options={{
             automaticLayout: true,
             minimap: { enabled: false },
@@ -224,6 +283,8 @@ export function useFunctionEditor({
             wordWrap: 'on',
             tabSize: 2,
             readOnly: false,
+            domReadOnly: false,
+            contextmenu: true,
           }}
         />
       </div>

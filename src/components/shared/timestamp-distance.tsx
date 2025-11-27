@@ -46,13 +46,13 @@ export const TimestampDistance: React.FC<TimestampDistanceProps> = ({
         <span
           style={{
             fontSize: '12px',
-            color: '#9ca3af',
+            color: 'var(--color-panel-text-secondary)',
           }}
           className={className}
         >
           {prefix ? `${prefix} ` : ''}{displayTime}
         </span>
-        <Info size={12} style={{ color: '#9ca3af', cursor: 'help' }} />
+        <Info size={12} style={{ color: 'var(--color-panel-text-secondary)', cursor: 'help' }} />
       </div>
     </Tooltip>
   );

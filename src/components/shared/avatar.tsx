@@ -19,13 +19,14 @@ export const Avatar: React.FC<AvatarProps> = ({ name, size = 20 }) => {
         width: size,
         height: size,
         borderRadius: '50%',
-        backgroundColor: '#374151',
+        backgroundColor: 'var(--color-panel-bg-tertiary)',
+        border: '1px solid var(--color-panel-border)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         fontSize: size * 0.4,
         fontWeight: 500,
-        color: '#d1d5db',
+        color: 'var(--color-panel-text)',
         flexShrink: 0,
       }}
     >

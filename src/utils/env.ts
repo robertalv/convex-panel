@@ -34,7 +34,7 @@ export const getEnvVar = (name: string): string | undefined => {
  * Get Convex URL from environment or provided value
  */
 export const getConvexUrl = (provided?: string): string | undefined => {
-  return provided || getEnvVar('VITE_CONVEX_URL');
+  return provided || getEnvVar('CONVEX_URL');
 };
 
 /**
@@ -45,7 +45,7 @@ export const getOAuthConfigFromEnv = (): {
   redirectUri: string;
   tokenExchangeUrl?: string;
 } | undefined => {
-  const clientId = getEnvVar('VITE_OAUTH_CLIENT_ID');
+  const clientId = getEnvVar('OAUTH_CLIENT_ID');
   
   if (!clientId) return undefined;
 
@@ -55,7 +55,7 @@ export const getOAuthConfigFromEnv = (): {
         : window.location.origin + window.location.pathname)
     : 'http://localhost:3000';
 
-  const tokenExchangeUrl = getEnvVar('VITE_CONVEX_TOKEN_EXCHANGE_URL');
+  const tokenExchangeUrl = getEnvVar('CONVEX_TOKEN_EXCHANGE_URL');
 
   return {
     clientId,

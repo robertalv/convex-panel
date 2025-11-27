@@ -368,4 +368,257 @@ export const authPanelStyles: AuthPanelStyles = {
   },
 };
 
+interface FunctionsViewStyles {
+  container: CSSProperties;
+  sidebar: CSSProperties;
+  searchContainer: CSSProperties;
+  searchInput: CSSProperties;
+  searchInputFocus: CSSProperties;
+  functionList: CSSProperties;
+  loadingMessage: CSSProperties;
+  emptyMessage: CSSProperties;
+  groupContainer: CSSProperties;
+  groupHeader: CSSProperties;
+  groupHeaderHover: CSSProperties;
+  chevronIcon: CSSProperties;
+  functionItem: CSSProperties;
+  functionItemSelected: CSSProperties;
+  functionItemHover: CSSProperties;
+  functionName: CSSProperties;
+  functionType: CSSProperties;
+  mainContent: CSSProperties;
+  header: CSSProperties;
+  headerTitle: CSSProperties;
+  headerBadge: CSSProperties;
+  runButton: CSSProperties;
+  runButtonHover: CSSProperties;
+  contentArea: CSSProperties;
+  detailsSection: CSSProperties;
+  detailsTitle: CSSProperties;
+  detailsCard: CSSProperties;
+  detailsText: CSSProperties;
+  detailsRow: CSSProperties;
+  detailsLabel: CSSProperties;
+  codeBlock: CSSProperties;
+  emptyState: CSSProperties;
+  emptyStateIcon: CSSProperties;
+  emptyStateText: CSSProperties;
+  emptyStateButton: CSSProperties;
+  emptyStateButtonHover: CSSProperties;
+}
+
+export const functionsViewStyles: FunctionsViewStyles = {
+  container: {
+    display: 'flex',
+    height: '100%',
+    overflow: 'hidden',
+  },
+  sidebar: {
+    width: '300px',
+    borderRight: '1px solid #2D313A',
+    backgroundColor: '#0F1115',
+    display: 'flex',
+    flexDirection: 'column',
+    flexShrink: 0,
+  },
+  searchContainer: {
+    padding: '12px',
+    borderBottom: '1px solid #2D313A',
+  },
+  searchInput: {
+    width: '100%',
+    padding: '8px 12px',
+    backgroundColor: '#16181D',
+    border: '1px solid #2D313A',
+    borderRadius: '4px',
+    fontSize: '12px',
+    color: '#fff',
+    outline: 'none',
+  },
+  searchInputFocus: {
+    borderColor: '#5B46DF',
+  },
+  functionList: {
+    flex: 1,
+    overflow: 'auto',
+    padding: '8px',
+  },
+  loadingMessage: {
+    padding: '16px',
+    color: '#9ca3af',
+    fontSize: '12px',
+  },
+  emptyMessage: {
+    padding: '16px',
+    color: '#9ca3af',
+    fontSize: '12px',
+  },
+  groupContainer: {
+    marginBottom: '8px',
+  },
+  groupHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '6px 8px',
+    cursor: 'pointer',
+    borderRadius: '4px',
+    fontSize: '11px',
+    fontWeight: 600,
+    color: '#9ca3af',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  groupHeaderHover: {
+    backgroundColor: '#16181D',
+  },
+  chevronIcon: {
+    transition: 'transform 0.2s',
+  },
+  functionItem: {
+    padding: '8px 12px',
+    marginBottom: '4px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    fontFamily: 'monospace',
+    color: '#d1d5db',
+    backgroundColor: 'transparent',
+    border: '1px solid transparent',
+  },
+  functionItemSelected: {
+    color: '#fff',
+    backgroundColor: '#1C1F26',
+    border: '1px solid #5B46DF',
+  },
+  functionItemHover: {
+    backgroundColor: '#16181D',
+  },
+  functionName: {
+    fontSize: '12px',
+    fontFamily: 'monospace',
+  },
+  functionType: {
+    fontSize: '10px',
+    color: '#6b7280',
+    marginTop: '2px',
+  },
+  mainContent: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: '#0F1115',
+  },
+  header: {
+    padding: '16px',
+    borderBottom: '1px solid #2D313A',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitle: {
+    fontSize: '16px',
+    fontWeight: 600,
+    color: '#fff',
+    margin: 0,
+    marginBottom: '4px',
+    fontFamily: 'monospace',
+  },
+  headerBadge: {
+    fontSize: '11px',
+    padding: '2px 6px',
+    borderRadius: '4px',
+    backgroundColor: '#1C1F26',
+    color: '#9ca3af',
+    textTransform: 'uppercase',
+  },
+  runButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '8px 16px',
+    backgroundColor: '#5B46DF',
+    border: 'none',
+    borderRadius: '6px',
+    color: '#fff',
+    fontSize: '12px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+  runButtonHover: {
+    backgroundColor: '#4d3bc2',
+  },
+  contentArea: {
+    flex: 1,
+    padding: '16px',
+    overflow: 'auto',
+  },
+  detailsSection: {
+    marginBottom: '16px',
+  },
+  detailsTitle: {
+    fontSize: '12px',
+    fontWeight: 600,
+    color: '#9ca3af',
+    marginBottom: '8px',
+  },
+  detailsCard: {
+    backgroundColor: '#16181D',
+    border: '1px solid #2D313A',
+    borderRadius: '6px',
+    padding: '12px',
+  },
+  detailsText: {
+    fontSize: '12px',
+    color: '#d1d5db',
+    fontFamily: 'monospace',
+  },
+  detailsRow: {
+    marginBottom: '8px',
+  },
+  detailsLabel: {
+    color: '#9ca3af',
+  },
+  codeBlock: {
+    margin: '4px 0 0 0',
+    padding: '8px',
+    backgroundColor: '#0F1115',
+    borderRadius: '4px',
+    overflow: 'auto',
+  },
+  emptyState: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'column',
+    gap: '16px',
+    color: '#9ca3af',
+  },
+  emptyStateIcon: {
+    opacity: 0.5,
+  },
+  emptyStateText: {
+    fontSize: '14px',
+  },
+  emptyStateButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '8px 16px',
+    backgroundColor: '#1C1F26',
+    border: '1px solid #2D313A',
+    borderRadius: '6px',
+    color: '#fff',
+    fontSize: '12px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+  emptyStateButtonHover: {
+    backgroundColor: '#2D313A',
+  },
+};
+
 

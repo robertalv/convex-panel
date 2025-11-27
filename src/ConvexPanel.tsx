@@ -8,10 +8,18 @@ import { BottomSheet } from './components/bottom-sheet';
 import { AuthPanel } from './components/auth-panel';
 import { getConvexUrl, getOAuthConfigFromEnv } from './utils/env';
 import { extractProjectName } from './utils/api';
-import { getStorageItem, setStorageItem } from './utils/storage';
-import { STORAGE_KEYS } from './utils/constants';
-import { TabId } from './types/tabs';
 import { Team, Project } from './types';
+import { useActiveTab } from './hooks/useActiveTab';
+import { ThemeProvider, Theme, useTheme } from './hooks/useTheme';
+
+const ThemedToaster: React.FC = () => {
+  const { theme } = useTheme();
+  return (
+    <div className={`cp-theme-${theme}`}>
+      <Toaster position="bottom-right" />
+    </div>
+  );
+};
 
 export interface ConvexPanelProps {
   convex?: ConvexReactClient | any;
@@ -30,6 +38,8 @@ export interface ConvexPanelProps {
   projectSlug?: string;
   team?: Team;
   project?: Project;
+  /** Initial theme for the panel. Defaults to 'dark'. User's preference is persisted in localStorage. */
+  defaultTheme?: Theme;
   [key: string]: any;
 }
 
@@ -45,19 +55,16 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
   projectSlug,
   team,
   project,
-  ...props
+  defaultTheme = 'dark',
+  onError,
+  theme,
+  mergedTheme,
+  settings,
+  ...restProps
 }) => {
   const [isMounted, setIsMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabId>(() => {
-    if (typeof window !== 'undefined') {
-      return getStorageItem<TabId>(
-        STORAGE_KEYS.ACTIVE_TAB, 
-        'health'
-      );
-    }
-    return 'health';
-  });
+  const [activeTab, setActiveTab] = useActiveTab();
 
   let convexFromContext: any;
   try {
@@ -114,13 +121,6 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
     }
   }, [adminClient, providedDeployKey, effectiveAccessToken, isMounted]);
 
-  // Save activeTab to localStorage whenever it changes
-  useEffect(() => {
-    if (activeTab) {
-      setStorageItem(STORAGE_KEYS.ACTIVE_TAB, activeTab);
-    }
-  }, [activeTab]);
-
   // Don't render during SSR
   if (typeof window === 'undefined') {
     return null;
@@ -148,10 +148,10 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
 
   // Root container with scoped styles - no CSS imports
   return (
-    <>
-      <Toaster position="bottom-right" />
-      <BottomSheet 
-        isOpen={isAuthenticated ? isOpen : false} 
+    <ThemeProvider defaultTheme={defaultTheme}>
+      <ThemedToaster />
+      <BottomSheet
+        isOpen={isAuthenticated ? isOpen : false}
         onClose={toggleOpen}
         projectName={deployUrl ? extractProjectName(deployUrl) : undefined}
         deploymentUrl={deployUrl}
@@ -185,12 +185,17 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
               baseUrl: deployUrl,
               adminClient: adminClient,
               useMockData: mockup || useMockData || !effectiveAccessToken,
-              ...props
+              onError,
+              theme,
+              mergedTheme,
+              settings,
+              // Allow any other props that might be needed by child components
+              ...restProps
             }}
           />
         )}
       </BottomSheet>
-    </>
+    </ThemeProvider>
   );
 };
 

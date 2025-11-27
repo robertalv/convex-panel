@@ -1,5 +1,8 @@
 import ConvexPanel from './ConvexPanel';
 
+// Import Tailwind CSS styles
+import './styles/tailwind.css';
+
 export type {
   ButtonProps,
   ThemeClasses,
@@ -79,6 +82,10 @@ export {
   storeToken,
   clearToken,
 } from './utils/oauth';
+
+// Theme exports
+export { ThemeProvider, useTheme, useThemeSafe } from './hooks/useTheme';
+export type { Theme } from './hooks/useTheme';
 
 // Component exports
 export { ConvexPanel };

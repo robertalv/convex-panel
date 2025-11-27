@@ -209,9 +209,9 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
             );
           })}
           {/* Grid lines */}
-          <line x1="0" y1="25" x2="300" y2="25" stroke="#333" strokeDasharray="4" />
-          <line x1="0" y1="50" x2="300" y2="50" stroke="#333" strokeDasharray="4" />
-          <line x1="0" y1="75" x2="300" y2="75" stroke="#333" strokeDasharray="4" />
+          <line x1="0" y1="25" x2="300" y2="25" stroke="var(--color-panel-border)" strokeDasharray="4" opacity="0.5" />
+          <line x1="0" y1="50" x2="300" y2="50" stroke="var(--color-panel-border)" strokeDasharray="4" opacity="0.5" />
+          <line x1="0" y1="75" x2="300" y2="75" stroke="var(--color-panel-border)" strokeDasharray="4" opacity="0.5" />
           {/* Current time line (yellow, right edge) */}
           {chartData.timestamps.length > 0 && (
             <line
@@ -219,7 +219,7 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
               y1="0"
               x2={currentTimeX}
               y2="100"
-              stroke="#eab308"
+              stroke="var(--color-panel-warning)"
               strokeWidth="2"
               strokeDasharray="3 3"
               vectorEffect="non-scaling-stroke"
@@ -232,8 +232,9 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
               y1="0"
               x2={hoverX}
               y2="100"
-              stroke="rgba(255, 255, 255, 0.3)"
+              stroke="var(--color-panel-text)"
               strokeWidth="1"
+              strokeOpacity="0.3"
               vectorEffect="non-scaling-stroke"
             />
           )}
@@ -254,7 +255,7 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
                     cy={y}
                     r="4"
                     fill={color}
-                    stroke="#fff"
+                    stroke="var(--color-panel-bg)"
                     strokeWidth="2"
                     vectorEffect="non-scaling-stroke"
                   />
@@ -270,15 +271,16 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
               left: `${(hoverX / 300) * 100}%`,
               top: '8px',
               transform: 'translateX(-50%)',
-              backgroundColor: 'rgba(0, 0, 0, 0.9)',
-              color: '#fff',
+              backgroundColor: 'var(--color-panel-bg-tertiary)',
+              border: '1px solid var(--color-panel-border)',
+              color: 'var(--color-panel-text)',
               padding: '8px 12px',
               borderRadius: '4px',
               fontSize: '11px',
               pointerEvents: 'none',
               zIndex: 10,
               minWidth: '200px',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+              boxShadow: '0 2px 8px var(--color-panel-shadow)',
             }}
           >
             <div style={{ marginBottom: '6px', fontWeight: 500 }}>{hoverTime}</div>
@@ -366,7 +368,7 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
                   gap: '4px',
                   background: 'none',
                   border: 'none',
-                  color: isVisible ? '#fff' : '#6b7280',
+                  color: isVisible ? 'var(--color-panel-text)' : 'var(--color-panel-text-muted)',
                   cursor: 'pointer',
                   padding: '2px 4px',
                   fontSize: '11px',
@@ -412,7 +414,7 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
           display: 'flex',
           justifyContent: 'space-between',
           fontSize: '10px',
-          color: '#6b7280',
+          color: 'var(--color-panel-text-muted)',
           marginTop: '6px',
           width: '100%',
         }}

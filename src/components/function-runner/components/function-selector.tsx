@@ -23,14 +23,6 @@ export const FunctionSelector: React.FC<FunctionSelectorProps> = ({
   functions,
   componentId,
 }) => {
-  useEffect(() => {
-    console.log('[FunctionSelector] Props:', {
-      functionsCount: functions.length,
-      componentId,
-      selectedFunction,
-    });
-  }, [functions, componentId, selectedFunction]);
-
   const filteredFunctions = useMemo(() => {
     const normalizedComponentId = componentId === 'app' ? null : componentId;
 
@@ -45,33 +37,9 @@ export const FunctionSelector: React.FC<FunctionSelectorProps> = ({
           fn.componentId === normalizedComponentId;
       }
 
-      if (!matchesComponent) {
-        console.log('[FunctionSelector] Function filtered out:', {
-          name: fn.name,
-          identifier: fn.identifier,
-          componentId: fn.componentId,
-          matchesComponent,
-          currentComponentId: componentId,
-          normalizedComponentId,
-        });
-      }
-
       return matchesComponent;
     });
   }, [functions, componentId]);
-
-  useEffect(() => {
-    console.log('[FunctionSelector] Filtered functions:', {
-      totalFunctions: functions.length,
-      filteredCount: filteredFunctions.length,
-      componentId,
-      filteredFunctions: filteredFunctions.map(f => ({
-        name: f.name,
-        identifier: f.identifier,
-        componentId: f.componentId,
-      })),
-    });
-  }, [functions.length, filteredFunctions, componentId]);
 
   const customQueryOption = useMemo<CustomQuery>(() => ({
     type: 'customQuery',
@@ -80,37 +48,48 @@ export const FunctionSelector: React.FC<FunctionSelectorProps> = ({
   }), [componentId]);
 
   const options = useMemo<SearchableDropdownOption<ModuleFunction | CustomQuery>[]>(() => {
-    const functionOptions = filteredFunctions.map((fn, index) => ({
-      key: fn.identifier || fn.name || `function-${index}`,
-      label: fn.name || fn.identifier || 'Unnamed function',
-      value: fn,
-      icon: <CodeIcon style={{ width: '14px', height: '14px', color: '#999' }} />,
-      searchValue: `${fn.name || ''} ${fn.identifier || ''}`.toLowerCase(),
-    }));
+    const functionOptions = filteredFunctions.map((fn, index) => {
+      const filePath = fn.file?.path || '';
+      let fileName = filePath.split('/').pop() || filePath;
+      // Remove .js extension if present
+      if (fileName.endsWith('.js')) {
+        fileName = fileName.slice(0, -3);
+      }
+      
+      return {
+        key: fn.identifier || fn.name || `function-${index}`,
+        label: (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+            {filePath && (
+              <span style={{ 
+                fontFamily: 'monospace', 
+                fontSize: '11px', 
+                color: 'var(--color-panel-text-muted)',
+                flexShrink: 0,
+              }}>
+                {fileName}
+              </span>
+            )}
+            <span style={{ flex: 1 }}>{fn.name || fn.identifier || 'Unnamed function'}</span>
+          </div>
+        ),
+        value: fn,
+        icon: <CodeIcon style={{ width: '14px', height: '14px', color: 'var(--color-panel-text-muted)' }} />,
+        searchValue: `${fn.name || ''} ${fn.identifier || ''} ${filePath || ''}`.toLowerCase(),
+      };
+    });
 
     return [
       {
         key: 'custom-query',
         label: 'Custom test query',
         value: customQueryOption,
-        icon: <CodeIcon style={{ width: '14px', height: '14px', color: '#999' }} />,
+        icon: <CodeIcon style={{ width: '14px', height: '14px', color: 'var(--color-panel-text-muted)' }} />,
         searchValue: 'custom test query custom-query',
       },
       ...functionOptions,
     ];
   }, [filteredFunctions, customQueryOption]);
-
-  useEffect(() => {
-    console.log('[FunctionSelector] Options array:', {
-      totalOptions: options.length,
-      options: options.map((opt, idx) => ({
-        index: idx,
-        isCustomQuery: isCustomQueryValue(opt.value),
-        label: opt.label,
-        identifier: isCustomQueryValue(opt.value) ? 'custom-query' : (opt.value as ModuleFunction).identifier,
-      })),
-    });
-  }, [options]);
 
   const getIsSelected = useCallback((
     current: ModuleFunction | CustomQuery | null,

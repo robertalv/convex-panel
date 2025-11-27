@@ -43,31 +43,8 @@ export const DeploymentDisplay: React.FC<DeploymentDisplayProps> = ({
 
   return (
     <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        padding: '2px 12px',
-        borderRadius: '9999px',
-        border: '1px solid rgba(34, 197, 94, 0.3)',
-        backgroundColor: 'rgba(34, 197, 94, 0.1)',
-        color: '#4ade80',
-        fontSize: '10px',
-        fontWeight: 500,
-        cursor: isClickable ? 'pointer' : 'default',
-        transition: 'background-color 0.2s',
-      }}
+      className={`cp-deployment-badge ${isClickable ? 'clickable' : ''}`}
       onClick={handleClick}
-      onMouseEnter={(e) => {
-        if (isClickable) {
-          e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.2)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (isClickable) {
-          e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.1)';
-        }
-      }}
       title={dashboardUrl ? `Open ${deploymentName} in Convex Dashboard` : undefined}
     >
       <div style={{ width: '12px', height: '12px' }}>
@@ -80,7 +57,7 @@ export const DeploymentDisplay: React.FC<DeploymentDisplayProps> = ({
       <span>
         {environmentLabel} ({kindLabel})
       </span>
-      <span style={{ color: '#16a34a' }}>•</span>
+      <span className="cp-deployment-dot">•</span>
       <span>{deploymentName}</span>
       {isClickable && (
         <ExternalLink size={12} style={{ marginLeft: '4px', opacity: 0.7 }} />

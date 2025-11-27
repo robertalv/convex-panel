@@ -146,12 +146,12 @@ export const LastDeployedCard: React.FC<LastDeployedCardProps> = ({
         }}
       >
         {loading ? (
-          <span style={{ fontSize: '12px', color: '#6b7280' }}>Loading...</span>
+          <span style={{ fontSize: '12px', color: 'var(--color-panel-text-muted)' }}>Loading...</span>
         ) : !lastDeployed ? (
           <span
             style={{
               fontSize: '14px',
-              color: '#9ca3af',
+              color: 'var(--color-panel-text-secondary)',
             }}
           >
             Never
@@ -172,9 +172,9 @@ export const LastDeployedCard: React.FC<LastDeployedCardProps> = ({
             <span
               style={{
                 fontSize: '14px',
-                color: '#9ca3af',
+                color: 'var(--color-panel-text-secondary)',
                 fontFamily: 'monospace',
-                backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                backgroundColor: 'var(--color-panel-bg-tertiary)',
                 padding: '3px 6px',
                 borderRadius: '4px',
               }}
@@ -189,7 +189,7 @@ export const LastDeployedCard: React.FC<LastDeployedCardProps> = ({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  color: '#9ca3af',
+                  color: 'var(--color-panel-text-secondary)',
                   textDecoration: 'none',
                   cursor: 'pointer',
                 }}

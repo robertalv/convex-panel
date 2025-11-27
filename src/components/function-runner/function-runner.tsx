@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Play, Settings, Code as CodeIcon, ChevronDown, Copy, Maximize2, ArrowLeft, ArrowRight, ChevronUp } from 'lucide-react';
-import { toast } from '../../utils/toast';
+import Editor, { BeforeMount, OnMount } from '@monaco-editor/react';
+import { copyToClipboard } from '../../utils/toast';
 import { ModuleFunction } from '../../utils/functionDiscovery';
 import { useFunctionResult } from '../../hooks/useFunctionResult';
 import { useFunctionEditor } from '../../hooks/useFunctionEditor';
@@ -9,6 +10,7 @@ import { QueryResult } from './components/query-result';
 import { useRunHistory, RunHistoryItem } from '../../hooks/useRunHistory';
 import { ComponentSelector } from './components/component-selector';
 import { FunctionSelector } from './components/function-selector';
+import { useThemeSafe } from '../../hooks/useTheme';
 import { Value } from 'convex/values';
 
 export type CustomQuery = {
@@ -48,6 +50,8 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
   const [runHistoryItem, setRunHistoryItem] = useState<RunHistoryItem | undefined>();
   const [historyIndex, setHistoryIndex] = useState(0);
   const [isExpanded, setIsExpanded] = useState(true);
+  const [argsMonaco, setArgsMonaco] = useState<Parameters<BeforeMount>[0]>();
+  const { theme } = useThemeSafe();
 
   // Sync selectedComponent with propComponentId when it changes
   useEffect(() => {
@@ -276,6 +280,85 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
     }
   };
 
+  // Monaco editor setup for arguments
+  const handleArgsEditorWillMount: BeforeMount = (monacoInstance) => {
+    setArgsMonaco(monacoInstance);
+
+    // Helper to get theme color from CSS variable
+    const getThemeColor = (varName: string, fallback: string = '#0F1115') => {
+      const themeElement = document.querySelector('.cp-theme-dark, .cp-theme-light') || document.documentElement;
+      const color = getComputedStyle(themeElement).getPropertyValue(varName).trim();
+      return color || fallback;
+    };
+
+    // Helper to convert hex to Monaco format (without #)
+    const toMonacoColor = (hex: string) => hex.replace('#', '');
+
+    // Define dark theme (Monaco will handle if already defined)
+    try {
+      monacoInstance.editor.defineTheme('convex-dark', {
+        base: 'vs-dark',
+        inherit: true,
+        rules: [
+          { token: 'comment', foreground: toMonacoColor(getThemeColor('--color-panel-text-muted', '#6b7280')), fontStyle: 'italic' },
+          { token: 'keyword', foreground: 'c084fc' },
+          { token: 'string', foreground: 'fbbf24' },
+          { token: 'number', foreground: 'fb923c' },
+        ],
+        colors: {
+          'editor.background': getThemeColor('--color-panel-bg-secondary', '#16181D'),
+          'editor.foreground': getThemeColor('--color-panel-warning', '#fbbf24'),
+          'editor.lineHighlightBackground': getThemeColor('--color-panel-bg-secondary', '#16181D'),
+          'editor.selectionBackground': getThemeColor('--color-panel-active', 'rgba(255, 255, 255, 0.1)'),
+          'editorCursor.foreground': getThemeColor('--color-panel-warning', '#fbbf24'),
+          'editorLineNumber.foreground': getThemeColor('--color-panel-text-muted', '#6b7280'),
+          'editorLineNumber.activeForeground': getThemeColor('--color-panel-text', '#d1d5db'),
+          'editorIndentGuide.background': getThemeColor('--color-panel-border', '#2D313A'),
+          'editorIndentGuide.activeBackground': getThemeColor('--color-panel-text-muted', '#6b7280'),
+          'editorWhitespace.foreground': getThemeColor('--color-panel-border', '#2D313A'),
+        },
+      });
+    } catch {
+      // Theme already defined, ignore
+    }
+
+    // Define light theme
+    try {
+      monacoInstance.editor.defineTheme('convex-light', {
+        base: 'vs',
+        inherit: true,
+        rules: [
+          { token: 'comment', foreground: toMonacoColor(getThemeColor('--color-panel-text-muted', '#9ca3af')), fontStyle: 'italic' },
+          { token: 'keyword', foreground: '7c3aed' },
+          { token: 'string', foreground: 'd97706' },
+          { token: 'number', foreground: 'ea580c' },
+        ],
+        colors: {
+          'editor.background': getThemeColor('--color-panel-bg-secondary', '#f9fafb'),
+          'editor.foreground': getThemeColor('--color-panel-warning', '#d97706'),
+          'editor.lineHighlightBackground': getThemeColor('--color-panel-bg-secondary', '#f9fafb'),
+          'editor.selectionBackground': getThemeColor('--color-panel-active', 'rgba(0, 0, 0, 0.1)'),
+          'editorCursor.foreground': getThemeColor('--color-panel-warning', '#d97706'),
+          'editorLineNumber.foreground': getThemeColor('--color-panel-text-muted', '#9ca3af'),
+          'editorLineNumber.activeForeground': getThemeColor('--color-panel-text', '#111827'),
+          'editorIndentGuide.background': getThemeColor('--color-panel-border', '#e5e7eb'),
+          'editorIndentGuide.activeBackground': getThemeColor('--color-panel-text-muted', '#9ca3af'),
+          'editorWhitespace.foreground': getThemeColor('--color-panel-border', '#e5e7eb'),
+        },
+      });
+    } catch {
+      // Theme already defined, ignore
+    }
+  };
+
+  // Update Monaco theme when theme changes
+  useEffect(() => {
+    if (argsMonaco) {
+      const monacoTheme = theme === 'light' ? 'convex-light' : 'convex-dark';
+      argsMonaco.editor.setTheme(monacoTheme);
+    }
+  }, [theme, argsMonaco]);
+
   const isRunning = isCustomQuery ? customQueryLoading : loading;
   const currentResult = isCustomQuery ? customQueryResult : result;
   const currentTiming = isCustomQuery ? customQueryTiming : lastRequestTiming;
@@ -287,7 +370,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
         flexDirection: 'column',
         height: '100%',
         width: '100%',
-        backgroundColor: '#16181D',
+        backgroundColor: 'var(--color-panel-bg-secondary)',
       }}
     >
       {/* Runner content area */}
@@ -298,8 +381,8 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
             width: '450px',
             display: 'flex',
             flexDirection: 'column',
-            borderRight: '1px solid #2D313A',
-            backgroundColor: '#0F1115',
+            borderRight: '1px solid var(--color-panel-border)',
+            backgroundColor: 'var(--color-panel-bg)',
             flexShrink: 0,
           }}
         >
@@ -309,11 +392,11 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
               padding: '0 16px',
               display: 'flex',
               alignItems: 'center',
-              borderBottom: '1px solid #2D313A',
-              backgroundColor: '#16181D',
+              borderBottom: '1px solid var(--color-panel-border)',
+              backgroundColor: 'var(--color-panel-bg-secondary)',
             }}
           >
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#d1d5db' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-panel-text)' }}>
               Function Input
             </span>
           </div>
@@ -354,7 +437,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                     marginBottom: '8px',
                   }}
                 >
-                  <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 500 }}>Arguments</span>
+                  <span style={{ fontSize: '12px', color: 'var(--color-panel-text-secondary)', fontWeight: 500 }}>Arguments</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <button
                       style={{
@@ -362,11 +445,11 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                         borderRadius: '4px',
                         border: 'none',
                         background: 'transparent',
-                        color: '#999',
+                        color: 'var(--color-panel-text-muted)',
                         cursor: 'pointer',
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#2D313A';
+                        e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = 'transparent';
@@ -386,12 +469,13 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                         borderRadius: '4px',
                         border: 'none',
                         background: 'transparent',
-                        color: historyIndex > 0 ? '#999' : '#3d4149',
+                        color: historyIndex > 0 ? 'var(--color-panel-text-muted)' : 'var(--color-panel-text-muted)',
+                        opacity: historyIndex > 0 ? 1 : 0.5,
                         cursor: historyIndex > 0 ? 'pointer' : 'not-allowed',
                       }}
                       onMouseEnter={(e) => {
                         if (historyIndex > 0) {
-                          e.currentTarget.style.backgroundColor = '#2D313A';
+                          e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
                         }
                       }}
                       onMouseLeave={(e) => {
@@ -412,12 +496,13 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                         borderRadius: '4px',
                         border: 'none',
                         background: 'transparent',
-                        color: historyIndex < runHistory.length - 1 ? '#999' : '#3d4149',
+                        color: historyIndex < runHistory.length - 1 ? 'var(--color-panel-text-muted)' : 'var(--color-panel-text-muted)',
+                        opacity: historyIndex < runHistory.length - 1 ? 1 : 0.5,
                         cursor: historyIndex < runHistory.length - 1 ? 'pointer' : 'not-allowed',
                       }}
                       onMouseEnter={(e) => {
                         if (historyIndex < runHistory.length - 1) {
-                          e.currentTarget.style.backgroundColor = '#2D313A';
+                          e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
                         }
                       }}
                       onMouseLeave={(e) => {
@@ -431,39 +516,52 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                 <div
                   style={{
                     flex: 1,
-                    backgroundColor: '#16181D',
-                    border: '1px solid #2D313A',
+                    backgroundColor: 'var(--color-panel-bg-secondary)',
+                    border: '1px solid var(--color-panel-border)',
                     borderRadius: '4px',
-                    padding: '8px',
+                    overflow: 'hidden',
                     position: 'relative',
+                    minHeight: '200px',
                   }}
                 >
-                  <textarea
+                  <Editor
+                    height="100%"
+                    defaultLanguage="json"
+                    theme={theme === 'light' ? 'convex-light' : 'convex-dark'}
                     value={JSON.stringify(args, null, 2)}
-                    onChange={(e) => {
-                      try {
-                        const parsed = JSON.parse(e.target.value);
-                        if (typeof parsed === 'object' && parsed !== null) {
-                          setArgs(parsed);
+                    beforeMount={handleArgsEditorWillMount}
+                    onChange={(value) => {
+                      if (value !== null && value !== undefined) {
+                        try {
+                          const parsed = JSON.parse(value);
+                          if (typeof parsed === 'object' && parsed !== null) {
+                            setArgs(parsed);
+                          }
+                        } catch {
+                          // Invalid JSON, keep current args
                         }
-                      } catch {
-                        // Invalid JSON, keep as is
                       }
                     }}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      outline: 'none',
-                      fontSize: '14px',
-                      fontFamily: 'monospace',
-                      color: '#eab308',
-                      resize: 'none',
-                      padding: '8px',
+                    options={{
+                      automaticLayout: true,
+                      minimap: { enabled: false },
+                      scrollBeyondLastLine: false,
+                      fontSize: 13,
+                      fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
+                      lineNumbers: 'on',
+                      lineNumbersMinChars: 3,
+                      scrollbar: {
+                        horizontalScrollbarSize: 8,
+                        verticalScrollbarSize: 8,
+                      },
+                      wordWrap: 'on',
+                      tabSize: 2,
+                      readOnly: false,
+                      domReadOnly: false,
+                      contextmenu: true,
+                      formatOnPaste: true,
+                      formatOnType: true,
                     }}
-                    spellCheck={false}
-                    placeholder="{\n  \n}"
                   />
                 </div>
               </div>
@@ -481,8 +579,8 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
           <div
             style={{
               padding: '16px',
-              borderTop: '1px solid #2D313A',
-              backgroundColor: '#0F1115',
+              borderTop: '1px solid var(--color-panel-border)',
+              backgroundColor: 'var(--color-panel-bg)',
             }}
           >
             {!isCustomQuery && (
@@ -499,8 +597,8 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                   }}
                   style={{
                     borderRadius: '4px',
-                    backgroundColor: '#1C1F26',
-                    border: '1px solid #2D313A',
+                    backgroundColor: 'var(--color-panel-bg-tertiary)',
+                    border: '1px solid var(--color-panel-border)',
                     cursor: 'pointer',
                   }}
                 />
@@ -508,7 +606,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                   htmlFor="asUser"
                   style={{
                     fontSize: '12px',
-                    color: '#d1d5db',
+                    color: 'var(--color-panel-text)',
                     userSelect: 'none',
                     cursor: 'pointer',
                     display: 'flex',
@@ -517,7 +615,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                   }}
                 >
                   Act as a user
-                  <Settings style={{ width: '12px', height: '12px', color: '#9ca3af' }} />
+                  <Settings style={{ width: '12px', height: '12px', color: 'var(--color-panel-text-secondary)' }} />
                 </label>
               </div>
             )}
@@ -527,9 +625,9 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
               style={{
                 width: '100%',
                 height: '36px',
-                backgroundColor: isRunning ? '#4d3bc2' : '#5B46DF',
+                backgroundColor: isRunning ? 'var(--color-panel-accent-hover)' : 'var(--color-panel-accent)',
                 border: 'none',
-                color: '#fff',
+                color: 'var(--color-panel-bg)',
                 fontSize: '14px',
                 fontWeight: 500,
                 borderRadius: '4px',
@@ -539,17 +637,17 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                 gap: '8px',
                 cursor: isRunning ? 'not-allowed' : 'pointer',
                 transition: 'background-color 0.2s',
-                boxShadow: '0 4px 12px rgba(91, 70, 223, 0.2)',
+                boxShadow: '0 4px 12px color-mix(in srgb, var(--color-panel-accent) 20%, transparent)',
                 opacity: isRunning ? 0.7 : 1,
               }}
               onMouseEnter={(e) => {
                 if (!isRunning) {
-                  e.currentTarget.style.backgroundColor = '#4d3bc2';
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-accent-hover)';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isRunning) {
-                  e.currentTarget.style.backgroundColor = '#5B46DF';
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-accent)';
                 }
               }}
             >
@@ -573,7 +671,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
-            backgroundColor: '#16181D',
+            backgroundColor: 'var(--color-panel-bg-secondary)',
           }}
         >
           <div
@@ -583,12 +681,12 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              borderBottom: '1px solid #2D313A',
-              backgroundColor: '#16181D',
+              borderBottom: '1px solid var(--color-panel-border)',
+              backgroundColor: 'var(--color-panel-bg-secondary)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: '#d1d5db' }}>Output</span>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-panel-text)' }}>Output</span>
               {currentResult && currentTiming && (
                 <>
                   {currentResult.success ? (
@@ -598,15 +696,15 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                           width: '12px',
                           height: '12px',
                           borderRadius: '50%',
-                          backgroundColor: '#22c55e',
+                          backgroundColor: 'var(--color-panel-success)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
                       >
-                        <span style={{ color: '#fff', fontSize: '8px' }}>✓</span>
+                        <span style={{ color: 'var(--color-panel-bg)', fontSize: '8px' }}>✓</span>
                       </div>
-                      <span style={{ fontSize: '12px', color: '#22c55e' }}>Success</span>
+                      <span style={{ fontSize: '12px', color: 'var(--color-panel-success)' }}>Success</span>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -615,23 +713,23 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                           width: '12px',
                           height: '12px',
                           borderRadius: '50%',
-                          backgroundColor: '#ef4444',
+                          backgroundColor: 'var(--color-panel-error)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
                       >
-                        <span style={{ color: '#fff', fontSize: '8px', fontWeight: 'bold' }}>×</span>
+                        <span style={{ color: 'var(--color-panel-bg)', fontSize: '8px', fontWeight: 'bold' }}>×</span>
                       </div>
-                      <span style={{ fontSize: '12px', color: '#ef4444' }}>error</span>
+                      <span style={{ fontSize: '12px', color: 'var(--color-panel-error)' }}>error</span>
                     </div>
                   )}
-                  <span style={{ fontSize: '12px', color: '#9ca3af' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--color-panel-text-secondary)' }}>
                     {currentTiming.endedAt - currentTiming.startedAt < 1000
                       ? `${currentTiming.endedAt - currentTiming.startedAt}ms`
                       : `${((currentTiming.endedAt - currentTiming.startedAt) / 1000).toFixed(2)}s`}
                   </span>
-                  <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--color-panel-text-muted)' }}>
                     {(() => {
                       const now = Date.now();
                       const elapsed = now - currentTiming.endedAt;
@@ -655,57 +753,80 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
               )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Copy
+              <button
+                className="cp-icon-btn"
                 style={{
-                  width: '14px',
-                  height: '14px',
-                  color: '#999',
+                  padding: '4px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--color-panel-text-muted)',
                   cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '24px',
+                  height: '24px',
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = '#fff';
+                onMouseEnter={e => {
+                  e.currentTarget.style.color = 'var(--color-panel-text)';
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
                 }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = '#999';
+                onMouseLeave={e => {
+                  e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                  e.currentTarget.style.backgroundColor = 'transparent';
                 }}
                 onClick={async () => {
                   if (currentResult) {
                     const text = currentResult.success
                       ? JSON.stringify(currentResult.value, null, 2)
                       : currentResult.errorMessage || '';
-                    try {
-                      await navigator.clipboard.writeText(text);
-                      toast('success', 'Copied to clipboard');
-                    } catch (err) {
-                      console.error('Failed to copy:', err);
-                      toast('error', 'Failed to copy to clipboard');
-                    }
+                    await copyToClipboard(text);
                   }
                 }}
-              />
+                title="Copy result"
+                type="button"
+              >
+                <Copy
+                  style={{
+                    width: '14px',
+                    height: '14px',
+                  }}
+                />
+              </button>
               <button
                 onClick={onClose}
+                className="cp-icon-btn"
                 style={{
                   padding: '4px',
-                  borderRadius: '4px',
+                  borderRadius: '8px',
                   border: 'none',
                   background: 'transparent',
-                  color: '#999',
+                  color: 'var(--color-panel-text-muted)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  width: '24px',
+                  height: '24px',
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#2D313A';
-                  e.currentTarget.style.color = '#fff';
+                onMouseEnter={e => {
+                  e.currentTarget.style.color = 'var(--color-panel-text)';
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
                 }}
-                onMouseLeave={(e) => {
+                onMouseLeave={e => {
+                  e.currentTarget.style.color = 'var(--color-panel-text-muted)';
                   e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '#999';
                 }}
+                title="Close"
+                type="button"
               >
-                <X size={16} />
+                <X
+                  style={{
+                    width: '14px',
+                    height: '14px',
+                  }}
+                />
               </button>
             </div>
           </div>
@@ -733,7 +854,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
               <div
                 style={{
                   fontSize: '12px',
-                  color: '#999',
+                  color: 'var(--color-panel-text-muted)',
                   fontStyle: 'italic',
                   fontFamily: 'monospace',
                 }}

@@ -11,16 +11,16 @@ export const Tooltip: React.FC<{
     const baseStyle: React.CSSProperties = {
       position: 'absolute',
       padding: '8px 12px',
-      backgroundColor: '#0F1115',
-      border: '1px solid #2D313A',
-      color: '#d1d5db',
+      backgroundColor: 'var(--color-panel-bg-tertiary)',
+      border: '1px solid var(--color-panel-border)',
+      color: 'var(--color-panel-text)',
       fontSize: '12px',
       borderRadius: '4px',
       opacity: showTooltip ? 1 : 0,
       transition: 'opacity 0.2s',
       pointerEvents: 'none',
       zIndex: 50,
-      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)',
+      boxShadow: '0 10px 15px -3px var(--color-panel-shadow)',
       whiteSpace: 'nowrap',
       lineHeight: '1.5',
     };
@@ -67,9 +67,9 @@ export const Tooltip: React.FC<{
       position: 'absolute',
       width: '8px',
       height: '8px',
-      backgroundColor: '#0F1115',
-      borderTop: '1px solid #2D313A',
-      borderLeft: '1px solid #2D313A',
+      backgroundColor: 'var(--color-panel-bg-tertiary)',
+      borderTop: '1px solid var(--color-panel-border)',
+      borderLeft: '1px solid var(--color-panel-border)',
     };
 
     switch (side) {

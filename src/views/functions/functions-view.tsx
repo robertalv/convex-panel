@@ -17,7 +17,6 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
   useMockData = false,
   onError,
 }) => {
-  const [functions, setFunctions] = useState<ModuleFunction[]>([]);
   const [groupedFunctions, setGroupedFunctions] = useState<Array<{ path: string; functions: ModuleFunction[] }>>([]);
   const [selectedFunction, setSelectedFunction] = useState<ModuleFunction | null>(null);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
@@ -31,7 +30,6 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
     setIsLoading(true);
     discoverFunctions(adminClient, useMockData)
       .then((funcs) => {
-        setFunctions(funcs);
         setGroupedFunctions(groupFunctionsByPath(funcs));
         // Expand all paths by default
         const allPaths = new Set(funcs.map(f => f.file?.path || 'root'));
@@ -79,252 +77,127 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
     });
   };
 
+  // Helper function to remove .js extension from file paths
+  const removeJsExtension = (path: string): string => {
+    if (!path) return path;
+    return path.endsWith('.js') ? path.slice(0, -3) : path;
+  };
+
+  // Helper function to get badge class for function type
+  const getFunctionTypeBadgeClass = (udfType: string): string => {
+    const normalizedType = udfType.toLowerCase();
+    // Map httpAction to httpaction for CSS class
+    const typeMap: Record<string, string> = {
+      'httpaction': 'httpaction',
+      'query': 'query',
+      'mutation': 'mutation',
+      'action': 'action',
+    };
+    return typeMap[normalizedType] || 'query';
+  };
+
+  // Using Tailwind CSS classes from src/styles/tailwind.css
+
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div className="cp-functions-container">
       {/* Sidebar */}
-      <div
-        style={{
-          width: '300px',
-          borderRight: '1px solid #2D313A',
-          backgroundColor: '#0F1115',
-          display: 'flex',
-          flexDirection: 'column',
-          flexShrink: 0,
-        }}
-      >
+      <div className="cp-functions-sidebar">
         {/* Search */}
-        <div style={{ padding: '12px', borderBottom: '1px solid #2D313A' }}>
+        <div className="cp-functions-search">
           <input
             type="text"
             placeholder="Search functions..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              backgroundColor: '#16181D',
-              border: '1px solid #2D313A',
-              borderRadius: '4px',
-              fontSize: '12px',
-              color: '#fff',
-              outline: 'none',
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = '#5B46DF';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = '#2D313A';
-            }}
+            className="cp-functions-search-input"
           />
         </div>
 
         {/* Function List */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '8px' }}>
+        <div className="cp-functions-list cp-scrollbar">
           {isLoading ? (
-            <div style={{ padding: '16px', color: '#9ca3af', fontSize: '12px' }}>Loading functions...</div>
+            <div className="cp-functions-loading">Loading functions...</div>
           ) : filteredGroups.length === 0 ? (
-            <div style={{ padding: '16px', color: '#9ca3af', fontSize: '12px' }}>
+            <div className="cp-functions-empty">
               {searchQuery ? 'No functions found' : 'No functions available'}
             </div>
           ) : (
-            filteredGroups.map((group) => (
-              <div key={group.path} style={{ marginBottom: '8px' }}>
-                <div
-                  onClick={() => togglePath(group.path)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '6px 8px',
-                    cursor: 'pointer',
-                    borderRadius: '4px',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: '#9ca3af',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#16181D';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <ChevronDown
-                    size={12}
-                    style={{
-                      transform: expandedPaths.has(group.path) ? 'rotate(0deg)' : 'rotate(-90deg)',
-                      transition: 'transform 0.2s',
-                    }}
-                  />
-                  {group.path || 'root'}
-                </div>
-                {expandedPaths.has(group.path) && (
-                  <div style={{ paddingLeft: '16px' }}>
-                    {group.functions.map((func) => (
-                      <div
-                        key={func.identifier}
-                        onClick={() => handleFunctionClick(func)}
-                        style={{
-                          padding: '8px 12px',
-                          marginBottom: '4px',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          fontFamily: 'monospace',
-                          color: selectedFunction?.identifier === func.identifier ? '#fff' : '#d1d5db',
-                          backgroundColor:
-                            selectedFunction?.identifier === func.identifier ? '#1C1F26' : 'transparent',
-                          border:
-                            selectedFunction?.identifier === func.identifier
-                              ? '1px solid #5B46DF'
-                              : '1px solid transparent',
-                        }}
-                        onMouseEnter={(e) => {
-                          if (selectedFunction?.identifier !== func.identifier) {
-                            e.currentTarget.style.backgroundColor = '#16181D';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (selectedFunction?.identifier !== func.identifier) {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }
-                        }}
-                      >
-                        {func.name}
-                        <div
-                          style={{
-                            fontSize: '10px',
-                            color: '#6b7280',
-                            marginTop: '2px',
-                          }}
-                        >
-                          {func.udfType}
-                        </div>
-                      </div>
-                    ))}
+            filteredGroups.map((group) => {
+              const isExpanded = expandedPaths.has(group.path);
+              return (
+                <div key={group.path} className="cp-functions-group">
+                  <div
+                    onClick={() => togglePath(group.path)}
+                    className="cp-functions-group-header"
+                  >
+                    <ChevronDown
+                      size={12}
+                      style={{
+                        transition: 'transform 0.2s',
+                        transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+                      }}
+                    />
+                    {removeJsExtension(group.path) || 'root'}
                   </div>
-                )}
-              </div>
-            ))
+                  {isExpanded && (
+                    <div style={{ paddingLeft: '16px' }}>
+                      {group.functions.map((func) => {
+                        const isSelected = selectedFunction?.identifier === func.identifier;
+                        return (
+                          <div
+                            key={func.identifier}
+                            onClick={() => handleFunctionClick(func)}
+                            className={`cp-functions-item ${isSelected ? 'selected' : ''}`}
+                          >
+                            {func.name}
+                            <div className={`cp-badge cp-badge-${getFunctionTypeBadgeClass(func.udfType)}`}>{func.udfType}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       </div>
 
       {/* Main Content */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#0F1115' }}>
+      <div className="cp-functions-main">
         {selectedFunction ? (
           <>
-            <div
-              style={{
-                padding: '16px',
-                borderBottom: '1px solid #2D313A',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
+            <div className="cp-functions-header">
               <div>
-                <h2
-                  style={{
-                    fontSize: '16px',
-                    fontWeight: 600,
-                    color: '#fff',
-                    margin: 0,
-                    marginBottom: '4px',
-                    fontFamily: 'monospace',
-                  }}
-                >
-                  {selectedFunction.identifier}
-                </h2>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      backgroundColor: '#1C1F26',
-                      color: '#9ca3af',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    {selectedFunction.udfType}
-                  </span>
+                <h2 className="cp-functions-title">{selectedFunction.identifier}</h2>
+                <div className="cp-flex cp-items-center cp-gap-2" style={{ marginTop: '4px' }}>
+                  <span className={`cp-badge cp-badge-${getFunctionTypeBadgeClass(selectedFunction.udfType)}`}>{selectedFunction.udfType}</span>
                   {selectedFunction.visibility && (
-                    <span
-                      style={{
-                        fontSize: '11px',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        backgroundColor: '#1C1F26',
-                        color: '#9ca3af',
-                      }}
-                    >
-                      {selectedFunction.visibility.kind}
-                    </span>
+                    <span className="cp-functions-badge">{selectedFunction.visibility.kind}</span>
                   )}
                 </div>
               </div>
               <button
                 onClick={() => handleRunFunction(selectedFunction)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 16px',
-                  backgroundColor: '#5B46DF',
-                  border: 'none',
-                  borderRadius: '6px',
-                  color: '#fff',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#4d3bc2';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#5B46DF';
-                }}
+                className="cp-functions-run-btn"
               >
                 <Play size={14} />
                 Run Function
               </button>
             </div>
-            <div style={{ flex: 1, padding: '16px', overflow: 'auto' }}>
-              <div style={{ marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '12px', fontWeight: 600, color: '#9ca3af', marginBottom: '8px' }}>
-                  Function Details
-                </h3>
-                <div
-                  style={{
-                    backgroundColor: '#16181D',
-                    border: '1px solid #2D313A',
-                    borderRadius: '6px',
-                    padding: '12px',
-                  }}
-                >
-                  <div style={{ fontSize: '12px', color: '#d1d5db', fontFamily: 'monospace' }}>
-                    <div style={{ marginBottom: '8px' }}>
-                      <span style={{ color: '#9ca3af' }}>Path: </span>
-                      {selectedFunction.file?.path || 'N/A'}
+            <div className="cp-functions-content cp-scrollbar">
+              <div className="cp-functions-details-section">
+                <h3 className="cp-functions-details-title">Function Details</h3>
+                <div className="cp-functions-details-card">
+                  <div className="cp-functions-details-text">
+                    <div className="cp-functions-details-row">
+                      <span className="cp-functions-details-label">Path: </span>
+                      {selectedFunction.file?.path ? removeJsExtension(selectedFunction.file.path) : 'N/A'}
                     </div>
                     {selectedFunction.args && (
-                      <div style={{ marginBottom: '8px' }}>
-                        <span style={{ color: '#9ca3af' }}>Args Validator: </span>
-                        <pre
-                          style={{
-                            margin: '4px 0 0 0',
-                            padding: '8px',
-                            backgroundColor: '#0F1115',
-                            borderRadius: '4px',
-                            overflow: 'auto',
-                          }}
-                        >
-                          {selectedFunction.args}
-                        </pre>
+                      <div className="cp-functions-details-row">
+                        <span className="cp-functions-details-label">Args Validator: </span>
+                        <pre className="cp-functions-code-block">{selectedFunction.args}</pre>
                       </div>
                     )}
                   </div>
@@ -333,44 +206,15 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
             </div>
           </>
         ) : (
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexDirection: 'column',
-              gap: '16px',
-              color: '#9ca3af',
-            }}
-          >
-            <Code2 size={48} style={{ opacity: 0.5 }} />
-            <div style={{ fontSize: '14px' }}>Select a function to view details</div>
+          <div className="cp-functions-empty-state">
+            <Code2 size={48} className="cp-functions-empty-icon" />
+            <div className="cp-functions-empty-text">Select a function to view details</div>
             <button
               onClick={() => {
                 const customQuery: CustomQuery = { type: 'customQuery', table: null };
                 showGlobalRunner(customQuery as any, 'click');
               }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 16px',
-                backgroundColor: '#1C1F26',
-                border: '1px solid #2D313A',
-                borderRadius: '6px',
-                color: '#fff',
-                fontSize: '12px',
-                fontWeight: 500,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#2D313A';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#1C1F26';
-              }}
+              className="cp-functions-empty-btn"
             >
               <Play size={14} />
               Create Custom Query

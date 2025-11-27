@@ -21,6 +21,7 @@ import {
   ContextMenu,
   ContextMenuEntry,
 } from '../../../components/shared/context-menu';
+import { copyToClipboard } from '../../../utils/toast';
 
 export interface DataTableProps {
   selectedTable: string;
@@ -72,15 +73,15 @@ const formatValue = (value: any): string => {
 
 const getValueColor = (value: any): string => {
   if (typeof value === 'string' && value.length > 20) {
-    return '#fff';
+    return 'var(--color-panel-text)';
   }
   if (typeof value === 'boolean') {
-    return '#F3A78C';
+    return 'var(--color-panel-warning)';
   }
   if (typeof value === 'number') {
-    return '#F3A78C';
+    return 'var(--color-panel-warning)';
   }
-  return '#d1d5db';
+  return 'var(--color-panel-text)';
 };
 
 const deriveTypeLabel = (field?: TableField): string => {
@@ -160,35 +161,35 @@ const SchemaHoverLabel: React.FC<{
             left: 0,
             minWidth: 200,
             padding: '8px 12px',
-            backgroundColor: '#0F1115',
-            border: '1px solid #2D313A',
+            backgroundColor: 'var(--color-panel-bg-tertiary)',
+            border: '1px solid var(--color-panel-border)',
             borderRadius: '6px',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
+            boxShadow: '0 10px 25px var(--color-panel-shadow)',
             zIndex: 30,
-            color: '#d1d5db',
+            color: 'var(--color-panel-text)',
             fontSize: '12px',
             lineHeight: 1.4,
           }}
         >
-          <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: 0.5, color: '#9ca3af', marginBottom: 6 }}>
+          <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--color-panel-text-secondary)', marginBottom: 6 }}>
             Schema
           </div>
           <div style={{ marginBottom: 4 }}>
             Type:{' '}
-            <span style={{ color: '#fff' }}>
+            <span style={{ color: 'var(--color-panel-text)' }}>
               {meta?.typeLabel ?? 'unknown'}
             </span>
           </div>
           <div style={{ marginBottom: 4 }}>
             Optional:{' '}
-            <span style={{ color: meta?.optional ? '#FDE68A' : '#34D399' }}>
+            <span style={{ color: meta?.optional ? 'var(--color-panel-warning)' : 'var(--color-panel-success)' }}>
               {meta?.optional ? 'Yes' : 'No'}
             </span>
           </div>
           {meta?.linkTable && (
             <div>
               References:{' '}
-              <span style={{ color: '#93C5FD' }}>{meta.linkTable}</span>
+              <span style={{ color: 'var(--color-panel-accent)' }}>{meta.linkTable}</span>
             </div>
           )}
         </div>
@@ -258,7 +259,14 @@ export const DataTable: React.FC<DataTableProps> = ({
     return hasSelectedTable ? unique : [];
   }, [tableSchema, hasSelectedTable]);
 
-  const filteredColumns = baseColumns;
+  const filteredColumns = useMemo(() => {
+    if (!visibleFields || visibleFields.length === 0) {
+      // If no visibleFields specified, show all columns
+      return baseColumns;
+    }
+    // Filter columns based on visibleFields
+    return baseColumns.filter(col => visibleFields.includes(col));
+  }, [baseColumns, visibleFields]);
 
   useEffect(() => {
     setColumnOrder(filteredColumns);
@@ -475,7 +483,7 @@ export const DataTable: React.FC<DataTableProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             height: '100%',
-            color: '#9ca3af',
+            color: 'var(--color-panel-text-secondary)',
             fontSize: '14px',
       }}
     >
@@ -508,7 +516,7 @@ export const DataTable: React.FC<DataTableProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             height: '100%',
-            color: '#9ca3af',
+            color: 'var(--color-panel-text-secondary)',
             fontSize: '14px',
             }}
           >
@@ -540,10 +548,10 @@ export const DataTable: React.FC<DataTableProps> = ({
               <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <tr
                   style={{
-                  borderBottom: '1px solid #2D313A',
+                  borderBottom: '1px solid var(--color-panel-border)',
                   fontSize: '12px',
-                    color: '#9ca3af',
-                    backgroundColor: '#0F1115',
+                    color: 'var(--color-panel-text-secondary)',
+                    backgroundColor: 'var(--color-panel-bg)',
                   }}
                 >
                   <th
@@ -555,7 +563,7 @@ export const DataTable: React.FC<DataTableProps> = ({
                       textAlign: 'center',
                       position: 'sticky',
                       left: 0,
-                  backgroundColor: '#0F1115',
+                  backgroundColor: 'var(--color-panel-bg)',
                       zIndex: 11,
                     }}
                   >
@@ -566,7 +574,7 @@ export const DataTable: React.FC<DataTableProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        borderRight: '1px solid #2D313A',
+                        borderRight: '1px solid var(--color-panel-border)',
                       }}
                     >
                       <Checkbox
@@ -595,10 +603,10 @@ export const DataTable: React.FC<DataTableProps> = ({
                           padding: '8px 12px',
                         fontWeight: 500,
                           position: 'relative',
-                          borderRight: '1px solid #2D313A',
+                          borderRight: '1px solid var(--color-panel-border)',
                           cursor: 'default',
-                          color: '#9ca3af',
-                          backgroundColor: isDragging ? '#13161D' : '#0F1115',
+                          color: 'var(--color-panel-text-secondary)',
+                          backgroundColor: isDragging ? 'var(--color-panel-active)' : 'var(--color-panel-bg)',
                           width,
                           minWidth: width,
                           maxWidth: width,
@@ -613,8 +621,8 @@ export const DataTable: React.FC<DataTableProps> = ({
                               bottom: 4,
                               width: 3,
                               borderRadius: 999,
-                              background: 'linear-gradient(180deg,#34D399,#10B981)',
-                              boxShadow: '0 0 12px rgba(16,185,129,0.7)',
+                              background: 'linear-gradient(180deg, var(--color-panel-success), var(--color-panel-success))',
+                              boxShadow: '0 0 12px color-mix(in srgb, var(--color-panel-success) 70%, transparent)',
                               [dragState.position === 'left' ? 'left' : 'right']: -1,
                               pointerEvents: 'none',
                             }}
@@ -688,10 +696,10 @@ export const DataTable: React.FC<DataTableProps> = ({
                               width: 2,
                               height: '70%',
                               borderRadius: 999,
-                              backgroundColor: resizingHover === column ? '#34D399' : 'transparent',
+                              backgroundColor: resizingHover === column ? 'var(--color-panel-success)' : 'transparent',
                               boxShadow:
                                 resizingHover === column
-                                  ? '0 0 8px rgba(52,211,153,0.7)'
+                                  ? '0 0 8px color-mix(in srgb, var(--color-panel-success) 70%, transparent)'
                                   : 'none',
                               transition: 'background-color 0.15s ease, box-shadow 0.15s ease',
                             }}
@@ -704,7 +712,7 @@ export const DataTable: React.FC<DataTableProps> = ({
                     style={{
                       padding: '8px',
                       width: trailingSpacerWidth,
-                      borderRight: '1px solid #2D313A',
+                      borderRight: '1px solid var(--color-panel-border)',
                     }}
                   ></th>
                 </tr>
@@ -713,17 +721,17 @@ export const DataTable: React.FC<DataTableProps> = ({
                 style={{
                   fontSize: '12px',
                   fontFamily: 'monospace',
-                  color: '#d1d5db',
+                  color: 'var(--color-panel-text)',
                 }}
               >
                 {documents.map((doc: TableDocument) => (
                 <tr
                   key={doc._id}
                   style={{
-                    borderBottom: '1px solid #2D313A',
+                    borderBottom: '1px solid var(--color-panel-border)',
                     transition: 'background-color 0.15s ease',
                     backgroundColor: selectedDocumentIds.includes(doc._id)
-                      ? '#1A232F'
+                      ? 'var(--color-panel-active)'
                       : 'transparent',
                   }}
                 >
@@ -736,7 +744,7 @@ export const DataTable: React.FC<DataTableProps> = ({
                         maxWidth: 40,
                         position: 'sticky',
                         left: 0,
-                        backgroundColor: '#0F1115',
+                        backgroundColor: 'var(--color-panel-bg)',
                         zIndex: 11,
                       }}
                     >
@@ -747,7 +755,7 @@ export const DataTable: React.FC<DataTableProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          borderRight: '1px solid #2D313A',
+                          borderRight: '1px solid var(--color-panel-border)',
                         }}
                       >
                         <Checkbox
@@ -774,14 +782,14 @@ export const DataTable: React.FC<DataTableProps> = ({
                         key={column}
                         style={{
                             padding: 0,
-                            borderRight: '1px solid #2D313A',
+                            borderRight: '1px solid var(--color-panel-border)',
                             width,
                             minWidth: width,
                             maxWidth: width,
                             backgroundColor: isMenuOpen
-                              ? '#1E2530'
+                              ? 'var(--color-panel-active)'
                               : isHovered
-                                ? '#171C23'
+                                ? 'var(--color-panel-hover)'
                                 : 'transparent',
                           }}
                           onMouseEnter={() =>
@@ -823,7 +831,7 @@ export const DataTable: React.FC<DataTableProps> = ({
                           >
                             <span
                               style={{
-                                color: isUnset ? '#b4ada3' : getValueColor(value),
+                                color: isUnset ? 'var(--color-panel-text-muted)' : getValueColor(value),
                           whiteSpace: 'nowrap',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
@@ -860,18 +868,18 @@ export const DataTable: React.FC<DataTableProps> = ({
                                   width: 22,
                                   height: 22,
                                   borderRadius: 6,
-                                  border: '1px solid #3B3F4A',
-                                  backgroundColor: '#12151B',
+                                  border: '1px solid var(--color-panel-border)',
+                                  backgroundColor: 'var(--color-panel-bg-tertiary)',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  color: '#fff',
+                                  color: 'var(--color-panel-text)',
                                   cursor: 'pointer',
                                 }}
                               >
                                 <MoreVertical 
                                   size={12}
-                                  color="#9CA3AF"
+                                  color="var(--color-panel-text-secondary)"
                                 />
                               </button>
                             )}
@@ -883,7 +891,7 @@ export const DataTable: React.FC<DataTableProps> = ({
                       style={{
                         padding: '8px',
                         width: trailingSpacerWidth,
-                        borderRight: '1px solid #2D313A',
+                        borderRight: '1px solid var(--color-panel-border)',
                       }}
                     ></td>
                 </tr>
@@ -897,8 +905,8 @@ export const DataTable: React.FC<DataTableProps> = ({
       <div
         style={{
         height: '40px',
-        borderTop: '1px solid #2D313A',
-        backgroundColor: '#0F1115',
+        borderTop: '1px solid var(--color-panel-border)',
+        backgroundColor: 'var(--color-panel-bg)',
         display: 'flex',
         alignItems: 'center',
         padding: '0 16px',
@@ -910,20 +918,20 @@ export const DataTable: React.FC<DataTableProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            color: '#6b7280',
+            color: 'var(--color-panel-text-muted)',
             fontSize: '12px',
-            border: '1px solid #2D313A',
+            border: '1px solid var(--color-panel-border)',
             borderRadius: '4px',
             padding: '6px 12px',
             backgroundColor: 'transparent',
             cursor: 'pointer',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = '#fff';
-            e.currentTarget.style.backgroundColor = '#1C1F26';
+            e.currentTarget.style.color = 'var(--color-panel-text)';
+            e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.color = '#6b7280';
+            e.currentTarget.style.color = 'var(--color-panel-text-muted)';
             e.currentTarget.style.backgroundColor = 'transparent';
           }}
         >
@@ -960,7 +968,7 @@ const buildCellMenuItems = (
   {
     label: `Copy ${column}`,
     shortcut: '⌘C',
-    onClick: () => navigator.clipboard.writeText(formatValue(value)),
+    onClick: () => copyToClipboard(formatValue(value)),
   },
   {
     label: `Edit ${column}`,
@@ -1032,19 +1040,19 @@ const EmptyTableState: React.FC<{ columns: string[] }> = ({ columns }) => {
             borderCollapse: 'collapse',
             tableLayout: 'fixed',
             fontSize: '12px',
-            color: '#6b7280',
+            color: 'var(--color-panel-text-muted)',
           }}
         >
           <thead>
-            <tr style={{ backgroundColor: 'rgba(17, 20, 28, 0.85)' }}>
+            <tr style={{ backgroundColor: 'color-mix(in srgb, var(--color-panel-bg) 85%, transparent)' }}>
               {placeholderColumns.map((column) => (
                 <th
                   key={column}
                   style={{
                     textAlign: 'left',
                     padding: '8px 12px',
-                    borderRight: '1px solid rgba(45, 49, 58, 0.6)',
-                    borderBottom: '1px solid rgba(45, 49, 58, 0.6)',
+                    borderRight: '1px solid color-mix(in srgb, var(--color-panel-border) 60%, transparent)',
+                    borderBottom: '1px solid color-mix(in srgb, var(--color-panel-border) 60%, transparent)',
                     textTransform: 'lowercase',
                   }}
                 >
@@ -1061,15 +1069,15 @@ const EmptyTableState: React.FC<{ columns: string[] }> = ({ columns }) => {
                     key={`${rowIdx}-${column}`}
                     style={{
                       padding: '6px 12px',
-                      borderRight: '1px solid rgba(45, 49, 58, 0.3)',
-                      borderBottom: '1px solid rgba(45, 49, 58, 0.3)',
+                      borderRight: '1px solid color-mix(in srgb, var(--color-panel-border) 30%, transparent)',
+                      borderBottom: '1px solid color-mix(in srgb, var(--color-panel-border) 30%, transparent)',
                     }}
                   >
                     <div
                       style={{
                         height: '12px',
                         borderRadius: '999px',
-                        backgroundColor: 'rgba(255,255,255,0.06)',
+                        backgroundColor: 'var(--color-panel-hover)',
                         width: `${60 + Math.random() * 30}%`,
                       }}
                     />
@@ -1093,15 +1101,15 @@ const EmptyTableState: React.FC<{ columns: string[] }> = ({ columns }) => {
       >
         <div
           style={{
-            backgroundColor: 'rgba(15,17,21,0.92)',
-            border: '1px solid #2D313A',
-            borderRadius: '10px',
+            backgroundColor: 'color-mix(in srgb, var(--color-panel-bg) 92%, transparent)',
+            border: '1px solid var(--color-panel-border)',
+            borderRadius: '24px',
             padding: '32px 40px',
             textAlign: 'center',
-            color: '#E5E7EB',
+            color: 'var(--color-panel-text)',
             maxWidth: 420,
             width: '90%',
-            boxShadow: '0 25px 55px rgba(0,0,0,0.55)',
+            boxShadow: '0 25px 55px var(--color-panel-shadow)',
           }}
         >
           <div
@@ -1110,8 +1118,8 @@ const EmptyTableState: React.FC<{ columns: string[] }> = ({ columns }) => {
               height: 48,
               margin: '0 auto 16px',
               borderRadius: '12px',
-              backgroundColor: '#181C24',
-              border: '1px solid #2D313A',
+              backgroundColor: 'var(--color-panel-bg-tertiary)',
+              border: '1px solid var(--color-panel-border)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1127,7 +1135,7 @@ const EmptyTableState: React.FC<{ columns: string[] }> = ({ columns }) => {
             style={{
               margin: '0 0 20px',
               fontSize: '13px',
-              color: '#9CA3AF',
+              color: 'var(--color-panel-text-secondary)',
               lineHeight: 1.5,
             }}
           >
@@ -1146,9 +1154,9 @@ const EmptyTableState: React.FC<{ columns: string[] }> = ({ columns }) => {
                 pointerEvents: 'auto',
                 height: '36px',
                 borderRadius: '8px',
-                border: '1px solid #323641',
+                border: '1px solid var(--color-panel-border)',
                 background: 'transparent',
-                color: '#E5E7EB',
+                color: 'var(--color-panel-text)',
                 fontSize: '13px',
                 cursor: 'pointer',
               }}
@@ -1162,7 +1170,7 @@ const EmptyTableState: React.FC<{ columns: string[] }> = ({ columns }) => {
               style={{
                 pointerEvents: 'auto',
                 fontSize: '12px',
-                color: '#34D399',
+                color: 'var(--color-panel-success)',
                 textDecoration: 'none',
               }}
             >

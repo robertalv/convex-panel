@@ -66,7 +66,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.2)',
+          backgroundColor: 'color-mix(in srgb, var(--color-panel-bg) 80%, transparent)',
           zIndex: 999,
           animation: 'fadeIn 0.2s ease-out',
         }}
@@ -81,12 +81,12 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
           bottom: 0,
           width: '480px',
           maxWidth: '90vw',
-          backgroundColor: '#0F1115',
-          borderLeft: '1px solid #2D313A',
+          backgroundColor: 'var(--color-panel-bg)',
+          borderLeft: '1px solid var(--color-panel-border)',
           zIndex: 1000,
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '-4px 0 24px rgba(0, 0, 0, 0.5)',
+          boxShadow: '-4px 0 24px var(--color-panel-shadow)',
           animation: 'slideInRight 0.3s ease-out',
         }}
         onClick={(e) => e.stopPropagation()}
@@ -96,7 +96,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
           style={{
             flex: 1,
             overflow: 'hidden',
-            backgroundColor: '#0F1115',
+            backgroundColor: 'var(--color-panel-bg)',
             display: 'flex',
             flexDirection: 'column',
           }}

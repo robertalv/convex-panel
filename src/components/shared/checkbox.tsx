@@ -54,11 +54,11 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
             height: size,
             borderRadius: 6,
             cursor: 'pointer',
-            border: props.checked ? '1px solid transparent' : '1px solid #4B5563',
-            backgroundColor: props.checked ? '#34D399' : '#1C212C',
+            border: props.checked ? '1px solid transparent' : '1px solid var(--color-panel-border)',
+            backgroundColor: props.checked ? 'var(--color-panel-success)' : 'var(--color-panel-bg-tertiary)',
             boxShadow: props.checked
-              ? '0 0 6px rgba(52,211,153,0.6)'
-              : '0 1px 2px rgba(0,0,0,0.35)',
+              ? '0 0 6px color-mix(in srgb, var(--color-panel-success) 60%, transparent)'
+              : '0 1px 2px var(--color-panel-shadow)',
             transition: 'all 0.15s ease',
           }}
         />

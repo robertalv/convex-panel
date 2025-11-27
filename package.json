@@ -5,12 +5,18 @@
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
+  "style": "dist/index.css",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.esm.js",
       "require": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./styles.css": {
+      "import": "./dist/index.css",
+      "require": "./dist/index.css",
+      "default": "./dist/index.css"
     },
     "./utils/getConvexToken": {
       "types": "./dist/utils/getConvexToken.d.ts",
@@ -32,8 +38,9 @@
   ],
   "scripts": {
     "copy-src": "node copy-src.js",
-    "build": "npm run copy-src && rollup -c",
-    "dev": "npm run copy-src && rollup -c -w",
+    "build": "npm run copy-src && tsup",
+    "build:rollup": "npm run copy-src && rollup -c",
+    "dev": "tsup --watch",
     "dev:live": "vite --config dev/vite.config.ts",
     "dev:server": "node dev/server.js",
     "dev:all": "npm run dev:server & npm run dev:live",
@@ -80,12 +87,14 @@
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^11.1.6",
     "@rollup/plugin-url": "^8.0.2",
+    "@tailwindcss/postcss": "^4.1.17",
     "@types/debounce": "^1.2.1",
     "@types/node": "^22.13.10",
     "@types/react": "^18.2.21",
     "@types/react-dom": "^18.2.7",
     "@types/react-window": "^1.8.8",
     "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.22",
     "convex": "^1.21.0",
     "copyfiles": "^2.4.1",
     "cors": "^2.8.5",
@@ -93,13 +102,17 @@
     "express": "^4.21.2",
     "monaco-editor-webpack-plugin": "^7.1.0",
     "next": "^13.4.19",
+    "postcss": "^8.5.6",
+    "postcss-import": "^16.1.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "rimraf": "^5.0.1",
     "rollup": "^3.29.1",
     "rollup-plugin-peer-deps-external": "^2.2.4",
     "rollup-plugin-url": "^3.0.1",
+    "tailwindcss": "^4.1.17",
     "tslib": "^2.8.1",
+    "tsup": "^8.5.1",
     "typescript": "^5.8.2",
     "vite": "^5.4.0"
   },

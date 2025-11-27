@@ -34,7 +34,7 @@ export const InsightsSummaryListItem: React.FC<{ insight: Insight }> = ({ insigh
         minWidth: 'fit-content',
         alignItems: 'center',
         gap: '8px',
-        borderBottom: '1px solid #2D313A',
+        borderBottom: '1px solid var(--color-panel-border)',
         padding: '8px',
         textAlign: 'left',
         background: 'none',
@@ -43,10 +43,10 @@ export const InsightsSummaryListItem: React.FC<{ insight: Insight }> = ({ insigh
         borderTop: 'none',
         cursor: 'pointer',
         fontSize: '12px',
-        color: '#d1d5db',
+        color: 'var(--color-panel-text)',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = '#1C1F26';
+        e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.backgroundColor = 'transparent';
@@ -66,9 +66,9 @@ export const InsightsSummaryListItem: React.FC<{ insight: Insight }> = ({ insigh
                 alignItems: 'center',
                 padding: '4px 8px',
                 borderRadius: '4px',
-                border: '1px solid #dc2626',
-                backgroundColor: 'rgba(220, 38, 38, 0.1)',
-                color: '#ef4444',
+                border: '1px solid var(--color-panel-error)',
+                backgroundColor: 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)',
+                color: 'var(--color-panel-error)',
                 fontSize: '12px',
               }}
             >
@@ -89,9 +89,9 @@ export const InsightsSummaryListItem: React.FC<{ insight: Insight }> = ({ insigh
                 alignItems: 'center',
                 padding: '4px 8px',
                 borderRadius: '4px',
-                border: '1px solid #f59e0b',
-                backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                color: '#fbbf24',
+                border: '1px solid var(--color-panel-warning)',
+                backgroundColor: 'color-mix(in srgb, var(--color-panel-warning) 10%, transparent)',
+                color: 'var(--color-panel-warning)',
                 fontSize: '12px',
               }}
             >
@@ -101,7 +101,7 @@ export const InsightsSummaryListItem: React.FC<{ insight: Insight }> = ({ insigh
           </Tooltip>
         )}
       </span>
-      <div style={{ width: '288px', minWidth: '288px', fontWeight: 600, color: '#e5e7eb' }}>
+      <div style={{ width: '288px', minWidth: '288px', fontWeight: 600, color: 'var(--color-panel-text)' }}>
         {functionName}
       </div>
       <div style={{ width: '240px', minWidth: '240px' }}>

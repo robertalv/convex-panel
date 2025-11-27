@@ -377,6 +377,7 @@ export interface UseTableDataProps {
   adminClient: ConvexClient | null;
   onError?: (error: string) => void;
   useMockData?: boolean;
+  componentId?: string | null;
 }
 
 export interface UseTableDataReturn {
@@ -444,7 +445,6 @@ export interface CacheHitData {
 export interface CacheHitRateChartProps {
   deploymentUrl: string;
   authToken: string;
-  refreshInterval?: number;
   refreshInterval?: number;
   useMockData?: boolean;
 }

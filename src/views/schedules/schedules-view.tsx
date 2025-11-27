@@ -98,17 +98,10 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
   }, [components, functions]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: '#0F1115' }}>
+    <div className="cp-schedules-container">
       {/* Header */}
-      <div style={{
-        height: '48px',
-        borderBottom: '1px solid #2D313A',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 16px',
-      }}>
-        <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#fff' }}>Schedules</h2>
+      <div className="cp-schedules-header">
+        <h2 className="cp-schedules-title">Schedules</h2>
         <div style={{ width: '192px' }}>
           <ComponentSelector
             selectedComponent={selectedComponent}
@@ -119,52 +112,23 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
       </div>
 
       {/* Tabs */}
-      <div style={{
-        padding: '0 16px',
-        borderBottom: '1px solid #2D313A',
-        display: 'flex',
-        gap: '24px',
-        fontSize: '14px',
-      }}>
+      <div className="cp-schedules-tabs">
         <button
           onClick={() => setSelectedTab('scheduled')}
-          style={{
-            padding: '12px 0',
-            color: selectedTab === 'scheduled' ? '#fff' : '#9ca3af',
-            fontWeight: selectedTab === 'scheduled' ? 500 : 400,
-            backgroundColor: 'transparent',
-            border: 'none',
-            borderBottom: selectedTab === 'scheduled' ? '2px solid #fff' : '2px solid transparent',
-            cursor: 'pointer',
-            transition: 'color 0.2s',
-          }}
+          className={`cp-schedules-tab ${selectedTab === 'scheduled' ? 'active' : ''}`}
         >
           Scheduled Functions
         </button>
         <button
           onClick={() => setSelectedTab('cron')}
-          style={{
-            padding: '12px 0',
-            color: selectedTab === 'cron' ? '#fff' : '#9ca3af',
-            fontWeight: selectedTab === 'cron' ? 500 : 400,
-            backgroundColor: 'transparent',
-            border: 'none',
-            borderBottom: selectedTab === 'cron' ? '2px solid #fff' : '2px solid transparent',
-            cursor: 'pointer',
-            transition: 'color 0.2s',
-          }}
+          className={`cp-schedules-tab ${selectedTab === 'cron' ? 'active' : ''}`}
         >
           Cron Jobs
         </button>
       </div>
 
       {/* Filters Bar */}
-      <div style={{
-        padding: '16px',
-        borderBottom: '1px solid #2D313A',
-        display: 'flex',
-        gap: '8px',
-      }}>
+      <div className="cp-schedules-filters">
         <div style={{ width: '192px' }}>
           <FunctionSelector
             selectedFunction={selectedFunction}
@@ -173,41 +137,14 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
             componentId={selectedComponent}
           />
         </div>
-        <button style={{
-          padding: '6px 12px',
-          backgroundColor: 'rgba(239, 68, 68, 0.1)',
-          border: '1px solid rgba(239, 68, 68, 0.2)',
-          borderRadius: '4px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          fontSize: '12px',
-          color: '#f87171',
-          cursor: 'pointer',
-          transition: 'background-color 0.2s',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
-        }}
-        >
+        <button className="cp-schedules-cancel-btn">
           <Trash2 style={{ width: '14px', height: '14px' }} />
           Cancel All
         </button>
       </div>
 
       {/* Table Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '8px 16px',
-        borderBottom: '1px solid #2D313A',
-        fontSize: '12px',
-        fontWeight: 500,
-        color: '#9ca3af',
-      }}>
+      <div className="cp-schedules-table-header">
         <div style={{ width: '96px' }}>ID</div>
         <div style={{ width: '128px' }}>Scheduled Time</div>
         <div style={{ width: '96px' }}>Status</div>
@@ -218,59 +155,17 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
       </div>
 
       {/* Empty State */}
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-      }}>
-        <div style={{
-          width: '48px',
-          height: '48px',
-          backgroundColor: 'rgba(168, 85, 247, 0.2)',
-          borderRadius: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '16px',
-        }}>
+      <div className="cp-schedules-empty">
+        <div className="cp-schedules-empty-icon">
           <Calendar style={{ width: '24px', height: '24px', color: '#a78bfa' }} />
         </div>
-        <h3 style={{
-          fontSize: '18px',
-          fontWeight: 500,
-          color: '#fff',
-          marginBottom: '8px',
-        }}>
+        <h3 className="cp-schedules-empty-title">
           Schedule functions to run later
         </h3>
-        <p style={{
-          fontSize: '14px',
-          color: '#9ca3af',
-          marginBottom: '24px',
-          maxWidth: '384px',
-        }}>
+        <p className="cp-schedules-empty-desc">
           Scheduled functions can run after an amount of time passes, or at a specific date.
         </p>
-        <a
-          href="#"
-          style={{
-            fontSize: '14px',
-            color: '#60a5fa',
-            textDecoration: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.textDecoration = 'underline';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.textDecoration = 'none';
-          }}
-        >
+        <a href="#" className="cp-schedules-empty-link">
           <ExternalLink style={{ width: '12px', height: '12px' }} />
           Learn more about scheduled functions
         </a>

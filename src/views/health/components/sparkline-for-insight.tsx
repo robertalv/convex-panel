@@ -20,7 +20,7 @@ export const SparklineForInsight: React.FC<{ insight: Insight }> = ({ insight })
         <polyline
           points={points}
           fill="none"
-          stroke="#9ca3af"
+          stroke="var(--color-panel-text-secondary)"
           strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"

@@ -12,13 +12,13 @@ export const BigMetric: React.FC<BigMetricProps> = ({ health, metric, children }
   const getHealthColor = () => {
     switch (health) {
       case 'healthy':
-        return '#22c55e'; // green
+        return 'var(--color-panel-success)';
       case 'warning':
-        return '#f59e0b'; // amber
+        return 'var(--color-panel-warning)';
       case 'error':
-        return '#ef4444'; // red
+        return 'var(--color-panel-error)';
       default:
-        return '#fff'; // white
+        return 'var(--color-panel-text)';
     }
   };
 
@@ -50,7 +50,7 @@ export const BigMetric: React.FC<BigMetricProps> = ({ health, metric, children }
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           textAlign: 'center',
-          color: '#9ca3af', // text-content-secondary
+          color: 'var(--color-panel-text-secondary)',
           fontSize: '12px',
         }}
       >

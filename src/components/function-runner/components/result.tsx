@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
 import { FunctionResult as FunctionResultType } from '../../../utils/functionExecution';
+import { copyToClipboard } from '../../../utils/toast';
 
 interface ResultProps {
   result?: FunctionResultType;
@@ -20,8 +21,6 @@ export const Result: React.FC<ResultProps> = ({
   requestFilter,
   startCursor,
 }) => {
-  const [copied, setCopied] = useState(false);
-
   const resultString = useMemo(() => {
     if (!result) return '';
     if (result.success) {
@@ -32,13 +31,7 @@ export const Result: React.FC<ResultProps> = ({
 
   const handleCopy = async () => {
     if (resultString) {
-      try {
-        await navigator.clipboard.writeText(resultString);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      } catch (err) {
-        console.error('Failed to copy:', err);
-      }
+      await copyToClipboard(resultString);
     }
   };
 

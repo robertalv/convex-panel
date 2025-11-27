@@ -15,31 +15,14 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({
   const displayTeam = project ? team : null;
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '2px 8px',
-        borderRadius: '4px',
-        userSelect: 'none',
-      }}
-    >
+    <div className="cp-project-selector">
       {displayTeam && (
         <Avatar name={displayTeam.name} size={20} />
       )}
       {!displayTeam && team && (
         <Avatar name={team.name} size={20} />
       )}
-      <span style={{ 
-        fontSize: '12px', 
-        fontWeight: 600, 
-        color: '#fff',
-        maxWidth: '200px',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-      }}>
+      <span className="cp-project-name">
         {displayName}
       </span>
     </div>

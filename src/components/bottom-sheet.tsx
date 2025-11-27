@@ -11,25 +11,25 @@ import {
   ScrollText,
   Settings,
   HelpCircle,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { ConvexLogo } from './icons';
 import { AskAI } from './ask-ai';
 import { extractDeploymentName, extractProjectName, fetchDeploymentMetadata, fetchProjectInfo } from '../utils/api';
 import { DeploymentDisplay } from './shared/deployment-display';
 import { ProjectSelector } from './shared/project-selector';
-import { getStorageItem, setStorageItem } from '../utils/storage';
-import { STORAGE_KEYS } from '../utils/constants';
 import { GlobalFunctionTester } from './function-runner/global-function-tester';
+import { useActiveTab } from '../hooks/useActiveTab';
 import { useIsGlobalRunnerShown, useShowGlobalRunner } from '../lib/functionRunner';
 import { useFunctionRunnerShortcuts } from '../hooks/useFunctionRunnerShortcuts';
 import { TabId } from '../types/tabs';
-import { bottomSheetStyles } from '../styles/panelStyles';
 import { Team, Project, EnvType } from '../types';
+import { useThemeSafe } from '../hooks/useTheme';
 
 interface BottomSheetProps {
   isOpen: boolean;
   onClose: () => void;
-  onHide?: () => void;
   children?: React.ReactNode;
   projectName?: string;
   deploymentUrl?: string;
@@ -54,30 +54,6 @@ interface SidebarItemProps {
   onClick: () => void;
 }
 
-const {
-  rootBase: rootBaseStyle,
-  headerBase: headerBaseStyle,
-  headerSection: headerSectionStyle,
-  supportButton: supportButtonStyle,
-  supportButtonHover: supportButtonHoverStyle,
-  iconButton: iconButtonStyle,
-  iconButtonHover: iconButtonHoverStyle,
-  connectButton: connectButtonStyle,
-  connectButtonHover: connectButtonHoverStyle,
-  resizeHandle: resizeHandleStyle,
-  sidebarItemWrapper: sidebarItemWrapperStyle,
-  sidebarButtonBase: sidebarButtonBaseStyle,
-  sidebarButtonActive: sidebarButtonActiveStyle,
-  sidebarButtonHover: sidebarButtonHoverStyle,
-  tooltip: tooltipStyle,
-  sidebarContainer: sidebarContainerStyle,
-  separator: separatorStyle,
-  mainContent: mainContentStyle,
-  floatingButtonWrapper: floatingButtonWrapperStyle,
-  floatingButton: floatingButtonStyle,
-  floatingButtonHover: floatingButtonHoverStyle,
-} = bottomSheetStyles;
-
 const PANEL_HEIGHT_STORAGE_KEY = 'convex-panel-bottom-sheet-height';
 const PANEL_MIN_HEIGHT = 40;
 const PANEL_COLLAPSED_HEIGHT = `${PANEL_MIN_HEIGHT}px`;
@@ -91,93 +67,33 @@ interface TabDefinition {
 }
 
 const TAB_DEFINITIONS: TabDefinition[] = [
-  { id: 'health', icon: <Activity size={20} />, label: 'Health' },
-  { id: 'data', icon: <Database size={20} />, label: 'Data' },
-  { id: 'functions', icon: <Code2 size={20} />, label: 'Functions' },
-  { id: 'files', icon: <FileCode size={20} />, label: 'Files' },
-  { id: 'schedules', icon: <CalendarClock size={20} />, label: 'Schedules' },
-  { id: 'logs', icon: <ScrollText size={20} />, label: 'Logs' },
-  { id: 'settings', icon: <Settings size={20} />, label: 'Settings' },
+  { id: 'health', icon: <Activity size={14} />, label: 'Health' },
+  { id: 'data', icon: <Database size={14} />, label: 'Data' },
+  { id: 'functions', icon: <Code2 size={14} />, label: 'Functions' },
+  { id: 'files', icon: <FileCode size={14} />, label: 'Files' },
+  { id: 'schedules', icon: <CalendarClock size={14} />, label: 'Schedules' },
+  { id: 'logs', icon: <ScrollText size={14} />, label: 'Logs' },
+  { id: 'settings', icon: <Settings size={14} />, label: 'Settings' },
 ];
-
-interface HoverButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  hoverStyle?: React.CSSProperties;
-  style: React.CSSProperties;
-}
-
-const HoverButton: React.FC<HoverButtonProps> = ({
-  style,
-  hoverStyle,
-  children,
-  onMouseEnter,
-  onMouseLeave,
-  ...rest
-}) => {
-  const [isHovered, setIsHovered] = useState(false);
-
-  const handleMouseEnter = (event: React.MouseEvent<HTMLButtonElement>) => {
-    setIsHovered(true);
-    onMouseEnter?.(event);
-  };
-
-  const handleMouseLeave = (event: React.MouseEvent<HTMLButtonElement>) => {
-    setIsHovered(false);
-    onMouseLeave?.(event);
-  };
-
-  return (
-    <button
-      {...rest}
-      style={{
-        ...style,
-        ...(isHovered && hoverStyle ? hoverStyle : {}),
-      }}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      {children}
-    </button>
-  );
-};
 
 const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, isActive, onClick }) => {
   const [showTooltip, setShowTooltip] = useState(false);
 
   return (
     <div
-      style={{
-        ...sidebarItemWrapperStyle,
-        position: 'relative',
-      }}
+      className="cp-sidebar-item-wrapper"
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
     >
-      {isActive && (
-        <div
-          style={{
-            position: 'absolute',
-            left: 4,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            width: 3,
-            height: 24,
-            borderRadius: 999,
-            background: '#34D399',
-          }}
-        />
-      )}
-      <HoverButton
+      {isActive && <div className="cp-sidebar-active-indicator" />}
+      <button
         type="button"
         onClick={onClick}
-        style={{
-          ...sidebarButtonBaseStyle,
-          ...(isActive ? sidebarButtonActiveStyle : {}),
-        }}
-        hoverStyle={isActive ? undefined : sidebarButtonHoverStyle}
+        className={`cp-sidebar-btn ${isActive ? 'active' : ''}`}
       >
         {icon}
-      </HoverButton>
-      {showTooltip && <div style={tooltipStyle}>{label}</div>}
+      </button>
+      {showTooltip && <div className="cp-tooltip">{label}</div>}
     </div>
   );
 };
@@ -185,14 +101,14 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, isActive, onClic
 export const BottomSheet: React.FC<BottomSheetProps> = ({
   isOpen,
   onClose,
-  onHide,
   children,
   projectName: providedProjectName,
   deploymentUrl,
   environment: providedEnvironment = 'development',
   isAuthenticated,
   onConnect,
-  oauthConfig,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  oauthConfig: _oauthConfig,
   activeTab: externalActiveTab,
   onTabChange,
   adminClient,
@@ -202,13 +118,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   team,
   project,
 }) => {
-  const [internalActiveTab, setInternalActiveTab] = useState<TabId>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = getStorageItem<TabId>(STORAGE_KEYS.ACTIVE_TAB, 'health');
-      return saved;
-    }
-    return 'health';
-  });
+  const [internalActiveTab, setInternalActiveTab] = useActiveTab();
   const activeTab = externalActiveTab ?? internalActiveTab;
   const [isResizing, setIsResizing] = useState(false);
   const [customHeight, setCustomHeight] = useState<number | null>(() => {
@@ -287,22 +197,17 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     fetchInfo();
   }, [isAuthenticated, deploymentUrl, adminClient, accessToken, teamSlug, projectSlug, team, project]);
 
-  const projectName = deploymentMetadata?.projectName || providedProjectName || extractProjectName(deploymentUrl) || 'convex-panel';
+  // Project name for future use
+  const _projectName = deploymentMetadata?.projectName || providedProjectName || extractProjectName(deploymentUrl) || 'convex-panel';
+  void _projectName; // Silence unused warning
   const deploymentName = deploymentMetadata?.deploymentName || extractDeploymentName(deploymentUrl) || 'convex-panel';
   const deploymentType = deploymentMetadata?.deploymentType || providedEnvironment || 'development';
   const environment = deploymentType === 'prod' ? 'production' : deploymentType === 'preview' ? 'preview' : 'development';
   
   const handleTabChange = (tab: TabId) => {
     setInternalActiveTab(tab);
-    setStorageItem(STORAGE_KEYS.ACTIVE_TAB, tab);
     onTabChange?.(tab);
   };
-
-  useEffect(() => {
-    if (activeTab) {
-      setStorageItem(STORAGE_KEYS.ACTIVE_TAB, activeTab);
-    }
-  }, [activeTab]);
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     if (!isAuthenticated) return;
@@ -348,23 +253,12 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     if (customHeight !== null) return `${customHeight}px`;
     return PANEL_DEFAULT_HEIGHT;
   };
-  
-  const height = getHeight();
-  const panelStyle: React.CSSProperties = {
-    ...rootBaseStyle,
-    height,
-    transition: isResizing ? 'none' : 'height 0.3s ease',
-    userSelect: isResizing ? 'none' : 'auto',
-  };
 
-  const headerStyle: React.CSSProperties = {
-    ...headerBaseStyle,
-    borderBottom: isOpen ? '1px solid #2D313A' : 'none',
-  };
+  const height = getHeight();
 
   const headerLeftContent = isAuthenticated ? (
     <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div className="cp-flex cp-items-center cp-gap-2">
         <ConvexLogo width={20} height={20} />
         <ProjectSelector team={projectInfo?.team || team} project={projectInfo?.project || project} />
       </div>
@@ -380,10 +274,9 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     <>
       <ConvexLogo width={20} height={20} />
       {onConnect && (
-        <HoverButton
+        <button
           type="button"
-          style={connectButtonStyle}
-          hoverStyle={connectButtonHoverStyle}
+          className="cp-connect-btn"
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -391,31 +284,36 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
           }}
         >
           Connect
-        </HoverButton>
+        </button>
       )}
     </>
   );
 
+  const { theme, toggleTheme } = useThemeSafe();
+
   const headerRightContent = (
     <>
       <AskAI />
-      <HoverButton type="button" style={supportButtonStyle} hoverStyle={supportButtonHoverStyle}>
+      <button type="button" className="cp-support-btn">
         <HelpCircle size={14} /> Support
-      </HoverButton>
-      <div style={separatorStyle} />
+      </button>
+      <button
+        type="button"
+        onClick={toggleTheme}
+        className="cp-theme-toggle-btn"
+        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+      </button>
+      <div className="cp-separator" />
       {isAuthenticated ? (
-        <HoverButton type="button" onClick={onClose} style={iconButtonStyle} hoverStyle={iconButtonHoverStyle}>
+        <button type="button" onClick={onClose} className="cp-icon-btn cp-theme-toggle-btn">
           {isOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-        </HoverButton>
+        </button>
       ) : (
-        <HoverButton
-          type="button"
-          onClick={onHide || onClose}
-          style={iconButtonStyle}
-          hoverStyle={iconButtonHoverStyle}
-        >
+        <button type="button" onClick={onClose} className="cp-icon-btn">
           <X size={16} />
-        </HoverButton>
+        </button>
       )}
     </>
   );
@@ -423,19 +321,26 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   const isPanelExpanded = Boolean(isAuthenticated && isOpen);
 
   return (
-    <div style={panelStyle}>
+    <div
+      className={`cp-bottom-sheet cp-theme-${theme}`}
+      style={{
+        height,
+        transition: isResizing ? 'none' : 'height 0.3s ease',
+        userSelect: isResizing ? 'none' : 'auto',
+      }}
+    >
       {isPanelExpanded && (
-        <div onMouseDown={handleResizeStart} style={resizeHandleStyle} />
+        <div onMouseDown={handleResizeStart} className="cp-resize-handle" />
       )}
 
-      <div style={headerStyle}>
-        <div style={headerSectionStyle}>{headerLeftContent}</div>
-        <div style={headerSectionStyle}>{headerRightContent}</div>
+      <div className="cp-header" style={{ borderBottom: isOpen ? undefined : 'none' }}>
+        <div className="cp-header-section">{headerLeftContent}</div>
+        <div className="cp-header-section">{headerRightContent}</div>
       </div>
 
       {isPanelExpanded && (
         <>
-          <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          <div className="cp-flex cp-flex-1 cp-overflow-hidden">
             {isRunnerShown ? (
               <GlobalFunctionTester
                 adminClient={adminClient}
@@ -444,7 +349,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
               />
             ) : (
               <>
-                <div style={sidebarContainerStyle}>
+                <div className="cp-sidebar">
                   {TAB_DEFINITIONS.map((tab) => (
                     <SidebarItem
                       key={tab.id}
@@ -456,22 +361,21 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
                   ))}
                 </div>
 
-                <div style={mainContentStyle}>{children}</div>
+                <div className="cp-main-content">{children}</div>
               </>
             )}
           </div>
 
           {!isRunnerShown && isAuthenticated && (
-            <div style={floatingButtonWrapperStyle}>
-              <HoverButton
+            <div className="cp-floating-btn-wrapper">
+              <button
                 type="button"
                 onClick={() => showGlobalRunner(null, 'click')}
-                style={floatingButtonStyle}
-                hoverStyle={floatingButtonHoverStyle}
+                className="cp-floating-btn"
                 title="Run functions (Ctrl+`)"
               >
                 fn
-              </HoverButton>
+              </button>
             </div>
           )}
         </>

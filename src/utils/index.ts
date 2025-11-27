@@ -1,6 +1,4 @@
 import { LogEntry } from "../types";
-import { STORAGE_KEYS } from "./constants";
-import { getStorageItem } from "./storage";
 
 /**
  * Format JSON for display
@@ -28,34 +26,6 @@ export const getLogId = (log: LogEntry) => {
   return `${log.timestamp}-${log.function?.request_id || ''}-${log.message || ''}`;
 };
 
-/**
- * In-memory cache
- * @type {Record<string, any>}
- * @description A simple in-memory cache to reduce localStorage reads
- */
-export const memoryCache: Record<string, any> = {};
-
-/**
- * Get table filters from memory cache or localStorage
- * @param tableName - The name of the table to get filters for
- * @returns The filters for the table
- */
-export function getTableFilters(tableName: string) {
-  // Use a specific cache key for each table's filters
-  const cacheKey = `${STORAGE_KEYS.TABLE_FILTERS}:${tableName}`;
-  
-  if (cacheKey in memoryCache) {
-    return memoryCache[cacheKey];
-  }
-  
-  const allFilters = getStorageItem<Record<string, any>>(STORAGE_KEYS.TABLE_FILTERS, {});
-  const tableFilters = allFilters[tableName] || { clauses: [] };
-  
-  // Cache the result for this specific table
-  memoryCache[cacheKey] = tableFilters;
-  
-  return tableFilters;
-}
 
 /**
  * Generate a color for a function name

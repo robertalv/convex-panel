@@ -42,7 +42,7 @@ export const HealthCard: React.FC<HealthCardProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#6b7280',
+            color: 'var(--color-panel-text-muted)',
             fontSize: '12px',
           }}
         >
@@ -55,7 +55,7 @@ export const HealthCard: React.FC<HealthCardProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#ef4444',
+            color: 'var(--color-panel-error)',
             fontSize: '12px',
           }}
         >

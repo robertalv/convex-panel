@@ -22,7 +22,7 @@ export const ProblemForInsight: React.FC<{ insight: Insight }> = ({ insight }) =
   };
 
   return (
-    <span style={{ fontSize: '12px', color: '#d1d5db' }}>
+    <span style={{ fontSize: '12px', color: 'var(--color-panel-text)' }}>
       {getProblemText()}
     </span>
   );

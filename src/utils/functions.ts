@@ -66,3 +66,52 @@ export const deleteDocuments = async (
     throw error;
   }
 };
+
+/**
+ * Inserts documents into a table
+ * @param table - The table name
+ * @param documents - Array of documents to insert
+ * @param adminClient - The Convex admin client instance
+ * @param componentId - Optional component ID
+ * @returns The result of the mutation
+ */
+export const insertDocuments = async (
+  table: string,
+  documents: any[],
+  adminClient: any,
+  componentId: string | null = null
+) => {
+  if (!adminClient) {
+    throw new Error("Admin client is not available");
+  }
+
+  try {
+    // Try using system mutation first
+    try {
+      const result = await adminClient.mutation(
+        "_system/frontend/insertDocuments" as any,
+        {
+          table,
+          documents,
+          componentId
+        }
+      );
+      return result;
+    } catch (systemError: any) {
+      // If system mutation doesn't exist, try using a generic mutation approach
+      // This would require the user to have a mutation in their codebase
+      console.warn("System insertDocuments mutation not available, trying alternative approach:", systemError);
+      
+      // Alternative: Use HTTP API if available
+      // For now, throw the error so the user knows they need to implement a mutation
+      throw new Error(
+        "Insert documents mutation not available. Please create a mutation in your Convex functions: " +
+        "export const insertDocuments = mutation({ args: { table: v.string(), documents: v.array(v.any()) }, " +
+        "handler: async (ctx, { table, documents }) => { return await Promise.all(documents.map(doc => ctx.db.insert(table, doc))); } });"
+      );
+    }
+  } catch (error) {
+    console.error("Error inserting documents:", error);
+    throw error;
+  }
+};

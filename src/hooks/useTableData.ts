@@ -59,6 +59,12 @@ export const useTableData = ({
    * @default false
    */
   useMockData = false,
+
+  /**
+   * Optional component ID to filter tables/data by component.
+   * If null or 'app', fetches root app tables/data.
+   */
+  componentId = null,
 }: UseTableDataProps): UseTableDataReturn => {
   // Use a ref to track if filters have been loaded from storage
   const filtersLoadedRef = useRef<Record<string, boolean>>({});
@@ -154,13 +160,17 @@ export const useTableData = ({
     setError(null);
         
     try {
+      // Normalize componentId: 'app' means root (null)
+      const normalizedComponentId = componentId === 'app' || componentId === null ? null : componentId;
+
       // Use mock data if useMockData is true
       const { tables: tableData, selectedTable: newSelectedTable } = useMockData
         ? await mockFetchTablesFromApi()
         : await fetchTablesFromApi({
             convexUrl,
             accessToken,
-            adminClient
+            adminClient,
+            componentId: normalizedComponentId
           });
 
       setTables(tableData);
@@ -186,7 +196,7 @@ export const useTableData = ({
     } finally {
       setIsLoading(false);
     }
-  }, [convexUrl, accessToken, onError, adminClient, setSelectedTable, useMockData]);
+  }, [convexUrl, accessToken, onError, adminClient, setSelectedTable, useMockData, componentId]);
 
   /**
    * Fetch table data
@@ -339,11 +349,14 @@ export const useTableData = ({
           }))
         : null;
 
+      // Normalize componentId: 'app' means root (null)
+      const normalizedComponentId = componentId === 'app' || componentId === null ? null : componentId;
+
       const args: PageArgs = {
         paginationOpts: page,
         table: tableName,
         filters: filterString,
-        componentId: null,
+        componentId: normalizedComponentId,
       };
 
       if (!adminClient) {
@@ -402,7 +415,7 @@ export const useTableData = ({
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [adminClient, convexUrl, onError, useMockData, sortConfig]);
+  }, [adminClient, convexUrl, onError, useMockData, sortConfig, componentId]);
 
   /**
    * Helper to debounce a table fetch

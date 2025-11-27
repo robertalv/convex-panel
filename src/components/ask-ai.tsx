@@ -36,25 +36,7 @@ export function AskAI() {
 
   return (
     <button
-      className="js-launch-kapa-ai"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        fontSize: '12px',
-        color: '#999',
-        background: 'transparent',
-        border: 'none',
-        cursor: 'pointer',
-        transition: 'color 0.2s',
-        padding: 0,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.color = '#fff';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.color = '#999';
-      }}
+      className="js-launch-kapa-ai cp-ask-ai-btn"
     >
       <Sparkles style={{ width: '12px', height: '12px' }} /> Ask AI
     </button>

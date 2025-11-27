@@ -20,13 +20,20 @@ export const STORAGE_KEYS: Record<string, string> = {
   DETAIL_PANEL_WIDTH: `${STORAGE_PREFIX}:detail-panel-width`,
   SELECTED_FUNCTION: `${STORAGE_PREFIX}:selected-function`,
   PANEL_HIDDEN: `${STORAGE_PREFIX}:panel-hidden`,
+  THEME: `${STORAGE_PREFIX}:theme`,
+  PANEL_HEIGHT: `${STORAGE_PREFIX}:panel-height`,
 }
 
-// Default UI measurements
+export const PANEL_MIN_HEIGHT = 40;
+
 export const UI_DEFAULTS = {
-  DETAIL_PANEL_DEFAULT_WIDTH: 400, // pixels
-  DETAIL_PANEL_MIN_WIDTH: 300, // pixels
-  DETAIL_PANEL_MAX_WIDTH: 800, // pixels
+  DETAIL_PANEL_DEFAULT_WIDTH: 400,
+  DETAIL_PANEL_MIN_WIDTH: 300,
+  DETAIL_PANEL_MAX_WIDTH: 800,
+  PANEL_MIN_HEIGHT,
+  PANEL_COLLAPSED_HEIGHT: `${PANEL_MIN_HEIGHT}px`,
+  PANEL_MAX_HEIGHT_RATIO: 0.9,
+  PANEL_DEFAULT_HEIGHT: '60vh',
 };
 
 /**

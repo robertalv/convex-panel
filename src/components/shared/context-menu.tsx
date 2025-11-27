@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useThemeSafe } from '../../hooks/useTheme';
 
 export interface ContextMenuItemDescriptor {
   label: string;
@@ -22,6 +23,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onClose,
 }) => {
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const { theme } = useThemeSafe();
 
   useEffect(() => {
     const handleMouseDown = (event: MouseEvent) => {
@@ -54,16 +56,16 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   return createPortal(
     <div
       ref={menuRef}
-      className="global-context-menu"
+      className={`global-context-menu cp-theme-${theme}`}
       style={{
         position: 'fixed',
         top: position.y,
         left: position.x,
         minWidth: 220,
-        backgroundColor: '#11151C',
-        border: '1px solid #2D313A',
-        borderRadius: 10,
-        boxShadow: '0 20px 35px rgba(0,0,0,0.55)',
+        backgroundColor: 'var(--color-panel-bg-secondary)',
+        border: '1px solid var(--color-panel-border)',
+        borderRadius: 12,
+        boxShadow: '0 20px 35px var(--color-panel-shadow)',
         padding: '6px 0',
         zIndex: 100000,
       }}
@@ -74,7 +76,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             <div
               key={`divider-${index}`}
               style={{
-                borderTop: '1px solid #2C313D',
+                borderTop: '1px solid var(--color-panel-border)',
                 margin: '6px 0',
               }}
             />
@@ -98,22 +100,24 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               alignItems: 'center',
               justifyContent: 'space-between',
               fontSize: '12px',
-              color: action.destructive ? '#F87171' : '#E5E7EB',
+              color: action.destructive ? 'var(--color-panel-error)' : 'var(--color-panel-text)',
               cursor: 'pointer',
               transition: 'background 0.15s,color 0.15s',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.backgroundColor = action.destructive ? 'rgba(248,113,113,0.10)' : '#232832';
-              e.currentTarget.style.color = action.destructive ? '#ef4444' : '#fff';
+              e.currentTarget.style.backgroundColor = action.destructive 
+                ? 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)' 
+                : 'var(--color-panel-hover)';
+              e.currentTarget.style.color = action.destructive ? 'var(--color-panel-error)' : 'var(--color-panel-text)';
             }}
             onMouseLeave={e => {
               e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = action.destructive ? '#F87171' : '#E5E7EB';
+              e.currentTarget.style.color = action.destructive ? 'var(--color-panel-error)' : 'var(--color-panel-text)';
             }}
           >
             <span>{action.label}</span>
             {action.shortcut && (
-              <span style={{ color: '#6B7280', fontSize: '11px' }}>
+              <span style={{ color: 'var(--color-panel-text-muted)', fontSize: '11px' }}>
                 {action.shortcut}
               </span>
             )}

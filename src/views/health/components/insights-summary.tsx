@@ -74,26 +74,26 @@ export const InsightsSummary: React.FC<{
     return (
       <Card
         title="Insights"
-        action={<div style={{ fontSize: '11px', color: '#6b7280' }}>{getTimeRange()}</div>}
+        action={<div style={{ fontSize: '11px', color: 'var(--color-panel-text-muted)' }}>{getTimeRange()}</div>}
       >
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 0' }}>
           <div
             style={{
               width: '40px',
               height: '40px',
-              backgroundColor: 'rgba(34, 197, 94, 0.1)',
+              backgroundColor: 'color-mix(in srgb, var(--color-panel-success) 10%, transparent)',
               borderRadius: '10px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: '12px',
-              boxShadow: '0 0 0 1px rgba(34, 197, 94, 0.3)',
+              boxShadow: '0 0 0 1px color-mix(in srgb, var(--color-panel-success) 30%, transparent)',
             }}
           >
-            <CheckCircle2 size={20} color="#22c55e" />
+            <CheckCircle2 size={20} color="var(--color-panel-success)" />
           </div>
-          <h3 style={{ fontSize: '16px', fontWeight: 500, color: '#fff', marginBottom: '3px' }}>All clear!</h3>
-          <p style={{ color: '#9ca3af', marginBottom: '12px', fontSize: '12px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 500, color: 'var(--color-panel-text)', marginBottom: '3px' }}>All clear!</h3>
+          <p style={{ color: 'var(--color-panel-text-secondary)', marginBottom: '12px', fontSize: '12px' }}>
             There are no issues here to address.
           </p>
           <a
@@ -101,7 +101,7 @@ export const InsightsSummary: React.FC<{
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              color: '#EE342F',
+              color: 'var(--color-panel-accent)',
               fontSize: '12px',
               display: 'flex',
               alignItems: 'center',
@@ -110,10 +110,10 @@ export const InsightsSummary: React.FC<{
               textDecoration: 'none',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = '#D12520';
+              e.currentTarget.style.color = 'var(--color-panel-accent-hover)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.color = '#EE342F';
+              e.currentTarget.style.color = 'var(--color-panel-accent)';
             }}
           >
             <ExternalLink size={12} /> Learn more about Insights
@@ -126,7 +126,7 @@ export const InsightsSummary: React.FC<{
   return (
     <Card
       title="Insights"
-      action={<div style={{ fontSize: '11px', color: '#6b7280' }}>{getTimeRange()}</div>}
+      action={<div style={{ fontSize: '11px', color: 'var(--color-panel-text-muted)' }}>{getTimeRange()}</div>}
     >
       <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
         <div
@@ -134,10 +134,10 @@ export const InsightsSummary: React.FC<{
             display: 'flex',
             minWidth: 'fit-content',
             gap: '8px',
-            borderBottom: '1px solid #2D313A',
+            borderBottom: '1px solid var(--color-panel-border)',
             padding: '8px',
             fontSize: '12px',
-            color: '#9ca3af',
+            color: 'var(--color-panel-text-secondary)',
           }}
         >
           <p style={{ minWidth: '80px' }}>Severity</p>
@@ -155,7 +155,7 @@ export const InsightsSummary: React.FC<{
                   width: '100%',
                   alignItems: 'center',
                   gap: '8px',
-                  borderBottom: '1px solid #2D313A',
+                  borderBottom: '1px solid var(--color-panel-border)',
                   padding: '8px',
                 }}
               >
@@ -163,7 +163,7 @@ export const InsightsSummary: React.FC<{
                   style={{
                     width: '80px',
                     height: '24px',
-                    backgroundColor: '#2D313A',
+                    backgroundColor: 'var(--color-panel-border)',
                     borderRadius: '4px',
                     animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                   }}
@@ -172,7 +172,7 @@ export const InsightsSummary: React.FC<{
                   style={{
                     width: '288px',
                     height: '16px',
-                    backgroundColor: '#2D313A',
+                    backgroundColor: 'var(--color-panel-border)',
                     borderRadius: '4px',
                     animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                   }}
@@ -181,7 +181,7 @@ export const InsightsSummary: React.FC<{
                   style={{
                     width: '240px',
                     height: '36px',
-                    backgroundColor: '#2D313A',
+                    backgroundColor: 'var(--color-panel-border)',
                     borderRadius: '4px',
                     animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                   }}
@@ -190,7 +190,7 @@ export const InsightsSummary: React.FC<{
                   style={{
                     width: '240px',
                     height: '36px',
-                    backgroundColor: '#2D313A',
+                    backgroundColor: 'var(--color-panel-border)',
                     borderRadius: '4px',
                     animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                   }}
@@ -207,7 +207,7 @@ export const InsightsSummary: React.FC<{
           </div>
         )}
         {error && (
-          <div style={{ padding: '16px', color: '#ef4444', fontSize: '12px' }}>
+          <div style={{ padding: '16px', color: 'var(--color-panel-error)', fontSize: '12px' }}>
             Error: {error}
           </div>
         )}
