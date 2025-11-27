@@ -2,6 +2,8 @@
 
 ## Two Separate Environments
 
+Only the four variables below are required anywhere in the codebase. Three live in the browser environment and one is server-only.
+
 ### 1. Browser Environment (Vite - `.env` in project root or `dev/`)
 
 These variables are exposed to the browser and must start with `VITE_`:
@@ -68,4 +70,5 @@ CONVEX_CLIENT_ID=your-client-id-here
 - **Server env vars** (no prefix): Server-side only, used by `dev/server.js` for token exchange
 
 The client secret must stay on the server to prevent it from being exposed to the browser.
+
 

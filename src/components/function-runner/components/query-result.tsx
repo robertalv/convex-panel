@@ -16,8 +16,6 @@ export const QueryResult: React.FC<QueryResultProps> = ({
   loading,
   lastRequestTiming,
 }) => {
-  // QueryResult now just displays the result passed to it
-  // It no longer auto-runs queries
   return (
     <Result
       result={result}

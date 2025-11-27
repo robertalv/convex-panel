@@ -6,10 +6,11 @@ import { useOAuth } from './hooks/useOAuth';
 import { MainViews } from './components/main-view';
 import { BottomSheet } from './components/bottom-sheet';
 import { AuthPanel } from './components/auth-panel';
-import { getConvexUrl, getOAuthConfigFromEnv, getEnvVar } from './utils/env';
+import { getConvexUrl, getOAuthConfigFromEnv } from './utils/env';
 import { extractProjectName } from './utils/api';
 import { getStorageItem, setStorageItem } from './utils/storage';
 import { STORAGE_KEYS } from './utils/constants';
+import { TabId } from './types/tabs';
 
 export interface Team {
   id: string;
@@ -25,7 +26,7 @@ export interface Project {
 }
 
 export interface ConvexPanelProps {
-  convex?: ConvexReactClient | any; // Use 'any' to avoid ESM/CJS type conflicts
+  convex?: ConvexReactClient | any;
   accessToken?: string;
   deployUrl?: string;
   deployKey?: string;
@@ -36,11 +37,11 @@ export interface ConvexPanelProps {
     tokenExchangeUrl?: string;
   };
   useMockData?: boolean;
-  mockup?: boolean; // Show panel with mock data without authentication
-  teamSlug?: string; // Team slug for dashboard link (e.g., 'idylcode')
-  projectSlug?: string; // Project slug for dashboard link (e.g., 'deskforge')
-  team?: Team; // Current team
-  project?: Project; // Current project
+  mockup?: boolean;
+  teamSlug?: string;
+  projectSlug?: string;
+  team?: Team;
+  project?: Project;
   [key: string]: any;
 }
 
@@ -59,11 +60,10 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
   ...props
 }) => {
   const [isMounted, setIsMounted] = useState(false);
-  const [isOpen, setIsOpen] = useState(true); // Start open by default
-  // Load active tab from localStorage on initialization
-  const [activeTab, setActiveTab] = useState<'health' | 'data' | 'functions' | 'files' | 'schedules' | 'logs' | 'settings'>(() => {
+  const [isOpen, setIsOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
     if (typeof window !== 'undefined') {
-      return getStorageItem<'health' | 'data' | 'functions' | 'files' | 'schedules' | 'logs' | 'settings'>(
+      return getStorageItem<TabId>(
         STORAGE_KEYS.ACTIVE_TAB, 
         'health'
       );
@@ -72,17 +72,13 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
   });
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Try to get Convex client from context if not provided
-  // Always call useConvex (rules of hooks), but handle if not in provider
   let convexFromContext: any;
   try {
     convexFromContext = useConvex();
   } catch (e) {
-    // Not in ConvexProvider context, that's okay
     convexFromContext = undefined;
   }
 
-  // Auto-detect configuration from environment variables if not provided
   const convex = providedConvex || convexFromContext;
   const deployUrl = providedDeployUrl || getConvexUrl();
   
@@ -102,8 +98,8 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
     if (typeof window !== 'undefined' && !mockup && !providedOAuthConfig && envOAuthConfig) {
     }
   }, []); // Only run once on mount
-  const accessToken = providedAccessToken || getEnvVar('NEXT_PUBLIC_CONVEX_ACCESS_TOKEN') || getEnvVar('VITE_CONVEX_ACCESS_TOKEN');
-  const deployKey = providedDeployKey || getEnvVar('NEXT_PUBLIC_CONVEX_DEPLOY_KEY') || getEnvVar('VITE_CONVEX_DEPLOY_KEY');
+  const accessToken = providedAccessToken;
+  const deployKey = providedDeployKey;
 
   // OAuth authentication (skip if mockup mode)
   const oauth = useOAuth(mockup ? null : (oauthConfig || null));
