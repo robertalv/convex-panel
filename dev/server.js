@@ -13,7 +13,7 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 
-const PORT = 3004; // Different port from Vite dev server
+const PORT = 3001; // Different port from Vite dev server
 
 // CORS configuration - must be before other middleware
 const corsOptions = {
