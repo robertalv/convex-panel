@@ -6,8 +6,6 @@ import {
   handleOAuthCallback,
   getStoredToken,
   clearToken,
-  generateState,
-  storeToken,
 } from '../utils/oauth';
 
 export interface UseOAuthReturn {
@@ -94,12 +92,8 @@ export function useOAuth(config: OAuthConfig | null): UseOAuthReturn {
       setError(null);
       setIsLoading(true);
       
-      // Generate state for CSRF protection
-      const state = generateState();
-      sessionStorage.setItem('convex-panel-oauth-state', state);
-      
-      // Build authorization URL
-      const authUrl = await buildAuthorizationUrl(config, state);
+      // Build authorization URL (automatically manages OAuth state + PKCE)
+      const authUrl = await buildAuthorizationUrl(config);
       
       // Redirect to Convex authorization page
       window.location.href = authUrl;

@@ -2,8 +2,7 @@ import React from 'react';
 import { HealthView } from '../views/health/health-view';
 import { DataView } from '../views/data/data-view';
 import { FunctionsView } from '../views/functions';
-
-type TabId = 'health' | 'data' | 'functions' | 'files' | 'schedules' | 'logs' | 'settings';
+import { TabId } from '../types/tabs';
 
 interface MainViewsProps {
   activeTab: TabId;
@@ -22,71 +21,44 @@ interface MainViewsProps {
   };
 }
 
-export const FunctionsViewComponent: React.FC<MainViewsProps['containerProps']> = (props) => {
-  return (
-    <FunctionsView
-      adminClient={props.adminClient}
-      accessToken={props.accessToken}
-      useMockData={props.useMockData}
-      onError={props.onError}
+const comingSoonStyle: React.CSSProperties = { padding: '24px', color: '#fff' };
+
+const createComingSoonRenderer =
+  (label: string) => (): React.ReactElement =>
+    <div style={comingSoonStyle}>{`${label} View - Coming Soon`}</div>;
+
+type ContainerProps = MainViewsProps['containerProps'];
+type TabRenderer = (props: ContainerProps) => React.ReactElement;
+
+const tabRenderers: Record<TabId, TabRenderer> = {
+  health: ({ deployUrl, accessToken, useMockData }) => (
+    <HealthView deploymentUrl={deployUrl} authToken={accessToken} useMockData={useMockData} />
+  ),
+  data: ({ deployUrl, baseUrl, accessToken, adminClient, useMockData, onError }) => (
+    <DataView
+      convexUrl={deployUrl || baseUrl}
+      accessToken={accessToken}
+      baseUrl={baseUrl}
+      adminClient={adminClient}
+      useMockData={useMockData}
+      onError={onError}
     />
-  );
-};
-
-export const FilesView: React.FC = () => {
-  return <div style={{ padding: '24px', color: '#fff' }}>Files View - Coming Soon</div>;
-};
-
-export const SchedulesView: React.FC = () => {
-  return <div style={{ padding: '24px', color: '#fff' }}>Schedules View - Coming Soon</div>;
-};
-
-export const LogsView: React.FC<MainViewsProps['containerProps']> = () => {
-  return <div style={{ padding: '24px', color: '#fff' }}>Logs View - Coming Soon</div>;
-};
-
-export const SettingsView: React.FC = () => {
-  return <div style={{ padding: '24px', color: '#fff' }}>Settings View - Coming Soon</div>;
+  ),
+  functions: ({ adminClient, accessToken, useMockData, onError }) => (
+    <FunctionsView
+      adminClient={adminClient}
+      accessToken={accessToken}
+      useMockData={useMockData}
+      onError={onError}
+    />
+  ),
+  files: createComingSoonRenderer('Files'),
+  schedules: createComingSoonRenderer('Schedules'),
+  logs: createComingSoonRenderer('Logs'),
+  settings: createComingSoonRenderer('Settings'),
 };
 
 export const MainViews: React.FC<MainViewsProps> = ({ activeTab, containerProps }) => {
-  switch (activeTab) {
-    case 'health':
-      return (
-        <HealthView
-          deploymentUrl={containerProps.deployUrl}
-          authToken={containerProps.accessToken}
-          useMockData={containerProps.useMockData}
-        />
-      );
-    case 'data':
-      return (
-        <DataView
-          convexUrl={containerProps.deployUrl || containerProps.baseUrl}
-          accessToken={containerProps.accessToken}
-          baseUrl={containerProps.baseUrl}
-          adminClient={containerProps.adminClient}
-          useMockData={containerProps.useMockData}
-          onError={containerProps.onError}
-        />
-      );
-    case 'functions':
-      return <FunctionsViewComponent {...containerProps} />;
-    case 'files':
-      return <FilesView />;
-    case 'schedules':
-      return <SchedulesView />;
-    case 'logs':
-      return <LogsView {...containerProps} />;
-    case 'settings':
-      return <SettingsView />;
-    default:
-      return (
-        <HealthView
-          deploymentUrl={containerProps.deployUrl}
-          authToken={containerProps.accessToken}
-          useMockData={containerProps.useMockData}
-        />
-      );
-  }
+  const render = tabRenderers[activeTab] || tabRenderers.health;
+  return render(containerProps);
 };

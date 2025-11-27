@@ -22,6 +22,41 @@ export interface OAuthToken {
 const STORAGE_KEY = 'convex-panel-oauth-token';
 const STATE_STORAGE_KEY = 'convex-panel-oauth-state';
 const USED_CODE_STORAGE_KEY = 'convex-panel-oauth-used-codes';
+const STATE_PAYLOAD_VERSION = 1;
+
+const inFlightExchanges = new Map<string, Promise<OAuthToken | null>>();
+
+interface OAuthStatePayload {
+  v: number;
+  nonce: string;
+  pkce?: string;
+  ts: number;
+}
+
+function encodeStatePayload(payload: OAuthStatePayload): string {
+  const base64 = btoa(JSON.stringify(payload));
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function decodeStatePayload(state: string | null): OAuthStatePayload | null {
+  if (!state) return null;
+
+  try {
+    let base64 = state.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4 !== 0) {
+      base64 += '=';
+    }
+    const json = atob(base64);
+    const payload = JSON.parse(json) as OAuthStatePayload;
+    if (payload && typeof payload === 'object' && payload.v === STATE_PAYLOAD_VERSION) {
+      return payload;
+    }
+  } catch (err) {
+    console.debug('[OAuth] State payload decode skipped (legacy format):', err);
+  }
+
+  return null;
+}
 
 /**
  * Generate a random state string for OAuth flow
@@ -79,14 +114,18 @@ export async function buildAuthorizationUrl(
   console.log('[OAuth] Base URL:', baseUrl);
   console.log('[OAuth] Scope:', scope);
   
+  const managesStateInternally = !state;
+  const stateNonce = state || generateState();
+
   const params = new URLSearchParams({
     client_id: config.clientId,
     redirect_uri: config.redirectUri,
     response_type: 'code',
-    ...(state && { state }),
   });
 
   console.log('[OAuth] Initial params:', params.toString());
+
+  let pkceCodeVerifier: string | undefined;
 
   // Add PKCE if available
   try {
@@ -96,12 +135,31 @@ export async function buildAuthorizationUrl(
       codeVerifier: pkce.codeVerifier.substring(0, 20) + '...',
       codeChallenge: pkce.codeChallenge.substring(0, 20) + '...',
     });
+    pkceCodeVerifier = pkce.codeVerifier;
     sessionStorage.setItem(`${STATE_STORAGE_KEY}-pkce`, pkce.codeVerifier);
     params.append('code_challenge', pkce.codeChallenge);
     params.append('code_challenge_method', 'S256');
     console.log('[OAuth] PKCE added to params');
   } catch (e) {
     console.warn('[OAuth] PKCE not available, continuing without it:', e);
+  }
+
+  let finalState = stateNonce;
+  if (managesStateInternally) {
+    const payload: OAuthStatePayload = {
+      v: STATE_PAYLOAD_VERSION,
+      nonce: stateNonce,
+      ts: Date.now(),
+      ...(pkceCodeVerifier && { pkce: pkceCodeVerifier }),
+    };
+    finalState = encodeStatePayload(payload);
+  }
+  params.set('state', finalState);
+
+  try {
+    sessionStorage.setItem(STATE_STORAGE_KEY, finalState);
+  } catch (err) {
+    console.warn('[OAuth] Failed to store state in sessionStorage:', err);
   }
 
   const finalUrl = `${baseUrl}?${params.toString()}`;
@@ -341,6 +399,7 @@ export async function handleOAuthCallback(
   const code = urlParams.get('code');
   const state = urlParams.get('state');
   const error = urlParams.get('error');
+  const statePayload = decodeStatePayload(state);
 
   if (error) {
     throw new Error(`OAuth error: ${error}`);
@@ -350,6 +409,12 @@ export async function handleOAuthCallback(
     return null;
   }
 
+  const existingExchange = inFlightExchanges.get(code);
+  if (existingExchange) {
+    console.log('[OAuth] Exchange already in progress for this code, awaiting existing result');
+    return existingExchange;
+  }
+
   // Prevent duplicate exchanges (React StrictMode calls effects twice)
   if (isCodeUsed(code)) {
     console.log('[OAuth] Code already used, skipping duplicate exchange');
@@ -357,31 +422,42 @@ export async function handleOAuthCallback(
     return getStoredToken();
   }
 
-  // Mark code as used immediately to prevent duplicate exchanges
-  markCodeAsUsed(code);
+  const exchangePromise = (async () => {
+    try {
+      // Verify state if stored
+      const storedState = sessionStorage.getItem(STATE_STORAGE_KEY);
+      if (storedState && state !== storedState) {
+        throw new Error('OAuth state mismatch');
+      }
 
-  // Verify state if stored
-  const storedState = sessionStorage.getItem(STATE_STORAGE_KEY);
-  if (storedState && state !== storedState) {
-    throw new Error('OAuth state mismatch');
-  }
+      // Get PKCE code verifier if used
+      const storedCodeVerifier = getStoredCodeVerifier();
+      const fallbackCodeVerifier = statePayload?.pkce || null;
+      const codeVerifier = storedCodeVerifier || fallbackCodeVerifier || undefined;
 
-  // Get PKCE code verifier if used
-  const codeVerifier = getStoredCodeVerifier();
+      // Exchange code for token
+      const token = await exchangeCodeForToken(code, config, codeVerifier);
+      
+      // Store token
+      storeToken(token);
 
-  // Exchange code for token
-  const token = await exchangeCodeForToken(code, config, codeVerifier || undefined);
-  
-  // Store token
-  storeToken(token);
-  
-  // Clean up
-  sessionStorage.removeItem(`${STATE_STORAGE_KEY}-pkce`);
-  sessionStorage.removeItem(STATE_STORAGE_KEY);
-  
-  // Clean URL immediately to prevent React from reading it again
-  window.history.replaceState({}, document.title, window.location.pathname);
-  
-  return token;
+      // Mark code as used only after successful exchange
+      markCodeAsUsed(code);
+      
+      // Clean up
+      sessionStorage.removeItem(`${STATE_STORAGE_KEY}-pkce`);
+      sessionStorage.removeItem(STATE_STORAGE_KEY);
+      
+      // Clean URL immediately to prevent React from reading it again
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      return token;
+    } finally {
+      inFlightExchanges.delete(code);
+    }
+  })();
+
+  inFlightExchanges.set(code, exchangePromise);
+  return exchangePromise;
 }
 

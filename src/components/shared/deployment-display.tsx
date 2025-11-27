@@ -25,7 +25,6 @@ export const DeploymentDisplay: React.FC<DeploymentDisplayProps> = ({
   
   const kindLabel = kind === 'local' ? 'Local' : 'Cloud';
 
-  // Construct dashboard URL if we have team, project, and deployment name
   const dashboardUrl = teamSlug && projectSlug && deploymentName
     ? `https://dashboard.convex.dev/t/${teamSlug}/${projectSlug}/${deploymentName}`
     : null;

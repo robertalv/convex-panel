@@ -34,7 +34,7 @@ export const getEnvVar = (name: string): string | undefined => {
  * Get Convex URL from environment or provided value
  */
 export const getConvexUrl = (provided?: string): string | undefined => {
-  return provided || getEnvVar('NEXT_PUBLIC_CONVEX_URL') || getEnvVar('VITE_CONVEX_URL');
+  return provided || getEnvVar('VITE_CONVEX_URL');
 };
 
 /**
@@ -43,63 +43,23 @@ export const getConvexUrl = (provided?: string): string | undefined => {
 export const getOAuthConfigFromEnv = (): {
   clientId: string;
   redirectUri: string;
-  scope?: 'team' | 'project';
   tokenExchangeUrl?: string;
 } | undefined => {
-  // Try multiple possible env var names for flexibility
-  const clientId = getEnvVar('NEXT_PUBLIC_CONVEX_OAUTH_CLIENT_ID') || 
-                   getEnvVar('VITE_CONVEX_OAUTH_CLIENT_ID') ||
-                   getEnvVar('NEXT_PUBLIC_OAUTH_CLIENT_ID') ||
-                   getEnvVar('VITE_OAUTH_CLIENT_ID');
+  const clientId = getEnvVar('VITE_OAUTH_CLIENT_ID');
   
   if (!clientId) return undefined;
 
-  // Construct redirect URI - normalize to remove trailing slash if pathname is just "/"
   const redirectUri = typeof window !== 'undefined' 
     ? (window.location.pathname === '/' 
         ? window.location.origin 
         : window.location.origin + window.location.pathname)
     : 'http://localhost:3000';
 
-  // Try multiple possible env var names for token exchange URL
-  const tokenExchangeUrl = getEnvVar('NEXT_PUBLIC_CONVEX_TOKEN_EXCHANGE_URL') || 
-                           getEnvVar('VITE_CONVEX_TOKEN_EXCHANGE_URL') ||
-                           getEnvVar('NEXT_PUBLIC_TOKEN_EXCHANGE_URL') ||
-                           getEnvVar('VITE_TOKEN_EXCHANGE_URL');
-  
-  // Debug logging (can be removed in production)
-  if (typeof window !== 'undefined' && !tokenExchangeUrl) {
-    // Check what's actually available in the environment
-    const envCheck: any = {};
-    try {
-      // @ts-ignore - import.meta.env is available in Vite
-      if (typeof import.meta !== 'undefined' && import.meta.env) {
-        // @ts-ignore
-        envCheck.VITE_CONVEX_TOKEN_EXCHANGE_URL = import.meta.env.VITE_CONVEX_TOKEN_EXCHANGE_URL;
-        // @ts-ignore
-        envCheck.VITE_TOKEN_EXCHANGE_URL = import.meta.env.VITE_TOKEN_EXCHANGE_URL;
-      }
-    } catch (e) {
-      // Ignore
-    }
-    
-    console.warn(
-      '[OAuth] tokenExchangeUrl not found. ' +
-      'Tried: VITE_CONVEX_TOKEN_EXCHANGE_URL, NEXT_PUBLIC_CONVEX_TOKEN_EXCHANGE_URL, ' +
-      'VITE_TOKEN_EXCHANGE_URL, NEXT_PUBLIC_TOKEN_EXCHANGE_URL. ' +
-      '\nMake sure to add VITE_CONVEX_TOKEN_EXCHANGE_URL=http://localhost:3004/api/convex/exchange to your .env file (in project root or dev/ directory) and RESTART the dev server.',
-      '\nCurrent env check:', envCheck
-    );
-  }
-
-  const scope = (getEnvVar('NEXT_PUBLIC_CONVEX_OAUTH_SCOPE') || 
-                getEnvVar('VITE_CONVEX_OAUTH_SCOPE') || 
-                'project') as 'team' | 'project';
+  const tokenExchangeUrl = getEnvVar('VITE_CONVEX_TOKEN_EXCHANGE_URL');
 
   return {
     clientId,
     redirectUri,
-    scope,
     ...(tokenExchangeUrl && { tokenExchangeUrl }),
   };
 };

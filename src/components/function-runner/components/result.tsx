@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { CheckCircle, XCircle, Copy, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { FunctionResult as FunctionResultType } from '../../../utils/functionExecution';
-import { formatDistanceToNow } from 'date-fns';
 
 interface ResultProps {
   result?: FunctionResultType;
