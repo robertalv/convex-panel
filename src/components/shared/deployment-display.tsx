@@ -1,10 +1,11 @@
 import React from 'react';
 import { ExternalLink } from 'lucide-react';
+import { EnvType, DeploymentKind } from '../../types';
 
 export interface DeploymentDisplayProps {
-  environment?: 'development' | 'production' | 'preview';
+  environment?: EnvType;
   deploymentName?: string;
-  kind?: 'cloud' | 'local';
+  kind?: DeploymentKind;
   teamSlug?: string;
   projectSlug?: string;
   onClick?: () => void;

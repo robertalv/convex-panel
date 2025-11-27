@@ -24,19 +24,7 @@ import { useIsGlobalRunnerShown, useShowGlobalRunner } from '../lib/functionRunn
 import { useFunctionRunnerShortcuts } from '../hooks/useFunctionRunnerShortcuts';
 import { TabId } from '../types/tabs';
 import { bottomSheetStyles } from '../styles/panelStyles';
-
-interface Team {
-  id: string;
-  name: string;
-  slug: string;
-}
-
-interface Project {
-  id: string;
-  name: string;
-  slug: string;
-  teamId: string;
-}
+import { Team, Project, EnvType } from '../types';
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -45,7 +33,7 @@ interface BottomSheetProps {
   children?: React.ReactNode;
   projectName?: string;
   deploymentUrl?: string;
-  environment?: 'development' | 'production' | 'preview';
+  environment?: EnvType;
   isAuthenticated?: boolean;
   onConnect?: () => void;
   oauthConfig?: any;
