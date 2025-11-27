@@ -8,13 +8,21 @@
  * @module
  */
 
+import type * as crons from "../crons.js";
+import type * as dummyjson from "../dummyjson.js";
+import type * as todo from "../todo.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
-declare const fullApi: ApiFromModules<{}>;
+declare const fullApi: ApiFromModules<{
+  crons: typeof crons;
+  dummyjson: typeof dummyjson;
+  todo: typeof todo;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.

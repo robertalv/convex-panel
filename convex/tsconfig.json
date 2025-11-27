@@ -20,6 +20,6 @@
     "isolatedModules": true,
     "noEmit": true
   },
-  "include": ["./**/*"],
+  "include": ["./**/*.{ts,tsx,js,jsx}"],
   "exclude": ["./_generated"]
 }
