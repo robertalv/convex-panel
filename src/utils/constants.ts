@@ -101,6 +101,7 @@ export const defaultSettings = {
 export const ROUTES = {
   STREAM_FUNCTION_LOGS: '/api/stream_function_logs',
   SHAPES2: '/api/shapes2',
+  TABLE_COLUMNS: '/api/get_table_column_names',
   CACHE_HIT_RATE: '/api/app_metrics/cache_hit_percentage_top_k',
   FAILURE_RATE: '/api/app_metrics/failure_percentage_top_k',
   LIST_FUNCTION_LOGS: '/api/list_function_logs',

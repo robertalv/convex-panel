@@ -94,7 +94,6 @@ export const bottomSheetStyles: BottomSheetStyles = {
     justifyContent: 'center',
   },
   iconButtonHover: {
-    backgroundColor: '#2D313A',
     color: '#fff',
   },
   connectButton: {
@@ -215,6 +214,8 @@ export const bottomSheetStyles: BottomSheetStyles = {
     backgroundColor: '#2D313A',
     opacity: 1,
     transform: 'scale(1.05)',
+    color: '#34D399',
+    borderColor: '#34D399',
   },
 };
 

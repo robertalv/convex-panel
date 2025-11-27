@@ -1,5 +1,5 @@
 import { ROUTES } from '../utils/constants';
-import { LogEntry, TableDefinition } from '../types';
+import { LogEntry, TableDefinition, TableField } from '../types';
 import { getActiveTable } from './storage';
 import { FetchLogsOptions, FetchLogsResponse, FetchTablesOptions, FetchTablesResponse } from '../types';
 import { mockFetchLogsFromApi, mockFetchTablesFromApi, mockFetchCacheHitRate, mockFetchFailureRate, mockFetchSchedulerLag } from './mockData';
@@ -107,37 +107,11 @@ export async function fetchLogsFromApi({
  * Fetch all tables from the Convex instance
  */
 export async function fetchTablesFromApi({
-  /**
-   * The URL of the Convex instance.
-   * Used to make API requests to the Convex backend.
-   * @required
-   */
   convexUrl,
-
-  /**
-   * Access token for authenticating API requests.
-   * Required for securing access to the Convex backend.
-   * Should be kept private and not exposed to clients.
-   * @required
-   */
   accessToken,
-
-  /**
-   * Optional Convex admin client instance.
-   * Used for making admin-level API requests.
-   * Must be initialized and configured before passing.
-   * @optional
-   */
   adminClient,
-
-  /**
-   * Whether to use mock data instead of making API calls.
-   * Useful for development, testing, and demos.
-   * @default false
-   */
   useMockData = false
 }: FetchTablesOptions & { useMockData?: boolean }): Promise<FetchTablesResponse> {
-  // Use mock data if useMockData is true
   if (useMockData) {
     return mockFetchTablesFromApi();
   }
@@ -148,41 +122,62 @@ export async function fetchTablesFromApi({
 
   const response = await fetch(`${convexUrl}${ROUTES.SHAPES2}`, {
     headers: {
-      "authorization": `Convex ${accessToken}`,
-      "convex-client": "dashboard-0.0.0"
-    }
+      authorization: `Convex ${accessToken}`,
+      'convex-client': 'dashboard-0.0.0',
+    },
   });
 
   if (!response.ok) {
     throw new Error(`Failed to fetch tables: HTTP ${response.status}`);
   }
 
-  const data = await response.json();
+  const shapesData = await response.json();
 
-  // Verify data structure
-  if (!data || typeof data !== 'object') {
+  if (!shapesData || typeof shapesData !== 'object') {
     throw new Error('Invalid data structure received');
   }
 
-  // Include all tables - "Never" type tables are still valid tables that may exist
-  // The official Convex dashboard shows all tables regardless of type
-  const tableData = Object.entries(data).reduce((acc, [tableName, tableSchema]) => {
-    // Only exclude if the schema is completely invalid (not an object)
-    if (tableSchema && typeof tableSchema === 'object') {
-      acc[tableName] = tableSchema as any;
-    }
-    return acc;
-  }, {} as TableDefinition);
+  const columnMap = await fetchTableColumnsFromApi(convexUrl, accessToken).catch(
+    () => ({}),
+  );
 
-  // Check if we have a stored active table
+  const tableData = Object.entries(shapesData).reduce(
+    (acc, [tableName, tableSchema]) => {
+      if (!tableSchema || typeof tableSchema !== 'object') {
+        return acc;
+      }
+
+      const normalizedFields = mergeFieldsWithColumns(
+        (tableSchema as TableDefinition[string])?.fields || [],
+        columnMap[tableName],
+      );
+
+      acc[tableName] = {
+        type: (tableSchema as any)?.type ?? 'table',
+        fields: normalizedFields,
+      };
+
+      return acc;
+    },
+    {} as TableDefinition,
+  );
+
+  Object.entries(columnMap).forEach(([tableName, columns]) => {
+    if (tableData[tableName]) {
+      return;
+    }
+    tableData[tableName] = {
+      type: 'table',
+      fields: mergeFieldsWithColumns([], columns),
+    };
+  });
+
   const storedActiveTable = getActiveTable();
   let selectedTable = '';
 
   if (storedActiveTable && tableData[storedActiveTable]) {
-    // Use the stored table if it exists
     selectedTable = storedActiveTable;
   } else if (Object.keys(tableData).length > 0 && adminClient) {
-    // Otherwise use the first table if adminClient is available
     try {
       await adminClient.query("_system/frontend/tableSize:default" as any, {
         componentId: null,
@@ -192,7 +187,6 @@ export async function fetchTablesFromApi({
       // Error fetching table size
     }
 
-    
     selectedTable = Object.keys(tableData)[0] || '';
   }
 
@@ -200,6 +194,103 @@ export async function fetchTablesFromApi({
     tables: tableData,
     selectedTable
   };
+}
+
+async function fetchTableColumnsFromApi(
+  convexUrl: string,
+  accessToken: string,
+): Promise<Record<string, string[]>> {
+  const result: Record<string, string[]> = {};
+
+  try {
+    const response = await fetch(`${convexUrl}${ROUTES.TABLE_COLUMNS}`, {
+      headers: {
+        authorization: `Convex ${accessToken}`,
+        'convex-client': 'dashboard-0.0.0',
+      },
+    });
+
+    if (!response.ok) {
+      let errorDetails: any = null;
+      try {
+        errorDetails = await response.json();
+      } catch {
+        // ignore json parse errors
+      }
+
+      if (
+        response.status === 403 &&
+        (errorDetails?.code === 'StreamingExportNotEnabled' ||
+          errorDetails?.message?.includes('Streaming export is only available'))
+      ) {
+        console.warn(
+          '[fetchTableColumnsFromApi] Streaming export unavailable on this plan; falling back to shapes-only columns.',
+        );
+        return result;
+      }
+
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    const addColumns = (tableName?: string, columns?: string[]) => {
+      if (!tableName || !Array.isArray(columns)) {
+        return;
+      }
+      const existing = new Set(result[tableName] ?? []);
+      columns.forEach((column) => {
+        if (column) {
+          existing.add(column);
+        }
+      });
+      result[tableName] = Array.from(existing);
+    };
+
+    if (Array.isArray(data.tables)) {
+      data.tables.forEach((table: any) => addColumns(table?.name, table?.columns));
+    }
+
+    if (data.by_component && typeof data.by_component === 'object') {
+      Object.values(data.by_component).forEach((tables: any) => {
+        if (Array.isArray(tables)) {
+          tables.forEach((table) => addColumns(table?.name, table?.columns));
+        }
+      });
+    }
+  } catch (error) {
+    console.warn('fetchTableColumnsFromApi failed', error);
+  }
+
+  return result;
+}
+
+function mergeFieldsWithColumns(
+  existingFields: TableField[],
+  extraColumns?: string[],
+): TableField[] {
+  const fieldMap = new Map<string, TableField>();
+  existingFields.forEach((field) => {
+    if (field?.fieldName) {
+      fieldMap.set(field.fieldName, field);
+    }
+  });
+
+  const addPlaceholderField = (fieldName?: string) => {
+    if (!fieldName || fieldMap.has(fieldName)) {
+      return;
+    }
+    fieldMap.set(fieldName, {
+      fieldName,
+      optional: true,
+      shape: { type: 'string' },
+    });
+  };
+
+  ['_id', '_creationTime'].forEach(addPlaceholderField);
+  extraColumns?.forEach(addPlaceholderField);
+
+  return Array.from(fieldMap.values());
 }
 
 /**

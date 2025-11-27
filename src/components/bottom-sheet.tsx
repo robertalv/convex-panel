@@ -145,10 +145,27 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, isActive, onClic
 
   return (
     <div
-      style={sidebarItemWrapperStyle}
+      style={{
+        ...sidebarItemWrapperStyle,
+        position: 'relative',
+      }}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
     >
+      {isActive && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 4,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 3,
+            height: 24,
+            borderRadius: 999,
+            background: '#34D399',
+          }}
+        />
+      )}
       <HoverButton
         type="button"
         onClick={onClick}

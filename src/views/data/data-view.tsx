@@ -35,6 +35,7 @@ export const DataView: React.FC<DataViewProps> = ({
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [visibleFields, setVisibleFields] = useState<string[]>([]);
   const [isColumnVisibilityOpen, setIsColumnVisibilityOpen] = useState(false);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
 
   // Calculate all fields for the selected table
   const tableSchema = tableData.tables[tableData.selectedTable];
@@ -51,7 +52,14 @@ export const DataView: React.FC<DataViewProps> = ({
         setVisibleFields([...allFields]);
       }
     }
+    setSelectedDocumentIds([]);
   }, [tableData.selectedTable, allFields.length]);
+
+  useEffect(() => {
+    setSelectedDocumentIds((prev) =>
+      prev.filter((id) => tableData.documents.some((doc) => doc._id === id)),
+    );
+  }, [tableData.documents]);
 
   // Track if we've initialized to prevent multiple fetches
   const hasInitialized = useRef(false);
@@ -89,6 +97,13 @@ export const DataView: React.FC<DataViewProps> = ({
               }
             }}
             hiddenFieldsCount={allFields.length - visibleFields.length}
+            selectedCount={selectedDocumentIds.length}
+            onDeleteSelected={() => {
+              console.log('Delete selected rows', selectedDocumentIds);
+            }}
+            onEditSelected={() => {
+              console.log('Edit selected row', selectedDocumentIds);
+            }}
           />
           
           <DataTable
@@ -97,6 +112,8 @@ export const DataView: React.FC<DataViewProps> = ({
             isLoading={tableData.isLoading}
             tables={tableData.tables}
             visibleFields={visibleFields}
+            selectedDocumentIds={selectedDocumentIds}
+            onSelectionChange={setSelectedDocumentIds}
           />
         </div>
       </div>

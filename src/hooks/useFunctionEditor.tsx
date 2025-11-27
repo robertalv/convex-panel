@@ -21,6 +21,20 @@ export interface UseFunctionEditorReturn {
   runCustomQuery: () => Promise<void>;
 }
 
+const convexExtraLib = `
+declare type ConvexQueryCtx = {
+  db: {
+    query: (table: string) => {
+      take: (limit: number) => Promise<any>;
+    };
+  };
+};
+
+declare function query<T>(config: {
+  handler: (ctx: ConvexQueryCtx) => Promise<T> | T;
+}): Promise<T>;
+`;
+
 const defaultCode = (tableName: string) => `export default query({
   handler: async (ctx) => {
     console.log("Write and test your query function here!");

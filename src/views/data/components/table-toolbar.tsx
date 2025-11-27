@@ -1,5 +1,5 @@
 import React from 'react';
-import { Filter, Plus, MoreVertical, EyeOff } from 'lucide-react';
+import { Filter, Plus, MoreVertical, EyeOff, Trash2, Edit2 } from 'lucide-react';
 
 export interface TableToolbarProps {
   selectedTable: string;
@@ -8,6 +8,9 @@ export interface TableToolbarProps {
   isFilterOpen: boolean;
   onColumnVisibilityToggle?: () => void;
   hiddenFieldsCount?: number;
+  selectedCount?: number;
+  onDeleteSelected?: () => void;
+  onEditSelected?: () => void;
 }
 
 export const TableToolbar: React.FC<TableToolbarProps> = ({
@@ -17,7 +20,13 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
   isFilterOpen,
   onColumnVisibilityToggle,
   hiddenFieldsCount = 0,
+  selectedCount = 0,
+  onDeleteSelected,
+  onEditSelected,
 }) => {
+
+  const hasSelection = selectedCount > 0;
+  const deleteLabel = selectedCount > 1 ? `Delete ${selectedCount} rows` : 'Delete';
 
   return (
     <div style={{
@@ -101,53 +110,133 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <button
-          style={{
-            height: '28px',
-            padding: '0 12px',
-            backgroundColor: '#1C1F26',
-            border: '1px solid #2D313A',
-            borderRadius: '4px',
-            fontSize: '12px',
-            color: '#fff',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#2D313A';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#1C1F26';
-          }}
-        >
-          <Plus size={14} />
-          Add
-        </button>
-        
-        <button
-          style={{
-            height: '28px',
-            width: '28px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#1C1F26',
-            border: '1px solid #2D313A',
-            borderRadius: '4px',
-            color: '#fff',
-            cursor: 'pointer',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#2D313A';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#1C1F26';
-          }}
-        >
-          <MoreVertical size={14} />
-        </button>
+        {hasSelection ? (
+          <>
+            <button
+              style={{
+                height: '28px',
+                padding: '0 12px',
+                backgroundColor: '#1C1F26',
+                border: '1px solid #2D313A',
+                borderRadius: '4px',
+                fontSize: '12px',
+                color: '#fff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+              onClick={() => {
+                if (selectedCount === 1) {
+                  onEditSelected?.();
+                }
+              }}
+            >
+              <Edit2 size={12} />
+              Edit
+            </button>
+            <button
+              style={{
+                height: '28px',
+                padding: '0 12px',
+                backgroundColor: '#661313',
+                border: '1px solid #7F1D1D',
+                borderRadius: '4px',
+                fontSize: '12px',
+                color: '#fff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'background-color 0.2s, border-color 0.2s',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.backgroundColor = '#a91a1a';
+                e.currentTarget.style.borderColor = '#b91c1c';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.backgroundColor = '#661313';
+                e.currentTarget.style.borderColor = '#7F1D1D';
+              }}
+              onClick={() => onDeleteSelected?.()}
+            >
+              <Trash2 size={12} />
+              {deleteLabel}
+            </button>
+            <button
+              style={{
+                height: '28px',
+                width: '28px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#1C1F26',
+                border: '1px solid #2D313A',
+                borderRadius: '4px',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#2D313A';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#1C1F26';
+              }}
+            >
+              <MoreVertical size={14} />
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              style={{
+                height: '28px',
+                padding: '0 12px',
+                backgroundColor: '#1C1F26',
+                border: '1px solid #2D313A',
+                borderRadius: '4px',
+                fontSize: '12px',
+                color: '#fff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#2D313A';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#1C1F26';
+              }}
+            >
+              <Plus size={14} />
+              Add
+            </button>
+            
+            <button
+              style={{
+                height: '28px',
+                width: '28px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#1C1F26',
+                border: '1px solid #2D313A',
+                borderRadius: '4px',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#2D313A';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#1C1F26';
+              }}
+            >
+              <MoreVertical size={14} />
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
