@@ -182,7 +182,7 @@ export const useTableData = ({
         // This ensures we always have a table selected to fetch data for
         const firstTable = Object.keys(tableData)[0];
         if (firstTable) {
-          console.log('[useTableData] fetchTables: No selected table returned, selecting first table:', firstTable);
+          console.debug('No selected table returned, selecting first table:', firstTable);
           setSelectedTable(firstTable);
         }
       }

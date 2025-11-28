@@ -1,1 +1,1 @@
-console.log('Convex Panel Content Script');
+console.debug('Convex Panel Content Script');

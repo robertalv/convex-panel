@@ -7,15 +7,15 @@
  * @returns The result of the mutation
  */
 export const patchDocumentFields = async (
-  table: string, 
-  ids: string[], 
+  table: string,
+  ids: string[],
   fields: Record<string, any>,
   adminClient: any
 ) => {
   if (!adminClient) {
     throw new Error("Admin client is not available");
   }
-  
+
   try {
     const result = await adminClient.mutation(
       "_system/frontend/patchDocumentsFields" as any,
@@ -26,7 +26,7 @@ export const patchDocumentFields = async (
         fields
       }
     );
-    
+
     return result;
   } catch (error) {
     console.error("Error updating document:", error);
@@ -85,8 +85,12 @@ export const insertDocuments = async (
     throw new Error("Admin client is not available");
   }
 
+  if (!documents || documents.length === 0) {
+    throw new Error("No documents to insert");
+  }
+
   try {
-    // Try using system mutation first
+    // Try using system mutation first (available on newer Convex versions/plans)
     try {
       const result = await adminClient.mutation(
         "_system/frontend/insertDocuments" as any,
@@ -98,19 +102,31 @@ export const insertDocuments = async (
       );
       return result;
     } catch (systemError: any) {
-      // If system mutation doesn't exist, try using a generic mutation approach
-      // This would require the user to have a mutation in their codebase
-      console.warn("System insertDocuments mutation not available, trying alternative approach:", systemError);
-      
-      // Alternative: Use HTTP API if available
-      // For now, throw the error so the user knows they need to implement a mutation
-      throw new Error(
-        "Insert documents mutation not available. Please create a mutation in your Convex functions: " +
-        "export const insertDocuments = mutation({ args: { table: v.string(), documents: v.array(v.any()) }, " +
-        "handler: async (ctx, { table, documents }) => { return await Promise.all(documents.map(doc => ctx.db.insert(table, doc))); } });"
-      );
+      console.warn("System insertDocuments mutation not available, trying user-defined mutation...", systemError);
+
+      // Try calling a user-defined mutation as fallback
+      try {
+        const result = await adminClient.mutation(
+          "panel:insertDocuments" as any,
+          {
+            table,
+            documents,
+          }
+        );
+        return result;
+      } catch (userMutationError: any) {
+        console.warn("User-defined panel:insertDocuments mutation not found", userMutationError);
+
+        // Neither system nor user mutation exists - throw upgrade error
+        const upgradeError: any = new Error(
+          `Cannot insert documents: The system mutation is unavailable on your plan.`
+        );
+        upgradeError.code = 'UPGRADE_REQUIRED';
+        upgradeError.isUpgradeError = true;
+        throw upgradeError;
+      }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error inserting documents:", error);
     throw error;
   }

@@ -57,7 +57,7 @@ async function setupConvexToken() {
           // Try reading the config file again after login
           configData = await fs.readFile(configPath, 'utf-8');
         } else {
-          console.log('❌ Convex login is required to use this package.');
+          console.error('Convex login is required to use this package.');
           process.exit(1);
         }
       } else {
@@ -78,7 +78,7 @@ async function setupConvexToken() {
           throw new Error('No access token found after login');
         }
       } else {
-        console.log('❌ Convex login is required to use this package.');
+        console.error('Convex login is required to use this package.');
         process.exit(1);
       }
     }
@@ -100,13 +100,13 @@ async function setupConvexToken() {
       // Add the token to .env
       const newEnvContent = `${envContent}\nCONVEX_ACCESS_TOKEN=${accessToken}`.trim();
       await fs.writeFile(envPath, newEnvContent);
-      console.log('✅ Added Convex access token to .env file');
+      console.log('Added Convex access token to .env file');
     } else {
-      console.log('ℹ️ Convex access token already exists in .env file');
+      console.log('Convex access token already exists in .env file');
     }
 
   } catch (error) {
-    console.error('❌ Error setting up Convex token:', error.message);
+    console.error('Error setting up Convex token:', error.message);
     process.exit(1);
   }
 }

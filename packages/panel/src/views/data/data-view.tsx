@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { TableSidebar } from './components/table-sidebar';
 import { TableToolbar } from './components/table-toolbar';
-import { DataTable } from './components/data-table';
+import { DataTable } from './components/table/data-table';
 import { FilterSheet } from './components/filter-sheet';
 import { AddDocumentSheet } from './components/add-document-sheet';
 import { useTableData } from '../../hooks/useTableData';
 import { fetchComponents } from '../../utils/api';
+import { saveTableFilters } from '../../utils/storage';
 
 export interface DataViewProps {
   convexUrl?: string;
@@ -14,6 +15,8 @@ export interface DataViewProps {
   adminClient?: any;
   useMockData?: boolean;
   onError?: (error: string) => void;
+  teamSlug?: string;
+  projectSlug?: string;
 }
 
 export const DataView: React.FC<DataViewProps> = ({
@@ -23,6 +26,8 @@ export const DataView: React.FC<DataViewProps> = ({
   adminClient,
   useMockData = false,
   onError,
+  teamSlug,
+  projectSlug,
 }) => {
   const [selectedComponent, setSelectedComponent] = useState<string | null>('app');
   const [components, setComponents] = useState<any[]>([]);
@@ -77,16 +82,40 @@ export const DataView: React.FC<DataViewProps> = ({
     return count;
   }, [allFields.length, visibleFields.length, visibleFields]);
 
+  // Track the last table and fields to prevent unnecessary updates
+  const lastTableRef = useRef<string | null>(null);
+  const lastFieldsStringRef = useRef<string>('');
+
   // Initialize visibleFields when table changes - show all fields by default
   useEffect(() => {
-    if (tableData.selectedTable && allFields.length > 0) {
-      // If visibleFields is empty or doesn't match current table's fields, reset to show all
-      if (visibleFields.length === 0 || !visibleFields.some(f => allFields.includes(f))) {
+    const currentTable = tableData.selectedTable;
+    const fieldsString = JSON.stringify([...allFields].sort());
+    
+    // Only update if table changed or fields actually changed (by content, not reference)
+    const tableChanged = currentTable !== lastTableRef.current;
+    const fieldsChanged = fieldsString !== lastFieldsStringRef.current;
+    
+    if (currentTable && allFields.length > 0) {
+      // When table changes, always reset to show all fields
+      // When fields change (e.g., schema loads), check if visibleFields is missing any fields
+      // and add them (but don't remove fields user may have hidden)
+      if (tableChanged) {
+        // Table changed: always reset to show all fields
         setVisibleFields([...allFields]);
+        lastTableRef.current = currentTable;
+        lastFieldsStringRef.current = fieldsString;
+        setSelectedDocumentIds([]);
+      } else if (fieldsChanged) {
+        // Fields changed (e.g., schema loaded): add any missing fields to visibleFields
+        const missingFields = allFields.filter(field => !visibleFields.includes(field));
+        if (missingFields.length > 0) {
+          // Add missing fields while preserving existing visibleFields
+          setVisibleFields([...new Set([...visibleFields, ...missingFields])]);
+        }
+        lastFieldsStringRef.current = fieldsString;
       }
     }
-    setSelectedDocumentIds([]);
-  }, [tableData.selectedTable, allFields.length]);
+  }, [tableData.selectedTable, allFields]);
 
   useEffect(() => {
     setSelectedDocumentIds((prev) =>
@@ -178,10 +207,10 @@ export const DataView: React.FC<DataViewProps> = ({
             hiddenFieldsCount={hiddenFieldsCount}
             selectedCount={selectedDocumentIds.length}
             onDeleteSelected={() => {
-              console.log('Delete selected rows', selectedDocumentIds);
+              // TODO: Implement delete selected rows
             }}
             onEditSelected={() => {
-              console.log('Edit selected row', selectedDocumentIds);
+              // TODO: Implement edit selected rows
             }}
             filters={tableData.filters}
             sortConfig={tableData.sortConfig}
@@ -207,6 +236,48 @@ export const DataView: React.FC<DataViewProps> = ({
             visibleFields={visibleFields}
             selectedDocumentIds={selectedDocumentIds}
             onSelectionChange={setSelectedDocumentIds}
+            adminClient={adminClient}
+            onDocumentUpdate={() => {
+              // Refresh table data after update
+              if (tableData.selectedTable) {
+                tableData.fetchTableData(tableData.selectedTable, null);
+              }
+            }}
+            deploymentUrl={convexUrl}
+            componentId={selectedComponentId}
+            onNavigateToTable={(tableName: string, documentId: string) => {
+              // Create filter to show only this document by _id
+              const filter = {
+                clauses: [{
+                  field: '_id',
+                  op: 'eq' as const,
+                  value: documentId,
+                  enabled: true,
+                }],
+              };
+              
+              // Save filter to localStorage first
+              saveTableFilters(tableName, filter);
+              
+              // If we're already on this table, just apply the filter directly
+              if (tableData.selectedTable === tableName) {
+                tableData.setFilters(filter);
+                return;
+              }
+              
+              // Set the selected table - this will trigger effects that may reset filters
+              tableData.setSelectedTable(tableName);
+              
+              // Set the filter after a delay to ensure table change effects complete
+              // The useTableData hook has an effect that resets filters when table changes,
+              // then loads from localStorage. We need to wait for that to complete.
+              setTimeout(() => {
+                tableData.setFilters(filter);
+              }, 150);
+            }}
+            accessToken={accessToken}
+            teamSlug={teamSlug}
+            projectSlug={projectSlug}
           />
         </div>
       </div>

@@ -53,30 +53,25 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
   const [argsMonaco, setArgsMonaco] = useState<Parameters<BeforeMount>[0]>();
   const { theme } = useThemeSafe();
 
-  // Sync selectedComponent with propComponentId when it changes
   useEffect(() => {
     if (propComponentId !== undefined) {
       setSelectedComponent(propComponentId || 'app');
     }
   }, [propComponentId]);
 
-  // Sync selectedFunction with propSelectedFunction when it changes
   useEffect(() => {
     if (propSelectedFunction !== undefined) {
       setSelectedFunction(propSelectedFunction);
     }
   }, [propSelectedFunction]);
 
-  // Use provided components list (display names) or extract from available functions
   const components = useMemo(() => {
     if (availableComponents && availableComponents.length > 0) {
       return availableComponents;
     }
-    // Fallback: extract from functions and use componentId as display name
     const componentSet = new Set<string>(['app']);
     availableFunctions.forEach(fn => {
       if (fn.componentId) {
-        // Use shortened version if ID is too long
         const displayName = fn.componentId.length > 20 ? `${fn.componentId.substring(0, 20)}...` : fn.componentId;
         componentSet.add(displayName);
       }
@@ -84,12 +79,10 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
     return Array.from(componentSet).sort();
   }, [availableFunctions, availableComponents]);
   
-  // Get the display name for the currently selected component
   const selectedComponentDisplayName = useMemo(() => {
     if (!selectedComponent || selectedComponent === 'app') {
       return 'app';
     }
-    // Find the display name for this componentId
     if (componentIdMap) {
       for (const [displayName, id] of componentIdMap.entries()) {
         if (id === selectedComponent) {
@@ -97,41 +90,24 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
         }
       }
     }
-    // Fallback: use shortened version of componentId
     return selectedComponent.length > 20 ? `${selectedComponent.substring(0, 20)}...` : selectedComponent;
   }, [selectedComponent, componentIdMap]);
 
-  // Filter functions by selected component
-  // Component functions have identifiers like: "componentName:moduleName:functionName" or "componentName:functionName"
-  // App functions have identifiers like: "moduleName:functionName" (no component prefix)
   const filteredFunctions = useMemo(() => {
     if (!selectedComponent || selectedComponent === 'app') {
-      // Show app-level functions (no componentId and identifier doesn't start with component name)
       return availableFunctions.filter(fn => {
-        // Check both componentId and identifier pattern
         const hasComponentId = fn.componentId !== null && fn.componentId !== undefined;
         if (hasComponentId) return false;
         
-        // Also check identifier pattern - if it starts with a known component name, exclude it
-        // We'll check this by seeing if the first part of the identifier matches any component
         if (fn.identifier && fn.identifier.includes(':')) {
           const firstPart = fn.identifier.split(':')[0];
-          // If first part matches a component name (not 'app'), exclude it
-          // We can't check all components here, so we rely on componentId being set
-          // But if componentId is null, we assume it's an app function
           return true;
         }
         return true;
       });
     }
     
-    // Show functions for the selected component
-    // Match by identifier pattern FIRST (most reliable), then by componentId
-    // Component functions have identifiers like: "componentName:moduleName:functionName"
-    // selectedComponent should be the component name (used in identifiers), not the ID
     const filtered = availableFunctions.filter(fn => {
-      // PRIMARY: Check identifier pattern - this is the most reliable method
-      // Component functions always have identifiers starting with "componentName:"
       if (fn.identifier && fn.identifier.startsWith(`${selectedComponent}:`)) {
         return true;
       }
@@ -144,71 +120,31 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
       return false;
     });
     
-    // Debug logging
-    console.log('[FunctionRunner] Filtering functions:', {
-      selectedComponent,
-      totalFunctions: availableFunctions.length,
-      filteredCount: filtered.length,
-      sampleAvailable: availableFunctions.slice(0, 5).map(f => ({
-        identifier: f.identifier,
-        componentId: f.componentId,
-        name: f.name,
-      })),
-      sampleFiltered: filtered.slice(0, 5).map(f => ({
-        identifier: f.identifier,
-        componentId: f.componentId,
-        name: f.name,
-      })),
-      allComponentIds: [...new Set(availableFunctions.map(f => f.componentId).filter(Boolean))],
-      identifiersStartingWith: availableFunctions
-        .filter(f => f.identifier && f.identifier.startsWith(`${selectedComponent}:`))
-        .slice(0, 5)
-        .map(f => f.identifier),
-    });
-    
     return filtered;
   }, [availableFunctions, selectedComponent]);
 
-  // Handle component selection
-  // component is a display name, we need to map it to component name (used in identifiers)
   const handleComponentSelect = (component: string | null) => {
     let componentName: string | null = null;
     
     if (component === 'app' || !component) {
       componentName = 'app';
     } else if (componentIdMap) {
-      // Map display name to component name (used in identifiers)
-      // componentIdMap maps displayName -> componentName (not ID)
       componentName = componentIdMap.get(component) || component;
     } else {
-      // Fallback: assume component is already a name
+      // FALLBACK: assume component is already a name
       componentName = component;
     }
     
-    console.log('[FunctionRunner] Component selected:', {
-      displayName: component,
-      componentName,
-      availableFunctionsCount: availableFunctions.length,
-      sampleIdentifiers: availableFunctions.slice(0, 5).map(f => ({
-        identifier: f.identifier,
-        componentId: f.componentId,
-        name: f.name,
-      })),
-    });
-    
     setSelectedComponent(componentName);
-    // Reset function selection when component changes
     setSelectedFunction(null);
     setArgs({});
   };
 
-  // Handle function selection
   const handleFunctionSelect = (fn: ModuleFunction | CustomQuery) => {
     setSelectedFunction(fn);
     if (onFunctionSelect) {
       onFunctionSelect(fn);
     }
-    // Reset args when function changes (unless it's from history)
     if (!runHistoryItem) {
       setArgs({});
     }
@@ -257,7 +193,6 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
     runCustomQuery,
   } = editorHookResult;
 
-  // Update history index when runHistory changes
   useEffect(() => {
     if (runHistory.length > 0 && historyIndex >= runHistory.length) {
       setHistoryIndex(0);
@@ -280,21 +215,17 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
     }
   };
 
-  // Monaco editor setup for arguments
   const handleArgsEditorWillMount: BeforeMount = (monacoInstance) => {
     setArgsMonaco(monacoInstance);
 
-    // Helper to get theme color from CSS variable
     const getThemeColor = (varName: string, fallback: string = '#0F1115') => {
       const themeElement = document.querySelector('.cp-theme-dark, .cp-theme-light') || document.documentElement;
       const color = getComputedStyle(themeElement).getPropertyValue(varName).trim();
       return color || fallback;
     };
 
-    // Helper to convert hex to Monaco format (without #)
     const toMonacoColor = (hex: string) => hex.replace('#', '');
 
-    // Define dark theme (Monaco will handle if already defined)
     try {
       monacoInstance.editor.defineTheme('convex-dark', {
         base: 'vs-dark',
@@ -319,10 +250,8 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
         },
       });
     } catch {
-      // Theme already defined, ignore
     }
 
-    // Define light theme
     try {
       monacoInstance.editor.defineTheme('convex-light', {
         base: 'vs',
@@ -347,11 +276,10 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
         },
       });
     } catch {
-      // Theme already defined, ignore
+      console.debug('Theme already defined, ignoring');
     }
   };
 
-  // Update Monaco theme when theme changes
   useEffect(() => {
     if (argsMonaco) {
       const monacoTheme = theme === 'light' ? 'convex-light' : 'convex-dark';
@@ -539,6 +467,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                           }
                         } catch {
                           // Invalid JSON, keep current args
+                          console.debug('Invalid JSON, keeping current args');
                         }
                       }
                     }}

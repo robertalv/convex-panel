@@ -1,1 +1,1 @@
-console.log('Convex Panel Background Script');
+console.warn('Convex Panel Background Script');

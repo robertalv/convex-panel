@@ -18,16 +18,16 @@
 [34mCJS[39m Build start
 [34mESM[39m Build start
 DTS Build start
-[32mESM[39m [1mdist/index.css        [22m[32m41.69 KB[39m
-[32mESM[39m [1mdist/index.esm.js     [22m[32m485.66 KB[39m
-[32mESM[39m [1mdist/index.css.map    [22m[32m67.01 KB[39m
-[32mESM[39m [1mdist/index.esm.js.map [22m[32m838.17 KB[39m
-[32mESM[39m ⚡️ Build success in 309ms
-[32mCJS[39m [1mdist/index.js      [22m[32m510.13 KB[39m
-[32mCJS[39m [1mdist/index.css     [22m[32m41.69 KB[39m
-[32mCJS[39m [1mdist/index.css.map [22m[32m67.01 KB[39m
-[32mCJS[39m [1mdist/index.js.map  [22m[32m829.67 KB[39m
-[32mCJS[39m ⚡️ Build success in 310ms
-DTS ⚡️ Build success in 4027ms
+[32mESM[39m [1mdist/index.css        [22m[32m42.35 KB[39m
+[32mESM[39m [1mdist/index.esm.js     [22m[32m539.55 KB[39m
+[32mESM[39m [1mdist/index.css.map    [22m[32m68.14 KB[39m
+[32mESM[39m [1mdist/index.esm.js.map [22m[32m933.55 KB[39m
+[32mESM[39m ⚡️ Build success in 373ms
+[32mCJS[39m [1mdist/index.css     [22m[32m42.35 KB[39m
+[32mCJS[39m [1mdist/index.js      [22m[32m566.76 KB[39m
+[32mCJS[39m [1mdist/index.css.map [22m[32m68.14 KB[39m
+[32mCJS[39m [1mdist/index.js.map  [22m[32m923.85 KB[39m
+[32mCJS[39m ⚡️ Build success in 373ms
+DTS ⚡️ Build success in 4340ms
 DTS dist/index.d.ts  20.30 KB
 DTS dist/index.d.mts 20.30 KB

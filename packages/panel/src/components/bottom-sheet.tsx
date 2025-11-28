@@ -13,6 +13,8 @@ import {
   HelpCircle,
   Sun,
   Moon,
+  Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 import { ConvexLogo } from './icons';
 import { AskAI } from './ask-ai';
@@ -26,6 +28,7 @@ import { useFunctionRunnerShortcuts } from '../hooks/useFunctionRunnerShortcuts'
 import { TabId } from '../types/tabs';
 import { Team, Project, EnvType } from '../types';
 import { useThemeSafe } from '../hooks/useTheme';
+import { useHasSubscription } from '../hooks/useTeamOrbSubscription';
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -291,8 +294,32 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
   const { theme, toggleTheme } = useThemeSafe();
 
+  // Get team ID for subscription check
+  const teamId = projectInfo?.team?.id || team?.id;
+  // Convert string team ID to number if needed, or pass as-is if already a number
+  const teamIdNumber = teamId ? (typeof teamId === 'string' ? parseInt(teamId, 10) : teamId) : undefined;
+  const hasSubscription = useHasSubscription(teamIdNumber);
+  
+  // Show upgrade button if authenticated, not loading, and no subscription
+  const showUpgradeButton = isAuthenticated && hasSubscription === false;
+
+  const handleUpgradeClick = () => {
+    window.open('https://convex.dev/referral/IDYLCO2615', '_blank', 'noopener,noreferrer');
+  };
+
   const headerRightContent = (
     <>
+      {showUpgradeButton && (
+        <button
+          type="button"
+          onClick={handleUpgradeClick}
+          className="cp-upgrade-btn"
+        >
+          <Sparkles size={14} />
+          <span>Upgrade to Pro</span>
+          <ExternalLink size={12} />
+        </button>
+      )}
       <AskAI />
       <button type="button" className="cp-support-btn">
         <HelpCircle size={14} /> Support

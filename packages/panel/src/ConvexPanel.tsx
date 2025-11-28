@@ -192,6 +192,8 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
               theme,
               mergedTheme,
               settings,
+              teamSlug,
+              projectSlug,
               // Allow any other props that might be needed by child components
               ...restProps
             }}

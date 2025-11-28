@@ -23,16 +23,51 @@ export interface UseFunctionEditorReturn {
 }
 
 const convexExtraLib = `
-declare type ConvexQueryCtx = {
-  db: {
-    query: (table: string) => {
-      take: (limit: number) => Promise<any>;
+declare module "convex:/_system/repl/wrappers.js" {
+  type ConvexQueryCtx = {
+    db: {
+      query: (table: string) => {
+        take: (limit: number) => Promise<any>;
+        collect: () => Promise<any[]>;
+        first: () => Promise<any>;
+        filter: (predicate: (q: any) => any) => any;
+        order: (direction: "asc" | "desc") => any;
+        index: (indexName: string, ...args: any[]) => any;
+      };
+      get: (id: any) => Promise<any>;
+      system: {
+        get: (id: any) => Promise<any>;
+      };
     };
   };
-};
 
+  export function query<T>(config: {
+    handler: (ctx: ConvexQueryCtx) => Promise<T> | T;
+  }): Promise<T>;
+
+  export function internalQuery<T>(config: {
+    handler: (ctx: ConvexQueryCtx) => Promise<T> | T;
+  }): Promise<T>;
+}
+
+// Make query available globally for convenience
 declare function query<T>(config: {
-  handler: (ctx: ConvexQueryCtx) => Promise<T> | T;
+  handler: (ctx: {
+    db: {
+      query: (table: string) => {
+        take: (limit: number) => Promise<any>;
+        collect: () => Promise<any[]>;
+        first: () => Promise<any>;
+        filter: (predicate: (q: any) => any) => any;
+        order: (direction: "asc" | "desc") => any;
+        index: (indexName: string, ...args: any[]) => any;
+      };
+      get: (id: any) => Promise<any>;
+      system: {
+        get: (id: any) => Promise<any>;
+      };
+    };
+  }) => Promise<T> | T;
 }): Promise<T>;
 `;
 
@@ -153,6 +188,12 @@ export function useFunctionEditor({
       isolatedModules: true,
       strict: true,
     });
+
+    // Add Convex type definitions to Monaco's TypeScript environment
+    monacoInstance.languages.typescript.typescriptDefaults.addExtraLib(
+      convexExtraLib,
+      'file:///node_modules/@types/convex-repl/index.d.ts'
+    );
 
     // Helper to get theme color from CSS variable
     const getThemeColor = (varName: string, fallback: string = '#0F1115') => {

@@ -473,6 +473,27 @@
   color: var(--color-panel-text);
 }
 
+/* Upgrade to Pro button */
+.cp-upgrade-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: none;
+  background: var(--color-panel-accent);
+  color: var(--color-panel-bg);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-panel-accent) 20%, transparent);
+}
+
+.cp-upgrade-btn:hover {
+  background: var(--color-panel-accent-hover);
+}
+
 /* Ask AI button */
 .cp-ask-ai-btn {
   display: flex;
@@ -1192,6 +1213,7 @@
   padding-left: 12px;
   padding-right: 12px;
   border-bottom: 1px solid var(--color-panel-border);
+  padding-bottom: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;

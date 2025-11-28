@@ -102,7 +102,7 @@ export async function buildAuthorizationUrl(
   config: OAuthConfig,
   state?: string
 ): Promise<string> {
-  console.log('[OAuth] buildAuthorizationUrl called with:', {
+  console.debug('buildAuthorizationUrl called with:', {
     clientId: config.clientId,
     redirectUri: config.redirectUri,
     scope: config.scope,
@@ -111,8 +111,8 @@ export async function buildAuthorizationUrl(
 
   const scope = config.scope || 'project';
   const baseUrl = `https://dashboard.convex.dev/oauth/authorize/${scope}`;
-  console.log('[OAuth] Base URL:', baseUrl);
-  console.log('[OAuth] Scope:', scope);
+  console.debug('Base URL:', baseUrl);
+  console.debug('Scope:', scope);
   
   const managesStateInternally = !state;
   const stateNonce = state || generateState();
@@ -123,15 +123,15 @@ export async function buildAuthorizationUrl(
     response_type: 'code',
   });
 
-  console.log('[OAuth] Initial params:', params.toString());
+  console.debug('Initial params:', params.toString());
 
   let pkceCodeVerifier: string | undefined;
 
   // Add PKCE if available
   try {
-    console.log('[OAuth] Generating PKCE...');
+    console.debug('Generating PKCE...');
     const pkce = await generatePKCE();
-    console.log('[OAuth] PKCE generated:', {
+    console.debug('PKCE generated:', {
       codeVerifier: pkce.codeVerifier.substring(0, 20) + '...',
       codeChallenge: pkce.codeChallenge.substring(0, 20) + '...',
     });
@@ -139,9 +139,9 @@ export async function buildAuthorizationUrl(
     sessionStorage.setItem(`${STATE_STORAGE_KEY}-pkce`, pkce.codeVerifier);
     params.append('code_challenge', pkce.codeChallenge);
     params.append('code_challenge_method', 'S256');
-    console.log('[OAuth] PKCE added to params');
+    console.debug('PKCE added to params');
   } catch (e) {
-    console.warn('[OAuth] PKCE not available, continuing without it:', e);
+    console.warn('PKCE not available, continuing without it:', e);
   }
 
   let finalState = stateNonce;
@@ -159,11 +159,11 @@ export async function buildAuthorizationUrl(
   try {
     sessionStorage.setItem(STATE_STORAGE_KEY, finalState);
   } catch (err) {
-    console.warn('[OAuth] Failed to store state in sessionStorage:', err);
+    console.warn('Failed to store state in sessionStorage:', err);
   }
 
   const finalUrl = `${baseUrl}?${params.toString()}`;
-  console.log('[OAuth] Final authorization URL:', finalUrl);
+  console.debug('Final authorization URL:', finalUrl);
   return finalUrl;
 }
 
@@ -179,8 +179,8 @@ export async function exchangeCodeForToken(
   config: OAuthConfig,
   codeVerifier?: string
 ): Promise<OAuthToken> {
-  console.log('[OAuth] exchangeCodeForToken called');
-  console.log('[OAuth] config:', {
+  console.debug('exchangeCodeForToken called');
+  console.debug('config:', {
     clientId: config.clientId,
     hasClientSecret: !!config.clientSecret,
     tokenExchangeUrl: config.tokenExchangeUrl,
@@ -189,18 +189,18 @@ export async function exchangeCodeForToken(
   // Warn if tokenExchangeUrl is missing (will fail with CORS)
   if (!config.tokenExchangeUrl) {
     console.warn(
-      '[OAuth] tokenExchangeUrl is not set. ' +
+      'tokenExchangeUrl is not set. ' +
       'Set VITE_CONVEX_TOKEN_EXCHANGE_URL or NEXT_PUBLIC_CONVEX_TOKEN_EXCHANGE_URL ' +
       'to your server-side token exchange endpoint (e.g., http://localhost:3004/api/convex/exchange). ' +
       'Direct token exchange from browser will fail due to CORS.'
     );
   }
-  console.log('[OAuth] code:', code.substring(0, 20) + '...');
-  console.log('[OAuth] hasCodeVerifier:', !!codeVerifier);
+  console.debug('code:', code.substring(0, 20) + '...');
+  console.debug('hasCodeVerifier:', !!codeVerifier);
 
   // If a server-side token exchange URL is provided, use it
   if (config.tokenExchangeUrl) {
-    console.log('[OAuth] Using server-side token exchange endpoint:', config.tokenExchangeUrl);
+    console.debug('Using server-side token exchange endpoint:', config.tokenExchangeUrl);
     const response = await fetch(config.tokenExchangeUrl, {
       method: 'POST',
       headers: {
@@ -229,7 +229,7 @@ export async function exchangeCodeForToken(
         errorData = { error: errorText };
       }
       
-      console.error('[OAuth] Token exchange failed:', response.status, errorData);
+      console.error('Token exchange failed:', response.status, errorData);
       
       // Provide helpful error message for missing client secret
       if (response.status === 500 && errorData.error?.includes('CONVEX_CLIENT_SECRET')) {
@@ -246,12 +246,12 @@ export async function exchangeCodeForToken(
     }
 
     const token: OAuthToken = await response.json();
-    console.log('[OAuth] Token received from server');
+    console.debug('Token received from server');
     return token;
   }
 
   // Otherwise, try direct exchange (will fail due to CORS in browser)
-  console.log('[OAuth] Attempting direct token exchange (may fail due to CORS)');
+  console.debug('Attempting direct token exchange (may fail due to CORS)');
   const body = new URLSearchParams({
     client_id: config.clientId,
     grant_type: 'authorization_code',
@@ -276,12 +276,12 @@ export async function exchangeCodeForToken(
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[OAuth] Direct token exchange failed:', response.status, error);
+      console.error('Direct token exchange failed:', response.status, error);
       throw new Error(`Failed to exchange code for token: ${response.status} ${error}. Note: Token exchange must happen server-side. Provide a tokenExchangeUrl in oauthConfig.`);
     }
 
     const token: OAuthToken = await response.json();
-    console.log('[OAuth] Token received from direct exchange');
+    console.debug('Token received from direct exchange');
     
     // Store token with optional expiration
     if (token.expires_at) {
@@ -388,7 +388,7 @@ function markCodeAsUsed(code: string): void {
       sessionStorage.setItem(USED_CODE_STORAGE_KEY, JSON.stringify(codes));
     }
   } catch (e) {
-    console.warn('[OAuth] Failed to mark code as used:', e);
+    console.warn('Failed to mark code as used:', e);
   }
 }
 
@@ -411,13 +411,13 @@ export async function handleOAuthCallback(
 
   const existingExchange = inFlightExchanges.get(code);
   if (existingExchange) {
-    console.log('[OAuth] Exchange already in progress for this code, awaiting existing result');
+    console.debug('Exchange already in progress for this code, awaiting existing result');
     return existingExchange;
   }
 
   // Prevent duplicate exchanges (React StrictMode calls effects twice)
   if (isCodeUsed(code)) {
-    console.log('[OAuth] Code already used, skipping duplicate exchange');
+    console.debug('Code already used, skipping duplicate exchange');
     // Return stored token if available
     return getStoredToken();
   }

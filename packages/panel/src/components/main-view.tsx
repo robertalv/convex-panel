@@ -35,7 +35,7 @@ const tabRenderers: Record<TabId, TabRenderer> = {
   health: ({ deployUrl, accessToken, useMockData }) => (
     <HealthView deploymentUrl={deployUrl} authToken={accessToken} useMockData={useMockData} />
   ),
-  data: ({ deployUrl, baseUrl, accessToken, adminClient, useMockData, onError }) => (
+  data: ({ deployUrl, baseUrl, accessToken, adminClient, useMockData, onError, teamSlug, projectSlug }) => (
     <DataView
       convexUrl={deployUrl || baseUrl}
       accessToken={accessToken}
@@ -43,6 +43,8 @@ const tabRenderers: Record<TabId, TabRenderer> = {
       adminClient={adminClient}
       useMockData={useMockData}
       onError={onError}
+      teamSlug={teamSlug}
+      projectSlug={projectSlug}
     />
   ),
   functions: ({ adminClient, accessToken, useMockData, onError }) => (

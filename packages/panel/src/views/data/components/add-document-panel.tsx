@@ -5,6 +5,7 @@ import { useThemeSafe } from '../../../hooks/useTheme';
 import { insertDocuments } from '../../../utils/functions';
 import { toast } from 'sonner';
 import { TableSchema } from '../../../types';
+import { UpgradePopup } from '../../../components/upgrade-popup';
 
 export interface AddDocumentPanelProps {
   selectedTable: string;
@@ -77,6 +78,7 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [showUpgradePopup, setShowUpgradePopup] = useState(false);
   const [monaco, setMonaco] = useState<Parameters<BeforeMount>[0]>();
   const editorRef = useRef<any>(null);
 
@@ -386,9 +388,16 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
         }
       }, 1500);
     } catch (err: any) {
-      const errorMessage = err?.message || 'Failed to insert documents';
-      setError(errorMessage);
-      toast.error(errorMessage);
+      // Check if this is an upgrade required error
+      if (err?.isUpgradeError || err?.code === 'UPGRADE_REQUIRED' || 
+          (err?.message && err.message.includes('unavailable on your plan'))) {
+        setShowUpgradePopup(true);
+        setError(null);
+      } else {
+        const errorMessage = err?.message || 'Failed to insert documents';
+        setError(errorMessage);
+        toast.error(errorMessage);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -706,6 +715,12 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
           }
         }
       `}</style>
+
+      {/* Upgrade Popup */}
+      <UpgradePopup
+        isOpen={showUpgradePopup}
+        onClose={() => setShowUpgradePopup(false)}
+      />
     </div>
   );
 };

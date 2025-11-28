@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useThemeSafe } from '../../hooks/useTheme';
 
@@ -17,6 +17,58 @@ export interface ContextMenuProps {
   onClose: () => void;
 }
 
+// Parse shortcut string to key combination
+function parseShortcut(shortcut: string): {
+  key: string;
+  meta: boolean;
+  ctrl: boolean;
+  shift: boolean;
+  alt: boolean;
+} {
+  const parts = shortcut.toLowerCase().split('+');
+  return {
+    key: parts[parts.length - 1],
+    meta: parts.includes('meta') || parts.includes('cmd'),
+    ctrl: parts.includes('ctrl'),
+    shift: parts.includes('shift'),
+    alt: parts.includes('alt'),
+  };
+}
+
+// Check if keyboard event matches shortcut
+function matchesShortcut(
+  event: KeyboardEvent,
+  shortcut: { key: string; meta: boolean; ctrl: boolean; shift: boolean; alt: boolean }
+): boolean {
+  const isMac = navigator.platform.includes('Mac');
+  const key = event.key.toLowerCase();
+  
+  // Map special keys
+  const keyMap: Record<string, string> = {
+    'enter': 'return',
+    ' ': 'space',
+    'escape': 'esc',
+  };
+  
+  const normalizedKey = keyMap[key] || key;
+  const normalizedShortcutKey = keyMap[shortcut.key] || shortcut.key;
+  
+  if (normalizedKey !== normalizedShortcutKey) return false;
+  
+  // Check modifiers
+  const metaMatch = shortcut.meta ? (isMac ? event.metaKey : event.ctrlKey) : !event.metaKey && !event.ctrlKey;
+  const ctrlMatch = shortcut.ctrl ? event.ctrlKey : !event.ctrlKey;
+  const shiftMatch = shortcut.shift === event.shiftKey;
+  const altMatch = shortcut.alt === event.altKey;
+  
+  // For Mac, meta takes precedence over ctrl
+  if (isMac && shortcut.meta) {
+    return metaMatch && shiftMatch && altMatch && !event.ctrlKey;
+  }
+  
+  return metaMatch && ctrlMatch && shiftMatch && altMatch;
+}
+
 export const ContextMenu: React.FC<ContextMenuProps> = ({
   items,
   position,
@@ -24,6 +76,35 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 }) => {
   const menuRef = useRef<HTMLDivElement | null>(null);
   const { theme } = useThemeSafe();
+  const [selectedIndex, setSelectedIndex] = useState<number>(0);
+  
+  // Get only actionable items (no dividers)
+  const actionableItems = items.filter(
+    (item): item is ContextMenuItemDescriptor => !('type' in item && (item as { type: string }).type === 'divider')
+  );
+  
+  // Map item index to actual index in items array
+  const getItemIndex = useCallback((actionableIndex: number): number => {
+    let actionableCount = 0;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!('type' in item && (item as { type: string }).type === 'divider')) {
+        if (actionableCount === actionableIndex) {
+          return i;
+        }
+        actionableCount++;
+      }
+    }
+    return -1;
+  }, [items]);
+
+  // Execute selected item
+  const executeSelected = useCallback(() => {
+    if (selectedIndex >= 0 && selectedIndex < actionableItems.length) {
+      actionableItems[selectedIndex].onClick();
+      onClose();
+    }
+  }, [selectedIndex, actionableItems, onClose]);
 
   useEffect(() => {
     const handleMouseDown = (event: MouseEvent) => {
@@ -40,9 +121,56 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        event.preventDefault();
         onClose();
+        return;
+      }
+
+      // Arrow key navigation
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setSelectedIndex((prev) => (prev + 1) % actionableItems.length);
+        return;
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setSelectedIndex((prev) => (prev - 1 + actionableItems.length) % actionableItems.length);
+        return;
+      }
+
+      // Enter or Space to activate
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        executeSelected();
+        return;
+      }
+
+      // Number keys for quick selection (1-9)
+      const numKey = parseInt(event.key);
+      if (!isNaN(numKey) && numKey >= 1 && numKey <= 9) {
+        const index = numKey - 1;
+        if (index < actionableItems.length) {
+          event.preventDefault();
+          actionableItems[index].onClick();
+          onClose();
+        }
+        return;
+      }
+
+      // Check for shortcut matches
+      for (const item of actionableItems) {
+        if (item.shortcut) {
+          const shortcut = parseShortcut(item.shortcut);
+          if (matchesShortcut(event, shortcut)) {
+            event.preventDefault();
+            item.onClick();
+            onClose();
+            return;
+          }
+        }
       }
     };
+    
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('keydown', handleKeyDown);
@@ -51,7 +179,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onClose]);
+  }, [onClose, actionableItems, executeSelected]);
 
   return createPortal(
     <div
@@ -83,6 +211,9 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           );
         }
         const action = item as ContextMenuItemDescriptor;
+        const actionableIndex = actionableItems.findIndex(a => a === action);
+        const isSelected = actionableIndex === selectedIndex;
+        
         return (
           <button
             key={action.label}
@@ -90,11 +221,16 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             onClick={(event) => {
               event.stopPropagation();
               action.onClick();
+              onClose();
             }}
             style={{
               width: '100%',
               padding: '6px 14px',
-              backgroundColor: 'transparent',
+              backgroundColor: isSelected
+                ? (action.destructive 
+                    ? 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)' 
+                    : 'var(--color-panel-hover)')
+                : 'transparent',
               border: 'none',
               display: 'flex',
               alignItems: 'center',
@@ -104,14 +240,13 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               cursor: 'pointer',
               transition: 'background 0.15s,color 0.15s',
             }}
-            onMouseEnter={e => {
-              e.currentTarget.style.backgroundColor = action.destructive 
-                ? 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)' 
-                : 'var(--color-panel-hover)';
-              e.currentTarget.style.color = action.destructive ? 'var(--color-panel-error)' : 'var(--color-panel-text)';
+            onMouseEnter={() => {
+              setSelectedIndex(actionableIndex);
             }}
-            onMouseLeave={e => {
-              e.currentTarget.style.backgroundColor = 'transparent';
+            onMouseLeave={(e) => {
+              if (!isSelected) {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }
               e.currentTarget.style.color = action.destructive ? 'var(--color-panel-error)' : 'var(--color-panel-text)';
             }}
           >

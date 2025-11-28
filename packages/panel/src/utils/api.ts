@@ -4,6 +4,8 @@ import { getActiveTable } from './storage';
 import { FetchLogsOptions, FetchLogsResponse, FetchTablesOptions, FetchTablesResponse } from '../types';
 import { mockFetchLogsFromApi, mockFetchTablesFromApi, mockFetchCacheHitRate, mockFetchFailureRate, mockFetchSchedulerLag } from './mockData';
 
+const tableColumnsForbiddenCache = new Set<string>();
+
 /**
  * Fetch logs from the Convex API
  * @param FetchLogsOptions
@@ -164,40 +166,27 @@ export async function fetchTablesFromApi({
     throw new Error('Missing URL or access token');
   }
 
-  // Normalize componentId: 'app' means root (null)
   const normalizedComponentId = componentId === 'app' || componentId === null ? null : componentId;
-  
-  console.log('[fetchTablesFromApi] Component ID:', componentId, 'Normalized:', normalizedComponentId);
 
-  // For components, we need to use getTableMapping to get the table names
-  // For root app, we can use shapes data
   let tableNames: string[] = [];
   let shapesData: any = {};
   
   if (adminClient) {
     try {
-      // Use getTableMapping to get tables for the component
       const tableMapping = await adminClient.query("_system/frontend/getTableMapping" as any, {
         componentId: normalizedComponentId
       }).catch(() => null);
 
-      console.log('[fetchTablesFromApi] Table mapping result:', tableMapping);
-
       if (tableMapping && typeof tableMapping === 'object') {
-        // tableMapping is an object mapping table numbers to table names
-        // e.g., {"1": "users", "2": "posts"}
         tableNames = Object.values(tableMapping) as string[];
-        // Filter out system tables that we don't want to show
         tableNames = tableNames.filter(name => name !== '_scheduled_jobs' && name !== '_file_storage');
         
-        console.log('[fetchTablesFromApi] Tables for component:', tableNames.length, 'tables:', tableNames);
       }
     } catch (err) {
-      console.warn('[fetchTablesFromApi] Failed to get table mapping, will try shapes data:', err);
+      console.warn('Failed to get table mapping, will try shapes data:', err);
     }
   }
 
-  // Fetch shapes data - this works for root app, but may not have component tables
   const response = await fetch(`${convexUrl}${ROUTES.SHAPES2}`, {
     headers: {
       authorization: `Convex ${accessToken}`,
@@ -215,46 +204,32 @@ export async function fetchTablesFromApi({
     throw new Error('Invalid data structure received');
   }
 
-  console.log('[fetchTablesFromApi] All tables from shapes:', Object.keys(shapesData).length, 'tables:', Object.keys(shapesData));
-
   const columnMap = await fetchTableColumnsFromApi(convexUrl, accessToken, normalizedComponentId).catch(
     () => ({}),
   );
 
-  // If we have component table names, use those; otherwise use all shapes data
   let filteredShapesData = shapesData;
   
   if (tableNames.length > 0) {
-    // For components, filter shapes data to only include component tables
-    // If a table doesn't exist in shapes data, we'll fetch its schema using adminClient
     const componentTableSet = new Set(tableNames);
     filteredShapesData = Object.fromEntries(
       Object.entries(shapesData).filter(([tableName]) => componentTableSet.has(tableName))
     );
     
-    // Fetch schema for component tables that weren't in shapes data
     if (adminClient && normalizedComponentId !== null) {
       const missingTables = tableNames.filter(tableName => !filteredShapesData[tableName]);
-      console.log('[fetchTablesFromApi] Fetching schema for missing component tables:', missingTables);
-      
-      // Try to fetch all fields for each missing table using the new system query
       for (const tableName of missingTables) {
         try {
-          // Fetch multiple pages of documents to get comprehensive field coverage
-          // We'll sample from the beginning and try to get as many unique fields as possible
           const allKeys = new Set<string>();
           const sampleDocuments: any[] = [];
           let cursor: string | null = null;
           let pagesFetched = 0;
-          const maxPages = 5; // Fetch up to 5 pages
-          const itemsPerPage = 50; // More items per page
+          const maxPages = 5;
+          const itemsPerPage = 50;
           
-          console.log('[fetchTablesFromApi] Starting to fetch documents for', tableName, 'with componentId:', normalizedComponentId);
-          
-          // Fetch multiple pages to get comprehensive field coverage
           while (pagesFetched < maxPages) {
             try {
-              const pageData = await adminClient.query("_system/frontend/paginatedTableDocuments:default" as any, {
+              const pageData: any = await adminClient.query("_system/frontend/paginatedTableDocuments:default" as any, {
                 componentId: normalizedComponentId,
                 table: tableName,
                 filters: null,
@@ -263,25 +238,14 @@ export async function fetchTablesFromApi({
                   cursor: cursor
                 }
               }).catch((err: any) => {
-                console.warn('[fetchTablesFromApi] Error querying paginatedTableDocuments for', tableName, ':', err);
+                console.warn('Error querying paginatedTableDocuments for', tableName, ':', err);
                 return null;
               });
               
-              console.log('[fetchTablesFromApi] Page data for', tableName, ':', {
-                hasPageData: !!pageData,
-                hasPage: !!(pageData?.page),
-                pageLength: pageData?.page?.length || 0,
-                hasContinuation: !!pageData?.continuationCursor,
-                responseKeys: pageData ? Object.keys(pageData) : [],
-                firstDocKeys: pageData?.page?.[0] ? Object.keys(pageData.page[0]) : []
-              });
-              
               if (!pageData || !pageData.page || !Array.isArray(pageData.page) || pageData.page.length === 0) {
-                console.log('[fetchTablesFromApi] No more documents for', tableName, 'after', pagesFetched, 'pages');
-                break; // No more documents
+                break;
               }
               
-              // Collect all keys from this page
               pageData.page.forEach((doc: any) => {
                 sampleDocuments.push(doc);
                 Object.keys(doc).forEach(key => {
@@ -291,20 +255,11 @@ export async function fetchTablesFromApi({
                 });
               });
               
-              console.log('[fetchTablesFromApi] Page', pagesFetched + 1, 'for', tableName, ':', {
-                documentsInPage: pageData.page.length,
-                totalDocuments: sampleDocuments.length,
-                totalFields: allKeys.size,
-                fields: Array.from(allKeys)
-              });
-              
-              // Check if we have a continuation cursor
               if (pageData.continuationCursor) {
                 cursor = pageData.continuationCursor;
                 pagesFetched++;
               } else {
-                console.log('[fetchTablesFromApi] No continuation cursor for', tableName, '- reached end');
-                break; // No more pages
+                break;
               }
             } catch (err) {
               console.warn('[fetchTablesFromApi] Error fetching page', pagesFetched + 1, 'for', tableName, ':', err);
@@ -313,26 +268,18 @@ export async function fetchTablesFromApi({
           }
           
           const allFields = Array.from(allKeys);
-          console.log('[fetchTablesFromApi] Final field collection for', tableName, ':', {
-            totalFields: allFields.length,
-            fields: allFields,
-            totalDocuments: sampleDocuments.length
-          });
-          
           if (allFields.length > 0 && sampleDocuments.length > 0) {
             
             const inferredFields: TableField[] = [];
             
-            // For each field, infer type from sample documents
             allFields.forEach(fieldName => {
               if (fieldName === '_id' || fieldName === '_creationTime') {
-                return; // Skip system fields
+                return;
               }
               
               let fieldType = 'any';
               let isOptional = true;
               
-              // Find the first document with a non-null value for this field
               let value: any = null;
               for (const doc of sampleDocuments) {
                 if (doc[fieldName] !== null && doc[fieldName] !== undefined) {
@@ -342,7 +289,6 @@ export async function fetchTablesFromApi({
                 }
               }
               
-              // Infer type from value
               if (value !== null && value !== undefined) {
                 if (typeof value === 'string') {
                   fieldType = 'string';
@@ -357,7 +303,6 @@ export async function fetchTablesFromApi({
                 }
               }
               
-              // Check if field is optional (if all documents have null/undefined for this field)
               if (!isOptional) {
                 isOptional = sampleDocuments.every((doc: any) => 
                   doc[fieldName] === null || doc[fieldName] === undefined
@@ -377,18 +322,14 @@ export async function fetchTablesFromApi({
               type: 'table',
               fields: inferredFields
             };
-            console.log('[fetchTablesFromApi] Found', inferredFields.length, 'fields for', tableName, ':', inferredFields.map(f => f.fieldName));
           } else {
-            // No fields found, create empty schema
             filteredShapesData[tableName] = {
               type: 'table',
               fields: []
             };
-            console.log('[fetchTablesFromApi] No fields found for', tableName, ', using empty fields');
           }
         } catch (err) {
           console.warn('[fetchTablesFromApi] Error fetching fields for', tableName, ':', err);
-          // Create empty schema as fallback
           filteredShapesData[tableName] = {
             type: 'table',
             fields: []
@@ -396,7 +337,6 @@ export async function fetchTablesFromApi({
         }
       }
     } else {
-      // No adminClient or root app - add empty schemas for missing tables
       tableNames.forEach(tableName => {
         if (!filteredShapesData[tableName]) {
           filteredShapesData[tableName] = {
@@ -407,9 +347,6 @@ export async function fetchTablesFromApi({
       });
     }
     
-    console.log('[fetchTablesFromApi] Filtered tables:', Object.keys(filteredShapesData).length, 'tables:', Object.keys(filteredShapesData));
-  } else {
-    console.log('[fetchTablesFromApi] No component table mapping, using all shapes data');
   }
 
   const tableData = Object.entries(filteredShapesData).reduce(
@@ -420,7 +357,9 @@ export async function fetchTablesFromApi({
 
       const normalizedFields = mergeFieldsWithColumns(
         (tableSchema as TableDefinition[string])?.fields || [],
-        columnMap[tableName],
+        (columnMap && typeof columnMap === 'object' && !Array.isArray(columnMap) && tableName in columnMap)
+          ? (columnMap as Record<string, string[]>)[tableName]
+          : undefined,
       );
 
       acc[tableName] = {
@@ -455,18 +394,11 @@ export async function fetchTablesFromApi({
         tableName: Object.keys(tableData)[0]
       });
     } catch (err) {
-      // Error fetching table size
+      console.error('Error fetching table size:', err);
     }
 
     selectedTable = Object.keys(tableData)[0] || '';
   }
-
-  console.log('[fetchTablesFromApi] Final result:', {
-    componentId: normalizedComponentId,
-    totalTables: Object.keys(tableData).length,
-    tableNames: Object.keys(tableData),
-    selectedTable
-  });
 
   return {
     tables: tableData,
@@ -481,6 +413,11 @@ async function fetchTableColumnsFromApi(
 ): Promise<Record<string, string[]>> {
   const result: Record<string, string[]> = {};
 
+  // Skip request if we've already seen a 403 for this deployment
+  if (tableColumnsForbiddenCache.has(convexUrl)) {
+    return result;
+  }
+
   try {
     const response = await fetch(`${convexUrl}${ROUTES.TABLE_COLUMNS}`, {
       headers: {
@@ -490,21 +427,9 @@ async function fetchTableColumnsFromApi(
     });
 
     if (!response.ok) {
-      let errorDetails: any = null;
-      try {
-        errorDetails = await response.json();
-      } catch {
-        // ignore json parse errors
-      }
-
-      if (
-        response.status === 403 &&
-        (errorDetails?.code === 'StreamingExportNotEnabled' ||
-          errorDetails?.message?.includes('Streaming export is only available'))
-      ) {
-        console.warn(
-          '[fetchTableColumnsFromApi] Streaming export unavailable on this plan; falling back to shapes-only columns.',
-        );
+      if (response.status === 403) {
+        // Cache this deployment as forbidden to skip future requests
+        tableColumnsForbiddenCache.add(convexUrl);
         return result;
       }
 
@@ -538,7 +463,9 @@ async function fetchTableColumnsFromApi(
       });
     }
   } catch (error) {
-    console.warn('fetchTableColumnsFromApi failed', error);
+    if (error instanceof Error && !error.message.includes('403')) {
+      console.warn('fetchTableColumnsFromApi failed', error);
+    }
   }
 
   return result;
@@ -1533,7 +1460,7 @@ export async function fetchDeploymentMetadata(
  * Parse team and project slugs from access token
  * Token format: "project:{teamSlug}:{projectSlug}|{token}"
  */
-function parseAccessToken(authToken: string | undefined): { teamSlug?: string; projectSlug?: string } {
+export function parseAccessToken(authToken: string | undefined): { teamSlug?: string; projectSlug?: string } {
   if (!authToken) return {};
   
   // Token format: "project:{teamSlug}:{projectSlug}|{token}"
