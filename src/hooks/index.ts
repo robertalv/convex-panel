@@ -1,1 +1,0 @@
-export { useGlobalLocalStorage } from './useGlobalLocalStorage';

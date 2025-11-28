@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@convex-panel/shared": [
+        "../shared/src"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*"
+  ]
+}

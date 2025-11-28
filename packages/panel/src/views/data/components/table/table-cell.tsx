@@ -1,0 +1,241 @@
+import React from 'react';
+import { MoreVertical, Link2 } from 'lucide-react';
+import { Tooltip } from '../../../../components/shared/tooltip';
+import { DocumentPreview } from '../document-preview';
+import { InlineCellEditor } from './inline-cell-editor';
+import { formatValue, getValueColor, isConvexId, createDocumentLink, ColumnMeta } from './data-table-utils';
+
+export interface TableCellProps {
+  column: string;
+  value: any;
+  width: number;
+  rowId: string;
+  columnMeta?: ColumnMeta;
+  isHovered: boolean;
+  isMenuOpen: boolean;
+  isEditing: boolean;
+  isEditable: boolean;
+  editingValue: string;
+  editingError: string | null;
+  isSaving: boolean;
+  editInputRef: React.RefObject<HTMLTextAreaElement>;
+  editorRef: React.RefObject<HTMLDivElement>;
+  adminClient?: any;
+  deploymentUrl?: string;
+  componentId?: string | null;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+  onDoubleClick: (e: React.MouseEvent) => void;
+  onContextMenu: (event: React.MouseEvent) => void;
+  onEditingValueChange: (value: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  onMenuClick: (event: React.MouseEvent) => void;
+  onNavigateToTable?: (tableName: string, documentId: string) => void;
+  accessToken?: string;
+  teamSlug?: string;
+  projectSlug?: string;
+}
+
+export const TableCell: React.FC<TableCellProps> = ({
+  column,
+  value,
+  width,
+  rowId,
+  columnMeta,
+  isHovered,
+  isMenuOpen,
+  isEditing,
+  isEditable,
+  editingValue,
+  editingError,
+  isSaving,
+  editInputRef,
+  editorRef,
+  adminClient,
+  deploymentUrl,
+  componentId,
+  onMouseEnter,
+  onMouseLeave,
+  onDoubleClick,
+  onContextMenu,
+  onEditingValueChange,
+  onSave,
+  onCancel,
+  onMenuClick,
+  onNavigateToTable,
+  accessToken,
+  teamSlug,
+  projectSlug,
+}) => {
+  const isUnset = value === null || value === undefined;
+  const showLink = columnMeta?.linkTable && column !== '_id' && typeof value === 'string' && isConvexId(value);
+
+  return (
+    <td
+      style={{
+        padding: 0,
+        borderRight: '1px solid var(--color-panel-border)',
+        width,
+        minWidth: width,
+        maxWidth: width,
+        backgroundColor: isEditing
+          ? 'var(--color-panel-bg-secondary)'
+          : isMenuOpen
+            ? 'var(--color-panel-active)'
+            : isHovered
+              ? 'var(--color-panel-hover)'
+              : 'transparent',
+        position: 'relative',
+      }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onDoubleClick={onDoubleClick}
+      onContextMenu={onContextMenu}
+    >
+      {isEditing ? (
+        <InlineCellEditor
+          value={editingValue}
+          onChange={onEditingValueChange}
+          onSave={onSave}
+          onCancel={onCancel}
+          isSaving={isSaving}
+          inputRef={editInputRef}
+          editorRef={editorRef}
+          cellWidth={width}
+          error={editingError}
+          linkTable={columnMeta?.linkTable}
+          adminClient={adminClient}
+          deploymentUrl={deploymentUrl}
+          componentId={componentId}
+          onNavigateToTable={onNavigateToTable}
+          accessToken={accessToken}
+          teamSlug={teamSlug}
+          projectSlug={projectSlug}
+        />
+      ) : (
+        <div
+          style={{
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '8px 12px',
+            gap: '8px',
+            cursor: isEditable ? 'pointer' : 'default',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
+            {showLink && (
+              <Tooltip
+                content={
+                  <DocumentPreview
+                    documentId={value}
+                    tableName={columnMeta?.linkTable || ''}
+                    adminClient={adminClient}
+                    deploymentUrl={deploymentUrl}
+                    componentId={componentId}
+                    onNavigateToTable={onNavigateToTable}
+                    accessToken={accessToken}
+                    teamSlug={teamSlug}
+                    projectSlug={projectSlug}
+                  />
+                }
+                placement="right"
+                maxWidth="500px"
+                delay={300}
+              >
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    cursor: 'pointer',
+                    width: '18px',
+                    height: '18px',
+                    minWidth: '18px',
+                    minHeight: '18px',
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const referencedTable = columnMeta?.linkTable;
+                    if (referencedTable) {
+                      if (onNavigateToTable) {
+                        onNavigateToTable(referencedTable, value);
+                      } else {
+                        const linkUrl = createDocumentLink(deploymentUrl, referencedTable, value, componentId || null, teamSlug, projectSlug, accessToken);
+                        if (linkUrl) {
+                          window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                        }
+                      }
+                    }
+                  }}
+                >
+                  <Link2
+                    size={14}
+                    style={{
+                      color: 'var(--color-panel-text-secondary)',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = 'var(--color-panel-accent)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
+                    }}
+                  />
+                </div>
+              </Tooltip>
+            )}
+            <span
+              style={{
+                color: isUnset ? 'var(--color-panel-text-muted)' : getValueColor(value),
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                fontStyle: isUnset ? 'italic' : 'normal',
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              {formatValue(value)}
+            </span>
+          </div>
+          {(isHovered || isMenuOpen) && (
+            <button
+              type="button"
+              data-menu-trigger
+              onClick={onMenuClick}
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 6,
+                border: '1px solid var(--color-panel-border)',
+                backgroundColor: 'var(--color-panel-bg-tertiary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--color-panel-text)',
+                cursor: 'pointer',
+              }}
+            >
+              <MoreVertical 
+                size={12}
+                color="var(--color-panel-text-secondary)"
+              />
+            </button>
+          )}
+        </div>
+      )}
+    </td>
+  );
+};
+
