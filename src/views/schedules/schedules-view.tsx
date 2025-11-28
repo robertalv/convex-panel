@@ -28,7 +28,6 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
   const [selectedFunction, setSelectedFunction] = useState<ModuleFunction | CustomQuery | null>(null);
   const [isLoadingFunctions, setIsLoadingFunctions] = useState(false);
   const [components, setComponents] = useState<any[]>([]);
-
   useEffect(() => {
     if (!adminClient) return;
 
