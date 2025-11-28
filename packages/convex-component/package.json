@@ -12,9 +12,9 @@
         "@convex-panel/shared": "workspace:*"
     },
     "devDependencies": {
+        "convex": "^1.10.0",
         "tsup": "^8.0.2",
-        "typescript": "^5.3.3",
-        "convex": "^1.10.0"
+        "typescript": "^5.9.3"
     },
     "peerDependencies": {
         "convex": ">=1.10.0"

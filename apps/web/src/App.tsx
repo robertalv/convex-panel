@@ -1,6 +1,7 @@
 import { ConvexReactClient, ConvexProvider } from "convex/react";
-// import ConvexPanel from "@convex-panel/panel";
+import ConvexPanel from "@convex-panel/panel";
 import TodoApp from "./TodoApp";
+import "@convex-panel/panel/styles.css"
 
 // Get Convex URL from environment variables (Vite uses import.meta.env)
 // ConvexPanel will auto-detect this, but we need it for ConvexProvider
@@ -11,7 +12,7 @@ function App() {
   return (
     <ConvexProvider client={convex}>
       <TodoApp />
-        {/* <ConvexPanel /> */}
+        <ConvexPanel />
     </ConvexProvider>
   );
 }

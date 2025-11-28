@@ -10,11 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@convex-panel/panel": "workspace:*",
+    "@repo/backend": "workspace:*",
+    "@tailwindcss/vite": "^4.1.17",
     "convex": "^1.29.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "@repo/backend": "workspace:*",
-    "@convex-panel/panel": "workspace:*"
+    "tailwindcss": "^4.1.17"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
