@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Filter, Plus, MoreVertical, EyeOff, Trash2, Edit2, X, ArrowUpDown } from 'lucide-react';
 import { FilterExpression, SortConfig } from '../../../types';
 import { operatorOptions } from '../../../utils/constants';
 import { TooltipAction } from '../../../components/shared/tooltip-action';
+import { TableMenuDropdown } from './table-menu-dropdown';
 
 export interface TableToolbarProps {
   selectedTable: string;
@@ -20,6 +21,12 @@ export interface TableToolbarProps {
   onRemoveFilter?: (index: number) => void;
   onClearFilters?: () => void;
   onRemoveSort?: () => void;
+  onCustomQuery?: () => void;
+  onSchema?: () => void;
+  onIndexes?: () => void;
+  onMetrics?: () => void;
+  onClearTable?: () => void;
+  onDeleteTable?: () => void;
 }
 
 export const TableToolbar: React.FC<TableToolbarProps> = ({
@@ -38,7 +45,16 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
   onRemoveFilter,
   onClearFilters,
   onRemoveSort,
+  onCustomQuery,
+  onSchema,
+  onIndexes,
+  onMetrics,
+  onClearTable,
+  onDeleteTable,
 }) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   const hasSelection = selectedCount > 0;
   const deleteLabel = selectedCount > 1 ? `Delete ${selectedCount} rows` : 'Delete';
@@ -365,27 +381,71 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
               {deleteLabel}
             </button>
             <button
+              ref={menuButtonRef}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (menuButtonRef.current) {
+                  const rect = menuButtonRef.current.getBoundingClientRect();
+                  const menuWidth = 180; // Menu minWidth
+                  const viewportWidth = window.innerWidth;
+                  
+                  // Calculate initial position: align right edge of menu with right edge of button
+                  let x = rect.right - menuWidth;
+                  let y = rect.bottom + 4;
+                  
+                  // Ensure it's within viewport bounds
+                  if (x + menuWidth > viewportWidth) {
+                    x = viewportWidth - menuWidth - 8;
+                  }
+                  if (x < 8) {
+                    x = 8;
+                  }
+                  
+                  setMenuPosition({ x, y });
+                  setIsMenuOpen(true);
+                }
+              }}
               style={{
                 height: '28px',
                 width: '28px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: 'var(--color-panel-bg-tertiary)',
+                backgroundColor: isMenuOpen ? 'var(--color-panel-border)' : 'var(--color-panel-bg-tertiary)',
                 border: '1px solid var(--color-panel-border)',
                 borderRadius: '4px',
                 color: 'var(--color-panel-text)',
                 cursor: 'pointer',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+                if (!isMenuOpen) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+                if (!isMenuOpen) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+                }
               }}
             >
               <MoreVertical size={14} />
             </button>
+            {isMenuOpen && menuPosition && (
+              <TableMenuDropdown
+                isOpen={isMenuOpen}
+                onClose={() => {
+                  setIsMenuOpen(false);
+                  setMenuPosition(null);
+                }}
+                position={menuPosition}
+                onCustomQuery={onCustomQuery || (() => {})}
+                onSchema={onSchema || (() => {})}
+                onIndexes={onIndexes || (() => {})}
+                onMetrics={onMetrics || (() => {})}
+                onClearTable={onClearTable}
+                onDeleteTable={onDeleteTable}
+              />
+            )}
           </>
         ) : (
           <>
@@ -416,27 +476,71 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
             </button>
             
             <button
+              ref={menuButtonRef}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (menuButtonRef.current) {
+                  const rect = menuButtonRef.current.getBoundingClientRect();
+                  const menuWidth = 180; // Menu minWidth
+                  const viewportWidth = window.innerWidth;
+                  
+                  // Calculate initial position: align right edge of menu with right edge of button
+                  let x = rect.right - menuWidth;
+                  let y = rect.bottom + 4;
+                  
+                  // Ensure it's within viewport bounds
+                  if (x + menuWidth > viewportWidth) {
+                    x = viewportWidth - menuWidth - 8;
+                  }
+                  if (x < 8) {
+                    x = 8;
+                  }
+                  
+                  setMenuPosition({ x, y });
+                  setIsMenuOpen(true);
+                }
+              }}
               style={{
                 height: '28px',
                 width: '28px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: 'var(--color-panel-bg-tertiary)',
+                backgroundColor: isMenuOpen ? 'var(--color-panel-border)' : 'var(--color-panel-bg-tertiary)',
                 border: '1px solid var(--color-panel-border)',
                 borderRadius: '4px',
                 color: 'var(--color-panel-text)',
                 cursor: 'pointer',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+                if (!isMenuOpen) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+                if (!isMenuOpen) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+                }
               }}
             >
               <MoreVertical size={14} />
             </button>
+            {isMenuOpen && menuPosition && (
+              <TableMenuDropdown
+                isOpen={isMenuOpen}
+                onClose={() => {
+                  setIsMenuOpen(false);
+                  setMenuPosition(null);
+                }}
+                position={menuPosition}
+                onCustomQuery={onCustomQuery || (() => {})}
+                onSchema={onSchema || (() => {})}
+                onIndexes={onIndexes || (() => {})}
+                onMetrics={onMetrics || (() => {})}
+                onClearTable={onClearTable}
+                onDeleteTable={onDeleteTable}
+              />
+            )}
           </>
         )}
       </div>

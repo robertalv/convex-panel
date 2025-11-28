@@ -4,9 +4,15 @@ import { TableToolbar } from './components/table-toolbar';
 import { DataTable } from './components/table/data-table';
 import { FilterSheet } from './components/filter-sheet';
 import { AddDocumentSheet } from './components/add-document-sheet';
+import { SchemaView } from './components/schema-view';
+import { IndexesView } from './components/indexes-view';
+import { MetricsView } from './components/metrics-view';
+import { CustomQuery } from '../../components/function-runner/function-runner';
 import { useTableData } from '../../hooks/useTableData';
 import { fetchComponents } from '../../utils/api';
 import { saveTableFilters } from '../../utils/storage';
+import { useSheetSafe } from '../../contexts/sheet-context';
+import { useShowGlobalRunner } from '../../lib/functionRunner';
 
 export interface DataViewProps {
   convexUrl?: string;
@@ -37,6 +43,8 @@ export const DataView: React.FC<DataViewProps> = ({
   const [visibleFields, setVisibleFields] = useState<string[]>([]);
   const [isColumnVisibilityOpen, setIsColumnVisibilityOpen] = useState(false);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+  const { openSheet } = useSheetSafe();
+  const showGlobalRunner = useShowGlobalRunner();
 
   // Create a mapping from component name to component ID
   const componentNameToId = useMemo(() => {
@@ -225,6 +233,54 @@ export const DataView: React.FC<DataViewProps> = ({
             }}
             onRemoveSort={() => {
               tableData.setSortConfig(null);
+            }}
+            onCustomQuery={() => {
+              const customQuery: CustomQuery = {
+                type: 'customQuery',
+                table: tableData.selectedTable,
+                componentId: selectedComponentId,
+              };
+              showGlobalRunner(customQuery, 'click');
+            }}
+            onSchema={() => {
+              openSheet({
+                title: `Schema for table ${tableData.selectedTable}`,
+                content: (
+                  <SchemaView
+                    tableName={tableData.selectedTable}
+                    tableSchema={tableSchema}
+                  />
+                ),
+                width: '600px',
+              });
+            }}
+            onIndexes={() => {
+              openSheet({
+                title: `Indexes for table ${tableData.selectedTable}`,
+                content: (
+                  <IndexesView
+                    tableName={tableData.selectedTable}
+                    tableSchema={tableSchema}
+                    adminClient={adminClient}
+                    componentId={selectedComponentId}
+                  />
+                ),
+                width: '600px',
+              });
+            }}
+            onMetrics={() => {
+              openSheet({
+                title: `${tableData.selectedTable} Metrics`,
+                content: (
+                  <MetricsView
+                    tableName={tableData.selectedTable}
+                    deploymentUrl={convexUrl}
+                    accessToken={accessToken}
+                    componentId={selectedComponentId}
+                  />
+                ),
+                width: '90vw',
+              });
             }}
           />
           

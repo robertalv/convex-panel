@@ -1121,6 +1121,78 @@ interface MetricsWindow {
 }
 
 /**
+ * Serialize a Date to the format expected by Convex metrics API
+ */
+function serializeDate(date: Date): { secs_since_epoch: number; nanos_since_epoch: number } {
+  const unixTsSeconds = date.getTime() / 1000;
+  const secsSinceEpoch = Math.floor(unixTsSeconds);
+  const nanosSinceEpoch = Math.floor((unixTsSeconds - secsSinceEpoch) * 1e9);
+  return {
+    secs_since_epoch: secsSinceEpoch,
+    nanos_since_epoch: nanosSinceEpoch,
+  };
+}
+
+/**
+ * Parse a serialized date from Convex metrics API
+ */
+function parseDate(date: { secs_since_epoch: number; nanos_since_epoch: number }): Date {
+  let unixTsMs = date.secs_since_epoch * 1000;
+  unixTsMs += date.nanos_since_epoch / 1_000_000;
+  return new Date(unixTsMs);
+}
+
+export type TableMetric = 'rowsRead' | 'rowsWritten';
+
+export interface TimeseriesBucket {
+  time: Date;
+  metric: number | null;
+}
+
+/**
+ * Fetch table rate metrics from the Convex API
+ */
+export async function fetchTableRate(
+  deploymentUrl: string,
+  tableName: string,
+  metric: TableMetric,
+  start: Date,
+  end: Date,
+  numBuckets: number,
+  authToken: string,
+): Promise<TimeseriesBucket[]> {
+  const windowArgs = {
+    start: serializeDate(start),
+    end: serializeDate(end),
+    num_buckets: numBuckets,
+  };
+
+  const name = encodeURIComponent(tableName);
+  const window = encodeURIComponent(JSON.stringify(windowArgs));
+  const url = `${deploymentUrl}/api/app_metrics/table_rate?name=${name}&metric=${metric}&window=${window}`;
+
+  const normalizedToken = authToken.startsWith('Convex ') ? authToken : `Convex ${authToken}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: normalizedToken,
+      'Convex-Client': 'dashboard-0.0.0',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch table rate: ${response.statusText}`);
+  }
+
+  const respJSON: Array<[{ secs_since_epoch: number; nanos_since_epoch: number }, number | null]> = await response.json();
+  
+  return respJSON.map(([time, metricValue]) => ({
+    time: parseDate(time),
+    metric: metricValue,
+  }));
+}
+
+/**
  * Fetch performance metrics for a specific function from the Convex API
  */
 const fetchPerformanceMetric = async (
