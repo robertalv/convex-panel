@@ -20,6 +20,6 @@
     "isolatedModules": true,
     "noEmit": true
   },
-  "include": ["./**/*.{ts,tsx,js,jsx}"],
-  "exclude": ["convex/_generated"]
+  "include": ["./**/*"],
+  "exclude": ["./_generated"]
 }
