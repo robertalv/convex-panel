@@ -29,8 +29,13 @@ app.options('/api/convex/exchange', cors(corsOptions), (req, res) => {
   res.sendStatus(204);
 });
 
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.get('/api/hello', async (req, res) => {
+  res.send("I am working! ")
+})
 
 app.post('/api/convex/exchange', async (req, res) => {
   console.debug('Token exchange request received');
