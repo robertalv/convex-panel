@@ -4,7 +4,24 @@ import { getActiveTable } from './storage';
 import { FetchLogsOptions, FetchLogsResponse, FetchTablesOptions, FetchTablesResponse } from '../types';
 import { mockFetchLogsFromApi, mockFetchTablesFromApi, mockFetchCacheHitRate, mockFetchFailureRate, mockFetchSchedulerLag } from './mockData';
 
-const tableColumnsForbiddenCache = new Set<string>();
+// Cache to track deployments that return 403 for table columns endpoint
+// Persisted in sessionStorage to survive page reloads
+const getTableColumnsForbiddenCache = (): Set<string> => {
+  try {
+    const cached = sessionStorage.getItem('tableColumnsForbiddenCache');
+    return cached ? new Set(JSON.parse(cached)) : new Set<string>();
+  } catch {
+    return new Set<string>();
+  }
+};
+
+const setTableColumnsForbiddenCache = (cache: Set<string>) => {
+  try {
+    sessionStorage.setItem('tableColumnsForbiddenCache', JSON.stringify(Array.from(cache)));
+  } catch {
+    // Ignore storage errors
+  }
+};
 
 /**
  * Fetch logs from the Convex API
@@ -414,7 +431,8 @@ async function fetchTableColumnsFromApi(
   const result: Record<string, string[]> = {};
 
   // Skip request if we've already seen a 403 for this deployment
-  if (tableColumnsForbiddenCache.has(convexUrl)) {
+  const cache = getTableColumnsForbiddenCache();
+  if (cache.has(convexUrl)) {
     return result;
   }
 
@@ -429,7 +447,8 @@ async function fetchTableColumnsFromApi(
     if (!response.ok) {
       if (response.status === 403) {
         // Cache this deployment as forbidden to skip future requests
-        tableColumnsForbiddenCache.add(convexUrl);
+        cache.add(convexUrl);
+        setTableColumnsForbiddenCache(cache);
         return result;
       }
 

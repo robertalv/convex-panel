@@ -1,6 +1,7 @@
 import React from 'react';
 import { Loader2, ExternalLink, Copy } from 'lucide-react';
 import { createDocumentLink } from './table/data-table-utils';
+import { useSheetSafe } from '../../../contexts/sheet-context';
 
 export interface DocumentPreviewProps {
   documentId: string;
@@ -27,6 +28,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   teamSlug,
   projectSlug,
 }) => {
+  const { closeSheet } = useSheetSafe();
   const [document, setDocument] = React.useState<any>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -297,8 +299,10 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
             // Execute navigation
             if (onNavigateToTable) {
               onNavigateToTable(tableName, documentId);
+              closeSheet();
             } else if (dashboardLink) {
               window.open(dashboardLink, '_blank', 'noopener,noreferrer');
+              closeSheet();
             }
           }}
           onMouseDown={(e) => {
@@ -308,8 +312,10 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
             // Execute navigation here as primary handler since onClick might not fire due to event propagation issues
             if (onNavigateToTable) {
               onNavigateToTable(tableName, documentId);
+              closeSheet();
             } else if (dashboardLink) {
               window.open(dashboardLink, '_blank', 'noopener,noreferrer');
+              closeSheet();
             }
           }}
           onPointerDown={(e) => {

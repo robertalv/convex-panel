@@ -1,12 +1,21 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useThemeSafe } from '../../hooks/useTheme';
+import { useSheetSafe } from '../../contexts/sheet-context';
+
+export interface ViewingAction {
+  title?: string;
+  content: React.ReactNode;
+  width?: string;
+}
 
 export interface ContextMenuItemDescriptor {
   label: string;
   onClick: () => void;
   shortcut?: string;
   destructive?: boolean;
+  viewing?: ViewingAction;
+  submenu?: ContextMenuEntry[];
 }
 
 export type ContextMenuEntry = ContextMenuItemDescriptor | { type: 'divider' };
@@ -75,8 +84,14 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onClose,
 }) => {
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const submenuRef = useRef<HTMLDivElement | null>(null);
+  const itemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const { theme } = useThemeSafe();
+  const { openSheet } = useSheetSafe();
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
+  const [hoveredItemIndex, setHoveredItemIndex] = useState<number | null>(null);
+  const [submenuPosition, setSubmenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const closeSubmenuTimeoutRef = useRef<number | null>(null);
   
   // Get only actionable items (no dividers)
   const actionableItems = items.filter(
@@ -101,21 +116,39 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   // Execute selected item
   const executeSelected = useCallback(() => {
     if (selectedIndex >= 0 && selectedIndex < actionableItems.length) {
-      actionableItems[selectedIndex].onClick();
+      const item = actionableItems[selectedIndex];
+      
+      // If this is a viewing action, open the sheet
+      if (item.viewing) {
+        openSheet({
+          title: item.viewing.title,
+          content: item.viewing.content,
+          width: item.viewing.width,
+        });
+        onClose();
+        return;
+      }
+      
+      // Otherwise, execute the onClick handler
+      item.onClick();
       onClose();
     }
-  }, [selectedIndex, actionableItems, onClose]);
+  }, [selectedIndex, actionableItems, onClose, openSheet]);
 
   useEffect(() => {
     const handleMouseDown = (event: MouseEvent) => {
       if (!menuRef.current) return;
-      if (!menuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (!menuRef.current.contains(target) && 
+          !(submenuRef.current && submenuRef.current.contains(target))) {
         onClose();
       }
     };
     const handleContextMenu = (event: MouseEvent) => {
       if (!menuRef.current) return;
-      if (!menuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (!menuRef.current.contains(target) && 
+          !(submenuRef.current && submenuRef.current.contains(target))) {
         onClose();
       }
     };
@@ -151,7 +184,20 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         const index = numKey - 1;
         if (index < actionableItems.length) {
           event.preventDefault();
-          actionableItems[index].onClick();
+          const item = actionableItems[index];
+          
+          // If this is a viewing action, open the sheet
+          if (item.viewing) {
+            openSheet({
+              title: item.viewing.title,
+              content: item.viewing.content,
+              width: item.viewing.width,
+            });
+            onClose();
+            return;
+          }
+          
+          item.onClick();
           onClose();
         }
         return;
@@ -163,6 +209,18 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           const shortcut = parseShortcut(item.shortcut);
           if (matchesShortcut(event, shortcut)) {
             event.preventDefault();
+            
+            // If this is a viewing action, open the sheet
+            if (item.viewing) {
+              openSheet({
+                title: item.viewing.title,
+                content: item.viewing.content,
+                width: item.viewing.width,
+              });
+              onClose();
+              return;
+            }
+            
             item.onClick();
             onClose();
             return;
@@ -178,8 +236,12 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       document.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('keydown', handleKeyDown);
+      // Clear timeout on unmount
+      if (closeSubmenuTimeoutRef.current) {
+        clearTimeout(closeSubmenuTimeoutRef.current);
+      }
     };
-  }, [onClose, actionableItems, executeSelected]);
+  }, [onClose, actionableItems, executeSelected, openSheet, submenuPosition]);
 
   return createPortal(
     <div
@@ -214,49 +276,200 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         const actionableIndex = actionableItems.findIndex(a => a === action);
         const isSelected = actionableIndex === selectedIndex;
         
+        const hasSubmenu = Boolean(action.submenu && action.submenu.length > 0);
+        const showSubmenu = hoveredItemIndex === actionableIndex && hasSubmenu;
+        
         return (
-          <button
+          <div
             key={action.label}
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              action.onClick();
-              onClose();
-            }}
-            style={{
-              width: '100%',
-              padding: '6px 14px',
-              backgroundColor: isSelected
-                ? (action.destructive 
-                    ? 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)' 
-                    : 'var(--color-panel-hover)')
-                : 'transparent',
-              border: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '12px',
-              color: action.destructive ? 'var(--color-panel-error)' : 'var(--color-panel-text)',
-              cursor: 'pointer',
-              transition: 'background 0.15s,color 0.15s',
-            }}
+            style={{ position: 'relative' }}
             onMouseEnter={() => {
               setSelectedIndex(actionableIndex);
+              // Clear any pending close timeout
+              if (closeSubmenuTimeoutRef.current) {
+                clearTimeout(closeSubmenuTimeoutRef.current);
+                closeSubmenuTimeoutRef.current = null;
+              }
+              if (hasSubmenu) {
+                setHoveredItemIndex(actionableIndex);
+                // Calculate submenu position
+                const itemElement = itemRefs.current.get(actionableIndex);
+                if (itemElement && menuRef.current) {
+                  const rect = itemElement.getBoundingClientRect();
+                  const menuRect = menuRef.current.getBoundingClientRect();
+                  setSubmenuPosition({
+                    top: rect.top,
+                    left: menuRect.right - 4, // Overlap slightly to bridge gap
+                  });
+                }
+              }
             }}
             onMouseLeave={(e) => {
-              if (!isSelected) {
-                e.currentTarget.style.backgroundColor = 'transparent';
+              // Check if mouse is moving to submenu
+              const relatedTarget = e.relatedTarget as HTMLElement;
+              if (relatedTarget && submenuRef.current?.contains(relatedTarget)) {
+                return; // Don't close if moving to submenu
               }
-              e.currentTarget.style.color = action.destructive ? 'var(--color-panel-error)' : 'var(--color-panel-text)';
+              // Add a small delay before closing to allow mouse to move to submenu
+              closeSubmenuTimeoutRef.current = window.setTimeout(() => {
+                setHoveredItemIndex(null);
+                setSubmenuPosition(null);
+              }, 200);
+            }}
+            ref={(el) => {
+              if (el) {
+                itemRefs.current.set(actionableIndex, el);
+              }
             }}
           >
-            <span>{action.label}</span>
-            {action.shortcut && (
-              <span style={{ color: 'var(--color-panel-text-muted)', fontSize: '11px' }}>
-                {action.shortcut}
-              </span>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                
+                // Don't close if there's a submenu
+                if (hasSubmenu) {
+                  return;
+                }
+                
+                // If this is a viewing action, open the sheet
+                if (action.viewing) {
+                  openSheet({
+                    title: action.viewing.title,
+                    content: action.viewing.content,
+                    width: action.viewing.width,
+                  });
+                  onClose();
+                  return;
+                }
+                
+                action.onClick();
+                onClose();
+              }}
+              style={{
+                width: '100%',
+                padding: '6px 14px',
+                backgroundColor: isSelected
+                  ? (action.destructive 
+                      ? 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)' 
+                      : 'var(--color-panel-hover)')
+                  : 'transparent',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '12px',
+                color: action.destructive ? 'var(--color-panel-error)' : 'var(--color-panel-text)',
+                cursor: 'pointer',
+                transition: 'background 0.15s,color 0.15s',
+              }}
+            >
+              <span>{action.label}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {action.shortcut && (
+                  <span style={{ color: 'var(--color-panel-text-muted)', fontSize: '11px' }}>
+                    {action.shortcut}
+                  </span>
+                )}
+                {hasSubmenu && (
+                  <span style={{ color: 'var(--color-panel-text-muted)', fontSize: '10px' }}>
+                    ▶
+                  </span>
+                )}
+              </div>
+            </button>
+            
+            {showSubmenu && action.submenu && submenuPosition && (
+              <div
+                ref={submenuRef}
+                style={{
+                  position: 'fixed',
+                  top: submenuPosition.top,
+                  left: submenuPosition.left,
+                  minWidth: 220,
+                  backgroundColor: 'var(--color-panel-bg-secondary)',
+                  border: '1px solid var(--color-panel-border)',
+                  borderRadius: 12,
+                  boxShadow: '0 20px 35px var(--color-panel-shadow)',
+                  padding: '6px 0',
+                  zIndex: 100001,
+                  maxHeight: '400px',
+                  overflowY: 'auto',
+                  // Overlap with parent menu to bridge gap
+                  marginLeft: '0px',
+                }}
+                onClick={(e) => e.stopPropagation()}
+                onMouseEnter={() => {
+                  // Clear any pending close timeout
+                  if (closeSubmenuTimeoutRef.current) {
+                    clearTimeout(closeSubmenuTimeoutRef.current);
+                    closeSubmenuTimeoutRef.current = null;
+                  }
+                  setHoveredItemIndex(actionableIndex);
+                }}
+                onMouseLeave={() => {
+                  // Close submenu when mouse leaves it
+                  setHoveredItemIndex(null);
+                  setSubmenuPosition(null);
+                }}
+              >
+                {action.submenu.map((subItem, subIndex) => {
+                  if ('type' in subItem && subItem.type === 'divider') {
+                    return (
+                      <div
+                        key={`sub-divider-${subIndex}`}
+                        style={{
+                          borderTop: '1px solid var(--color-panel-border)',
+                          margin: '6px 0',
+                        }}
+                      />
+                    );
+                  }
+                  const subAction = subItem as ContextMenuItemDescriptor;
+                  return (
+                    <button
+                      key={subAction.label}
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        subAction.onClick();
+                        onClose();
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '6px 14px',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '12px',
+                        color: subAction.destructive ? 'var(--color-panel-error)' : 'var(--color-panel-text)',
+                        cursor: 'pointer',
+                        transition: 'background 0.15s,color 0.15s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = subAction.destructive
+                          ? 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)'
+                          : 'var(--color-panel-hover)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = subAction.destructive ? 'var(--color-panel-error)' : 'var(--color-panel-text)';
+                      }}
+                    >
+                      <span>{subAction.label}</span>
+                      {subAction.shortcut && (
+                        <span style={{ color: 'var(--color-panel-text-muted)', fontSize: '11px' }}>
+                          {subAction.shortcut}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             )}
-          </button>
+          </div>
         );
       })}
     </div>,

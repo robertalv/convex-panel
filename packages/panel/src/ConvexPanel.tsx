@@ -11,6 +11,8 @@ import { extractProjectName } from './utils/api';
 import { Team, Project } from './types';
 import { useActiveTab } from './hooks/useActiveTab';
 import { ThemeProvider, Theme, useTheme } from './hooks/useTheme';
+import { SheetProvider } from './contexts/sheet-context';
+import { ConfirmDialogProvider } from './contexts/confirm-dialog-context';
 
 const ThemedToaster: React.FC = () => {
   const { theme } = useTheme();
@@ -152,54 +154,58 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
   // Root container with scoped styles - no CSS imports
   return (
     <ThemeProvider defaultTheme={defaultTheme}>
-      <ThemedToaster />
-      <BottomSheet
-        isOpen={isAuthenticated ? isOpen : false}
-        onClose={toggleOpen}
-        projectName={deployUrl ? extractProjectName(deployUrl) : undefined}
-        deploymentUrl={deployUrl}
-        environment="development"
-        isAuthenticated={isAuthenticated}
-        oauthConfig={oauthConfig}
-        onConnect={handleConnect}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        adminClient={adminClient}
-        accessToken={effectiveAccessToken}
-        teamSlug={teamSlug}
-        projectSlug={projectSlug}
-        team={team}
-        project={project}
-      >
-        {!isAuthenticated ? (
-          <AuthPanel
-            oauthConfig={oauthConfig}
-            onConnect={handleConnect}
-            error={oauth.error}
-            isLoading={oauth.isLoading}
-          />
-        ) : (
-          <MainViews
-            activeTab={activeTab}
-            containerProps={{
-              convex: convex,
-              accessToken: effectiveAccessToken || '',
-              deployUrl: deployUrl,
-              baseUrl: deployUrl,
-              adminClient: adminClient,
-              useMockData: mockup || useMockData || !effectiveAccessToken,
-              onError,
-              theme,
-              mergedTheme,
-              settings,
-              teamSlug,
-              projectSlug,
-              // Allow any other props that might be needed by child components
-              ...restProps
-            }}
-          />
-        )}
-      </BottomSheet>
+      <SheetProvider>
+        <ConfirmDialogProvider>
+          <ThemedToaster />
+          <BottomSheet
+          isOpen={isAuthenticated ? isOpen : false}
+          onClose={toggleOpen}
+          projectName={deployUrl ? extractProjectName(deployUrl) : undefined}
+          deploymentUrl={deployUrl}
+          environment="development"
+          isAuthenticated={isAuthenticated}
+          oauthConfig={oauthConfig}
+          onConnect={handleConnect}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          adminClient={adminClient}
+          accessToken={effectiveAccessToken}
+          teamSlug={teamSlug}
+          projectSlug={projectSlug}
+          team={team}
+          project={project}
+        >
+          {!isAuthenticated ? (
+            <AuthPanel
+              oauthConfig={oauthConfig}
+              onConnect={handleConnect}
+              error={oauth.error}
+              isLoading={oauth.isLoading}
+            />
+          ) : (
+            <MainViews
+              activeTab={activeTab}
+              containerProps={{
+                convex: convex,
+                accessToken: effectiveAccessToken || '',
+                deployUrl: deployUrl,
+                baseUrl: deployUrl,
+                adminClient: adminClient,
+                useMockData: mockup || useMockData || !effectiveAccessToken,
+                onError,
+                theme,
+                mergedTheme,
+                settings,
+                teamSlug,
+                projectSlug,
+                // Allow any other props that might be needed by child components
+                ...restProps
+              }}
+            />
+          )}
+        </BottomSheet>
+        </ConfirmDialogProvider>
+      </SheetProvider>
     </ThemeProvider>
   );
 };

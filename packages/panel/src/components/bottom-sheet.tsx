@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ChevronDown,
   ChevronUp,
@@ -22,6 +22,7 @@ import { extractDeploymentName, extractProjectName, fetchDeploymentMetadata, fet
 import { DeploymentDisplay } from './shared/deployment-display';
 import { ProjectSelector } from './shared/project-selector';
 import { GlobalFunctionTester } from './function-runner/global-function-tester';
+import { GlobalSheet } from './shared/global-sheet';
 import { useActiveTab } from '../hooks/useActiveTab';
 import { useIsGlobalRunnerShown, useShowGlobalRunner } from '../lib/functionRunner';
 import { useFunctionRunnerShortcuts } from '../hooks/useFunctionRunnerShortcuts';
@@ -131,6 +132,19 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     }
     return null;
   });
+  const [sheetContainer, setSheetContainer] = useState<HTMLElement | null>(null);
+  
+  // Calculate isPanelExpanded early so it can be used in the callback ref
+  const isPanelExpanded = Boolean(isAuthenticated && isOpen);
+  
+  // Callback ref to track the main content container
+  const mainContentRef = useCallback((node: HTMLDivElement | null) => {
+    if (node && isPanelExpanded) {
+      setSheetContainer(node);
+    } else {
+      setSheetContainer(null);
+    }
+  }, [isPanelExpanded]);
   
   const [deploymentMetadata, setDeploymentMetadata] = useState<{
     deploymentName?: string;
@@ -345,8 +359,6 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     </>
   );
 
-  const isPanelExpanded = Boolean(isAuthenticated && isOpen);
-
   return (
     <div
       className={`cp-bottom-sheet cp-theme-${theme}`}
@@ -388,7 +400,10 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
                   ))}
                 </div>
 
-                <div className="cp-main-content">{children}</div>
+                <div className="cp-main-content" ref={mainContentRef} style={{ position: 'relative', overflow: 'hidden' }}>
+                  {children}
+                  {isPanelExpanded && <GlobalSheet container={sheetContainer} />}
+                </div>
               </>
             )}
           </div>

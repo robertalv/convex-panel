@@ -245,6 +245,8 @@ export const DataView: React.FC<DataViewProps> = ({
             }}
             deploymentUrl={convexUrl}
             componentId={selectedComponentId}
+            filters={tableData.filters}
+            setFilters={tableData.setFilters}
             onNavigateToTable={(tableName: string, documentId: string) => {
               // Create filter to show only this document by _id
               const filter = {

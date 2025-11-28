@@ -8,9 +8,12 @@ import React, {
 import {
   TableDocument,
   TableDefinition,
+  FilterExpression,
 } from '../../../../types';
 import { ContextMenu } from '../../../../components/shared/context-menu';
-import { patchDocumentFields } from '../../../../utils/functions';
+import { patchDocumentFields, deleteDocuments } from '../../../../utils/functions';
+import { useConfirmSafe } from '../../../../contexts/confirm-dialog-context';
+import { toast } from '../../../../utils/toast';
 import { EmptyTableState } from './empty-table-state';
 import { TableHeader } from './table-header';
 import { TableRow } from './table-row';
@@ -41,6 +44,8 @@ export interface DataTableProps {
   accessToken?: string;
   teamSlug?: string;
   projectSlug?: string;
+  filters?: FilterExpression;
+  setFilters?: (filters: FilterExpression) => void;
 }
 
 export const DataTable: React.FC<DataTableProps> = ({
@@ -59,7 +64,10 @@ export const DataTable: React.FC<DataTableProps> = ({
   accessToken,
   teamSlug,
   projectSlug,
+  filters,
+  setFilters,
 }) => {
+  const { confirm } = useConfirmSafe();
   const [columnOrder, setColumnOrder] = useState<string[]>([]);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const [dragState, setDragState] = useState<{
@@ -392,6 +400,34 @@ export const DataTable: React.FC<DataTableProps> = ({
     setEditingValue('');
     setEditingError(null);
   }, []);
+
+  // Handle delete document with confirmation
+  const handleDeleteDocument = useCallback(async (documentId: string) => {
+    if (!adminClient || !selectedTable) return;
+
+    const confirmed = await confirm({
+      title: 'Delete Document',
+      message: `Are you sure you want to delete this document? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
+
+    try {
+      await deleteDocuments(selectedTable, [documentId], adminClient, componentId);
+      toast('success', 'Document deleted successfully');
+      
+      // Refresh table data
+      if (onDocumentUpdate) {
+        onDocumentUpdate();
+      }
+    } catch (error: any) {
+      console.error('Error deleting document:', error);
+      toast('error', error?.message || 'Failed to delete document');
+    }
+  }, [adminClient, selectedTable, componentId, confirm, onDocumentUpdate]);
 
   // Handle clicks outside the editor to close it
   useEffect(() => {
@@ -729,6 +765,22 @@ export const DataTable: React.FC<DataTableProps> = ({
             cellMenuState.value,
             cellMenuState.rowId,
             startEditing,
+            {
+              tableName: selectedTable,
+              adminClient,
+              deploymentUrl,
+              componentId,
+              onNavigateToTable,
+              accessToken,
+              teamSlug,
+              projectSlug,
+              filters,
+              setFilters,
+              onDeleteDocument: handleDeleteDocument,
+              getDocument: (documentId: string) => {
+                return documents.find(doc => doc._id === documentId);
+              },
+            },
           )}
           onClose={() => setCellMenuState(null)}
         />
