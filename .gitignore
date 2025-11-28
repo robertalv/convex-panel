@@ -15,7 +15,7 @@ out
 
 # Turborepo
 .turbo
-turbo.json
+
 
 # Testing
 coverage
