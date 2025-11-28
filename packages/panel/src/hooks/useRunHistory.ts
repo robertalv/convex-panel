@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, Dispatch, SetStateAction } from 'react';
 import { useLocalStorage } from 'react-use';
 import { Value } from 'convex/values';
 
@@ -86,7 +86,10 @@ export function useRunHistory(
   };
 }
 
-export function useImpersonatedUser() {
+export function useImpersonatedUser(): readonly [
+  UserIdentityAttributes | null | undefined,
+  Dispatch<SetStateAction<UserIdentityAttributes | null | undefined>>
+] {
   const [user, setUser] = useLocalStorage<UserIdentityAttributes | null>(
     'functionRunner:impersonatedUser',
     null
@@ -94,7 +97,7 @@ export function useImpersonatedUser() {
   return [user, setUser] as const;
 }
 
-export function useIsImpersonating() {
+export function useIsImpersonating(): readonly [boolean | undefined, Dispatch<SetStateAction<boolean | undefined>>] {
   const [isImpersonating, setIsImpersonating] = useLocalStorage<boolean>(
     'functionRunner:isImpersonating',
     false

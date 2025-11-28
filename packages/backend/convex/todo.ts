@@ -23,12 +23,14 @@ export const create = mutation({
 });
 
 export const toggle = mutation({
-  args: { id: v.id("todos") },
+  args: { id: v.string() },
   handler: async (ctx, { id }) => {
-    const todo = await ctx.db.get(id);
+    const aId = ctx.db.normalizeId("todos", id)
+    if(!aId) return;
+    const todo = await ctx.db.get(aId);
     if (!todo) throw new Error("Todo not found");
 
-    await ctx.db.patch(id, { done: !todo.done });
+    await ctx.db.patch(aId, { done: !todo.done });
 
     await ctx.runMutation(internal.todo.addRandomTodosAfter5Min)
   },
@@ -36,9 +38,11 @@ export const toggle = mutation({
 
 
 export const remove = mutation({
-  args: { id: v.id("todos") },
+  args: { id: v.string()},
   handler: async (ctx, { id }) => {
-    await ctx.db.delete(id);
+        const aId = ctx.db.normalizeId("todos", id)
+    if(!aId) return;
+    await ctx.db.delete(aId);
   },
 });
 

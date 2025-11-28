@@ -1,35 +1,19 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { ConvexReactClient, ConvexProvider } from "convex/react";
+// import ConvexPanel from "@convex-panel/panel";
+import TodoApp from "./TodoApp";
+
+// Get Convex URL from environment variables (Vite uses import.meta.env)
+// ConvexPanel will auto-detect this, but we need it for ConvexProvider
+const convexUrl = import.meta.env.VITE_CONVEX_URL || "https://polished-sockeye-52.convex.cloud";
+const convex = new ConvexReactClient(convexUrl);
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <ConvexProvider client={convex}>
+      <TodoApp />
+        {/* <ConvexPanel /> */}
+    </ConvexProvider>
+  );
 }
 
-export default App
+export default App;
