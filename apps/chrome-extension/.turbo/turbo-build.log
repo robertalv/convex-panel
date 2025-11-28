@@ -1,0 +1,14 @@
+
+[43m[30m WARN [39m[49m Issue while reading "/Users/robertalvarez/Desktop/convex-panel/.npmrc". Failed to replace env in config: ${GITHUB_TOKEN}
+
+> @convex-panel/chrome-extension@0.0.0 build /Users/robertalvarez/Desktop/convex-panel/apps/chrome-extension
+> vite build
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+[2K[1Gtransforming (1) [2msrc/p[2K[1Gtransforming (21) [2m../.[2K[1G[32m✓[39m 31 modules transformed.
+[2K[1Grendering chunks (1)...[2K[1Grendering chunks (2)...[2K[1Grendering chunks (3)...[2K[1G[2K[1Gcomputing gzip size (0)...[2K[1Gcomputing gzip size (1)...[2K[1Gcomputing gzip size (2)...[2K[1Gcomputing gzip size (3)...[2K[1Gcomputing gzip size (4)...[2K[1G[2mdist/[22m[32msrc/popup/index.html  [39m[1m[2m  0.31 kB[22m[1m[22m[2m │ gzip:  0.22 kB[22m
+[2mdist/[22m[36mcontent.js            [39m[1m[2m  0.04 kB[22m[1m[22m[2m │ gzip:  0.06 kB[22m
+[2mdist/[22m[36mbackground.js         [39m[1m[2m  0.05 kB[22m[1m[22m[2m │ gzip:  0.07 kB[22m
+[2mdist/[22m[36mpopup.js              [39m[1m[2m142.76 kB[22m[1m[22m[2m │ gzip: 45.85 kB[22m
+[32m✓ built in 376ms[39m
