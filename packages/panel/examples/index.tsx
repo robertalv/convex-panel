@@ -1,6 +1,6 @@
 import React from "react";
 import { ConvexReactClient, ConvexProvider } from "convex/react";
-import ConvexPanel from "convex-panel";
+import ConvexPanel from"@convex-panel/panel";
 
 // ConvexPanel auto-detects configuration from environment variables
 // Just provide the Convex client if you have one

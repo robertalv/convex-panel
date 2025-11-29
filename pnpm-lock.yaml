@@ -32,7 +32,11 @@ importers:
 
   apps/chrome-extension:
     dependencies:
+<<<<<<< HEAD
       convex-panel:
+=======
+      '@convex-panel/panel':
+>>>>>>> 771034e (revert panel changes, terminal didn't  ike the name)
         specifier: workspace:*
         version: link:../../packages/panel
       convex-panel/shared:
@@ -57,6 +61,12 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@convex-panel/panel':
+        specifier: workspace:*
+        version: link:../../packages/panel
+      '@convex-panel/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@tauri-apps/api':
         specifier: ^1.5.3
         version: 1.6.0
@@ -100,7 +110,7 @@ importers:
 
   apps/edge-extension:
     dependencies:
-      convex-panel:
+      '@convex-panel/panel':
         specifier: workspace:*
         version: link:../../packages/panel
       convex-panel/shared:
@@ -125,7 +135,7 @@ importers:
 
   apps/firefox-extension:
     dependencies:
-      convex-panel:
+      '@convex-panel/panel':
         specifier: workspace:*
         version: link:../../packages/panel
       convex-panel/shared:
@@ -150,12 +160,9 @@ importers:
 
   apps/web:
     dependencies:
-      '@erquhart/convex-oss-stats':
-        specifier: ^0.8.2
-        version: 0.8.2(@emotion/is-prop-valid@1.4.0)(convex@1.29.3(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)(zod@4.1.13)
-      '@radix-ui/react-slot':
-        specifier: ^1.1.2
-        version: 1.2.4(@types/react@19.2.7)(react@19.2.0)
+      '@convex-panel/panel':
+        specifier: workspace:*
+        version: link:../../packages/panel
       '@repo/backend':
         specifier: workspace:*
         version: link:../../packages/backend
