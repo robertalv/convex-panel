@@ -5,7 +5,7 @@ import { ConvexReactClient, ConvexProvider } from "convex/react";
 import dynamic from "next/dynamic";
 
 // Dynamic import to avoid SSR issues
-const ConvexPanel = dynamic(() => import("convex-panel"), { ssr: false });
+const ConvexPanel = dynamic(() => import("@convex-panel"), { ssr: false });
 
 const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 

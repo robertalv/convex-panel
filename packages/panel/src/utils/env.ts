@@ -1,4 +1,41 @@
 /**
+ * Utility to check if the current environment is development
+ */
+export const isDevelopment = (): boolean => {
+  // Try Vite style
+  try {
+    // @ts-ignore - import.meta.env is available in Vite
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      // @ts-ignore
+      if (import.meta.env.DEV !== undefined) {
+        // @ts-ignore
+        return import.meta.env.DEV === true;
+      }
+      // @ts-ignore
+      if (import.meta.env.MODE !== undefined) {
+        // @ts-ignore
+        return import.meta.env.MODE === 'development';
+      }
+    }
+  } catch (e) {
+    // Ignore if import.meta is not defined
+  }
+
+  // Try Node.js style (Next.js, Remix, TanStack Start, Webpack, etc.)
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      const nodeEnv = process.env.NODE_ENV;
+      if (nodeEnv === 'development') return true;
+      if (nodeEnv === 'production') return false;
+    }
+  } catch (e) {
+    // Ignore if process is not defined
+  }
+
+  return false;
+};
+
+/**
  * Utility to safely get environment variables in both Vite and Next.js
  */
 export const getEnvVar = (name: string): string | undefined => {

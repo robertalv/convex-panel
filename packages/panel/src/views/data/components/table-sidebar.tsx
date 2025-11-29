@@ -46,7 +46,7 @@ export const TableSidebar: React.FC<TableSidebarProps> = ({
       {/* Component Selector */}
       {availableComponents && availableComponents.length > 0 && (
         <div style={{ 
-          padding: '12px', 
+          padding: '8px', 
           borderBottom: '1px solid var(--color-panel-border)',
           backgroundColor: 'var(--color-panel-bg)'
         }}>
@@ -60,7 +60,7 @@ export const TableSidebar: React.FC<TableSidebarProps> = ({
 
       {/* Search Input */}
       <div style={{ 
-        padding: '12px', 
+        padding: '8px', 
         borderBottom: '1px solid var(--color-panel-border)',
         backgroundColor: 'var(--color-panel-bg)'
       }}>
@@ -86,11 +86,11 @@ export const TableSidebar: React.FC<TableSidebarProps> = ({
               width: '100%',
               backgroundColor: 'var(--color-panel-bg-secondary)',
               border: '1px solid var(--color-panel-border)',
-              borderRadius: '6px',
-              height: '36px',
+              borderRadius: '8px',
+              height: '32px',
               paddingLeft: '32px',
               paddingRight: '12px',
-              fontSize: '13px',
+              fontSize: '12px',
               color: 'var(--color-panel-text)',
               outline: 'none',
               transition: 'border-color 0.2s ease, background-color 0.2s ease',

@@ -87,6 +87,8 @@ export {
 export { ThemeProvider, useTheme, useThemeSafe } from './hooks/useTheme';
 export type { Theme } from './hooks/useTheme';
 
+export { isDevelopment } from './utils/env';
+
 // Component exports
 export { ConvexPanel };
 export { BottomSheet } from './components/bottom-sheet';

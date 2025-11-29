@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { UseOAuthReturn, OAuthConfig, buildAuthorizationUrl, exchangeCodeForToken, storeToken, clearToken, getStoredToken } from '@convex-panel/panel';
+import { UseOAuthReturn, OAuthConfig, buildAuthorizationUrl, exchangeCodeForToken, storeToken, clearToken, getStoredToken } from '@convex-panel';
 import { invoke } from '@tauri-apps/api/tauri';
 import { listen } from '@tauri-apps/api/event';
 

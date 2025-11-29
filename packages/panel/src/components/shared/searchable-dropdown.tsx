@@ -95,13 +95,15 @@ export function SearchableDropdown<T>({
           alignItems: 'center',
           justifyContent: 'space-between',
           width: '-webkit-fill-available',
-          height: '36px',
+          height: '32px',
           padding: '0 12px',
-          backgroundColor: 'var(--color-panel-bg-secondary)',
+          backgroundColor: 'var(--color-panel-bg-tertiary)',
           border: isOpen ? '1px solid var(--color-panel-accent)' : '1px solid var(--color-panel-border)',
-          borderRadius: '4px',
+          borderRadius: '6px',
           cursor: 'pointer',
-          transition: 'border-color 0.2s',
+          transition: 'color 0.15s',
+          color: 'var(--color-panel-text-secondary)',
+          fontSize: '12px',
         }}
         onMouseEnter={(e) => {
           if (!isOpen) {
@@ -114,7 +116,7 @@ export function SearchableDropdown<T>({
           }
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'var(--color-panel-text)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--color-panel-text)' }}>
           {triggerIcon ? (
             <span style={{ color: 'var(--color-panel-text-muted)', display: 'flex', alignItems: 'center' }}>{triggerIcon}</span>
           ) : null}
@@ -213,7 +215,7 @@ export function SearchableDropdown<T>({
                     }}
                     style={{
                       padding: '8px 12px',
-                      fontSize: '14px',
+                      fontSize: '12px',
                       color: isSelected ? 'var(--color-panel-text)' : 'var(--color-panel-text-secondary)',
                       backgroundColor: isSelected ? 'var(--color-panel-active)' : 'transparent',
                       cursor: 'pointer',

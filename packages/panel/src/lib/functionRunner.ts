@@ -13,6 +13,7 @@ export const useGlobalRunnerSelectedItem = createGlobalState<{
   componentId: string | null;
   fn: ModuleFunction | CustomQuery;
 } | null>(null);
+export const useGlobalRunnerAutoRun = createGlobalState(false);
 
 export function useIsGlobalRunnerShown() {
   const [isShown] = useGlobalRunnerShown();
@@ -22,9 +23,10 @@ export function useIsGlobalRunnerShown() {
 export function useShowGlobalRunner() {
   const [, setGlobalRunnerShown] = useGlobalRunnerShown();
   const [selectedItem, setGlobalRunnerSelectedItem] = useGlobalRunnerSelectedItem();
+  const [, setAutoRun] = useGlobalRunnerAutoRun();
 
   return useCallback(
-    (selected: ModuleFunction | CustomQuery | null, how: "click" | "keyboard" | "tutorial" | "redirect" = "click") => {
+    (selected: ModuleFunction | CustomQuery | null, how: "click" | "keyboard" | "tutorial" | "redirect" = "click", autoRun: boolean = false) => {
       if (selected || !selectedItem) {
         const fn = selected ?? {
           type: "customQuery" as const,
@@ -36,9 +38,10 @@ export function useShowGlobalRunner() {
           fn: fn,
         });
       }
+      setAutoRun(autoRun);
       setGlobalRunnerShown(true);
     },
-    [selectedItem, setGlobalRunnerShown, setGlobalRunnerSelectedItem],
+    [selectedItem, setGlobalRunnerShown, setGlobalRunnerSelectedItem, setAutoRun],
   );
 }
 

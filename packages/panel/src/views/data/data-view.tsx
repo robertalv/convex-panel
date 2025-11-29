@@ -9,7 +9,7 @@ import { IndexesView } from './components/indexes-view';
 import { MetricsView } from './components/metrics-view';
 import { CustomQuery } from '../../components/function-runner/function-runner';
 import { useTableData } from '../../hooks/useTableData';
-import { fetchComponents } from '../../utils/api';
+import { useComponents } from '../../hooks/useComponents';
 import { saveTableFilters } from '../../utils/storage';
 import { useSheetSafe } from '../../contexts/sheet-context';
 import { useShowGlobalRunner } from '../../lib/functionRunner';
@@ -35,9 +35,6 @@ export const DataView: React.FC<DataViewProps> = ({
   teamSlug,
   projectSlug,
 }) => {
-  const [selectedComponent, setSelectedComponent] = useState<string | null>('app');
-  const [components, setComponents] = useState<any[]>([]);
-  const [isLoadingComponents, setIsLoadingComponents] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isAddDocumentOpen, setIsAddDocumentOpen] = useState(false);
   const [visibleFields, setVisibleFields] = useState<string[]>([]);
@@ -46,27 +43,16 @@ export const DataView: React.FC<DataViewProps> = ({
   const { openSheet } = useSheetSafe();
   const showGlobalRunner = useShowGlobalRunner();
 
-  // Create a mapping from component name to component ID
-  const componentNameToId = useMemo(() => {
-    const map = new Map<string, string>();
-    components.forEach((comp) => {
-      if (comp.name && comp.id) {
-        map.set(comp.name, comp.id);
-      }
-    });
-    return map;
-  }, [components]);
+  const {
+    componentNames,
+    selectedComponentId,
+    selectedComponent,
+    setSelectedComponent,
+  } = useComponents({
+    adminClient,
+    useMockData,
+  });
 
-  // Get the actual component ID from the selected component name
-  const selectedComponentId = useMemo(() => {
-    if (selectedComponent === 'app' || selectedComponent === null) {
-      return null;
-    }
-    const componentId = componentNameToId.get(selectedComponent) || null;
-    return componentId;
-  }, [selectedComponent, componentNameToId]);
-
-  // Use the hook once in the parent component
   const tableData = useTableData({
     convexUrl: convexUrl || '',
     accessToken,
@@ -90,34 +76,25 @@ export const DataView: React.FC<DataViewProps> = ({
     return count;
   }, [allFields.length, visibleFields.length, visibleFields]);
 
-  // Track the last table and fields to prevent unnecessary updates
   const lastTableRef = useRef<string | null>(null);
   const lastFieldsStringRef = useRef<string>('');
 
-  // Initialize visibleFields when table changes - show all fields by default
   useEffect(() => {
     const currentTable = tableData.selectedTable;
     const fieldsString = JSON.stringify([...allFields].sort());
     
-    // Only update if table changed or fields actually changed (by content, not reference)
     const tableChanged = currentTable !== lastTableRef.current;
     const fieldsChanged = fieldsString !== lastFieldsStringRef.current;
     
     if (currentTable && allFields.length > 0) {
-      // When table changes, always reset to show all fields
-      // When fields change (e.g., schema loads), check if visibleFields is missing any fields
-      // and add them (but don't remove fields user may have hidden)
       if (tableChanged) {
-        // Table changed: always reset to show all fields
         setVisibleFields([...allFields]);
         lastTableRef.current = currentTable;
         lastFieldsStringRef.current = fieldsString;
         setSelectedDocumentIds([]);
       } else if (fieldsChanged) {
-        // Fields changed (e.g., schema loaded): add any missing fields to visibleFields
         const missingFields = allFields.filter(field => !visibleFields.includes(field));
         if (missingFields.length > 0) {
-          // Add missing fields while preserving existing visibleFields
           setVisibleFields([...new Set([...visibleFields, ...missingFields])]);
         }
         lastFieldsStringRef.current = fieldsString;
@@ -131,55 +108,18 @@ export const DataView: React.FC<DataViewProps> = ({
     );
   }, [tableData.documents]);
 
-  // Track if we've initialized to prevent multiple fetches
   const hasInitialized = useRef(false);
 
-  // Fetch components
-  useEffect(() => {
-    if (!adminClient || useMockData) {
-      setComponents([]);
-      return;
-    }
-
-    setIsLoadingComponents(true);
-    fetchComponents(adminClient, useMockData)
-      .then((comps) => {
-        setComponents(comps);
-      })
-      .catch((error) => {
-        console.error('Error fetching components:', error);
-        setComponents([]);
-      })
-      .finally(() => {
-        setIsLoadingComponents(false);
-      });
-  }, [adminClient, useMockData]);
-
-  // Extract component names for the selector
-  const componentNames = useMemo(() => {
-    const names = ['app'];
-    components.forEach((comp) => {
-      if (comp.name && comp.name.trim() !== '') {
-        names.push(comp.name);
-      }
-    });
-    return names;
-  }, [components]);
-
-  // Fetch tables on mount and when component changes
   useEffect(() => {
     if (!hasInitialized.current) {
       hasInitialized.current = true;
     }
-    // Refetch tables when component changes to get the correct table list
     tableData.fetchTables();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedComponent]); // Refetch when component changes
+  }, [selectedComponent]);
 
-  // Refetch table data when component changes (after tables are fetched)
   useEffect(() => {
     if (tableData.selectedTable && hasInitialized.current) {
-      // Reset and refetch data for the current table with the new component
       tableData.fetchTableData(tableData.selectedTable, null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

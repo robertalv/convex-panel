@@ -1,5 +1,5 @@
 import { ROUTES } from '../utils/constants';
-import { LogEntry, TableDefinition, TableField } from '../types';
+import { LogEntry, TableDefinition, TableField, FunctionExecutionStats, StreamUdfExecutionResponse, AggregatedFunctionStats } from '../types';
 import { getActiveTable } from './storage';
 import { FetchLogsOptions, FetchLogsResponse, FetchTablesOptions, FetchTablesResponse } from '../types';
 import { mockFetchLogsFromApi, mockFetchTablesFromApi, mockFetchCacheHitRate, mockFetchFailureRate, mockFetchSchedulerLag } from './mockData';
@@ -121,6 +121,7 @@ export async function fetchLogsFromApi({
     hostname: urlObj.hostname
   };
 }
+
 
 /**
  * Fetch all field names for a table using the getAllTableFields system query
@@ -1297,7 +1298,37 @@ export const fetchPerformanceCacheHitRate = async (
   udfType: string,
   window: MetricsWindow
 ) => {
-  return fetchPerformanceMetric(baseUrl, authToken, functionPath, 'cache_hit_percentage', udfType, window);
+
+  const udfTypeCapitalized = udfType.charAt(0).toUpperCase() + udfType.slice(1);
+  
+  const windowStart = new Date(window.start.secs_since_epoch * 1000).toISOString();
+  const windowEnd = new Date(window.end.secs_since_epoch * 1000).toISOString();
+  
+  const params = new URLSearchParams({
+    component_path: '',
+    udf_path: functionPath,
+    udf_type: udfTypeCapitalized,
+    window: JSON.stringify({ start: windowStart, end: windowEnd })
+  });
+  
+  const url = `${baseUrl}${ROUTES.CACHE_HIT_PERCENTAGE}?${params}`;
+
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Convex ${authToken}`,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-1.0.0',
+    }
+  });
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(`Failed to fetch cache hit rate: HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  return data;
 };
 
 /**
@@ -1314,29 +1345,42 @@ export async function fetchPerformanceInvocationRate(
     num_buckets: number;
   }
 ) {
+  console.log('[fetchPerformanceInvocationRate] Called with:', {
+    baseUrl,
+    functionPath,
+    udfType,
+    window,
+    hasAuthToken: !!authToken,
+  });  
+
+  const udfTypeCapitalized = udfType.charAt(0).toUpperCase() + udfType.slice(1);
+  
+  const windowStart = new Date(window.start.secs_since_epoch * 1000).toISOString();
+  const windowEnd = new Date(window.end.secs_since_epoch * 1000).toISOString();
+  
   const params = new URLSearchParams({
+    component_path: '',
+    udf_path: functionPath,
+    udf_type: udfTypeCapitalized,
     metric: 'invocations',
-    path: functionPath,
-    window: JSON.stringify(window),
-    udfType
+    window: JSON.stringify({ start: windowStart, end: windowEnd })
   });
   
-  const response = await fetch(
-    `${baseUrl}${ROUTES.UDF_RATE}?${params}`,
-    {
-      headers: {
-        Authorization: `Convex ${authToken}`,
-        'Content-Type': 'application/json',
-        'Convex-Client': 'dashboard-0.0.0',
-        'Origin': 'https://dashboard.convex.dev',
-        'Referer': 'https://dashboard.convex.dev/'
-      },
-    }
-  );
+  const url = `${baseUrl}${ROUTES.PERFORMANCE_INVOCATION_UDF_RATE}?${params}`;
+  
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Convex ${authToken}`,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-1.0.0',
+    },
+  });
+
+  console.log('[fetchPerformanceInvocationRate] Response status:', response.status, response.statusText);
 
   if (!response.ok) {
     const responseText = await response.text();
-    throw new Error(`Failed to fetch invocation rate: ${response.statusText}`);
+    throw new Error(`Failed to fetch invocation rate: HTTP ${response.status} - ${responseText}`);
   }
 
   const data = await response.json();
@@ -1354,25 +1398,30 @@ export const fetchPerformanceExecutionTime = async (
   udfType: string,
   window: any
 ) => {
+
+  const udfTypeCapitalized = udfType.charAt(0).toUpperCase() + udfType.slice(1);
+  
+  const windowStart = new Date(window.start.secs_since_epoch * 1000).toISOString();
+  const windowEnd = new Date(window.end.secs_since_epoch * 1000).toISOString();
+  
   const params = new URLSearchParams({
-    percentiles: JSON.stringify([50, 90, 95, 99]),
-    path: functionPath,
-    window: JSON.stringify(window),
-    udfType
+    component_path: '',
+    udf_path: functionPath,
+    udf_type: udfTypeCapitalized,
+    percentiles: [50, 90, 95, 99].join(','),
+    window: JSON.stringify({ start: windowStart, end: windowEnd })
   });
 
-  const response = await fetch(
-    `${baseUrl}${ROUTES.LATENCY_PERCENTILES}?${params}`,
-    {
-      headers: {
-        'Authorization': `Convex ${authToken}`,
-        'Content-Type': 'application/json',
-        'Convex-Client': 'dashboard-0.0.0',
-        'Origin': 'https://dashboard.convex.dev',
-        'Referer': 'https://dashboard.convex.dev/'
-      }
+  const url = `${baseUrl}${ROUTES.PERFORMANCE_EXECUTION_TIME}?${params}`;
+
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Convex ${authToken}`,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-1.0.0',
     }
-  );
+  });
+
 
   if (!response.ok) {
     const responseText = await response.text();
@@ -1385,36 +1434,296 @@ export const fetchPerformanceExecutionTime = async (
 };
 
 /**
+ * Fetch function statistics using system metrics queries
+ * Uses the adminClient to query _system/metrics and _system/logs functions
+ */
+export async function fetchFunctionStatistics(
+  adminClient: any,
+  functionIdentifier: string,
+  timeWindow: { start: number; end: number },
+  useMockData = false
+): Promise<{
+  cacheHitPercentage?: any;
+  latencyPercentiles?: any;
+  executions?: any[];
+  invocationRate?: any;
+}> {
+  console.log('[fetchFunctionStatistics] Starting with:', {
+    hasAdminClient: !!adminClient,
+    functionIdentifier,
+    timeWindow,
+    useMockData,
+  });
+
+  if (useMockData || !adminClient) {
+    console.log('[fetchFunctionStatistics] Early return - useMockData:', useMockData, 'hasAdminClient:', !!adminClient);
+    return {
+      cacheHitPercentage: null,
+      latencyPercentiles: null,
+      executions: [],
+      invocationRate: null,
+    };
+  }
+
+  try {
+    console.log('[fetchFunctionStatistics] Making queries for:', {
+      cacheHit: "_system/metrics:cache_hit_percentage",
+      latency: "_system/metrics:latency_percentiles",
+      executions: "_system/logs:stream_udf_execution",
+    });
+
+    const results = await Promise.allSettled([
+      // Get cache hit percentage for queries
+      adminClient.query("_system/metrics:cache_hit_percentage" as any, {
+        identifier: functionIdentifier,
+        window: timeWindow,
+      }),
+      
+      // Get latency percentiles
+      adminClient.query("_system/metrics:latency_percentiles" as any, {
+        identifier: functionIdentifier,
+        percentiles: [50, 90, 95, 99],
+        window: timeWindow,
+      }),
+      
+      // Get function executions for detailed stats
+      adminClient.query("_system/logs:stream_udf_execution" as any, {
+        cursor: timeWindow.start,
+      }),
+    ]);
+
+    console.log('[fetchFunctionStatistics] Query results status:', {
+      cacheHitStatus: results[0].status,
+      latencyStatus: results[1].status,
+      executionsStatus: results[2].status,
+    });
+
+    const cacheStats = results[0].status === 'fulfilled' ? results[0].value : null;
+    const latencyStats = results[1].status === 'fulfilled' ? results[1].value : null;
+    const executionsResult = results[2].status === 'fulfilled' ? results[2].value : null;
+
+    if (results[0].status === 'rejected') {
+      console.error('[fetchFunctionStatistics] Cache hit query failed:', results[0].reason);
+    } else {
+      console.log('[fetchFunctionStatistics] Cache hit result:', cacheStats);
+    }
+
+    if (results[1].status === 'rejected') {
+      console.error('[fetchFunctionStatistics] Latency query failed:', results[1].reason);
+    } else {
+      console.log('[fetchFunctionStatistics] Latency result:', latencyStats);
+    }
+
+    if (results[2].status === 'rejected') {
+      console.error('[fetchFunctionStatistics] Executions query failed:', results[2].reason);
+    } else {
+      console.log('[fetchFunctionStatistics] Executions result:', executionsResult);
+    }
+
+    // Get invocation rate (try different query names if needed)
+    let invocationRate = null;
+    try {
+      console.log('[fetchFunctionStatistics] Trying invocation_rate query...');
+      invocationRate = await adminClient.query("_system/metrics:invocation_rate" as any, {
+        identifier: functionIdentifier,
+        window: timeWindow,
+      });
+      console.log('[fetchFunctionStatistics] Invocation rate result:', invocationRate);
+    } catch (err1) {
+      console.warn('[fetchFunctionStatistics] invocation_rate failed:', err1);
+      // Try alternative name
+      try {
+        console.log('[fetchFunctionStatistics] Trying invocations query...');
+        invocationRate = await adminClient.query("_system/metrics:invocations" as any, {
+          identifier: functionIdentifier,
+          window: timeWindow,
+        });
+        console.log('[fetchFunctionStatistics] Invocations result:', invocationRate);
+      } catch (err2) {
+        console.warn('[fetchFunctionStatistics] invocations also failed:', err2);
+        // If both fail, invocationRate stays null
+      }
+    }
+
+    // Handle executions - it might be an array or an object with entries
+    let executions: any[] = [];
+    if (executionsResult) {
+      console.log('[fetchFunctionStatistics] Processing executions, type:', typeof executionsResult, 'isArray:', Array.isArray(executionsResult));
+      if (Array.isArray(executionsResult)) {
+        executions = executionsResult;
+        console.log('[fetchFunctionStatistics] Executions is array, length:', executions.length);
+      } else if (executionsResult.entries && Array.isArray(executionsResult.entries)) {
+        executions = executionsResult.entries;
+        console.log('[fetchFunctionStatistics] Executions has entries, length:', executions.length);
+      } else if (executionsResult.logs && Array.isArray(executionsResult.logs)) {
+        executions = executionsResult.logs;
+        console.log('[fetchFunctionStatistics] Executions has logs, length:', executions.length);
+      } else {
+        console.log('[fetchFunctionStatistics] Executions structure:', Object.keys(executionsResult));
+      }
+    }
+
+    const returnValue = {
+      cacheHitPercentage: cacheStats,
+      latencyPercentiles: latencyStats,
+      executions: executions,
+      invocationRate: invocationRate,
+    };
+
+    console.log('[fetchFunctionStatistics] Returning:', {
+      hasCacheHit: !!returnValue.cacheHitPercentage,
+      hasLatency: !!returnValue.latencyPercentiles,
+      executionsCount: returnValue.executions.length,
+      hasInvocationRate: !!returnValue.invocationRate,
+    });
+
+    return returnValue;
+  } catch (error) {
+    console.error('[fetchFunctionStatistics] Error fetching function statistics:', error);
+    return {
+      cacheHitPercentage: null,
+      latencyPercentiles: null,
+      executions: [],
+      invocationRate: null,
+    };
+  }
+}
+
+/**
+ * Analyze function executions to extract statistics
+ */
+export function analyzeExecutions(executions: any[]): {
+  totalInvocations: number;
+  successCount: number;
+  errorCount: number;
+  totalExecutionTime: number;
+  avgExecutionTime: number;
+  usageStats: {
+    totalDatabaseReads: number;
+    totalDatabaseWrites: number;
+    totalStorageReads: number;
+    totalStorageWrites: number;
+    totalMemoryUsed: number;
+  };
+} {
+  const stats = {
+    totalInvocations: executions.length,
+    successCount: 0,
+    errorCount: 0,
+    totalExecutionTime: 0,
+    avgExecutionTime: 0,
+    usageStats: {
+      totalDatabaseReads: 0,
+      totalDatabaseWrites: 0,
+      totalStorageReads: 0,
+      totalStorageWrites: 0,
+      totalMemoryUsed: 0,
+    },
+  };
+
+  executions.forEach((execution) => {
+    if (execution.params?.result?.is_ok) {
+      stats.successCount++;
+    } else {
+      stats.errorCount++;
+    }
+
+    stats.totalExecutionTime += execution.execution_time || 0;
+    stats.usageStats.totalDatabaseReads +=
+      execution.usage_stats?.database_read_bytes || 0;
+    stats.usageStats.totalDatabaseWrites +=
+      execution.usage_stats?.database_write_bytes || 0;
+    stats.usageStats.totalStorageReads +=
+      execution.usage_stats?.storage_read_bytes || 0;
+    stats.usageStats.totalStorageWrites +=
+      execution.usage_stats?.storage_write_bytes || 0;
+    stats.usageStats.totalMemoryUsed += execution.memory_used_mb || 0;
+  });
+
+  stats.avgExecutionTime =
+    stats.totalInvocations > 0
+      ? stats.totalExecutionTime / stats.totalInvocations
+      : 0;
+
+  return stats;
+}
+
+/**
  * Fetch source code for a function
  */
 export const fetchSourceCode = async (
   deploymentUrl: string,
   authToken: string,
-  functionPath: string
+  modulePath: string,
+  componentId?: string | null
 ) => {
-  // Extract just the file path (e.g., "users.js" from "users.js:viewer")
-  const path = functionPath;
+  console.log('[fetchSourceCode] Starting with:', {
+    deploymentUrl,
+    modulePath,
+    componentId,
+    hasAuthToken: !!authToken,
+  });
   
-  const params = new URLSearchParams({ path });
+  const params = new URLSearchParams({ path: modulePath });
+  
+  if (componentId) {
+    params.append('component', componentId);
+  }
+  
   const normalizedToken = authToken.startsWith('Convex ') ? authToken : `Convex ${authToken}`;
+  const url = `${deploymentUrl}${ROUTES.GET_SOURCE_CODE}?${params}`;
+  
+  console.log('[fetchSourceCode] Request URL:', url);
 
-  const response = await fetch(
-    `${deploymentUrl}${ROUTES.GET_SOURCE_CODE}?${params}`,
-    {
-      headers: {
-        'Authorization': normalizedToken,
-        'Content-Type': 'application/json',
-        'Convex-Client': 'dashboard-0.0.0',
-      }
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': normalizedToken,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-0.0.0',
     }
-  );
+  });
+
+  console.log('[fetchSourceCode] Response status:', response.status, response.statusText);
 
   if (!response.ok) {
     const responseText = await response.text();
-    throw new Error(`Failed to fetch source code: HTTP ${response.status}`);
+    console.error('[fetchSourceCode] Error response:', responseText);
+    throw new Error(`Failed to fetch source code: HTTP ${response.status} - ${responseText}`);
   }
 
-  return response.text();
+  const text = await response.text();
+  console.log('[fetchSourceCode] Response text length:', text?.length, 'first 100 chars:', text?.substring(0, 100));
+  
+  if (text === 'null' || text.trim() === '') {
+    console.log('[fetchSourceCode] Response is null or empty');
+    return null;
+  }
+  
+  try {
+    const json = JSON.parse(text);
+    console.log('[fetchSourceCode] Parsed JSON, keys:', Object.keys(json));
+    
+    if (json === null || json === undefined) {
+      return null;
+    }
+    if (typeof json === 'object' && 'code' in json) {
+      console.log('[fetchSourceCode] Found code property, length:', json.code?.length);
+      return json.code || null;
+    }
+    if (typeof json === 'object' && 'source' in json) {
+      console.log('[fetchSourceCode] Found source property, length:', json.source?.length);
+      return json.source || null;
+    }
+    if (typeof json === 'string') {
+      console.log('[fetchSourceCode] JSON is string, length:', json.length);
+      return json;
+    }
+  } catch (parseError) {
+    console.log('[fetchSourceCode] Not JSON, returning as text, length:', text.length);
+    // Not JSON, return as text
+  }
+  
+  return text;
 };
 
 /**
@@ -1654,4 +1963,138 @@ export async function fetchProjectInfo(
   }
 
   return {};
+}
+
+/**
+ * Fetch UDF execution statistics from the Convex API
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param authToken - The authentication token for the Convex deployment
+ * @param cursor - The cursor position to fetch from (in milliseconds, defaults to 0)
+ * @returns StreamUdfExecutionResponse with execution entries and new cursor
+ */
+export async function fetchUdfExecutionStats(
+  deploymentUrl: string,
+  authToken: string,
+  cursor: number = 0
+): Promise<StreamUdfExecutionResponse> {
+  const url = `${deploymentUrl}${ROUTES.STREAM_UDF_EXECUTION}?cursor=${cursor}`;
+
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Convex ${authToken}`,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-1.0.0',
+    },
+  });
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(`Failed to fetch UDF execution stats: HTTP ${response.status} - ${responseText}`);
+  }
+
+  const data = await response.json();
+
+  return {
+    entries: data.entries || [],
+    new_cursor: data.new_cursor || cursor,
+  };
+}
+
+/**
+ * Aggregate function execution statistics into time-bucketed data
+ * @param entries - Array of function execution entries
+ * @param functionIdentifier - The function identifier to filter by
+ * @param functionName - The function name (for fallback matching)
+ * @param functionPath - The module path (for fallback matching)
+ * @param timeStart - Start of time window in seconds
+ * @param timeEnd - End of time window in seconds
+ * @param numBuckets - Number of time buckets (default 30)
+ * @returns AggregatedFunctionStats with arrays of metrics per bucket
+ */
+export function aggregateFunctionStats(
+  entries: FunctionExecutionStats[],
+  functionIdentifier: string,
+  functionName: string,
+  functionPath: string,
+  timeStart: number,
+  timeEnd: number,
+  numBuckets: number = 30
+): AggregatedFunctionStats {
+  const functionEntries = entries.filter((entry) => {
+    return (
+      entry.identifier === functionIdentifier ||
+      entry.identifier === functionName ||
+      entry.identifier === functionPath ||
+      entry.identifier.includes(functionName) ||
+      entry.identifier.includes(functionPath) ||
+      (entry.identifier.includes(':') && entry.identifier.split(':')[0] === functionPath)
+    );
+  });
+
+  const invocations: number[] = Array(numBuckets).fill(0);
+  const errors: number[] = Array(numBuckets).fill(0);
+  const executionTimes: number[] = Array(numBuckets).fill(0);
+  const cacheHits: number[] = Array(numBuckets).fill(0);
+  const cacheMisses: number[] = Array(numBuckets).fill(0);
+
+  const bucketSizeSeconds = (timeEnd - timeStart) / numBuckets;
+
+  const executionTimesByBucket: number[][] = Array(numBuckets).fill(null).map(() => []);
+
+  functionEntries.forEach((entry) => {
+    let entryTime = entry.timestamp;
+    if (entryTime > 1e12) {
+      entryTime = Math.floor(entryTime / 1000);
+    }
+
+    if (entryTime < timeStart || entryTime > timeEnd) {
+      return;
+    }
+
+    const bucketIndex = Math.floor((entryTime - timeStart) / bucketSizeSeconds);
+    const clampedIndex = Math.max(0, Math.min(numBuckets - 1, bucketIndex));
+
+    invocations[clampedIndex]++;
+
+    if (!entry.success) {
+      errors[clampedIndex]++;
+    }
+
+    if (entry.execution_time_ms != null && entry.execution_time_ms > 0) {
+      executionTimesByBucket[clampedIndex].push(entry.execution_time_ms);
+    }
+
+    if (entry.udf_type === 'query' || entry.udf_type === 'Query') {
+      if (entry.cachedResult === true) {
+        cacheHits[clampedIndex]++;
+      } else if (entry.cachedResult === false) {
+        cacheMisses[clampedIndex]++;
+      }
+    }
+  });
+
+  executionTimesByBucket.forEach((times, index) => {
+    if (times.length > 0) {
+      const sorted = times.sort((a, b) => a - b);
+      const medianIndex = Math.floor(sorted.length / 2);
+      executionTimes[index] = sorted.length % 2 === 0
+        ? (sorted[medianIndex - 1] + sorted[medianIndex]) / 2
+        : sorted[medianIndex];
+    }
+  });
+
+  const cacheHitRates: number[] = Array(numBuckets).fill(0);
+  for (let i = 0; i < numBuckets; i++) {
+    const totalCacheOps = cacheHits[i] + cacheMisses[i];
+    if (totalCacheOps > 0) {
+      cacheHitRates[i] = (cacheHits[i] / totalCacheOps) * 100;
+    }
+  }
+
+  return {
+    invocations,
+    errors,
+    executionTimes,
+    cacheHits: cacheHitRates,
+  };
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@convex-panel/panel",
+  "name": "@convex-panel",
   "version": "0.2.14",
   "description": "A React component for monitoring and debugging Convex applications",
   "main": "dist/index.js",
@@ -25,9 +25,10 @@
       "default": "./dist/utils/getConvexToken.js"
     },
     "./vite": {
-      "import": "./vite.config.ts",
-      "require": "./vite.config.ts",
-      "default": "./vite.config.ts"
+      "types": "./dist/vite.d.ts",
+      "import": "./dist/vite.esm.js",
+      "require": "./dist/vite.js",
+      "default": "./dist/vite.js"
     }
   },
   "files": [
@@ -39,7 +40,6 @@
   "scripts": {
     "copy-src": "node copy-src.js",
     "build": "npm run copy-src && tsup",
-    "build:rollup": "npm run copy-src && rollup -c",
     "dev": "tsup --watch",
     "dev:live": "vite --config dev/vite.config.ts",
     "dev:server": "node dev/server.js",
@@ -84,11 +84,6 @@
     "swr": "^2.3.3"
   },
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^25.0.8",
-    "@rollup/plugin-node-resolve": "^15.3.1",
-    "@rollup/plugin-terser": "^0.4.4",
-    "@rollup/plugin-typescript": "^11.1.6",
-    "@rollup/plugin-url": "^8.0.2",
     "@tailwindcss/postcss": "^4.1.17",
     "@types/debounce": "^1.2.1",
     "@types/node": "^22.13.10",
@@ -107,9 +102,6 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "rimraf": "^5.0.1",
-    "rollup": "^3.29.1",
-    "rollup-plugin-peer-deps-external": "^2.2.4",
-    "rollup-plugin-url": "^3.0.1",
     "tailwindcss": "^4.1.17",
     "tslib": "^2.8.1",
     "tsup": "^8.5.1",

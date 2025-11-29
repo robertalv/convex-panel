@@ -473,6 +473,27 @@
   color: var(--color-panel-text);
 }
 
+/* Run Function button */
+.cp-run-function-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: none;
+  background: var(--color-panel-accent);
+  color: var(--color-panel-bg);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-panel-accent) 20%, transparent);
+}
+
+.cp-run-function-btn:hover {
+  background: var(--color-panel-accent-hover);
+}
+
 /* Upgrade to Pro button */
 .cp-upgrade-btn {
   display: flex;

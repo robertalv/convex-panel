@@ -9,7 +9,7 @@ This repository contains the `convex-panel` project and its related packages and
   - `edge-extension`: Edge browser extension
   - `firefox-extension`: Firefox browser extension
 - **packages/**
-  - `panel`: Core Convex Panel React component (`@convex-panel/panel`)
+  - `panel`: Core Convex Panel React component (`@convex-panel`)
   - `shared`: Shared utilities and types (`@convex-panel/shared`)
   - `convex-component`: Server-side Convex component (`@convex-panel/convex-component`)
 

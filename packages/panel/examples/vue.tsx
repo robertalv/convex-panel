@@ -5,7 +5,7 @@
 
 import React from "react";
 import { ConvexReactClient, ConvexProvider } from "convex/react";
-import ConvexPanel from "convex-panel";
+import ConvexPanel from "@convex-panel";
 import { createRoot } from "react-dom/client";
 
 // Vue types - uncomment when Vue is installed
@@ -46,7 +46,7 @@ export default defineComponent({
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import { ConvexReactClient, ConvexProvider } from 'convex/react';
-import ConvexPanel from 'convex-panel';
+import ConvexPanel from '@convex-panel';
 import { createRoot } from 'react-dom/client';
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL || 'https://your-deployment.convex.cloud';

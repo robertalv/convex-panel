@@ -482,6 +482,42 @@ export interface SchedulerStatusProps {
 export type TimeSeriesData = [TimeStamp, number | null][];
 export type APIResponse = [string, TimeSeriesData][];
 
+export interface FunctionExecutionStats {
+  udf_type: string;
+  component_path: string;
+  identifier: string;
+  timestamp: number;
+  execution_time_ms: number;
+  success: boolean;
+  error?: string;
+  usage_stats: {
+    database_read_bytes: number;
+    database_write_bytes: number;
+    database_read_documents: number;
+    storage_read_bytes: number;
+    storage_write_bytes: number;
+    vector_index_read_bytes?: number;
+    vector_index_write_bytes?: number;
+    memory_used_mb: number;
+  };
+  identity_type: string;
+  request_id: string;
+  execution_id: string;
+  cachedResult?: boolean;
+}
+
+export interface StreamUdfExecutionResponse {
+  entries: FunctionExecutionStats[];
+  new_cursor: number;
+}
+
+export interface AggregatedFunctionStats {
+  invocations: number[];
+  errors: number[];
+  executionTimes: number[];
+  cacheHits: number[];
+}
+
 export interface LogRowItemData {
   logs: LogEntry[];
   isDetailPanelOpen: boolean;

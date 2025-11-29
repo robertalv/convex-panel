@@ -5,7 +5,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { ConvexReactClient, ConvexProvider } from 'convex/react';
-  import ConvexPanel from 'convex-panel';
+  import ConvexPanel from '@convex-panel';
   import { createRoot } from 'react-dom/client';
   import React from 'react';
 

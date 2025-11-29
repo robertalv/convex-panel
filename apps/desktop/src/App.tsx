@@ -1,5 +1,5 @@
 import { useState } from "react";
-import ConvexPanel from "@convex-panel/panel";
+import ConvexPanel from "@convex-panel";
 import { useTauriAuth } from "./hooks/useTauriAuth";
 
 function App() {

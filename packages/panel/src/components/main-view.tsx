@@ -47,10 +47,12 @@ const tabRenderers: Record<TabId, TabRenderer> = {
       projectSlug={projectSlug}
     />
   ),
-  functions: ({ adminClient, accessToken, useMockData, onError }) => (
+  functions: ({ adminClient, accessToken, deployUrl, baseUrl, useMockData, onError }) => (
     <FunctionsView
       adminClient={adminClient}
       accessToken={accessToken}
+      deployUrl={deployUrl}
+      baseUrl={baseUrl}
       useMockData={useMockData}
       onError={onError}
     />

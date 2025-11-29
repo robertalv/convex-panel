@@ -6,7 +6,7 @@ import { useOAuth, UseOAuthReturn } from './hooks/useOAuth';
 import { MainViews } from './components/main-view';
 import { BottomSheet } from './components/bottom-sheet';
 import { AuthPanel } from './components/auth-panel';
-import { getConvexUrl, getOAuthConfigFromEnv } from './utils/env';
+import { getConvexUrl, getOAuthConfigFromEnv, isDevelopment } from './utils/env';
 import { extractProjectName } from './utils/api';
 import { Team, Project } from './types';
 import { useActiveTab } from './hooks/useActiveTab';
@@ -128,6 +128,10 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
 
   // Don't render during SSR
   if (typeof window === 'undefined') {
+    return null;
+  }
+
+  if (!isDevelopment()) {
     return null;
   }
 

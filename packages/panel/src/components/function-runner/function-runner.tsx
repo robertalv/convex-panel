@@ -29,6 +29,8 @@ export interface FunctionRunnerProps {
   availableComponents?: string[];
   componentIdMap?: Map<string, string>; // displayName -> componentId
   onFunctionSelect?: (fn: ModuleFunction | CustomQuery) => void;
+  autoRun?: boolean;
+  onAutoRunComplete?: () => void;
 }
 
 export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
@@ -41,6 +43,8 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
   availableComponents,
   componentIdMap,
   onFunctionSelect,
+  autoRun = false,
+  onAutoRunComplete,
 }) => {
   const [selectedComponent, setSelectedComponent] = useState<string | null>(propComponentId || 'app');
   const [selectedFunction, setSelectedFunction] = useState<ModuleFunction | CustomQuery | null>(propSelectedFunction || null);
@@ -290,6 +294,21 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
   const isRunning = isCustomQuery ? customQueryLoading : loading;
   const currentResult = isCustomQuery ? customQueryResult : result;
   const currentTiming = isCustomQuery ? customQueryTiming : lastRequestTiming;
+
+  useEffect(() => {
+    if (autoRun && selectedFunction && !isRunning) {
+      const timeoutId = setTimeout(() => {
+        if (isCustomQuery) {
+          runCustomQuery();
+        } else if (moduleFunction) {
+          runFunction();
+        }
+
+        onAutoRunComplete?.();
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [autoRun, selectedFunction, isRunning, isCustomQuery, moduleFunction, runCustomQuery, runFunction, onAutoRunComplete]);
 
   return (
     <div
