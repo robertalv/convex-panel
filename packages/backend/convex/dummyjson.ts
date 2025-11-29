@@ -12,7 +12,7 @@ type Todo = {
 type TodoList = {
   total: number;
   skip: number;
-  limit: number;
+  limit: number; 
   todos: Todo[];
 };
 

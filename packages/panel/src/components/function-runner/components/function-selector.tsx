@@ -80,13 +80,13 @@ export const FunctionSelector: React.FC<FunctionSelectorProps> = ({
     });
 
     return [
-      {
-        key: 'custom-query',
-        label: 'Custom test query',
-        value: customQueryOption,
-        icon: <CodeIcon style={{ width: '14px', height: '14px', color: 'var(--color-panel-text-muted)' }} />,
-        searchValue: 'custom test query custom-query',
-      },
+      // {
+      //   key: 'custom-query',
+      //   label: 'Custom test query',
+      //   value: customQueryOption,
+      //   icon: <CodeIcon style={{ width: '14px', height: '14px', color: 'var(--color-panel-text-muted)' }} />,
+      //   searchValue: 'custom test query custom-query',
+      // },
       ...functionOptions,
     ];
   }, [filteredFunctions, customQueryOption]);

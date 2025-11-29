@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Activity } from 'react';
 import {
   Calendar,
   ExternalLink,
@@ -9,7 +9,12 @@ import { ComponentSelector } from '../../components/function-runner/components/c
 import { FunctionSelector } from '../../components/function-runner/components/function-selector';
 import { discoverFunctions, ModuleFunction } from '../../utils/functionDiscovery';
 import { CustomQuery } from '../../components/function-runner/function-runner';
-import { fetchComponents } from '../../utils/api';
+// import { fetchComponents } from '../../utils/api';
+import { useComponents } from '../../hooks/useComponents';
+import { useFunctions } from '../../hooks/useFunctions';
+import { usePaginatedScheduledJobs } from '../../hooks/usePaginatedScheduledJobs';
+// import { getDeploymentUrl } from 'src/utils/adminClient';
+import { getDeploymentUrl } from '../../utils/adminClient';
 
 export interface SchedulesViewProps {
   adminClient?: any;
@@ -23,79 +28,50 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
   useMockData = false,
 }) => {
   const [selectedTab, setSelectedTab] = useState<'scheduled' | 'cron'>('scheduled');
-  const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
-  const [functions, setFunctions] = useState<ModuleFunction[]>([]);
-  const [selectedFunction, setSelectedFunction] = useState<ModuleFunction | CustomQuery | null>(null);
   const [isLoadingFunctions, setIsLoadingFunctions] = useState(false);
   const [components, setComponents] = useState<any[]>([]);
-  useEffect(() => {
-    if (!adminClient) return;
+  
+  const {
+    componentNames:componentList,
+    selectedComponentId,
+    selectedComponent,
+    setSelectedComponent,
+  } = useComponents({
+    adminClient,
+    useMockData,
+  });
+  
+  const {
+    functions:allFunctions,
+    groupedFunctions,
+    isLoading,
+    error: functionsError,
+  } = useFunctions({
+    adminClient,
+    useMockData,
+    componentId: selectedComponent,
+    // onError
+  });
+  const [selectedFunction, setSelectedFunction] = useState<ModuleFunction |CustomQuery | null>(allFunctions?.[0]);
 
-    setIsLoadingFunctions(true);
-    Promise.all([
-      discoverFunctions(adminClient, useMockData),
-      fetchComponents(adminClient, useMockData).catch(() => []),
-    ])
-      .then(([funcs, comps]) => {
-        setFunctions(funcs);
-        setComponents(comps);
-      })
-      .catch((error) => {
-        console.error('Error fetching functions/components:', error);
-      })
-      .finally(() => {
-        setIsLoadingFunctions(false);
-      });
-  }, [adminClient, useMockData]);
+    const deploymentUrl = getDeploymentUrl(adminClient)
+    // get functions view, we first want to see the current selected component
+    // this is a copy
+    const {results} = usePaginatedScheduledJobs(
+      (selectedFunction && 'identifier' in selectedFunction) ? selectedFunction.identifier : undefined,
+      adminClient,
+      deploymentUrl ?? "",
+    )
 
-  const componentList = useMemo(() => {
-    const componentSet = new Set<string>(['app']);
-    const idToDisplayName = new Map<string, string>();
-    
-    components.forEach(comp => {
-      const id = comp.id;
-      const name = comp.name || comp.id;
-      if (name) {
-        const displayName = name.length > 20 ? `${name.substring(0, 20)}...` : name;
-        componentSet.add(displayName);
-        idToDisplayName.set(id, displayName);
-        if (id !== name) {
-          idToDisplayName.set(name, displayName);
-        }
-      }
-    });
-    
-    const componentNamesFromFunctions = new Set<string>();
-    functions.forEach(fn => {
-      if (fn.identifier && fn.identifier.includes(':')) {
-        const firstPart = fn.identifier.split(':')[0];
-        if (firstPart && !componentNamesFromFunctions.has(firstPart)) {
-          const component = components.find(c => c.name === firstPart || c.id === firstPart);
-          const matchesComponentId = fn.componentId === firstPart;
-          
-          if (component || matchesComponentId) {
-            componentNamesFromFunctions.add(firstPart);
-            const componentName = component?.name || firstPart;
-            const displayName = componentName.length > 20 ? `${componentName.substring(0, 20)}...` : componentName;
-            if (!componentSet.has(displayName)) {
-              componentSet.add(displayName);
-            }
-          }
-        }
-      }
-      if (fn.componentId) {
-        const component = components.find(c => c.id === fn.componentId || c.name === fn.componentId);
-        const componentName = component?.name || fn.componentId;
-        const displayName = componentName.length > 20 ? `${componentName.substring(0, 20)}...` : componentName;
-        if (!componentSet.has(displayName)) {
-          componentSet.add(displayName);
-        }
-      }
-    });
-    
-    return Array.from(componentSet).sort();
-  }, [components, functions]);
+    useEffect(()=>{
+      setSelectedFunction(allFunctions[0])
+    },[allFunctions,setSelectedFunction])
 
+    useEffect(()=>{
+      console.log("selected function", selectedFunction)
+      console.log("all functions", allFunctions)
+      console.log("paginated Results", results)
+    },[selectedFunction, allFunctions, results])
   return (
     <div className="cp-schedules-container">
       {/* Header */}
@@ -126,13 +102,14 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
         </button>
       </div>
 
+      <Activity mode={selectedTab ==="scheduled" ? "visible":"hidden"}>
       {/* Filters Bar */}
       <div className="cp-schedules-filters">
         <div style={{ width: '192px' }}>
           <FunctionSelector
             selectedFunction={selectedFunction}
             onSelect={setSelectedFunction}
-            functions={functions}
+            functions={allFunctions}
             componentId={selectedComponent}
           />
         </div>
@@ -169,7 +146,25 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
           Learn more about scheduled functions
         </a>
       </div>
+      </Activity>
+
     </div>
   );
 };
+interface SharedProps{
+  selectedTab: "scheduled" | "cron", 
+  // refers to app etc, but also refers to components
+  selectedComponent: ""
+}
 
+// Add Schedules and crons here for now! 
+export const ScheduledFunctionsView = (
+  currentOpenFunction
+:{ currentOpenFunction: ModuleFunction | undefined;}) => {
+
+  return <div>
+    ssss
+  </div>
+}
+
+export const CronJobsView = () => {}
