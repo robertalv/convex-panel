@@ -1,5 +1,5 @@
 {
-  "name": "@convex-panel",
+  "name": "@convex-panel/panel",
   "version": "0.2.14",
   "description": "A React component for monitoring and debugging Convex applications",
   "main": "dist/index.js",

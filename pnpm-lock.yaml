@@ -20,7 +20,7 @@ importers:
 
   apps/chrome-extension:
     dependencies:
-      '@convex-panel':
+      '@convex-panel/panel':
         specifier: workspace:*
         version: link:../../packages/panel
       '@convex-panel/shared':
@@ -45,7 +45,7 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@convex-panel':
+      '@convex-panel/panel':
         specifier: workspace:*
         version: link:../../packages/panel
       '@convex-panel/shared':
@@ -88,7 +88,7 @@ importers:
 
   apps/edge-extension:
     dependencies:
-      '@convex-panel':
+      '@convex-panel/panel':
         specifier: workspace:*
         version: link:../../packages/panel
       '@convex-panel/shared':
@@ -113,7 +113,7 @@ importers:
 
   apps/firefox-extension:
     dependencies:
-      '@convex-panel':
+      '@convex-panel/panel':
         specifier: workspace:*
         version: link:../../packages/panel
       '@convex-panel/shared':
@@ -138,7 +138,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@convex-panel':
+      '@convex-panel/panel':
         specifier: workspace:*
         version: link:../../packages/panel
       '@repo/backend':

@@ -14,8 +14,8 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@convex-panel/styles.css': path.resolve(__dirname, '../../packages/panel/src/styles/tailwind.css'),
-      '@convex-panel': path.resolve(__dirname, '../../packages/panel/src/index.ts'),
+      '@convex-panel/panel/styles.css': path.resolve(__dirname, '../../packages/panel/src/styles/tailwind.css'),
+      '@convex-panel/panel': path.resolve(__dirname, '../../packages/panel/src/index.ts'),
     },
   },
 })

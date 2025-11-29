@@ -23,7 +23,7 @@
             "@convex-panel/shared": [
                 "./packages/shared/src"
             ],
-            "@convex-panel": [
+           "@convex-panel/panel": [
                 "./packages/panel/src"
             ],
             "@convex-panel/convex-component": [
