@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Play, ChevronDown, Search, Pause, Code, CodeXml } from 'lucide-react';
 import Editor, { BeforeMount, OnMount } from '@monaco-editor/react';
+import { ModuleFunction as TypedModuleFunction, FunctionExecutionLog } from '../../types';
 import { ModuleFunction } from '../../utils/functionDiscovery';
 import { useShowGlobalRunner } from '../../lib/functionRunner';
 import { useFunctions } from '../../hooks/useFunctions';
@@ -10,13 +11,14 @@ import {
   fetchSourceCode,
 } from '../../utils/api';
 import { getAdminKey } from '../../utils/adminClient';
-import { LogEntry } from '../../types';
 import { ComponentSelector } from '../../components/function-runner/components/component-selector';
 import { useComponents } from '../../hooks/useComponents';
+import { useFunctionLogStream } from '../../hooks';
 import { Card } from '../../components/shared/card';
 import { HealthCard } from '../health/components/health-card';
 import { useThemeSafe } from '../../hooks/useTheme';
 import { EmptyFunctionsState } from './components/empty-functions-state';
+import { FunctionExecutionDetailSheet } from './components/function-execution-detail-sheet';
 
 export interface FunctionsViewProps {
   adminClient: any;
@@ -43,7 +45,7 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
   onError,
 }) => {
   // Load initial state from localStorage
-  const [selectedFunction, setSelectedFunction] = useState<ModuleFunction | null>(null);
+  const [selectedFunction, setSelectedFunction] = useState<any | null>(null);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -89,12 +91,15 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
   const [codeLoading, setCodeLoading] = useState(false);
 
   // Logs data
-  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logs, setLogs] = useState<FunctionExecutionLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [logCursor, setLogCursor] = useState<number | string>('now');
+  const [selectedExecution, setSelectedExecution] = useState<FunctionExecutionLog | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const deploymentUrl = deployUrl || baseUrl;
+  const adminKey = getAdminKey(adminClient) || accessToken;
 
   // Save search query to localStorage
   useEffect(() => {
@@ -291,13 +296,26 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
   });
 
   const handleFunctionClick = (func: ModuleFunction) => {
-    setSelectedFunction(func);
-    setActiveTab('statistics');
+    // Cast function discovery type to the shared types.ModuleFunction shape
+    const typedFunc: TypedModuleFunction = {
+      name: func.name,
+      identifier: func.identifier,
+      udfType: func.udfType.toLowerCase() as any,
+      visibility: func.visibility,
+      file: {
+        name: func.file?.path || '',
+        path: func.file?.path || '',
+      },
+    };
+
+    setSelectedFunction(typedFunc);
     setLogs([]);
     setLogCursor('now');
+    setSelectedExecution(null);
+    setIsDetailOpen(false);
   };
 
-  const handleRunFunction = (func: ModuleFunction) => {
+  const handleRunFunction = (func: ModuleFunction | TypedModuleFunction) => {
     showGlobalRunner(func as any, 'click', true);
   };
 
@@ -458,6 +476,34 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
   };
 
   const monacoTheme = theme === 'light' ? 'convex-light' : 'convex-dark';
+
+  // Live function log streaming (only when logs tab active and real data)
+  const isLogsTabActive = activeTab === 'logs';
+  const effectiveIsPaused = isPaused || !isLogsTabActive;
+  const {
+    logs: streamedLogs,
+    isLoading: streamingLoading,
+    error: streamingError,
+    cursor: streamingCursor,
+  } = useFunctionLogStream({
+    deploymentUrl,
+    authToken: adminKey,
+    selectedFunction: selectedFunction as any,
+    isPaused: effectiveIsPaused,
+    useProgressEvents: false,
+    useMockData,
+  });
+
+  useEffect(() => {
+    if (activeTab === 'logs') {
+      setLogs(streamedLogs);
+      setLogsLoading(streamingLoading);
+      setLogCursor(streamingCursor);
+      if (streamingError && onError) {
+        onError(streamingError.message);
+      }
+    }
+  }, [activeTab, streamedLogs, streamingLoading, streamingCursor, streamingError, onError]);
 
   return (
     <div style={{ display: 'flex', height: '100%' }}>
@@ -903,78 +949,143 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
               )}
 
               {activeTab === 'code' && (
-                <div style={{ padding: '16px', overflowY: 'auto' }}>
-                  <Card>
-                    <div style={{ marginBottom: '16px' }}>
-                      <div style={{ fontSize: '14px', color: 'var(--color-panel-text-secondary)', marginBottom: '8px' }}>
-                        <span style={{ fontWeight: 600 }}>Path: </span>
-                        {selectedFunction.file?.path ? removeJsExtension(selectedFunction.file.path) : 'N/A'}
+                <div
+                  style={{
+                    flex: 1,
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                    minHeight: 0,
+                  }}
+                >
+                  <Card
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden',
+                      minHeight: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        minHeight: 0,
+                      }}
+                    >
+                      <div style={{ marginBottom: '16px', flexShrink: 0 }}>
+                        <div style={{ fontSize: '14px', color: 'var(--color-panel-text-secondary)', marginBottom: '8px' }}>
+                          <span style={{ fontWeight: 600 }}>Path: </span>
+                          {selectedFunction.file?.path ? removeJsExtension(selectedFunction.file.path) : 'N/A'}
+                        </div>
+                        {selectedFunction.args && typeof selectedFunction.args === 'string' && (
+                          <div style={{ fontSize: '14px', color: 'var(--color-panel-text-secondary)', marginBottom: '16px' }}>
+                            <span style={{ fontWeight: 600 }}>Args Validator: </span>
+                            <pre
+                              style={{
+                                backgroundColor: 'var(--color-panel-code-bg)',
+                                padding: '8px',
+                                borderRadius: '4px',
+                                marginTop: '8px',
+                                fontSize: '12px',
+                                fontFamily: 'monospace',
+                                overflowX: 'auto',
+                                color: 'var(--color-panel-text)',
+                              }}
+                            >
+                              {selectedFunction.args}
+                            </pre>
+                          </div>
+                        )}
                       </div>
-                      {selectedFunction.args && (
-                        <div style={{ fontSize: '14px', color: 'var(--color-panel-text-secondary)', marginBottom: '16px' }}>
-                          <span style={{ fontWeight: 600 }}>Args Validator: </span>
-                          <pre
+                      <div
+                        style={{
+                          flex: 1,
+                          minHeight: 0,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {codeLoading ? (
+                          <div
                             style={{
-                              backgroundColor: 'var(--color-panel-code-bg)',
-                              padding: '8px',
-                              borderRadius: '4px',
-                              marginTop: '8px',
-                              fontSize: '12px',
-                              fontFamily: 'monospace',
-                              overflowX: 'auto',
-                              color: 'var(--color-panel-text)',
+                              height: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--color-panel-text-muted)',
+                              fontSize: '14px',
+                              padding: '32px',
+                              textAlign: 'center',
                             }}
                           >
-                            {selectedFunction.args}
-                          </pre>
-                        </div>
-                      )}
+                            Loading source code...
+                          </div>
+                        ) : sourceCode && sourceCode !== 'null' ? (
+                          <div
+                            style={{
+                              height: '100%',
+                              border: '1px solid var(--color-panel-border)',
+                              borderRadius: '4px',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            <Editor
+                              height="100%"
+                              language={getLanguageFromPath(selectedFunction.file?.path)}
+                              theme={monacoTheme}
+                              value={sourceCode}
+                              beforeMount={handleEditorWillMount}
+                              options={{
+                                automaticLayout: true,
+                                minimap: { enabled: false },
+                                scrollBeyondLastLine: false,
+                                fontSize: 13,
+                                fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
+                                lineNumbers: 'on',
+                                lineNumbersMinChars: 3,
+                                scrollbar: {
+                                  horizontalScrollbarSize: 8,
+                                  verticalScrollbarSize: 8,
+                                },
+                                wordWrap: 'on',
+                                tabSize: 2,
+                                readOnly: true,
+                                domReadOnly: true,
+                                contextmenu: true,
+                                selectOnLineNumbers: true,
+                                glyphMargin: false,
+                                folding: true,
+                                lineDecorationsWidth: 10,
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              height: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--color-panel-text-muted)',
+                              fontSize: '14px',
+                              padding: '32px',
+                              textAlign: 'center',
+                            }}
+                          >
+                            Source code not available
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    {codeLoading ? (
-                      <div style={{ color: 'var(--color-panel-text-muted)', fontSize: '14px', padding: '32px', textAlign: 'center' }}>Loading source code...</div>
-                    ) : sourceCode && sourceCode !== 'null' ? (
-                      <div style={{ height: '600px', border: '1px solid var(--color-panel-border)', borderRadius: '4px', overflow: 'hidden' }}>
-                        <Editor
-                          height="100%"
-                          language={getLanguageFromPath(selectedFunction.file?.path)}
-                          theme={monacoTheme}
-                          value={sourceCode}
-                          beforeMount={handleEditorWillMount}
-                          options={{
-                            automaticLayout: true,
-                            minimap: { enabled: false },
-                            scrollBeyondLastLine: false,
-                            fontSize: 13,
-                            fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
-                            lineNumbers: 'on',
-                            lineNumbersMinChars: 3,
-                            scrollbar: {
-                              horizontalScrollbarSize: 8,
-                              verticalScrollbarSize: 8,
-                            },
-                            wordWrap: 'on',
-                            tabSize: 2,
-                            readOnly: true,
-                            domReadOnly: true,
-                            contextmenu: true,
-                            selectOnLineNumbers: true,
-                            glyphMargin: false,
-                            folding: true,
-                            lineDecorationsWidth: 10,
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div style={{ color: 'var(--color-panel-text-muted)', fontSize: '14px', padding: '32px', textAlign: 'center' }}>
-                        Source code not available
-                      </div>
-                    )}
                   </Card>
                 </div>
               )}
 
               {activeTab === 'logs' && (
-                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
                   <div
                     style={{
                       padding: '8px',
@@ -1083,10 +1194,26 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                           style={{
                             display: 'flex',
                             padding: '4px 16px',
-                            cursor: 'default',
+                            cursor: 'pointer',
+                            backgroundColor:
+                              selectedExecution?.id === log.id
+                                ? 'var(--color-panel-bg-tertiary)'
+                                : 'transparent',
                           }}
-                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                          onClick={() => {
+                            setSelectedExecution(log);
+                            setIsDetailOpen(true);
+                          }}
+                          onMouseEnter={(e) => {
+                            if (selectedExecution?.id !== log.id) {
+                              e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (selectedExecution?.id !== log.id) {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }
+                          }}
                         >
                           <div style={{ width: '160px', color: 'var(--color-panel-text-secondary)' }}>{formatTimestamp(log.timestamp)}</div>
                           <div style={{ width: '80px', color: 'var(--color-panel-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1098,18 +1225,18 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                                 fontSize: '10px',
                               }}
                             >
-                              {log.function?.request_id?.slice(0, 4) || 'N/A'}
+                              {log.requestId?.slice(0, 4) || 'N/A'}
                             </span>
                           </div>
                           <div style={{ width: '128px', color: 'var(--color-panel-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            {log.status === 'success' ? (
+                            {log.success ? (
                               <>
                                 <span style={{ color: 'var(--color-panel-success)' }}>200</span>
-                                {log.execution_time_ms && (
-                                  <span style={{ color: 'var(--color-panel-text-muted)' }}>{log.execution_time_ms}ms</span>
+                                {log.durationMs && (
+                                  <span style={{ color: 'var(--color-panel-text-muted)' }}>{log.durationMs.toFixed(0)}ms</span>
                                 )}
                               </>
-                            ) : log.status === 'error' ? (
+                            ) : log.error ? (
                               <span style={{ color: 'var(--color-panel-error)' }}>Error</span>
                             ) : (
                               <span style={{ color: 'var(--color-panel-text-muted)' }}>-</span>
@@ -1125,17 +1252,24 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                                 fontSize: '10px',
                               }}
                             >
-                              {log.function?.type === 'query' ? 'Q' : log.function?.type === 'mutation' ? 'M' : 'A'}
+                              {log.udfType === 'query' ? 'Q' : log.udfType === 'mutation' ? 'M' : log.udfType === 'action' ? 'A' : 'H'}
                             </span>
-                            <span style={{ color: 'var(--color-panel-text-muted)' }}>{log.function?.path || selectedFunction.identifier}</span>
-                            {log.error_message && (
-                              <span style={{ color: 'var(--color-panel-error)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.error_message}</span>
+                            <span style={{ color: 'var(--color-panel-text-muted)' }}>{log.functionIdentifier}</span>
+                            {log.error && (
+                              <span style={{ color: 'var(--color-panel-error)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.error}</span>
                             )}
                           </div>
                         </div>
                       ))
                     )}
                   </div>
+
+                  {/* Detail sheet */}
+                  <FunctionExecutionDetailSheet
+                    log={selectedExecution}
+                    isOpen={isDetailOpen}
+                    onClose={() => setIsDetailOpen(false)}
+                  />
                 </div>
               )}
             </>

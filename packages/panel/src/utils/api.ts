@@ -1,5 +1,15 @@
 import { ROUTES } from '../utils/constants';
-import { LogEntry, TableDefinition, TableField, FunctionExecutionStats, StreamUdfExecutionResponse, AggregatedFunctionStats } from '../types';
+import {
+  LogEntry,
+  TableDefinition,
+  TableField,
+  FunctionExecutionStats,
+  StreamUdfExecutionResponse,
+  AggregatedFunctionStats,
+  FunctionExecutionJson,
+  FunctionExecutionLog,
+  ModuleFunction,
+} from '../types';
 import { getActiveTable } from './storage';
 import { FetchLogsOptions, FetchLogsResponse, FetchTablesOptions, FetchTablesResponse } from '../types';
 import { mockFetchLogsFromApi, mockFetchTablesFromApi, mockFetchCacheHitRate, mockFetchFailureRate, mockFetchSchedulerLag } from './mockData';
@@ -122,6 +132,204 @@ export async function fetchLogsFromApi({
   };
 }
 
+export async function streamUdfExecution(
+  deploymentUrl: string,
+  authToken: string,
+  cursor: number | string = 0,
+): Promise<{ entries: FunctionExecutionJson[]; newCursor: number | string }> {
+  const url = `${deploymentUrl}${ROUTES.STREAM_UDF_EXECUTION}?cursor=${cursor}`;
+
+  const normalizedToken =
+    authToken && authToken.startsWith('Convex ')
+      ? authToken
+      : `Convex ${authToken}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: normalizedToken,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-1.0.0',
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Failed to stream UDF executions: HTTP ${response.status} - ${text}`);
+  }
+
+  const data = await response.json();
+
+  return {
+    entries: (data.entries || []) as FunctionExecutionJson[],
+    newCursor: data.new_cursor ?? cursor,
+  };
+}
+
+export async function streamFunctionLogs(
+  deploymentUrl: string,
+  authToken: string,
+  cursor: number | string = 0,
+  sessionId?: string,
+  clientRequestCounter?: number,
+): Promise<{ entries: FunctionExecutionJson[]; newCursor: number | string }> {
+  const params = new URLSearchParams({
+    cursor: String(cursor),
+  });
+
+  if (sessionId && clientRequestCounter !== undefined) {
+    params.set('session_id', sessionId);
+    params.set('client_request_counter', String(clientRequestCounter));
+  }
+
+  const url = `${deploymentUrl}${ROUTES.STREAM_FUNCTION_LOGS}?${params.toString()}`;
+
+  const normalizedToken =
+    authToken && authToken.startsWith('Convex ')
+      ? authToken
+      : `Convex ${authToken}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: normalizedToken,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-1.0.0',
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Failed to stream function logs: HTTP ${response.status} - ${text}`);
+  }
+
+  const data = await response.json();
+
+  return {
+    entries: (data.entries || []) as FunctionExecutionJson[],
+    newCursor: data.new_cursor ?? cursor,
+  };
+}
+
+export function processFunctionLogs(
+  entries: FunctionExecutionJson[],
+  selectedFunction: ModuleFunction | null,
+): FunctionExecutionLog[] {
+  if (!entries || entries.length === 0) return [];
+
+  const targetIdentifier = selectedFunction?.identifier;
+
+  const normalizeIdentifier = (id: string | undefined | null) =>
+    (id || '').replace(/\.js:/g, ':').replace(/\.js$/g, '');
+
+  const matchesSelected = (entry: FunctionExecutionJson) => {
+    if (!selectedFunction) return true;
+
+    const raw: any = entry as any;
+    // Prefer Convex's full UDF path if present; otherwise identifier as-is.
+    const entryPath: string | undefined =
+      raw.udf_path || raw.identifier;
+
+    const normalizedEntryId = normalizeIdentifier(entryPath);
+    const normalizedTargetId = normalizeIdentifier(targetIdentifier);
+
+    return (
+      normalizedEntryId.length > 0 &&
+      normalizedTargetId.length > 0 &&
+      normalizedEntryId === normalizedTargetId
+    );
+  };
+
+  const matchingEntries = entries.filter(matchesSelected);
+  const effectiveEntries =
+    selectedFunction ? matchingEntries : entries;
+
+  if (typeof window !== 'undefined' && selectedFunction) {
+    const matchesSample = matchingEntries.slice(0, 20).map((e: any) => ({
+      identifier: e.identifier,
+      udf_path: e.udf_path,
+      component_path: e.component_path,
+    }));
+  }
+
+  return effectiveEntries
+    .map((entry) => {
+      const raw: any = entry as any;
+
+      const udfTypeRaw = (raw.udf_type || raw.udfType || 'query') as string;
+      const componentPath = raw.component_path || raw.componentPath;
+
+      const identifierRaw =
+        raw.identifier ||
+        raw.udf_path ||
+        (componentPath ? `${componentPath}:${raw.identifier}` : '');
+
+      const timestampSec = raw.timestamp ?? raw.execution_timestamp ?? 0;
+      const startedAtMs =
+        timestampSec > 1e12 ? timestampSec : timestampSec * 1000;
+
+      const executionTimeSeconds =
+        raw.execution_time ??
+        (raw.execution_time_ms != null
+          ? raw.execution_time_ms / 1000
+          : raw.executionTimeMs != null
+          ? raw.executionTimeMs / 1000
+          : 0);
+      const durationMs = executionTimeSeconds * 1000;
+      const completedAtMs = startedAtMs + durationMs;
+
+      const logLines = (raw.log_lines || raw.logLines || []).map((line: any) =>
+        typeof line === 'string' ? line : JSON.stringify(line),
+      );
+
+      const success =
+        raw.error == null &&
+        (raw.success === undefined ||
+          raw.success === null ||
+          raw.success === true ||
+          (typeof raw.success === 'object' && raw.success !== null));
+
+      const functionName =
+        typeof identifierRaw === 'string' && identifierRaw.includes(':')
+          ? identifierRaw.split(':').slice(-1)[0]
+          : identifierRaw;
+
+      const functionIdentifier =
+        componentPath && identifierRaw
+          ? `${componentPath}:${identifierRaw}`
+          : identifierRaw;
+
+      return {
+        id: raw.execution_id || raw.executionId || `${identifierRaw}-${startedAtMs}`,
+        functionIdentifier,
+        functionName,
+        udfType: (udfTypeRaw.toLowerCase() || 'query') as any,
+        componentPath,
+        timestamp: startedAtMs,
+        startedAt: startedAtMs,
+        completedAt: completedAtMs,
+        durationMs,
+        success,
+        error: raw.error || raw.error_message,
+        logLines,
+        usageStats: raw.usage_stats || raw.usageStats || {
+          database_read_bytes: 0,
+          database_write_bytes: 0,
+          database_read_documents: 0,
+          storage_read_bytes: 0,
+          storage_write_bytes: 0,
+          vector_index_read_bytes: 0,
+          vector_index_write_bytes: 0,
+          memory_used_mb: 0,
+        },
+        requestId: raw.request_id || raw.requestId || '',
+        executionId: raw.execution_id || raw.executionId || '',
+        caller: raw.caller,
+        environment: raw.environment,
+        identityType: raw.identity_type || raw.identityType || '',
+        returnBytes: raw.return_bytes || raw.returnBytes,
+        raw: raw,
+      } as FunctionExecutionLog;
+    });
+  }
 
 /**
  * Fetch all field names for a table using the getAllTableFields system query
@@ -1344,17 +1552,10 @@ export async function fetchPerformanceInvocationRate(
     end: { secs_since_epoch: number; nanos_since_epoch: number };
     num_buckets: number;
   }
-) {
-  console.log('[fetchPerformanceInvocationRate] Called with:', {
-    baseUrl,
-    functionPath,
-    udfType,
-    window,
-    hasAuthToken: !!authToken,
-  });  
+) { 
 
   const udfTypeCapitalized = udfType.charAt(0).toUpperCase() + udfType.slice(1);
-  
+
   const windowStart = new Date(window.start.secs_since_epoch * 1000).toISOString();
   const windowEnd = new Date(window.end.secs_since_epoch * 1000).toISOString();
   
@@ -1375,8 +1576,6 @@ export async function fetchPerformanceInvocationRate(
       'Convex-Client': 'dashboard-1.0.0',
     },
   });
-
-  console.log('[fetchPerformanceInvocationRate] Response status:', response.status, response.statusText);
 
   if (!response.ok) {
     const responseText = await response.text();
@@ -1448,15 +1647,7 @@ export async function fetchFunctionStatistics(
   executions?: any[];
   invocationRate?: any;
 }> {
-  console.log('[fetchFunctionStatistics] Starting with:', {
-    hasAdminClient: !!adminClient,
-    functionIdentifier,
-    timeWindow,
-    useMockData,
-  });
-
   if (useMockData || !adminClient) {
-    console.log('[fetchFunctionStatistics] Early return - useMockData:', useMockData, 'hasAdminClient:', !!adminClient);
     return {
       cacheHitPercentage: null,
       latencyPercentiles: null,
@@ -1466,12 +1657,6 @@ export async function fetchFunctionStatistics(
   }
 
   try {
-    console.log('[fetchFunctionStatistics] Making queries for:', {
-      cacheHit: "_system/metrics:cache_hit_percentage",
-      latency: "_system/metrics:latency_percentiles",
-      executions: "_system/logs:stream_udf_execution",
-    });
-
     const results = await Promise.allSettled([
       // Get cache hit percentage for queries
       adminClient.query("_system/metrics:cache_hit_percentage" as any, {
@@ -1492,12 +1677,6 @@ export async function fetchFunctionStatistics(
       }),
     ]);
 
-    console.log('[fetchFunctionStatistics] Query results status:', {
-      cacheHitStatus: results[0].status,
-      latencyStatus: results[1].status,
-      executionsStatus: results[2].status,
-    });
-
     const cacheStats = results[0].status === 'fulfilled' ? results[0].value : null;
     const latencyStats = results[1].status === 'fulfilled' ? results[1].value : null;
     const executionsResult = results[2].status === 'fulfilled' ? results[2].value : null;
@@ -1505,40 +1684,31 @@ export async function fetchFunctionStatistics(
     if (results[0].status === 'rejected') {
       console.error('[fetchFunctionStatistics] Cache hit query failed:', results[0].reason);
     } else {
-      console.log('[fetchFunctionStatistics] Cache hit result:', cacheStats);
     }
 
     if (results[1].status === 'rejected') {
       console.error('[fetchFunctionStatistics] Latency query failed:', results[1].reason);
-    } else {
-      console.log('[fetchFunctionStatistics] Latency result:', latencyStats);
     }
 
     if (results[2].status === 'rejected') {
       console.error('[fetchFunctionStatistics] Executions query failed:', results[2].reason);
-    } else {
-      console.log('[fetchFunctionStatistics] Executions result:', executionsResult);
     }
 
     // Get invocation rate (try different query names if needed)
     let invocationRate = null;
     try {
-      console.log('[fetchFunctionStatistics] Trying invocation_rate query...');
       invocationRate = await adminClient.query("_system/metrics:invocation_rate" as any, {
         identifier: functionIdentifier,
         window: timeWindow,
       });
-      console.log('[fetchFunctionStatistics] Invocation rate result:', invocationRate);
     } catch (err1) {
       console.warn('[fetchFunctionStatistics] invocation_rate failed:', err1);
       // Try alternative name
       try {
-        console.log('[fetchFunctionStatistics] Trying invocations query...');
         invocationRate = await adminClient.query("_system/metrics:invocations" as any, {
           identifier: functionIdentifier,
           window: timeWindow,
         });
-        console.log('[fetchFunctionStatistics] Invocations result:', invocationRate);
       } catch (err2) {
         console.warn('[fetchFunctionStatistics] invocations also failed:', err2);
         // If both fail, invocationRate stays null
@@ -1548,18 +1718,12 @@ export async function fetchFunctionStatistics(
     // Handle executions - it might be an array or an object with entries
     let executions: any[] = [];
     if (executionsResult) {
-      console.log('[fetchFunctionStatistics] Processing executions, type:', typeof executionsResult, 'isArray:', Array.isArray(executionsResult));
       if (Array.isArray(executionsResult)) {
         executions = executionsResult;
-        console.log('[fetchFunctionStatistics] Executions is array, length:', executions.length);
       } else if (executionsResult.entries && Array.isArray(executionsResult.entries)) {
         executions = executionsResult.entries;
-        console.log('[fetchFunctionStatistics] Executions has entries, length:', executions.length);
       } else if (executionsResult.logs && Array.isArray(executionsResult.logs)) {
         executions = executionsResult.logs;
-        console.log('[fetchFunctionStatistics] Executions has logs, length:', executions.length);
-      } else {
-        console.log('[fetchFunctionStatistics] Executions structure:', Object.keys(executionsResult));
       }
     }
 
@@ -1570,16 +1734,8 @@ export async function fetchFunctionStatistics(
       invocationRate: invocationRate,
     };
 
-    console.log('[fetchFunctionStatistics] Returning:', {
-      hasCacheHit: !!returnValue.cacheHitPercentage,
-      hasLatency: !!returnValue.latencyPercentiles,
-      executionsCount: returnValue.executions.length,
-      hasInvocationRate: !!returnValue.invocationRate,
-    });
-
     return returnValue;
   } catch (error) {
-    console.error('[fetchFunctionStatistics] Error fetching function statistics:', error);
     return {
       cacheHitPercentage: null,
       latencyPercentiles: null,
@@ -1657,13 +1813,6 @@ export const fetchSourceCode = async (
   modulePath: string,
   componentId?: string | null
 ) => {
-  console.log('[fetchSourceCode] Starting with:', {
-    deploymentUrl,
-    modulePath,
-    componentId,
-    hasAuthToken: !!authToken,
-  });
-  
   const params = new URLSearchParams({ path: modulePath });
   
   if (componentId) {
@@ -1672,8 +1821,6 @@ export const fetchSourceCode = async (
   
   const normalizedToken = authToken.startsWith('Convex ') ? authToken : `Convex ${authToken}`;
   const url = `${deploymentUrl}${ROUTES.GET_SOURCE_CODE}?${params}`;
-  
-  console.log('[fetchSourceCode] Request URL:', url);
 
   const response = await fetch(url, {
     headers: {
@@ -1683,43 +1830,34 @@ export const fetchSourceCode = async (
     }
   });
 
-  console.log('[fetchSourceCode] Response status:', response.status, response.statusText);
 
   if (!response.ok) {
     const responseText = await response.text();
-    console.error('[fetchSourceCode] Error response:', responseText);
     throw new Error(`Failed to fetch source code: HTTP ${response.status} - ${responseText}`);
   }
 
   const text = await response.text();
-  console.log('[fetchSourceCode] Response text length:', text?.length, 'first 100 chars:', text?.substring(0, 100));
   
   if (text === 'null' || text.trim() === '') {
-    console.log('[fetchSourceCode] Response is null or empty');
     return null;
   }
   
   try {
     const json = JSON.parse(text);
-    console.log('[fetchSourceCode] Parsed JSON, keys:', Object.keys(json));
     
     if (json === null || json === undefined) {
       return null;
     }
     if (typeof json === 'object' && 'code' in json) {
-      console.log('[fetchSourceCode] Found code property, length:', json.code?.length);
       return json.code || null;
     }
     if (typeof json === 'object' && 'source' in json) {
-      console.log('[fetchSourceCode] Found source property, length:', json.source?.length);
       return json.source || null;
     }
     if (typeof json === 'string') {
-      console.log('[fetchSourceCode] JSON is string, length:', json.length);
       return json;
     }
   } catch (parseError) {
-    console.log('[fetchSourceCode] Not JSON, returning as text, length:', text.length);
     // Not JSON, return as text
   }
   

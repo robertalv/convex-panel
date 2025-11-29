@@ -52,7 +52,16 @@ export function getDeploymentUrl(adminClient: any): string | null {
  * Priority: localStorage OAuth token > adminClient internal properties
  */
 export function getAdminKey(adminClient?: any): string | null {
-  // First, try to get from localStorage (OAuth token)
+  // Prefer explicit admin auth on the admin client (usually deployKey)
+  if (adminClient) {
+    const fromClient =
+      (adminClient as any)._adminAuth || (adminClient as any)._adminKey;
+    if (fromClient) {
+      return fromClient;
+    }
+  }
+
+  // Fallback: try to get from localStorage (OAuth token)
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
       const storedToken = window.localStorage.getItem(OAUTH_TOKEN_STORAGE_KEY);
@@ -67,9 +76,28 @@ export function getAdminKey(adminClient?: any): string | null {
     console.error('Failed to get token from localStorage:', e);
   }
 
-  // Fallback: try to get from adminClient if provided
-  if (adminClient) {
-    return (adminClient as any)._adminAuth || (adminClient as any)._adminKey || null;
+  // Fallback: try common environment variables (Next.js / Node)
+  try {
+    const maybeProcess: any = typeof process !== 'undefined' ? process : null;
+    if (maybeProcess?.env?.CONVEX_ACCESS_TOKEN) {
+      return maybeProcess.env.CONVEX_ACCESS_TOKEN as string;
+    }
+  } catch {
+    // Ignore env access errors
+  }
+
+  // Fallback: try Vite-style env (if available in host app)
+  try {
+    const maybeImportMeta: any =
+      typeof import.meta !== 'undefined' ? (import.meta as any) : null;
+    if (maybeImportMeta?.env?.CONVEX_ACCESS_TOKEN) {
+      return maybeImportMeta.env.CONVEX_ACCESS_TOKEN as string;
+    }
+    if (maybeImportMeta?.env?.VITE_CONVEX_ACCESS_TOKEN) {
+      return maybeImportMeta.env.VITE_CONVEX_ACCESS_TOKEN as string;
+    }
+  } catch {
+    // Ignore if import.meta is not available
   }
 
   return null;

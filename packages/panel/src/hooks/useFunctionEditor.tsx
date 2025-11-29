@@ -95,7 +95,7 @@ export function useFunctionEditor({
     endedAt: number;
   }>();
   const [monaco, setMonaco] = useState<Parameters<BeforeMount>[0]>();
-  const saveActionRef = useRef<() => void>();
+  const saveActionRef = useRef<() => void>(() => {});
 
   // Initialize code
   useEffect(() => {
