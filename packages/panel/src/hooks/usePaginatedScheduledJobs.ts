@@ -18,6 +18,7 @@ type CurrentDeployment = {
   kind?: "local" | "cloud";
 } | undefined;
 
+// TODO: Save this in local storage
 const fetchMetadata = async (adminClient: ConvexReactClient, deploymentUrl: string,) => {
   let metadata: CurrentDeployment = undefined
   try {
@@ -39,23 +40,25 @@ const fetchMetadata = async (adminClient: ConvexReactClient, deploymentUrl: stri
 
 
 
-
 export function usePaginatedScheduledJobs(udfPath: string | undefined, adminClient: ConvexReactClient, deploymentUrl: string,) {
-  // const { deployment, error: errorDeployment, loading: loadingDeployment } = useCurrentDeployment(adminClient, deploymentUrl)
-  // const isPaused = useIsDeploymentPaused(adminClient)
-  const [results, setResults] = useState<any| null>(null);
+  const { deployment, error: errorDeployment, loading: loadingDeployment } = useCurrentDeployment(adminClient, deploymentUrl)
+  const isPaused = useIsDeploymentPaused(adminClient)
+  const [results, setResults] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error|null>(null);
+  const [error, setError] = useState<Error | null>(null);
+  const [status, setStatus] = useState<"LoadingFirstPage" | "LoadingMore" | "Exhausted" | "CanLoadMore">("LoadingFirstPage")
 
-
+  usePaginatedQuery
   const args = {
     udfPath,
     componentId: null,
   };
 
+  // I do not like this method by one bit, I'm thinking of creating a useAsync hook, or focusing on doing this with pure javascript
+  // maybe this https://react.dev/reference/react/useEffectEvent
+  // or realistically https://developer.mozilla.org/en-US/docs/Glossary/IIFE
   useEffect(() => {
     let cancelled = false;
-    usePaginatedQuery
     const fetchResults = async () => {
       try {
         setLoading(true);
@@ -66,12 +69,14 @@ export function usePaginatedScheduledJobs(udfPath: string | undefined, adminClie
               numItems: SCHEDULED_JOBS_PAGE_SIZE,
               cursor: null,
             },
-            udfPath: undefined,
+            udfPath: udfPath ?? undefined,
           }
         );
-        console.log(data.page)
-        setResults(data);
-        setLoading(false);
+        // if(data)
+        if (!cancelled) {
+          setResults(data);
+          setLoading(false);
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err as Error);
@@ -79,13 +84,17 @@ export function usePaginatedScheduledJobs(udfPath: string | undefined, adminClie
         }
       }
     };
-
-    fetchResults();
+    // we only want to fetch these results when isPaused is false; 
+    if (!isPaused) {
+      fetchResults();
+    }
 
     return () => {
       cancelled = true;
     };
-  }, [adminClient]);
+  }, [adminClient, isPaused]);
+
+  // TODO: Grab paused data results
   // const {
   //   pausedData,
   //   isLoadingPausedData,
@@ -114,8 +123,12 @@ export function usePaginatedScheduledJobs(udfPath: string | undefined, adminClie
   //   togglePaused,
   //   reload,
   // };
+
   return {
-    results
+    jobs: isPaused ? null : results, // this is null for now, gonna switch it soon
+    status: status,
+    isPaused
+
   }
 }
 
