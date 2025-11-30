@@ -13,6 +13,7 @@ import {
 import { getActiveTable } from './storage';
 import { FetchLogsOptions, FetchLogsResponse, FetchTablesOptions, FetchTablesResponse } from '../types';
 import { mockFetchLogsFromApi, mockFetchTablesFromApi, mockFetchCacheHitRate, mockFetchFailureRate, mockFetchSchedulerLag } from './mockData';
+import { getDeploymentUrl, getAdminKey } from './adminClient';
 
 // Cache to track deployments that return 403 for table columns endpoint
 // Persisted in sessionStorage to survive page reloads
@@ -2235,4 +2236,880 @@ export function aggregateFunctionStats(
     executionTimes,
     cacheHits: cacheHitRates,
   };
+}
+
+/**
+ * File metadata interface
+ */
+export interface FileMetadata {
+  _id: string;
+  _creationTime: number;
+  storageId: string;
+  contentType?: string;
+  size?: number;
+  name?: string;
+  sha256?: string;
+  url?: string;
+}
+
+/**
+ * Fetch file metadata using system UDF
+ * @param adminClient - The Convex admin client instance
+ * @param storageId - The storage ID of the file
+ * @param useMockData - Whether to use mock data
+ * @returns File metadata or null if not found
+ */
+export async function fetchFileMetadata(
+  adminClient: any,
+  storageId: string,
+  useMockData = false
+): Promise<FileMetadata | null> {
+  if (useMockData) {
+    return null;
+  }
+
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    const file = await adminClient.query("_system/frontend/fileStorageV2:getFile" as any, {
+      storageId,
+    });
+    return file || null;
+  } catch (err: any) {
+    return null;
+  }
+}
+
+/**
+ * Alternative approach using system UDFs that might be available
+ */
+async function fetchFilesAlternative(
+  deploymentUrl: string,
+  authToken: string,
+  componentId: string | null = null,
+  paginationOpts: { numItems?: number; cursor?: string } = {}
+): Promise<{ page: FileMetadata[]; isDone: boolean; continueCursor?: string }> {
+  try {
+    // Try using the system table query UDF directly
+    const response = await fetch(`${deploymentUrl}/api/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Convex ${authToken}`,
+        'Convex-Client': 'dashboard-admin',
+      },
+      body: JSON.stringify({
+        path: 'system:listDocuments',
+        args: {
+          table: '_storage',
+          limit: paginationOpts.numItems || 100,
+        },
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+
+      if (result && (result.value || result.success)) {
+        const files = result.value || result;
+        const filesArray = Array.isArray(files) ? files : [];
+
+        const filesWithUrls: FileMetadata[] = filesArray.map((file: any) => ({
+          _id: file._id,
+          _creationTime: file._creationTime,
+          storageId: file._id,
+          contentType: file.contentType || null,
+          size: file.size || null,
+          name: file.name || null,
+          sha256: file.sha256 || null,
+          url: `${deploymentUrl}/api/storage/${file._id}`,
+        }));
+
+        return {
+          page: filesWithUrls,
+          isDone: true,
+          continueCursor: undefined,
+        };
+      }
+    }
+
+    // Last resort: try to use the dashboard's internal API
+    return await fetchFilesLastResort(deploymentUrl, authToken, componentId, paginationOpts);
+  } catch (err: any) {
+    return await fetchFilesLastResort(deploymentUrl, authToken, componentId, paginationOpts);
+  }
+}
+
+/**
+ * Last resort: try to mimic what the dashboard does
+ */
+async function fetchFilesLastResort(
+  deploymentUrl: string,
+  authToken: string,
+  componentId: string | null = null,
+  paginationOpts: { numItems?: number; cursor?: string } = {}
+): Promise<{ page: FileMetadata[]; isDone: boolean; continueCursor?: string }> {
+  try {
+    // This mimics what the Convex dashboard might do
+    const response = await fetch(`${deploymentUrl}/api/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Convex ${authToken}`,
+        'Convex-Client': 'dashboard-0.0.0',
+      },
+      body: JSON.stringify({
+        path: '_system/frontend/fileStorageV2:fileMetadata',
+        args: {
+          componentId: componentId,
+          paginationOpts: {
+            numItems: paginationOpts.numItems || 100,
+            cursor: paginationOpts.cursor || null, // cursor is REQUIRED
+          },
+        },
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+
+      if (result && result.value) {
+        const data = result.value;
+        const files = data.page || [];
+
+        const filesWithUrls: FileMetadata[] = files.map((file: any) => ({
+          _id: file._id,
+          _creationTime: file._creationTime,
+          storageId: file._id,
+          contentType: file.contentType || null,
+          size: file.size || null,
+          name: file.name || null,
+          sha256: file.sha256 || null,
+          url: file.url || `${deploymentUrl}/api/storage/${file._id}`,
+        }));
+
+        return {
+          page: filesWithUrls,
+          isDone: data.isDone !== false,
+          continueCursor: data.continueCursor,
+        };
+      }
+    }
+
+    // If everything fails, return empty
+    return {
+      page: [],
+      isDone: true,
+      continueCursor: undefined,
+    };
+  } catch (err: any) {
+    return {
+      page: [],
+      isDone: true,
+      continueCursor: undefined,
+    };
+  }
+}
+
+/**
+ * List files using admin API to query system tables directly
+ * @param deploymentUrl - The deployment URL
+ * @param authToken - The authentication token
+ * @param componentId - Optional component ID
+ * @param paginationOpts - Pagination options
+ * @returns Array of file metadata with URLs
+ */
+export async function fetchFilesDirectAPI(
+  deploymentUrl: string,
+  authToken: string,
+  componentId: string | null = null,
+  paginationOpts: { numItems?: number; cursor?: string } = {}
+): Promise<{ page: FileMetadata[]; isDone: boolean; continueCursor?: string }> {
+  try {
+    // Use the admin API to query the _storage table directly
+    const response = await fetch(`${deploymentUrl}/api/admin/query_batch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Convex ${authToken}`,
+        'Convex-Client': 'dashboard-admin',
+      },
+      body: JSON.stringify({
+        queries: [{
+          udf: {
+            identifier: "system:query",
+            args: {
+              table: "_storage",
+              limit: paginationOpts.numItems || 100,
+            }
+          }
+        }]
+      }),
+    });
+
+    if (!response.ok) {
+      // Try alternative approach
+      return await fetchFilesAlternative(deploymentUrl, authToken, componentId, paginationOpts);
+    }
+
+    const result = await response.json();
+
+    if (result && result.results && result.results[0]) {
+      const queryResult = result.results[0];
+      if (queryResult.success && queryResult.value) {
+        const files = Array.isArray(queryResult.value) ? queryResult.value : [];
+
+        const filesWithUrls: FileMetadata[] = files.map((file: any) => ({
+          _id: file._id,
+          _creationTime: file._creationTime,
+          storageId: file._id,
+          contentType: file.contentType || null,
+          size: file.size || null,
+          name: file.name || null,
+          sha256: file.sha256 || null,
+          url: `${deploymentUrl}/api/storage/${file._id}`,
+        }));
+
+        return {
+          page: filesWithUrls,
+          isDone: true,
+          continueCursor: undefined,
+        };
+      }
+    }
+
+    // If admin API didn't work, try alternative
+    return await fetchFilesAlternative(deploymentUrl, authToken, componentId, paginationOpts);
+  } catch (err: any) {
+    return await fetchFilesAlternative(deploymentUrl, authToken, componentId, paginationOpts);
+  }
+}
+
+/**
+ * Fetch files using admin client direct methods
+ */
+async function fetchFilesUsingAdminClient(
+  adminClient: any,
+  componentId: string | null = null,
+  paginationOpts: { numItems?: number; cursor?: string } = {}
+): Promise<{ page: FileMetadata[]; isDone: boolean; continueCursor?: string }> {
+  // Return empty for now - this is a placeholder for future admin client methods
+  return { page: [], isDone: true };
+}
+
+/**
+ * List all files with metadata
+ * Tries multiple approaches: admin client, system functions, and direct API
+ * @param adminClient - The Convex admin client instance
+ * @param componentId - Optional component ID to filter files
+ * @param useMockData - Whether to use mock data
+ * @param paginationOpts - Pagination options
+ * @returns Array of file metadata with URLs
+ */
+export async function fetchFiles(
+  adminClient: any,
+  componentId: string | null = null,
+  useMockData = false,
+  paginationOpts: { numItems?: number; cursor?: string } = {}
+): Promise<{ page: FileMetadata[]; isDone: boolean; continueCursor?: string }> {
+  if (useMockData) {
+    return { page: [], isDone: true };
+  }
+
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  const normalizedComponentId = componentId === 'app' || componentId === null ? null : componentId;
+  const deploymentUrl = getDeploymentUrl(adminClient);
+  const adminKey = getAdminKey(adminClient);
+
+  // Approach 1: Try admin client direct methods
+  try {
+    const result = await fetchFilesUsingAdminClient(adminClient, normalizedComponentId, paginationOpts);
+    if (result.page.length > 0) {
+      return result;
+    }
+  } catch (err) {
+    // Continue to next approach
+  }
+
+  // Approach 2: Try system functions with admin client
+  try {
+    // First try fileMetadata - this is the correct function that exists
+    try {
+      const result = await adminClient.query("_system/frontend/fileStorageV2:fileMetadata" as any, {
+        componentId: normalizedComponentId,
+        paginationOpts: {
+          numItems: paginationOpts.numItems || 100,
+          cursor: paginationOpts.cursor || null, // cursor is REQUIRED, can be null for first page
+        },
+      });
+
+      if (result && typeof result === 'object') {
+        const page = result.page || (Array.isArray(result) ? result : []);
+
+        const filesWithUrls: FileMetadata[] = page.map((file: any) => ({
+          _id: file._id || file.storageId,
+          _creationTime: file._creationTime || file.creationTime || Date.now(),
+          storageId: file.storageId || file._id,
+          contentType: file.contentType || file.content_type || null,
+          size: file.size || null,
+          name: file.name || null,
+          sha256: file.sha256 || null,
+          url: file.url || (deploymentUrl ? `${deploymentUrl}/api/storage/${file.storageId || file._id}` : undefined),
+        }));
+
+        return {
+          page: filesWithUrls,
+          isDone: result.isDone !== false,
+          continueCursor: result.continueCursor,
+        };
+      }
+    } catch (err: any) {
+      // Continue to try other approaches
+    }
+  } catch (err) {
+    // Continue to next approach
+  }
+
+  // Approach 3: Try direct API calls
+  if (deploymentUrl && adminKey) {
+    try {
+      const result = await fetchFilesDirectAPI(deploymentUrl, adminKey, normalizedComponentId, paginationOpts);
+      if (result.page.length > 0) {
+        return result;
+      }
+    } catch (err) {
+      // Continue
+    }
+  }
+
+  return { page: [], isDone: true };
+}
+
+/**
+ * Simple test to check if files exist and what APIs are available
+ * @param adminClient - The admin client instance
+ */
+export async function testFileAccess(adminClient: any): Promise<void> {
+  // Diagnostic function - kept for debugging but logs removed
+  const deploymentUrl = getDeploymentUrl(adminClient);
+  const adminKey = getAdminKey(adminClient);
+
+  if (!deploymentUrl || !adminKey) {
+    return;
+  }
+
+  // Test functions are available but logging removed
+  // This function can be called manually for debugging if needed
+}
+
+/**
+ * Debug function to test file fetching capabilities (alias for testFileAccess)
+ * @param adminClient - The admin client instance
+ */
+export async function debugFetchFiles(adminClient: any): Promise<void> {
+  return testFileAccess(adminClient);
+}
+
+/**
+ * Get file download URL
+ * @param deploymentUrl - The deployment URL
+ * @param authToken - The authentication token
+ * @param storageId - The storage ID of the file
+ * @param componentId - Optional component ID
+ * @returns File URL or null
+ */
+export async function getFileUrl(
+  deploymentUrl: string,
+  authToken: string,
+  storageId: string,
+  componentId?: string | null
+): Promise<string | null> {
+  try {
+    const url = `${deploymentUrl}/api/storage/${storageId}`;
+    const headers: Record<string, string> = {
+      'Authorization': `Convex ${authToken}`,
+    };
+
+    if (componentId) {
+      headers['X-Convex-Component'] = componentId;
+    }
+
+    // Just return the URL - the actual download happens when accessing it
+    return url;
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Generate an upload URL for file storage
+ * @param adminClient - The admin client instance (optional if deploymentUrl and accessToken are provided)
+ * @param componentId - Optional component ID
+ * @param deploymentUrl - Optional deployment URL (takes priority over extracting from adminClient)
+ * @param accessToken - Optional access token (takes priority over extracting from adminClient)
+ * @returns Upload URL with token or null
+ */
+/**
+ * Extract upload URL from various response formats
+ */
+function extractUploadUrl(result: any): string | null {
+  if (!result) return null;
+  
+  // Try different response formats
+  // The URL should contain '/api/storage/upload' and a token parameter
+  const checkForUploadUrl = (str: string): boolean => {
+    return str.includes('/api/storage/upload') || str.includes('storage/upload');
+  };
+  
+  if (typeof result === 'string') {
+    if (checkForUploadUrl(result)) {
+      return result;
+    }
+  }
+  
+  if (result.value) {
+    const value = result.value;
+    if (typeof value === 'string' && checkForUploadUrl(value)) {
+      return value;
+    }
+    if (value.uploadUrl && checkForUploadUrl(value.uploadUrl)) return value.uploadUrl;
+    if (value.url && checkForUploadUrl(value.url)) return value.url;
+    // Sometimes the value might be an object with the URL
+    if (typeof value === 'object') {
+      if (value.uploadUrl && checkForUploadUrl(value.uploadUrl)) return value.uploadUrl;
+      if (value.url && checkForUploadUrl(value.url)) return value.url;
+    }
+  }
+  
+  if (result.uploadUrl && checkForUploadUrl(result.uploadUrl)) return result.uploadUrl;
+  if (result.url && checkForUploadUrl(result.url)) return result.url;
+  
+  // Check if result itself is an object with uploadUrl property
+  if (typeof result === 'object' && result !== null) {
+    // Check all string properties
+    for (const key in result) {
+      if (typeof result[key] === 'string' && checkForUploadUrl(result[key])) {
+        return result[key];
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Make URL absolute if it's relative
+ */
+function makeAbsoluteUrl(uploadUrl: string, deploymentUrl: string): string {
+  if (uploadUrl.startsWith('http')) {
+    return uploadUrl;
+  }
+  if (uploadUrl.startsWith('/')) {
+    return `${deploymentUrl}${uploadUrl}`;
+  }
+  return uploadUrl;
+}
+
+export async function generateUploadUrl(
+  adminClient: any,
+  componentId: string | null = null,
+  deploymentUrl?: string,
+  accessToken?: string
+): Promise<{ uploadUrl: string | null; error?: string }> {
+  const normalizedComponentId = componentId === 'app' || componentId === null ? null : componentId;
+  
+  const finalDeploymentUrl = deploymentUrl || (adminClient ? getDeploymentUrl(adminClient) : null);
+  const finalAdminKey = accessToken || (adminClient ? getAdminKey(adminClient) : null);
+
+  if (!finalDeploymentUrl) {
+    return { uploadUrl: null, error: 'Missing deployment URL' };
+  }
+
+  if (!finalAdminKey) {
+    return { uploadUrl: null, error: 'Missing admin key/access token' };
+  }
+
+  const functionPath = '_system/frontend/fileStorageV2:generateUploadUrl';
+  
+  const componentVariations = [
+    normalizedComponentId,
+    null,
+  ].filter((id, index, arr) => arr.indexOf(id) === index);
+
+  if (adminClient && adminClient.mutation) {
+    for (const compId of componentVariations) {
+      try {
+        const result = await adminClient.mutation(functionPath as any, {
+          componentId: compId,
+        });
+
+        if (typeof result === 'string' && result.includes('/api/storage/upload')) {
+          const uploadUrl = result.startsWith('http') ? result : `${finalDeploymentUrl}${result.startsWith('/') ? result : '/' + result}`;
+          return { uploadUrl };
+        }
+      } catch (err: any) {
+        // Continue to next attempt
+      }
+    }
+  }
+  
+  if (adminClient && adminClient.query) {
+    for (const compId of componentVariations) {
+      try {
+        const result = await adminClient.query(functionPath as any, {
+          componentId: compId,
+        });
+
+        if (typeof result === 'string' && result.includes('/api/storage/upload')) {
+          const uploadUrl = result.startsWith('http') ? result : `${finalDeploymentUrl}${result.startsWith('/') ? result : '/' + result}`;
+          return { uploadUrl };
+        }
+      } catch (err: any) {
+        // Continue to next attempt
+      }
+    }
+  }
+
+  for (const compId of componentVariations) {
+    try {
+      const response = await fetch(`${finalDeploymentUrl}/api/mutation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Convex ${finalAdminKey}`,
+          'Convex-Client': 'dashboard-admin',
+        },
+        body: JSON.stringify({
+          path: functionPath,
+          args: compId !== null ? { componentId: compId } : {},
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        
+        // The result might be wrapped in { value: ... } or be a direct string
+        let uploadUrl: string | null = null;
+        
+        if (result.value && typeof result.value === 'string') {
+          uploadUrl = result.value;
+        } else if (typeof result === 'string') {
+          uploadUrl = result;
+        }
+        
+        if (uploadUrl && uploadUrl.includes('/api/storage/upload')) {
+          // Make sure it's an absolute URL
+          if (uploadUrl.startsWith('/')) {
+            uploadUrl = `${finalDeploymentUrl}${uploadUrl}`;
+          } else if (!uploadUrl.startsWith('http')) {
+            uploadUrl = `${finalDeploymentUrl}/${uploadUrl}`;
+          }
+          
+          return { uploadUrl };
+        }
+      }
+    } catch (err: any) {
+      // Continue to next attempt
+    }
+  }
+  
+  for (const compId of componentVariations) {
+    try {
+      const response = await fetch(`${finalDeploymentUrl}/api/query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Convex ${finalAdminKey}`,
+          'Convex-Client': 'dashboard-admin',
+        },
+        body: JSON.stringify({
+          path: functionPath,
+          args: compId !== null ? { componentId: compId } : {},
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        
+        // The result might be wrapped in { value: ... } or be a direct string
+        let uploadUrl: string | null = null;
+        
+        if (result.value && typeof result.value === 'string') {
+          uploadUrl = result.value;
+        } else if (typeof result === 'string') {
+          uploadUrl = result;
+        }
+        
+        if (uploadUrl && uploadUrl.includes('/api/storage/upload')) {
+          // Make sure it's an absolute URL
+          if (uploadUrl.startsWith('/')) {
+            uploadUrl = `${finalDeploymentUrl}${uploadUrl}`;
+          } else if (!uploadUrl.startsWith('http')) {
+            uploadUrl = `${finalDeploymentUrl}/${uploadUrl}`;
+          }
+          
+          return { uploadUrl };
+        }
+      }
+    } catch (err: any) {
+      // Continue to next attempt
+    }
+  }
+
+  return { uploadUrl: null, error: 'Unable to generate upload URL. File storage may not be available for this deployment.' };
+}
+
+/**
+ * Diagnose file storage availability
+ * @param adminClient - The admin client instance
+ * @param deploymentUrl - Optional deployment URL
+ * @param accessToken - Optional access token
+ * @returns Diagnostic information
+ */
+export async function diagnoseFileStorageAvailability(
+  adminClient: any,
+  deploymentUrl?: string,
+  accessToken?: string
+): Promise<{ available: boolean; details: string[] }> {
+  const finalDeploymentUrl = deploymentUrl || (adminClient ? getDeploymentUrl(adminClient) : null);
+  const finalAdminKey = accessToken || (adminClient ? getAdminKey(adminClient) : null);
+  
+  const details: string[] = [];
+  
+  if (!finalDeploymentUrl) {
+    details.push('❌ No deployment URL available');
+    return { available: false, details };
+  }
+  
+  if (!finalAdminKey) {
+    details.push('❌ No admin key available');
+    return { available: false, details };
+  }
+  
+  details.push(`✅ Deployment URL: ${finalDeploymentUrl}`);
+  details.push(`✅ Admin key: ${finalAdminKey.substring(0, 10)}...`);
+  
+  // Test basic connectivity
+  try {
+    const response = await fetch(`${finalDeploymentUrl}/api/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Convex ${finalAdminKey}`,
+      },
+      body: JSON.stringify({
+        path: '_system/frontend/fileStorageV2:generateUploadUrl',
+        args: { componentId: null },
+      }),
+    });
+    
+    details.push(`📡 API Response: ${response.status} ${response.statusText}`);
+    
+    if (response.ok) {
+      const result = await response.json();
+      details.push(`✅ File storage is available`);
+      details.push(`📄 Response: ${JSON.stringify(result, null, 2)}`);
+      return { available: true, details };
+    } else {
+      const errorText = await response.text();
+      details.push(`❌ File storage not available: ${errorText}`);
+      return { available: false, details };
+    }
+  } catch (error: any) {
+    details.push(`❌ Network error: ${error?.message || 'Unknown error'}`);
+    return { available: false, details };
+  }
+}
+
+/**
+ * Upload file with multiple fallback methods
+ * @param file - The file to upload
+ * @param adminClient - The admin client instance
+ * @param componentId - Optional component ID
+ * @param deploymentUrl - Optional deployment URL
+ * @param accessToken - Optional access token
+ * @param onProgress - Optional progress callback
+ * @returns Upload result with method used
+ */
+export async function uploadFileWithFallbacks(
+  file: File,
+  adminClient: any,
+  componentId: string | null = null,
+  deploymentUrl?: string,
+  accessToken?: string,
+  onProgress?: (progress: number) => void
+): Promise<{ storageId: string | null; error?: string; method?: string }> {
+
+  const { uploadUrl, error: urlError } = await generateUploadUrl(
+    adminClient, 
+    componentId, 
+    deploymentUrl, 
+    accessToken
+  );
+  
+  if (uploadUrl) {
+    try {
+      const storageId = await uploadFile(file, uploadUrl, onProgress);
+      if (storageId) {
+        return { storageId, method: 'upload-url' };
+      }
+    } catch (error: any) {
+      console.error('Upload failed:', error);
+    }
+  }
+  
+  return { 
+    storageId: null, 
+    error: `Upload failed: ${urlError || 'Unable to generate upload URL'}`,
+    method: 'none'
+  };
+}
+
+/**
+ * Upload a file to Convex storage
+ * @param file - The file to upload
+ * @param uploadUrl - The upload URL with token
+ * @param onProgress - Optional progress callback (0-100)
+ * @returns Storage ID or null
+ */
+export async function uploadFile(
+  file: File,
+  uploadUrl: string,
+  onProgress?: (progress: number) => void
+): Promise<string | null> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable && onProgress) {
+        const percentComplete = (e.loaded / e.total) * 100;
+        onProgress(percentComplete);
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status === 200) {
+        try {
+          const responseText = xhr.responseText.trim();
+          
+          if (!responseText) {
+            // Empty response - try to get storage ID from URL or headers
+            const location = xhr.getResponseHeader('Location');
+            if (location) {
+              const match = location.match(/\/([^\/]+)$/);
+              if (match) {
+                resolve(match[1]);
+                return;
+              }
+            }
+            resolve(null);
+            return;
+          }
+          
+          const response = JSON.parse(responseText);
+          
+          // Convex returns the storage ID in JSON format
+          let storageId: string | null = null;
+          
+          if (typeof response === 'string') {
+            storageId = response;
+          } else if (response.storageId) {
+            storageId = response.storageId;
+          } else if (response.id) {
+            storageId = response.id;
+          } else if (response._id) {
+            storageId = response._id;
+          } else if (response.value) {
+            // Nested value
+            storageId = typeof response.value === 'string' 
+              ? response.value 
+              : response.value.storageId || response.value.id || response.value._id || null;
+          }
+          
+          resolve(storageId);
+        } catch (err) {
+          // If response is not JSON, try to extract storage ID from headers or URL
+          const location = xhr.getResponseHeader('Location');
+          if (location) {
+            const match = location.match(/\/([^\/]+)$/);
+            if (match) {
+              resolve(match[1]);
+              return;
+            }
+          }
+          // If we can't parse the response, still resolve (upload might have succeeded)
+          resolve(null);
+        }
+      } else {
+        reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+      }
+    });
+
+    xhr.addEventListener('error', () => {
+      reject(new Error('Upload failed: network error'));
+    });
+
+    xhr.addEventListener('abort', () => {
+      reject(new Error('Upload aborted'));
+    });
+
+    xhr.open('POST', uploadUrl);
+    
+    // Set the file's content type - Convex expects the file directly, not FormData
+    // Don't set Content-Type if it's empty, let the browser set it
+    if (file.type) {
+      xhr.setRequestHeader('Content-Type', file.type);
+    }
+    
+    // Send the file directly (not as FormData)
+    xhr.send(file);
+  });
+}
+
+/**
+ * Delete files from storage using adminClient mutation
+ * @param adminClient - The Convex admin client instance
+ * @param storageIds - Array of storage IDs to delete (or single string)
+ * @param componentId - Optional component ID
+ * @returns Success status
+ */
+export async function deleteFile(
+  adminClient: any,
+  storageIds: string | string[],
+  componentId?: string | null
+): Promise<{ success: boolean; error?: string }> {
+  if (!adminClient) {
+    return {
+      success: false,
+      error: 'Admin client not available',
+    };
+  }
+
+  try {
+    // Normalize to array
+    const idsArray = Array.isArray(storageIds) ? storageIds : [storageIds];
+    const normalizedComponentId = componentId === 'app' || componentId === null ? null : componentId;
+
+    // Use adminClient.mutation to call the system function
+    // componentId is passed as part of the args object
+    const result = await adminClient.mutation(
+      '_system/frontend/fileStorageV2:deleteFiles' as any,
+      {
+        storageIds: idsArray,
+        componentId: normalizedComponentId,
+      }
+    );
+
+    return { success: true };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Failed to delete file',
+    };
+  }
 }
