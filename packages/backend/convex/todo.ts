@@ -74,8 +74,10 @@ export const insertFetchedTodos = internalMutation({
 export const addRandomTodosAfter5Min = internalMutation({
   args: {},
   handler: async (ctx) => {
+    // instead of 5 min, we do something like one hour?
+    const timeToRun = 1 * 60 * 60 * 1000;
     await ctx.scheduler.runAfter(
-      300000,
+      timeToRun,
       internal.dummyjson.getFirstFewTodos,
       { opts: { limit: 10, skip: 0 } }
     );
