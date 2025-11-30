@@ -102,7 +102,7 @@ export const bottomSheetStyles: BottomSheetStyles = {
     gap: '6px',
     padding: '4px 12px',
     borderRadius: '8px',
-    backgroundColor: '#5B46DF',
+    backgroundColor: '#34D399',
     border: 'none',
     color: '#fff',
     fontSize: '12px',
@@ -315,7 +315,7 @@ export const authPanelStyles: AuthPanelStyles = {
   },
   connectButton: {
     width: '100%',
-    backgroundColor: '#5B46DF',
+    backgroundColor: '#34D399',
     color: '#fff',
     border: 'none',
     padding: '12px 24px',
@@ -436,7 +436,7 @@ export const functionsViewStyles: FunctionsViewStyles = {
     outline: 'none',
   },
   searchInputFocus: {
-    borderColor: '#5B46DF',
+    borderColor: '#34D399',
   },
   functionList: {
     flex: 1,
@@ -489,7 +489,7 @@ export const functionsViewStyles: FunctionsViewStyles = {
   functionItemSelected: {
     color: '#fff',
     backgroundColor: '#1C1F26',
-    border: '1px solid #5B46DF',
+    border: '1px solid #34D399',
   },
   functionItemHover: {
     backgroundColor: '#16181D',
@@ -537,7 +537,7 @@ export const functionsViewStyles: FunctionsViewStyles = {
     alignItems: 'center',
     gap: '6px',
     padding: '8px 16px',
-    backgroundColor: '#5B46DF',
+    backgroundColor: '#34D399',
     border: 'none',
     borderRadius: '6px',
     color: '#fff',
@@ -641,6 +641,8 @@ export const searchInputStyles: SearchInputStyles = {
     color: 'var(--color-panel-text-muted)',
     pointerEvents: 'none',
     zIndex: 1,
+    width: '14px',
+    height: '14px',
   },
   input: {
     width: '100%',
@@ -659,6 +661,288 @@ export const searchInputStyles: SearchInputStyles = {
   inputFocus: {
     borderColor: 'var(--color-panel-accent)',
     backgroundColor: 'var(--color-panel-bg-tertiary)',
+  },
+};
+
+interface LogsViewStyles {
+  container: CSSProperties;
+  header: CSSProperties;
+  headerTitle: CSSProperties;
+  headerButtons: CSSProperties;
+  headerButton: CSSProperties;
+  headerButtonHover: CSSProperties;
+  searchContainer: CSSProperties;
+  searchWrapper: CSSProperties;
+  searchIcon: CSSProperties;
+  searchInput: CSSProperties;
+  searchInputFocus: CSSProperties;
+  pauseButton: CSSProperties;
+  pauseButtonPaused: CSSProperties;
+  pauseButtonHover: CSSProperties;
+  pauseButtonPausedHover: CSSProperties;
+  logsTable: CSSProperties;
+  tableHeader: CSSProperties;
+  tableHeaderCell: CSSProperties;
+  loadingContainer: CSSProperties;
+  loadingText: CSSProperties;
+  errorContainer: CSSProperties;
+  errorText: CSSProperties;
+  emptyContainer: CSSProperties;
+  emptyText: CSSProperties;
+  logRow: CSSProperties;
+  logRowHover: CSSProperties;
+  timestampCell: CSSProperties;
+  idCell: CSSProperties;
+  idBadge: CSSProperties;
+  statusCell: CSSProperties;
+  statusSuccess: CSSProperties;
+  statusError: CSSProperties;
+  statusDefault: CSSProperties;
+  executionTime: CSSProperties;
+  functionCell: CSSProperties;
+  logTypeIcon: CSSProperties;
+  logTypeQuery: CSSProperties;
+  logTypeMutation: CSSProperties;
+  logTypeAction: CSSProperties;
+  logTypeHttp: CSSProperties;
+  logTypeDefault: CSSProperties;
+  functionPath: CSSProperties;
+  logMessage: CSSProperties;
+}
+
+export const logsViewStyles: LogsViewStyles = {
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    backgroundColor: '#0F1115',
+  },
+  header: {
+    height: '48px',
+    borderBottom: '1px solid #2D313A',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '0 16px',
+  },
+  headerTitle: {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#fff',
+  },
+  headerButtons: {
+    display: 'flex',
+    gap: '8px',
+  },
+  headerButton: {
+    padding: '6px 12px',
+    border: '1px solid #2D313A',
+    borderRadius: '4px',
+    fontSize: '12px',
+    color: '#d1d5db',
+    backgroundColor: 'transparent',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+  headerButtonHover: {
+    backgroundColor: '#1C1F26',
+  },
+  searchContainer: {
+    padding: '8px',
+    borderBottom: '1px solid #2D313A',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0F1115',
+  },
+  searchWrapper: {
+    position: 'relative',
+    flex: 1,
+    marginRight: '16px',
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: '10px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    width: '14px',
+    height: '14px',
+    color: '#6b7280',
+    pointerEvents: 'none',
+  },
+  searchInput: {
+    width: '100%',
+    backgroundColor: '#1C1F26',
+    border: '1px solid #2D313A',
+    borderRadius: '4px',
+    height: '32px',
+    paddingLeft: '32px',
+    paddingRight: '12px',
+    fontSize: '12px',
+    color: '#fff',
+    outline: 'none',
+    transition: 'border-color 0.2s',
+  },
+  searchInputFocus: {
+    borderColor: '#6b7280',
+  },
+  pauseButton: {
+    padding: '4px 12px',
+    fontSize: '12px',
+    borderRadius: '4px',
+    fontWeight: 500,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    transition: 'all 0.2s',
+    backgroundColor: '#1C1F26',
+    border: '1px solid #2D313A',
+    color: '#d1d5db',
+    cursor: 'pointer',
+  },
+  pauseButtonPaused: {
+    backgroundColor: '#34D399',
+    color: '#fff',
+    border: 'none',
+  },
+  pauseButtonHover: {
+    backgroundColor: '#34D399',
+  },
+  pauseButtonPausedHover: {
+    backgroundColor: '#34D399',
+  },
+  logsTable: {
+    flex: 1,
+    overflow: 'auto',
+    backgroundColor: '#0F1115',
+    fontFamily: 'monospace',
+    fontSize: '12px',
+  },
+  tableHeader: {
+    display: 'flex',
+    borderBottom: '1px solid #2D313A',
+    color: '#6b7280',
+    padding: '4px 16px',
+    position: 'sticky',
+    top: 0,
+    backgroundColor: '#0F1115',
+  },
+  tableHeaderCell: {
+    fontSize: '12px',
+    fontWeight: 500,
+  },
+  loadingContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '48px 0',
+  },
+  loadingText: {
+    color: '#6b7280',
+    fontSize: '14px',
+  },
+  errorContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '48px 0',
+  },
+  errorText: {
+    color: '#f87171',
+    fontSize: '14px',
+  },
+  emptyContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '48px 0',
+  },
+  emptyText: {
+    color: '#6b7280',
+    fontSize: '14px',
+  },
+  logRow: {
+    display: 'flex',
+    padding: '4px 16px',
+    cursor: 'default',
+    borderBottom: '1px solid rgba(45, 49, 58, 0.3)',
+  },
+  logRowHover: {
+    backgroundColor: '#1C1F26',
+  },
+  timestampCell: {
+    width: '160px',
+    color: '#9ca3af',
+  },
+  idCell: {
+    width: '80px',
+    color: '#6b7280',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+  },
+  idBadge: {
+    border: '1px solid #374151',
+    borderRadius: '2px',
+    padding: '0 4px',
+    fontSize: '10px',
+  },
+  statusCell: {
+    width: '128px',
+    color: '#d1d5db',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+  },
+  statusSuccess: {
+    color: '#34d399',
+  },
+  statusError: {
+    color: '#f87171',
+  },
+  statusDefault: {
+    color: '#d1d5db',
+  },
+  executionTime: {
+    color: '#6b7280',
+  },
+  functionCell: {
+    flex: 1,
+    color: '#d1d5db',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  logTypeIcon: {
+    width: '16px',
+    textAlign: 'center',
+    fontWeight: 'bold',
+    fontSize: '10px',
+  },
+  logTypeQuery: {
+    color: '#60a5fa',
+  },
+  logTypeMutation: {
+    color: '#a78bfa',
+  },
+  logTypeAction: {
+    color: '#fb923c',
+  },
+  logTypeHttp: {
+    color: '#fbbf24',
+  },
+  logTypeDefault: {
+    color: '#6b7280',
+  },
+  functionPath: {
+    color: '#6b7280',
+  },
+  logMessage: {
+    color: '#9ca3af',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    maxWidth: '512px',
   },
 };
 
