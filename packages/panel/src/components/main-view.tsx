@@ -3,6 +3,7 @@ import { HealthView } from '../views/health/health-view';
 import { DataView } from '../views/data/data-view';
 import { FunctionsView } from '../views/functions';
 import { SchedulesView } from '../views/schedules';
+import { FilesView } from '../views/files';
 import { TabId } from '../types/tabs';
 
 interface MainViewsProps {
@@ -57,7 +58,18 @@ const tabRenderers: Record<TabId, TabRenderer> = {
       onError={onError}
     />
   ),
-  files: createComingSoonRenderer('Files'),
+  files: ({ deployUrl, baseUrl, accessToken, adminClient, useMockData, onError, teamSlug, projectSlug }) => (
+    <FilesView
+      convexUrl={deployUrl || baseUrl}
+      accessToken={accessToken}
+      baseUrl={baseUrl}
+      adminClient={adminClient}
+      useMockData={useMockData}
+      onError={onError}
+      teamSlug={teamSlug}
+      projectSlug={projectSlug}
+    />
+  ),
   schedules: ({ adminClient, accessToken, useMockData }) => (
     <SchedulesView
       adminClient={adminClient}

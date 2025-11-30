@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Search, Plus } from 'lucide-react';
 import { TableDefinition } from '../../../types';
 import { ComponentSelector } from '../../../components/function-runner/components/component-selector';
+import { searchInputStyles } from '../../../styles/panelStyles';
 
 export interface TableSidebarProps {
   tables: TableDefinition;
@@ -64,41 +65,19 @@ export const TableSidebar: React.FC<TableSidebarProps> = ({
         borderBottom: '1px solid var(--color-panel-border)',
         backgroundColor: 'var(--color-panel-bg)'
       }}>
-        <div style={{ position: 'relative' }}>
+        <div style={searchInputStyles.container}>
           <Search 
             size={14} 
-            style={{ 
-              position: 'absolute', 
-              left: '10px', 
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--color-panel-text-muted)',
-              pointerEvents: 'none',
-              zIndex: 1
-            }} 
+            style={searchInputStyles.icon}
           />
           <input
             type="text"
             placeholder="Search tables..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%',
-              backgroundColor: 'var(--color-panel-bg-secondary)',
-              border: '1px solid var(--color-panel-border)',
-              borderRadius: '8px',
-              height: '32px',
-              paddingLeft: '32px',
-              paddingRight: '12px',
-              fontSize: '12px',
-              color: 'var(--color-panel-text)',
-              outline: 'none',
-              transition: 'border-color 0.2s ease, background-color 0.2s ease',
-              boxSizing: 'border-box',
-            }}
+            style={searchInputStyles.input}
             onFocus={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-panel-accent)';
-              e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+              Object.assign(e.currentTarget.style, searchInputStyles.inputFocus);
             }}
             onBlur={(e) => {
               e.currentTarget.style.borderColor = 'var(--color-panel-border)';

@@ -621,4 +621,45 @@ export const functionsViewStyles: FunctionsViewStyles = {
   },
 };
 
+interface SearchInputStyles {
+  container: CSSProperties;
+  icon: CSSProperties;
+  input: CSSProperties;
+  inputFocus: CSSProperties;
+}
+
+export const searchInputStyles: SearchInputStyles = {
+  container: {
+    position: 'relative',
+    width: '100%',
+  },
+  icon: {
+    position: 'absolute',
+    left: '10px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: 'var(--color-panel-text-muted)',
+    pointerEvents: 'none',
+    zIndex: 1,
+  },
+  input: {
+    width: '100%',
+    backgroundColor: 'var(--color-panel-bg-secondary)',
+    border: '1px solid var(--color-panel-border)',
+    borderRadius: '8px',
+    height: '32px',
+    paddingLeft: '32px',
+    paddingRight: '12px',
+    fontSize: '12px',
+    color: 'var(--color-panel-text)',
+    outline: 'none',
+    transition: 'border-color 0.2s ease, background-color 0.2s ease',
+    boxSizing: 'border-box',
+  },
+  inputFocus: {
+    borderColor: 'var(--color-panel-accent)',
+    backgroundColor: 'var(--color-panel-bg-tertiary)',
+  },
+};
+
 
