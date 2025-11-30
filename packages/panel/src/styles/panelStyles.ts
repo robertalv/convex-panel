@@ -799,6 +799,7 @@ export const logsViewStyles: LogsViewStyles = {
     border: '1px solid #2D313A',
     color: '#d1d5db',
     cursor: 'pointer',
+    marginRight: '-16px',
   },
   pauseButtonPaused: {
     backgroundColor: '#34D399',

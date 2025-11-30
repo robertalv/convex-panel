@@ -1522,11 +1522,6 @@
 
 /* Tooltip Action Tooltip */
 .cp-tooltip-action-tooltip {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  margin-top: 8px;
-  margin-right: -8px;
   padding: 8px 12px;
   background-color: var(--color-panel-bg-tertiary);
   border: 1px solid var(--color-panel-border);
@@ -1535,16 +1530,20 @@
   border-radius: 4px;
   transition: opacity 0.2s;
   pointer-events: none;
-  z-index: 50;
+  z-index: 99999;
   box-shadow: 0 10px 15px -3px var(--color-panel-shadow);
-  width: 192px;
+  min-width: 192px;
+  max-width: 300px;
   text-align: center;
   line-height: 1.5;
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  transform: translateX(8px);
 }
 
 .cp-tooltip-action-arrow {
   position: absolute;
-  top: -4px;
   right: 12px;
   width: 8px;
   height: 8px;
@@ -1552,6 +1551,18 @@
   border-top: 1px solid var(--color-panel-border);
   border-left: 1px solid var(--color-panel-border);
   transform: rotate(45deg);
+}
+
+.cp-tooltip-action-tooltip[data-placement="top"] .cp-tooltip-action-arrow {
+  bottom: -4px;
+  border-top: none;
+  border-bottom: 1px solid var(--color-panel-border);
+  border-right: 1px solid var(--color-panel-border);
+  border-left: none;
+}
+
+.cp-tooltip-action-tooltip[data-placement="bottom"] .cp-tooltip-action-arrow {
+  top: -4px;
 }
 
 /* Tooltip Arrow (for Tooltip component) */

@@ -6,6 +6,11 @@ import {
   X,
   Copy,
   HelpCircle,
+  ChevronUp,
+  ChevronDown,
+  Clock,
+  CheckCircle2,
+  ArrowUp,
 } from 'lucide-react';
 import { FixedSizeList } from 'react-window';
 import { useLogs } from '../../hooks/useLogs';
@@ -18,6 +23,8 @@ import { useComponents } from '../../hooks/useComponents';
 import { discoverFunctions, ModuleFunction } from '../../utils/functionDiscovery';
 import { CustomQuery } from '../../components/function-runner/function-runner';
 import { Sheet } from '../../components/shared/sheet';
+import { TooltipAction } from '../../components/shared/tooltip-action';
+import { copyToClipboard } from '../../utils/toast';
 
 export interface LogsViewProps {
   convexUrl?: string;
@@ -852,6 +859,7 @@ type DetailTab = 'execution' | 'request' | 'functions';
 
 const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
   const [activeTab, setActiveTab] = useState<DetailTab>('execution');
+  const [isResourcesExpanded, setIsResourcesExpanded] = useState(true);
   const status = log.status || (log.function?.cached ? 'cached' : undefined);
   const isError = status === 'error' || status === 'failure' || !!log.error_message;
   const executionId = log.function?.request_id || log.raw?.execution_id || 'N/A';
@@ -862,11 +870,28 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
   const duration = log.execution_time_ms || 0;
   const usage = log.usage || log.raw?.usage_stats;
   const environment = log.raw?.environment || 'Convex';
-  const returnBytes = log.raw?.return_bytes;
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
+  const returnBytes = log.raw?.return_bytes || log.raw?.returnBytes;
+  const identity = log.raw?.identity || 'Admin';
+  const caller = log.raw?.caller || 'HTTP API';
+  
+  // Calculate compute (GB-hr and MB for duration)
+  const computeMemoryMB = usage?.action_memory_used_mb || log.raw?.usage_stats?.memory_used_mb || 0;
+  const durationSeconds = duration / 1000;
+  const computeGBHr = (computeMemoryMB * durationSeconds) / (1024 * 3600);
+  const computeDisplay = `${computeGBHr.toFixed(7)} GB-hr (${computeMemoryMB} MB for ${durationSeconds.toFixed(2)}s)`;
+  
+  // Get document count
+  const documentCount = usage?.database_read_documents || log.raw?.usage_stats?.database_read_documents || 0;
+  
+  // Get functions called (nested function calls)
+  // If no nested functions, show the current function itself
+  const functionsCalled = log.raw?.functions_called || log.raw?.functionsCalled || 
+    (log.function?.path ? [{
+      path: log.function.path,
+      execution_time_ms: duration,
+      success: status === 'success' || status !== 'error',
+      error: log.error_message
+    }] : []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -925,13 +950,16 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
             style={{
               padding: '10px 16px',
               fontSize: '12px',
-              fontWeight: 500,
+              fontWeight: activeTab === tab ? 600 : 500,
               border: 'none',
               borderBottom: activeTab === tab ? '2px solid var(--color-panel-accent)' : '2px solid transparent',
-              backgroundColor: 'transparent',
+              backgroundColor: activeTab === tab 
+                ? 'linear-gradient(to bottom, rgba(255, 255, 255, 0.05), transparent)' 
+                : 'transparent',
               color: activeTab === tab ? 'var(--color-panel-text)' : 'var(--color-panel-text-muted)',
               cursor: 'pointer',
               textTransform: 'capitalize',
+              position: 'relative',
             }}
           >
             {tab === 'functions' ? 'Functions Called' : tab}
@@ -940,63 +968,272 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
       </div>
 
       {/* Tab Content */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
         {activeTab === 'execution' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             <DetailRow label="Execution ID" value={executionId} />
             <DetailRow label="Function" value={functionPath} />
             <DetailRow label="Type" value={functionType} />
             <DetailRow label="Started at" value={formatDateTime(startedAt)} />
             <DetailRow label="Completed at" value={formatDateTime(completedAt)} />
             <DetailRow label="Duration" value={`${duration}ms`} />
-            <DetailRow label="Environment" value={environment} withHelp />
+            <DetailRow 
+              label="Environment" 
+              value={environment} 
+              withHelp 
+              helpText="This function was executed in Convex's isolated environment."
+            />
             
             {/* Resources Used */}
-            <div>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-panel-text)', marginBottom: '12px' }}>
+            <div style={{ borderTop: '1px solid var(--color-panel-border)', marginTop: '8px' }}>
+              <button
+                onClick={() => setIsResourcesExpanded(!isResourcesExpanded)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '12px 20px',
+                  marginBottom: isResourcesExpanded ? '0' : '0',
+                  color: 'var(--color-panel-text)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  width: '100%',
+                  textAlign: 'left',
+                }}
+              >
+                <Clock size={14} style={{ color: 'var(--color-panel-text-muted)' }} />
                 Resources Used
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '12px' }}>
-                {usage && (
-                  <>
-                    <DetailRow label="Compute" value="0.0000000 GB-hr (0 MB for 0.00s)" withHelp small />
-                    <DetailRow 
-                      label="DB Bandwidth" 
-                      value={`Accessed 0 documents, ${formatBytes(usage.database_read_bytes || 0)} read, ${formatBytes(usage.database_write_bytes || 0)} written`}
-                      small
-                    />
-                    <DetailRow 
-                      label="File Bandwidth" 
-                      value={`${formatBytes(usage.file_storage_read_bytes || 0)} read, ${formatBytes(usage.file_storage_write_bytes || 0)} written`}
-                      small
-                    />
-                    <DetailRow 
-                      label="Vector Bandwidth" 
-                      value={`${formatBytes(usage.vector_storage_read_bytes || 0)} read, ${formatBytes(usage.vector_storage_write_bytes || 0)} written`}
-                      small
-                    />
-                    {returnBytes !== undefined && (
-                      <DetailRow label="Return Size" value={`${formatBytes(returnBytes)} returned`} withHelp small />
-                    )}
-                  </>
+                {isResourcesExpanded ? (
+                  <ChevronUp size={14} style={{ color: 'var(--color-panel-text-muted)', marginLeft: 'auto' }} />
+                ) : (
+                  <ChevronDown size={14} style={{ color: 'var(--color-panel-text-muted)', marginLeft: 'auto' }} />
                 )}
-              </div>
+              </button>
+              {isResourcesExpanded && (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <DetailRow 
+                    label="Compute" 
+                    value={computeDisplay} 
+                    withHelp 
+                    small 
+                    helpText="Only compute from Actions incur additional cost. Query/Mutation compute are included."
+                  />
+                  <DetailRow 
+                    label="DB Bandwidth" 
+                    value={
+                      <span>
+                        Accessed <strong>{documentCount}</strong> {documentCount === 1 ? 'document' : 'documents'}, <strong>{formatBytes(usage?.database_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.database_write_bytes || 0)}</strong> written
+                      </span>
+                    }
+                    small
+                  />
+                  <DetailRow 
+                    label="File Bandwidth" 
+                    value={
+                      <span>
+                        <strong>{formatBytes(usage?.file_storage_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.file_storage_write_bytes || 0)}</strong> written
+                      </span>
+                    }
+                    small
+                  />
+                  <DetailRow 
+                    label="Vector Bandwidth" 
+                    value={
+                      <span>
+                        <strong>{formatBytes(usage?.vector_storage_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.vector_storage_write_bytes || 0)}</strong> written
+                      </span>
+                    }
+                    small
+                    noBorder={returnBytes === undefined}
+                  />
+                  <DetailRow 
+                    label="Return Size" 
+                    value={<span><strong>{formatBytes(returnBytes || 0)}</strong> returned</span>} 
+                    withHelp 
+                    small 
+                    noBorder 
+                    helpText="Bandwidth from sending the return value of a function call to the user does not incur costs."
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {activeTab === 'request' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             <DetailRow label="Request ID" value={log.function?.request_id || 'N/A'} />
-            <DetailRow label="Function Path" value={functionPath} />
-            <DetailRow label="Type" value={functionType} />
-            {log.message && <DetailRow label="Message" value={log.message} />}
+            <DetailRow label="Started at" value={formatDateTime(startedAt)} />
+            <DetailRow label="Completed at" value={formatDateTime(completedAt)} />
+            <DetailRow label="Duration" value={`${duration}ms`} />
+            <DetailRow 
+              label="Identity" 
+              value={identity} 
+              withHelp 
+              helpText="This request was initiated by a Convex Developer with access to this deployment."
+            />
+            <DetailRow 
+              label="Caller" 
+              value={caller} 
+              withHelp={caller === 'WebSocket'}
+              helpText={caller === 'WebSocket' ? "This function was called through a websocket connection." : undefined}
+            />
+            <DetailRow 
+              label="Environment" 
+              value={environment} 
+              withHelp 
+              helpText="This function was executed in Convex's isolated environment."
+            />
+            
+            {/* Resources Used */}
+            <div style={{ borderTop: '1px solid var(--color-panel-border)', marginTop: '8px' }}>
+              <button
+                onClick={() => setIsResourcesExpanded(!isResourcesExpanded)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '12px 20px',
+                  marginBottom: isResourcesExpanded ? '0' : '0',
+                  color: 'var(--color-panel-text)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  width: '100%',
+                  textAlign: 'left',
+                }}
+              >
+                <Clock size={14} style={{ color: 'var(--color-panel-text-muted)' }} />
+                Resources Used
+                {isResourcesExpanded ? (
+                  <ChevronUp size={14} style={{ color: 'var(--color-panel-text-muted)', marginLeft: 'auto' }} />
+                ) : (
+                  <ChevronDown size={14} style={{ color: 'var(--color-panel-text-muted)', marginLeft: 'auto' }} />
+                )}
+              </button>
+              {isResourcesExpanded && (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <DetailRow 
+                    label="Compute" 
+                    value={computeDisplay} 
+                    withHelp 
+                    small 
+                    helpText="Only compute from Actions incur additional cost. Query/Mutation compute are included."
+                  />
+                  <DetailRow 
+                    label="DB Bandwidth" 
+                    value={
+                      <span>
+                        Accessed <strong>{documentCount}</strong> {documentCount === 1 ? 'document' : 'documents'}, <strong>{formatBytes(usage?.database_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.database_write_bytes || 0)}</strong> written
+                      </span>
+                    }
+                    small
+                  />
+                  <DetailRow 
+                    label="File Bandwidth" 
+                    value={
+                      <span>
+                        <strong>{formatBytes(usage?.file_storage_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.file_storage_write_bytes || 0)}</strong> written
+                      </span>
+                    }
+                    small
+                  />
+                  <DetailRow 
+                    label="Vector Bandwidth" 
+                    value={
+                      <span>
+                        <strong>{formatBytes(usage?.vector_storage_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.vector_storage_write_bytes || 0)}</strong> written
+                      </span>
+                    }
+                    small
+                    noBorder={returnBytes === undefined}
+                  />
+                  <DetailRow 
+                    label="Return Size" 
+                    value={<span><strong>{formatBytes(returnBytes || 0)}</strong> returned</span>} 
+                    withHelp 
+                    small 
+                    noBorder 
+                    helpText="Bandwidth from sending the return value of a function call to the user does not incur costs."
+                  />
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {activeTab === 'functions' && (
-          <div style={{ color: 'var(--color-panel-text-muted)', fontSize: '12px' }}>
-            No functions called
+          <div style={{ padding: '20px' }}>
+            <div style={{ 
+              color: 'var(--color-panel-text-muted)', 
+              fontSize: '12px', 
+              marginBottom: '16px' 
+            }}>
+              This is an outline of the functions called in this request.
+            </div>
+            {functionsCalled.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {functionsCalled.map((func: any, index: number) => {
+                  const funcPath = func.path || func.identifier || func.function || 'Unknown';
+                  const pathParts = funcPath.split(':');
+                  const component = pathParts.length > 1 ? pathParts[0] : '';
+                  const functionName = pathParts.length > 1 ? pathParts[1] : funcPath;
+                  const execTime = func.execution_time_ms || func.executionTimeMs || func.duration || 0;
+                  const isSuccess = func.success !== false && !func.error;
+                  
+                  return (
+                    <div
+                      key={index}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px 16px',
+                        backgroundColor: 'rgba(180, 83, 9, 0.1)',
+                        border: '1px solid rgba(180, 83, 9, 0.2)',
+                        borderRadius: '8px',
+                        fontFamily: 'monospace',
+                        fontSize: '12px',
+                      }}
+                    >
+                      {isSuccess ? (
+                        <CheckCircle2 size={16} style={{ color: '#34d399', flexShrink: 0 }} />
+                      ) : (
+                        <X size={16} style={{ color: '#f87171', flexShrink: 0 }} />
+                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
+                        {component && (
+                          <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                            {component}:
+                          </span>
+                        )}
+                        <span style={{ color: 'var(--color-panel-text)', fontWeight: 500 }}>
+                          {functionName}
+                        </span>
+                        {execTime > 0 && (
+                          <span style={{ color: 'var(--color-panel-text-muted)', marginLeft: '4px' }}>
+                            ({execTime}ms)
+                          </span>
+                        )}
+                      </div>
+                      <ArrowUp size={14} style={{ color: 'var(--color-panel-text-muted)', flexShrink: 0 }} />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ 
+                color: 'var(--color-panel-text-muted)', 
+                fontSize: '12px' 
+              }}>
+                No functions called
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1006,11 +1243,19 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
 
 const DetailRow: React.FC<{ 
   label: string; 
-  value: string; 
+  value: string | React.ReactNode; 
   withHelp?: boolean;
   small?: boolean;
-}> = ({ label, value, withHelp, small }) => (
-  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+  noBorder?: boolean;
+  helpText?: string;
+}> = ({ label, value, withHelp, small, noBorder, helpText }) => (
+  <div style={{ 
+    display: 'flex', 
+    alignItems: 'flex-start', 
+    gap: '8px',
+    padding: '12px 20px',
+    borderBottom: noBorder ? 'none' : '1px solid var(--color-panel-border)',
+  }}>
     <div style={{ 
       fontSize: small ? '11px' : '12px', 
       color: 'var(--color-panel-text-muted)', 
@@ -1020,7 +1265,15 @@ const DetailRow: React.FC<{
       gap: '4px',
     }}>
       {label}
-      {withHelp && <HelpCircle size={12} style={{ opacity: 0.6 }} />}
+      {withHelp && helpText && (
+        <TooltipAction 
+          icon={<HelpCircle size={12} style={{ opacity: 0.6, color: 'var(--color-panel-text-muted)' }} />} 
+          text={helpText} 
+        />
+      )}
+      {withHelp && !helpText && (
+        <HelpCircle size={12} style={{ opacity: 0.6, color: 'var(--color-panel-text-muted)' }} />
+      )}
     </div>
     <div style={{ 
       fontSize: small ? '11px' : '12px', 

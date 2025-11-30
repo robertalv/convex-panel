@@ -52,22 +52,22 @@ export const Sheet: React.FC<SheetProps> = ({
 
   const sheetContent = (
     <>
-      {/* Backdrop - only show when not in container */}
-      {!isInContainer && (
-        <div
-          onClick={onClose}
-          style={{
-            position: positionType,
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'color-mix(in srgb, var(--color-panel-bg) 80%, transparent)',
-            zIndex: 9999,
-            animation: 'fadeIn 0.2s ease-out',
-          }}
-        />
-      )}
+      {/* Backdrop - show for both container and non-container cases */}
+      <div
+        onClick={onClose}
+        style={{
+          position: positionType,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: isInContainer 
+            ? 'rgba(0, 0, 0, 0.3)' 
+            : 'color-mix(in srgb, var(--color-panel-bg) 80%, transparent)',
+          zIndex: 9999,
+          animation: 'fadeIn 0.2s ease-out',
+        }}
+      />
 
       {/* Sheet */}
       <div
@@ -88,6 +88,37 @@ export const Sheet: React.FC<SheetProps> = ({
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Close button - always show in top right */}
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--color-panel-text-muted)',
+            borderRadius: '4px',
+            transition: 'background 0.15s, color 0.15s',
+            zIndex: 10001,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+            e.currentTarget.style.color = 'var(--color-panel-text)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+          }}
+        >
+          <X size={18} />
+        </button>
+
         {/* Header */}
         {title && (
           <div
@@ -110,31 +141,6 @@ export const Sheet: React.FC<SheetProps> = ({
             >
               {title}
             </h2>
-            <button
-              onClick={onClose}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--color-panel-text-muted)',
-                borderRadius: '4px',
-                transition: 'background 0.15s, color 0.15s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
-                e.currentTarget.style.color = 'var(--color-panel-text)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.color = 'var(--color-panel-text-muted)';
-              }}
-            >
-              <X size={18} />
-            </button>
           </div>
         )}
 
