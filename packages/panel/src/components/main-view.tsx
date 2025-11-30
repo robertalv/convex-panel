@@ -4,6 +4,7 @@ import { DataView } from '../views/data/data-view';
 import { FunctionsView } from '../views/functions';
 import { SchedulesView } from '../views/schedules';
 import { FilesView } from '../views/files';
+import { LogsView } from '../views/logs';
 import { TabId } from '../types/tabs';
 
 interface MainViewsProps {
@@ -77,7 +78,18 @@ const tabRenderers: Record<TabId, TabRenderer> = {
       useMockData={useMockData}
     />
   ),
-  logs: createComingSoonRenderer('Logs'),
+  logs: ({ deployUrl, baseUrl, accessToken, adminClient, useMockData, onError, teamSlug, projectSlug }) => (
+    <LogsView
+      convexUrl={deployUrl || baseUrl}
+      accessToken={accessToken}
+      baseUrl={baseUrl}
+      adminClient={adminClient}
+      useMockData={useMockData}
+      onError={onError}
+      teamSlug={teamSlug}
+      projectSlug={projectSlug}
+    />
+  ),
   settings: createComingSoonRenderer('Settings'),
 };
 

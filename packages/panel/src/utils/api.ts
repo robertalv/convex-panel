@@ -40,45 +40,18 @@ const setTableColumnsForbiddenCache = (cache: Set<string>) => {
  * @returns FetchLogsResponse
  */
 export async function fetchLogsFromApi({
-  /** 
-   * The cursor position to fetch logs from.
-   * Used for pagination and real-time log streaming.
-   * Pass the newCursor from previous response to get next batch.
-   * @default 'now' 
-   */
   cursor,
-
-  /**
-   * URL of your Convex deployment.
-   * Format: https://[deployment-name].convex.cloud
-   * Required for making API calls to correct environment.
-   * @required
-   */
   convexUrl,
-
-  /**
-   * Authentication token for Convex API access.
-   * Required to authorize log fetching requests.
-   * Keep secure and do not expose to clients.
-   * @required
-   */
   accessToken,
-
-  /**
-   * AbortSignal for cancelling fetch requests.
-   * Useful for cleanup when component unmounts.
-   * Pass signal from AbortController to enable cancellation.
-   * @optional
-   */
   signal,
-
-  /**
-   * Whether to use mock data instead of making API calls.
-   * Useful for development, testing, and demos.
-   * @default false
-   */
+  functionId,
+  limit,
   useMockData = false
-}: FetchLogsOptions & { useMockData?: boolean }): Promise<FetchLogsResponse> {
+}: FetchLogsOptions & { 
+  useMockData?: boolean;
+  functionId?: string;
+  limit?: number;
+}): Promise<FetchLogsResponse> {
   // Use mock data if useMockData is true
   if (useMockData) {
     return mockFetchLogsFromApi(cursor);
@@ -88,49 +61,145 @@ export async function fetchLogsFromApi({
   const urlObj = new URL(convexUrl);
   const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
   
-  // Stream function logs
-  const response = await fetch(`${baseUrl}${ROUTES.STREAM_FUNCTION_LOGS}?cursor=${cursor}`, {
+  // Build URL with query parameters - use the correct endpoint
+  const url = new URL(`${baseUrl}/api/app_metrics/stream_function_logs`);
+  // Always set cursor - use 0 for initial fetch or 'now', otherwise use the provided cursor
+  const cursorValue = (cursor === 'now' || cursor === '' || !cursor) ? '0' : String(cursor);
+  url.searchParams.set('cursor', cursorValue);
+  if (functionId) {
+    url.searchParams.set('function', functionId);
+  }
+  if (limit) {
+    url.searchParams.set('limit', String(limit));
+  }
+  
+  // Normalize token format
+  const normalizedToken =
+    accessToken && accessToken.startsWith('Convex ')
+      ? accessToken
+      : `Convex ${accessToken}`;
+  
+  // Fetch logs from /api/app_metrics/stream_function_logs endpoint
+  const response = await fetch(url.toString(), {
+    method: 'GET',
     headers: {
-      "authorization": `Convex ${accessToken}`
+      'Authorization': normalizedToken,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-0.0.0',
     },
     signal,
   });
   
   if (!response.ok) {
-    throw new Error(`Failed to fetch logs: HTTP ${response.status}`);
+    const errorText = await response.text();
+    throw new Error(`Failed to fetch logs: HTTP ${response.status} - ${errorText}`);
   }
   
   const data = await response.json();
   
   // Format logs to our log format
-  const formattedLogs: LogEntry[] = data.entries?.map((entry: any) => ({
-    timestamp: entry.timestamp || Date.now(),
-    topic: entry.topic || 'console',
-    function: {
-      type: entry.udfType,
-      path: entry.identifier,
-      cached: entry.cachedResult,
-      request_id: entry.requestId
-    },
-    log_level: entry.level || 'INFO',
-    message: entry.message || JSON.stringify(entry),
-    execution_time_ms: entry.executionTime ? entry.executionTime * 1000 : undefined,
-    status: entry.success === null 
-      ? undefined 
-      : (typeof entry.success === 'object' && entry.success !== null)
-        ? 'success'  // If success is an object (like {status: "200"}), it's a success
-        : entry.success === true
-          ? 'success'
-          : 'error',
-    error_message: entry.error,
-    raw: entry
-  })) || [];
+  // The API returns entries that may have different field names
+  const formattedLogs: LogEntry[] = (data.entries || []).map((entry: any) => {
+    // Handle different timestamp formats (seconds vs milliseconds)
+    const timestamp = entry.timestamp 
+      ? (entry.timestamp > 1e12 ? entry.timestamp : entry.timestamp * 1000)
+      : Date.now();
+    
+    // Extract function information
+    const udfType = entry.udfType || entry.udf_type || entry.type;
+    const identifier = entry.identifier || entry.udf_path || entry.function;
+    const requestId = entry.requestId || entry.request_id || entry.execution_id;
+    
+    // Handle execution time (may be in seconds or milliseconds)
+    const executionTime = entry.executionTime 
+      ? (entry.executionTime < 1000 ? entry.executionTime * 1000 : entry.executionTime)
+      : (entry.execution_time_ms || entry.executionTimeMs);
+    
+    // Determine success status
+    const success = entry.success;
+    let status: string | undefined;
+    
+    // Check if raw entry has a status field first
+    if (entry.status) {
+      status = entry.status;
+    } else if (success === null || success === undefined) {
+      status = undefined;
+    } else if (typeof success === 'object' && success !== null) {
+      status = 'success'; // Object like {status: "200"} indicates success
+    } else if (success === true) {
+      status = 'success';
+    } else {
+      status = 'error';
+    }
+    
+    return {
+      timestamp,
+      topic: entry.topic || 'console',
+      function: identifier ? {
+        type: udfType,
+        path: identifier,
+        cached: entry.cachedResult || entry.cached || false,
+        request_id: requestId
+      } : undefined,
+      log_level: entry.level || entry.log_level || 'INFO',
+      message: entry.message || entry.logLines?.join('\n') || JSON.stringify(entry),
+      execution_time_ms: executionTime,
+      status,
+      error_message: entry.error || entry.error_message,
+      raw: entry
+    };
+  });
 
   return {
     logs: formattedLogs,
-    newCursor: data.newCursor,
+    newCursor: data.newCursor || data.new_cursor,
     hostname: urlObj.hostname
   };
+}
+
+/**
+ * Fetch logs from another Convex deployment
+ * Similar to fetchLogsFromApi but with explicit parameter naming
+ */
+export async function fetchLogsFromAnotherApp(
+  deploymentUrl: string,
+  deployKey: string,
+  options?: {
+    functionId?: string;
+    cursor?: string;
+    limit?: number;
+  }
+): Promise<{ entries: any[]; newCursor?: string }> {
+  const url = new URL(`${deploymentUrl}/api/app_metrics/stream_function_logs`);
+  
+  if (options?.cursor) {
+    url.searchParams.set('cursor', options.cursor);
+  }
+  if (options?.functionId) {
+    url.searchParams.set('function', options.functionId);
+  }
+  if (options?.limit) {
+    url.searchParams.set('limit', options.limit.toString());
+  }
+
+  const normalizedToken =
+    deployKey && deployKey.startsWith('Convex ')
+      ? deployKey
+      : `Convex ${deployKey}`;
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      'Authorization': normalizedToken,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-0.0.0',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch logs: ${response.status} ${response.statusText}`);
+  }
+
+  return await response.json();
 }
 
 export async function streamUdfExecution(

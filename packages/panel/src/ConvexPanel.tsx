@@ -13,6 +13,7 @@ import { useActiveTab } from './hooks/useActiveTab';
 import { ThemeProvider, Theme, useTheme } from './hooks/useTheme';
 import { SheetProvider } from './contexts/sheet-context';
 import { ConfirmDialogProvider } from './contexts/confirm-dialog-context';
+import { Helmet } from 'react-helmet';
 
 const ThemedToaster: React.FC = () => {
   const { theme } = useTheme();
@@ -158,6 +159,9 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
   // Root container with scoped styles - no CSS imports
   return (
     <ThemeProvider defaultTheme={defaultTheme}>
+      <Helmet>
+        <script src="https://cdn.visitors.now/v.js" data-token="f306f3ae-cc04-42bd-8d48-66531197290d"></script>
+      </Helmet>
       <SheetProvider>
         <ConfirmDialogProvider>
           <ThemedToaster />

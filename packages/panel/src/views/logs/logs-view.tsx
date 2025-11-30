@@ -1,0 +1,1035 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  Search,
+  Pause,
+  Play,
+  X,
+  Copy,
+  HelpCircle,
+} from 'lucide-react';
+import { FixedSizeList } from 'react-window';
+import { useLogs } from '../../hooks/useLogs';
+import { LogEntry } from '../../types';
+import { logsViewStyles, searchInputStyles } from '../../styles/panelStyles';
+import { MultiSelectComponentSelector } from '../../components/function-runner/components/multi-select-component-selector';
+import { MultiSelectFunctionSelector } from '../../components/function-runner/components/multi-select-function-selector';
+import { MultiSelectLogTypeSelector } from '../../components/function-runner/components/multi-select-log-type-selector';
+import { useComponents } from '../../hooks/useComponents';
+import { discoverFunctions, ModuleFunction } from '../../utils/functionDiscovery';
+import { CustomQuery } from '../../components/function-runner/function-runner';
+import { Sheet } from '../../components/shared/sheet';
+
+export interface LogsViewProps {
+  convexUrl?: string;
+  accessToken: string;
+  baseUrl?: string;
+  adminClient?: any;
+  useMockData?: boolean;
+  onError?: (error: string) => void;
+  teamSlug?: string;
+  projectSlug?: string;
+}
+
+const formatTimestamp = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  const month = date.toLocaleString('default', { month: 'short' });
+  const day = date.getDate();
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const seconds = date.getSeconds();
+  const ms = date.getMilliseconds();
+  return `${month} ${day}, ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
+};
+
+const formatRelativeTime = (timestamp: number): string => {
+  const now = Date.now();
+  const diff = now - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  if (days > 0) return `${days} ${days === 1 ? 'day' : 'days'} ago`;
+  if (hours > 0) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+  if (minutes > 0) return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+  return 'Just now';
+};
+
+const formatDateTime = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  return date.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+};
+
+const formatBytes = (bytes?: number): string => {
+  if (!bytes || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`;
+};
+
+const getLogTypeIcon = (log: LogEntry): string => {
+  if (log.function?.type === 'query') return 'Q';
+  if (log.function?.type === 'mutation') return 'M';
+  if (log.function?.type === 'action') return 'A';
+  if (log.topic === 'http') return 'H';
+  return 'L';
+};
+
+export const LogsView: React.FC<LogsViewProps> = ({
+  convexUrl,
+  accessToken,
+  baseUrl,
+  adminClient,
+  useMockData = false,
+  onError,
+  teamSlug,
+  projectSlug,
+}) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFunctions, setSelectedFunctions] = useState<(ModuleFunction | CustomQuery)[]>([]);
+  const [selectedLogTypes, setSelectedLogTypes] = useState<string[]>(['success', 'failure', 'debug', 'log / info', 'warn', 'error']);
+  const [hoveredLogIndex, setHoveredLogIndex] = useState<number | null>(null);
+  const [functions, setFunctions] = useState<ModuleFunction[]>([]);
+  const [isLoadingFunctions, setIsLoadingFunctions] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const logsContainerRef = React.useRef<HTMLDivElement>(null);
+  const logsListRef = React.useRef<HTMLDivElement>(null);
+  const [listHeight, setListHeight] = useState(600);
+
+  const {
+    componentNames,
+    selectedComponentId,
+    selectedComponent,
+    setSelectedComponent,
+    componentNameToId,
+  } = useComponents({
+    adminClient,
+    useMockData,
+  });
+
+  // Initialize with all components selected
+  const [selectedComponents, setSelectedComponents] = useState<string[]>([]);
+
+  // Update selected components when componentNames change (e.g., on initial load)
+  // Initialize with all components selected by default
+  useEffect(() => {
+    if (componentNames.length > 0) {
+      // Only set if we don't have any selected, or if the component list changed significantly
+      const hasAllComponents = componentNames.every(name => selectedComponents.includes(name));
+      if (selectedComponents.length === 0 || !hasAllComponents) {
+        setSelectedComponents([...componentNames]);
+      }
+    }
+  }, [componentNames]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Determine functionId to pass to useLogs (only if single function selected)
+  const functionIdForApi = useMemo(() => {
+    if (selectedFunctions.length !== 1) return undefined;
+    const selectedFunction = selectedFunctions[0];
+    if ('type' in selectedFunction && selectedFunction.type === 'customQuery') {
+      return undefined;
+    }
+    return (selectedFunction as ModuleFunction).identifier;
+  }, [selectedFunctions]);
+
+  const {
+    logs,
+    isLoading,
+    error,
+    isPaused,
+    setIsPaused,
+    clearLogs,
+    refreshLogs,
+  } = useLogs({
+    convexUrl: convexUrl || baseUrl,
+    accessToken,
+    useMockData,
+    onError,
+    functionId: functionIdForApi,
+  });
+
+  // Fetch functions
+  useEffect(() => {
+    if (!adminClient || useMockData) return;
+
+    setIsLoadingFunctions(true);
+    discoverFunctions(adminClient, useMockData)
+      .then((funcs) => {
+        setFunctions(funcs);
+      })
+      .catch((error) => {
+        console.error('Error fetching functions:', error);
+        setFunctions([]);
+      })
+      .finally(() => {
+        setIsLoadingFunctions(false);
+      });
+  }, [adminClient, useMockData]);
+
+  // Auto-select all functions when functions are loaded or component changes
+  useEffect(() => {
+    // Only auto-select if no functions are currently selected
+    if (functions.length > 0 && selectedFunctions.length === 0) {
+      // Use the same filtering logic as MultiSelectFunctionSelector
+      // If selectedComponent is null, it means all components are selected, so show 'app' functions
+      const normalizedComponentId = selectedComponent === 'app' ? null : selectedComponent;
+      
+      const filteredFuncs = functions.filter((fn: ModuleFunction) => {
+        if (!normalizedComponentId) {
+          // Show functions from 'app' (componentId === null or undefined)
+          return fn.componentId === null || fn.componentId === undefined;
+        } else {
+          // Show functions matching the selected component
+          return (
+            (!!fn.identifier && fn.identifier.startsWith(`${normalizedComponentId}:`)) ||
+            fn.componentId === normalizedComponentId
+          );
+        }
+      });
+      
+      // Select all filtered functions
+      if (filteredFuncs.length > 0) {
+        setSelectedFunctions(filteredFuncs);
+      }
+    }
+  }, [functions, selectedComponent]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Filter logs
+  const filteredLogs = useMemo(() => {
+    return logs.filter((log) => {
+      // Filter by search query
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch =
+          log.message?.toLowerCase().includes(query) ||
+          log.function?.path?.toLowerCase().includes(query) ||
+          log.function?.request_id?.toLowerCase().includes(query) ||
+          log.error_message?.toLowerCase().includes(query);
+        if (!matchesSearch) return false;
+      }
+
+      // Filter by component (if component selector is used)
+      // If no components selected, show all (shouldn't happen, but handle it)
+      if (selectedComponents.length === 0) {
+        return false; // No components selected means show nothing
+      }
+
+      // If all components are selected, show all logs
+      if (selectedComponents.length === componentNames.length) {
+        // Show all logs
+      } else if (log.function?.path) {
+        // Check if log belongs to any selected component
+        const pathParts = log.function.path.split(':');
+        const componentMatch = pathParts.length > 1 ? pathParts[0] : null;
+        
+        let matchesAnySelected = false;
+        
+        for (const selectedComp of selectedComponents) {
+          if (selectedComp === 'app') {
+            // If 'app' is selected, match logs without component prefix
+            if (!componentMatch) {
+              matchesAnySelected = true;
+              break;
+            }
+          } else {
+            // Check component name match
+            if (componentMatch === selectedComp) {
+              matchesAnySelected = true;
+              break;
+            }
+            
+            // Check component ID match
+            const componentId = componentNameToId.get(selectedComp);
+            if (componentId && componentMatch === componentId) {
+              matchesAnySelected = true;
+              break;
+            }
+            
+            // Check log's componentId field from raw data
+            const logComponentId = (log.raw as any)?.component_id;
+            if (logComponentId && (logComponentId === selectedComp || logComponentId === componentId)) {
+              matchesAnySelected = true;
+              break;
+            }
+          }
+        }
+        
+        if (!matchesAnySelected) {
+          return false;
+        }
+      } else {
+        // Log has no function path - only show if 'app' is selected
+        if (!selectedComponents.includes('app')) {
+          return false;
+        }
+      }
+
+      // Filter by function(s)
+      if (selectedFunctions.length > 0) {
+        // Get all available functions for the selected component(s) to check if "all" are selected
+        const normalizedComponentId = selectedComponent === 'app' ? null : selectedComponent;
+        const availableFunctionsForComponent = functions.filter((fn: ModuleFunction) => {
+          if (!normalizedComponentId) {
+            return fn.componentId === null || fn.componentId === undefined;
+          } else {
+            return (
+              (!!fn.identifier && fn.identifier.startsWith(`${normalizedComponentId}:`)) ||
+              fn.componentId === normalizedComponentId
+            );
+          }
+        });
+        
+        // If all available functions are selected, show all logs for this component
+        const allFunctionsSelected = availableFunctionsForComponent.length > 0 && 
+          availableFunctionsForComponent.every(availableFn => 
+            selectedFunctions.some(selectedFn => {
+              if ('type' in selectedFn) return false;
+              return (selectedFn as ModuleFunction).identifier === availableFn.identifier;
+            })
+          );
+        
+        if (!allFunctionsSelected) {
+          // Check if log matches any selected function
+          let matchesAnyFunction = false;
+          
+          for (const selectedFunction of selectedFunctions) {
+            if ('type' in selectedFunction && selectedFunction.type === 'customQuery') {
+              // Don't filter by custom query - show all
+              matchesAnyFunction = true;
+              break;
+            }
+            const functionIdentifier = (selectedFunction as ModuleFunction).identifier;
+            if (functionIdentifier && log.function?.path) {
+              // Try exact match first
+              if (log.function.path === functionIdentifier) {
+                matchesAnyFunction = true;
+                break;
+              }
+              // Try matching without .js extension
+              const identifierWithoutJs = functionIdentifier.replace(/\.js:/g, ':').replace(/\.js$/g, '');
+              const logPathWithoutJs = log.function.path.replace(/\.js:/g, ':').replace(/\.js$/g, '');
+              if (logPathWithoutJs === identifierWithoutJs) {
+                matchesAnyFunction = true;
+                break;
+              }
+            }
+          }
+          
+          if (!matchesAnyFunction) {
+            return false;
+          }
+        }
+      }
+
+      // Filter by log type(s)
+      if (selectedLogTypes.length > 0 && selectedLogTypes.length < 6) {
+        // Not all log types selected, need to filter
+        let matchesAnyLogType = false;
+        
+        // Determine log type from log entry
+        const status = log.status || (log.function?.cached ? 'cached' : undefined);
+        const logLevel = log.log_level?.toLowerCase();
+        const hasError = log.error_message || status === 'error' || status === 'failure';
+        
+        for (const logType of selectedLogTypes) {
+          if (logType === 'success' && status === 'success') {
+            matchesAnyLogType = true;
+            break;
+          }
+          if (logType === 'failure') {
+            // Match failures: status is error/failure, or has error_message
+            if (status === 'error' || status === 'failure' || hasError) {
+              matchesAnyLogType = true;
+              break;
+            }
+          }
+          if (logType === 'debug' && logLevel === 'debug') {
+            matchesAnyLogType = true;
+            break;
+          }
+          if (logType === 'log / info') {
+            // Match info/log level or logs without explicit level (default to info)
+            if (logLevel === 'info' || logLevel === 'log' || (!logLevel && !hasError && status !== 'success' && status !== 'error' && status !== 'failure')) {
+              matchesAnyLogType = true;
+              break;
+            }
+          }
+          if (logType === 'warn' && (logLevel === 'warn' || logLevel === 'warning')) {
+            matchesAnyLogType = true;
+            break;
+          }
+          if (logType === 'error') {
+            // Match error log level or error status
+            if (logLevel === 'error' || status === 'error' || hasError) {
+              matchesAnyLogType = true;
+              break;
+            }
+          }
+        }
+        
+        if (!matchesAnyLogType) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [logs, searchQuery, selectedComponents, componentNames, componentNameToId, selectedFunctions, selectedLogTypes]);
+
+  const handleError = (error: Error | string | null) => {
+    if (error && onError) {
+      onError(error instanceof Error ? error.message : error);
+    }
+  };
+
+  React.useEffect(() => {
+    if (error) {
+      handleError(error);
+    }
+  }, [error, onError]);
+
+  // Calculate list height based on container
+  React.useEffect(() => {
+    const updateHeight = () => {
+      // Calculate available height: container height minus header and search
+      if (logsContainerRef.current) {
+        const containerRect = logsContainerRef.current.getBoundingClientRect();
+        // Approximate header + search + table header heights
+        const headerHeight = 40; // logsViewStyles.header height
+        const searchHeight = 60; // approximate search container height
+        const tableHeaderHeight = 40; // approximate table header height
+        const availableHeight = containerRect.height - headerHeight - searchHeight - tableHeaderHeight;
+        if (availableHeight > 0) {
+          setListHeight(availableHeight);
+        }
+      }
+    };
+
+    // Use a small delay to ensure the DOM is ready
+    const timeoutId = setTimeout(updateHeight, 0);
+    const resizeObserver = new ResizeObserver(updateHeight);
+    
+    // Observe the parent container
+    if (logsContainerRef.current) {
+      resizeObserver.observe(logsContainerRef.current);
+    }
+
+    // Also update when window resizes
+    window.addEventListener('resize', updateHeight);
+
+    return () => {
+      clearTimeout(timeoutId);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateHeight);
+    };
+  }, []);
+
+  // Memoized log row renderer
+  const LogRow = React.memo(({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
+    const log = data.logs[index];
+    const functions = data.functions;
+    const hoveredLogIndex = data.hoveredLogIndex;
+    const selectedLog = data.selectedLog;
+    const setHoveredLogIndex = data.setHoveredLogIndex;
+    const setSelectedLog = data.setSelectedLog;
+    const setIsSheetOpen = data.setIsSheetOpen;
+
+    const requestId = log.function?.request_id || '';
+    const shortId = requestId ? requestId.slice(0, 4) : '-';
+    const status = log.status || (log.function?.cached ? 'cached' : undefined);
+    const executionTime = log.execution_time_ms
+      ? `${Math.round(log.execution_time_ms)}ms`
+      : undefined;
+
+    // Determine status display - show status code for success, status text for others
+    const statusDisplay = status === 'success' 
+      ? (log.raw?.statusCode || '200')
+      : status === 'error' || status === 'failure'
+      ? 'failure'
+      : status || '';
+
+    // Parse function path to get identifier and name
+    const functionPath = log.function?.path || log.topic || '';
+    const pathParts = functionPath.split(':');
+    const functionIdentifier = pathParts.length > 1 ? pathParts[0] : '';
+    const functionName = pathParts.length > 1 ? pathParts[1] : functionPath;
+    
+    let displayFunctionName = functionName;
+    let matchingFunction: ModuleFunction | undefined;
+    if (functionPath && functions.length > 0) {
+      matchingFunction = functions.find((fn: ModuleFunction) => {
+        const fnIdentifier = fn.identifier.replace(/\.js:/g, ':').replace(/\.js$/g, '');
+        const logPath = functionPath.replace(/\.js:/g, ':').replace(/\.js$/g, '');
+        return fnIdentifier === logPath || fnIdentifier.endsWith(`:${functionName}`);
+      });
+      if (matchingFunction && matchingFunction.name) {
+        displayFunctionName = matchingFunction.name;
+      }
+    }
+    
+    // Determine function type - check multiple sources and normalize
+    const rawType = matchingFunction?.udfType 
+      || log.function?.type 
+      || log.raw?.udfType 
+      || log.raw?.udf_type 
+      || log.raw?.type;
+    
+    // Normalize the type (lowercase and trim)
+    const normalizedType = rawType ? String(rawType).toLowerCase().trim() : undefined;
+    
+    // Map to standard types (handle variations like 'httpAction' -> 'action')
+    const functionType = normalizedType === 'query' || normalizedType === 'mutation' || normalizedType === 'action'
+      ? normalizedType
+      : normalizedType === 'httpaction' || normalizedType === 'http_action'
+      ? 'action'
+      : undefined;
+
+    // Determine log type color for badge
+    let logTypeBadgeStyle: React.CSSProperties = {
+      backgroundColor: '#374151',
+      color: '#9ca3af',
+    };
+    if (functionType === 'query') {
+      logTypeBadgeStyle = { backgroundColor: '#1e3a5f', color: '#60a5fa' };
+    } else if (functionType === 'mutation') {
+      logTypeBadgeStyle = { backgroundColor: '#2d1b4e', color: '#a78bfa' };
+    } else if (functionType === 'action') {
+      logTypeBadgeStyle = { backgroundColor: '#4a2c1a', color: '#fb923c' };
+    } else if (log.topic === 'http') {
+      logTypeBadgeStyle = { backgroundColor: '#3d2f0f', color: '#fbbf24' };
+    }
+    
+    // Get the icon based on function type
+    const logTypeIcon = functionType === 'query' ? 'Q' 
+      : functionType === 'mutation' ? 'M'
+      : functionType === 'action' ? 'A'
+      : log.topic === 'http' ? 'H'
+      : 'L';
+
+    const isHovered = hoveredLogIndex === index;
+    const isError = status === 'error' || status === 'failure' || !!log.error_message;
+    const isSelected = selectedLog && 
+      selectedLog.timestamp === log.timestamp && 
+      selectedLog.function?.request_id === log.function?.request_id;
+
+    return (
+      <div
+        style={{
+          ...style,
+          ...logsViewStyles.logRow,
+          ...(isSelected ? {
+            backgroundColor: 'rgba(52, 211, 153, 0.15)',
+            borderLeft: '3px solid var(--color-panel-accent)',
+          } : isHovered && isError && !isSelected ? {
+            backgroundColor: 'rgba(239, 68, 68, 0.25)',
+            color: '#f87171',
+          } : isHovered && !isError && !isSelected ? {
+            backgroundColor: 'rgba(28, 31, 38, 0.7)',
+          } : {}),
+          ...(isError && !isSelected && !isHovered ? {
+            backgroundColor: 'rgba(239, 68, 68, 0.15)',
+            color: '#f87171',
+          } : {}),
+          cursor: 'pointer',
+        }}
+        onMouseEnter={() => setHoveredLogIndex(index)}
+        onMouseLeave={() => setHoveredLogIndex(null)}
+        onClick={() => {
+          setSelectedLog(log);
+          setIsSheetOpen(true);
+        }}
+      >
+        <div style={{ 
+          ...logsViewStyles.timestampCell, 
+          ...(isError ? { color: '#f87171' } : { color: '#9ca3af' }) 
+        }}>
+          {formatTimestamp(log.timestamp)}
+        </div>
+        <div style={{ 
+          ...logsViewStyles.idCell, 
+          ...(isError ? { color: '#f87171' } : {}) 
+        }}>
+          {shortId !== '-' && (
+            <span style={{
+              ...logsViewStyles.idBadge,
+              ...(isError ? {
+                border: '1px solid rgba(248, 113, 113, 0.5)',
+                backgroundColor: 'rgba(248, 113, 113, 0.1)',
+                color: '#f87171',
+              } : {}),
+            }}>
+              {shortId}
+            </span>
+          )}
+        </div>
+        <div style={logsViewStyles.statusCell}>
+          {statusDisplay && (
+            <span style={isError ? { color: '#f87171' } : status === 'success' ? { color: '#34d399' } : { color: '#d1d5db' }}>
+              {statusDisplay}
+            </span>
+          )}
+          {executionTime && (
+            <span style={{ 
+              ...logsViewStyles.executionTime, 
+              ...(isError ? { color: '#f87171' } : { color: '#6b7280' }),
+              marginLeft: '8px',
+            }}>
+              {executionTime}
+            </span>
+          )}
+        </div>
+        <div style={{ 
+          ...logsViewStyles.functionCell, 
+          ...(isError ? { color: '#f87171' } : {}) 
+        }}>
+          <span style={{
+            ...logsViewStyles.logTypeIcon,
+            ...logTypeBadgeStyle,
+            ...(isError ? { 
+              backgroundColor: 'rgba(248, 113, 113, 0.2)',
+              color: '#f87171',
+            } : {}),
+            borderRadius: '4px',
+            padding: '2px 6px',
+            fontSize: '11px',
+            fontWeight: 500,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: '20px',
+          }}>
+            {logTypeIcon}
+          </span>
+          {functionIdentifier && (
+            <span style={{ 
+              ...logsViewStyles.functionPath, 
+              color: isError ? '#f87171' : 'var(--color-panel-text-muted)', 
+              marginRight: '4px',
+              fontFamily: 'monospace',
+            }}>
+              {functionIdentifier}:
+            </span>
+          )}
+          <span style={{ 
+            ...logsViewStyles.functionPath, 
+            ...(isError ? { color: '#f87171' } : { color: '#d1d5db' }),
+            fontFamily: 'monospace',
+          }}>
+            {displayFunctionName}
+          </span>
+          {isError && log.error_message && (
+            <span style={{
+              marginLeft: '8px',
+              color: '#f87171',
+              fontSize: '11px',
+              opacity: 0.9,
+              fontFamily: 'monospace',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              flex: 1,
+              minWidth: 0,
+            }}>
+              • {log.error_message}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }, (prevProps, nextProps) => {
+    // Custom comparison function for better performance
+    const prevLog = prevProps.data.logs[prevProps.index];
+    const nextLog = nextProps.data.logs[nextProps.index];
+    const prevHovered = prevProps.data.hoveredLogIndex === prevProps.index;
+    const nextHovered = nextProps.data.hoveredLogIndex === nextProps.index;
+    const prevSelected = prevProps.data.selectedLog && 
+      prevProps.data.selectedLog.timestamp === prevLog.timestamp && 
+      prevProps.data.selectedLog.function?.request_id === prevLog.function?.request_id;
+    const nextSelected = nextProps.data.selectedLog && 
+      nextProps.data.selectedLog.timestamp === nextLog.timestamp && 
+      nextProps.data.selectedLog.function?.request_id === nextLog.function?.request_id;
+    
+    return (
+      prevProps.index === nextProps.index &&
+      prevLog.timestamp === nextLog.timestamp &&
+      prevLog.function?.request_id === nextLog.function?.request_id &&
+      prevLog.error_message === nextLog.error_message &&
+      prevHovered === nextHovered &&
+      prevSelected === nextSelected &&
+      prevProps.style === nextProps.style
+    );
+  });
+
+  LogRow.displayName = 'LogRow';
+
+  return (
+    <div ref={logsContainerRef} style={{ ...logsViewStyles.container, position: 'relative', overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={logsViewStyles.header}>
+        <h2 style={logsViewStyles.headerTitle}>Logs</h2>
+        <div style={{ ...logsViewStyles.headerButtons, position: 'relative', zIndex: 1, gap: '8px', marginRight: '-8px' }}>
+          <MultiSelectComponentSelector
+            selectedComponents={selectedComponents}
+            onSelect={(components) => {
+              setSelectedComponents(components);
+              setSelectedFunctions([]); // Reset functions when component changes
+              // Also update the single component selector for compatibility
+              if (components.length === 1) {
+                setSelectedComponent(components[0]);
+              } else if (components.length === 0) {
+                setSelectedComponent(null);
+              } else {
+                // Multiple selected - keep the first one for function selector
+                setSelectedComponent(components[0]);
+              }
+            }}
+            components={componentNames}
+          />
+          <MultiSelectFunctionSelector
+            selectedFunctions={selectedFunctions}
+            onSelect={(fns) => setSelectedFunctions(fns)}
+            functions={functions}
+            componentId={selectedComponent}
+          />
+          <MultiSelectLogTypeSelector
+            selectedLogTypes={selectedLogTypes}
+            onSelect={setSelectedLogTypes}
+          />
+        </div>
+      </div>
+
+      {/* Search */}
+      <div style={logsViewStyles.searchContainer}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+          <div style={{ ...searchInputStyles.container, flex: 1 }}>
+            <Search style={searchInputStyles.icon} />
+            <input
+              type="text"
+              placeholder="Filter logs..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={searchInputStyles.input}
+              onFocus={(e) => {
+                Object.assign(e.currentTarget.style, searchInputStyles.inputFocus);
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'var(--color-panel-border)';
+                e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
+              }}
+            />
+          </div>
+          <button
+            onClick={clearLogs}
+            style={logsViewStyles.headerButton}
+            onMouseEnter={(e) => {
+              Object.assign(e.currentTarget.style, logsViewStyles.headerButtonHover);
+            }}
+            onMouseLeave={(e) => {
+              Object.assign(e.currentTarget.style, logsViewStyles.headerButton);
+            }}
+          >
+            Clear Logs
+          </button>
+        </div>
+      </div>
+
+      {/* Logs Table */}
+      <div style={{ ...logsViewStyles.logsTable, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {/* Header */}
+        <div style={{ ...logsViewStyles.tableHeader, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginRight: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+            <div style={{ ...logsViewStyles.tableHeaderCell, width: '160px' }}>Timestamp</div>
+            <div style={{ ...logsViewStyles.tableHeaderCell, width: '80px' }}>ID</div>
+            <div style={{ ...logsViewStyles.tableHeaderCell, width: '128px' }}>Status</div>
+            <div style={{ ...logsViewStyles.tableHeaderCell, flex: 1 }}>Function</div>
+          </div>
+          <button
+            onClick={() => setIsPaused(!isPaused)}
+            style={{
+              ...logsViewStyles.pauseButton,
+              ...(isPaused ? logsViewStyles.pauseButtonPaused : {}),
+            }}
+            onMouseEnter={(e) => {
+              const baseStyle = isPaused ? logsViewStyles.pauseButtonPaused : logsViewStyles.pauseButton;
+              const hoverStyle = isPaused ? logsViewStyles.pauseButtonPausedHover : logsViewStyles.pauseButtonHover;
+              Object.assign(e.currentTarget.style, {
+                ...baseStyle,
+                ...hoverStyle,
+              });
+            }}
+            onMouseLeave={(e) => {
+              const baseStyle = isPaused ? logsViewStyles.pauseButtonPaused : logsViewStyles.pauseButton;
+              Object.assign(e.currentTarget.style, {
+                ...baseStyle,
+              });
+            }}
+          >
+            {isPaused ? (
+              <>
+                <Play style={{ width: '12px', height: '12px' }} /> Resume
+              </>
+            ) : (
+              <>
+                <Pause style={{ width: '12px', height: '12px' }} /> Pause
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Logs */}
+        {isLoading && logs.length === 0 ? (
+          <div style={logsViewStyles.loadingContainer}>
+            <div style={logsViewStyles.loadingText}>Loading logs...</div>
+          </div>
+        ) : error && logs.length === 0 ? (
+          <div style={logsViewStyles.errorContainer}>
+            <div style={logsViewStyles.errorText}>
+              Error loading logs: {error instanceof Error ? error.message : String(error)}
+            </div>
+          </div>
+        ) : filteredLogs.length === 0 ? (
+          <div style={logsViewStyles.emptyContainer}>
+            <div style={logsViewStyles.emptyText}>
+              {searchQuery || (selectedComponents.length < componentNames.length) || selectedFunctions.length > 0 || selectedLogTypes.length < 6
+                ? 'No logs match your filters'
+                : 'No logs yet'}
+            </div>
+          </div>
+        ) : (
+          <div ref={logsListRef} style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
+            {listHeight > 0 && (
+              <FixedSizeList
+                height={listHeight}
+                itemCount={filteredLogs.length}
+                itemSize={36}
+                width="100%"
+                itemData={{
+                  logs: filteredLogs,
+                  functions,
+                  hoveredLogIndex,
+                  selectedLog,
+                  setHoveredLogIndex,
+                  setSelectedLog,
+                  setIsSheetOpen,
+                }}
+              >
+                {LogRow}
+              </FixedSizeList>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Log Detail Sheet */}
+      <Sheet
+        isOpen={isSheetOpen}
+        onClose={() => {
+          setIsSheetOpen(false);
+          setSelectedLog(null);
+        }}
+        width="480px"
+        container={logsContainerRef.current}
+      >
+        {selectedLog && <LogDetailContent log={selectedLog} />}
+      </Sheet>
+    </div>
+  );
+};
+
+type DetailTab = 'execution' | 'request' | 'functions';
+
+const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
+  const [activeTab, setActiveTab] = useState<DetailTab>('execution');
+  const status = log.status || (log.function?.cached ? 'cached' : undefined);
+  const isError = status === 'error' || status === 'failure' || !!log.error_message;
+  const executionId = log.function?.request_id || log.raw?.execution_id || 'N/A';
+  const functionPath = log.function?.path || log.topic || 'Unknown';
+  const functionType = log.function?.type || 'Unknown';
+  const startedAt = log.timestamp;
+  const completedAt = log.timestamp + (log.execution_time_ms || 0);
+  const duration = log.execution_time_ms || 0;
+  const usage = log.usage || log.raw?.usage_stats;
+  const environment = log.raw?.environment || 'Convex';
+  const returnBytes = log.raw?.return_bytes;
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Header with timestamp and status */}
+      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-panel-border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-panel-text)' }}>
+              {formatTimestamp(log.timestamp)} ({formatRelativeTime(log.timestamp)})
+            </div>
+            <div style={{ fontSize: '12px', color: isError ? '#f87171' : '#34d399', marginTop: '4px' }}>
+              {status || 'unknown'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Error Message Section */}
+      {isError && log.error_message && (
+        <div style={{
+          margin: '16px 20px',
+          padding: '12px',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          borderRadius: '4px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#f87171' }}>Error</div>
+            <button
+              onClick={() => copyToClipboard(log.error_message || '')}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                color: '#f87171',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <Copy size={14} />
+            </button>
+          </div>
+          <div style={{ fontSize: '12px', color: '#f87171', fontFamily: 'monospace' }}>
+            {log.error_message}
+          </div>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--color-panel-border)' }}>
+        {(['execution', 'request', 'functions'] as DetailTab[]).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            style={{
+              padding: '10px 16px',
+              fontSize: '12px',
+              fontWeight: 500,
+              border: 'none',
+              borderBottom: activeTab === tab ? '2px solid var(--color-panel-accent)' : '2px solid transparent',
+              backgroundColor: 'transparent',
+              color: activeTab === tab ? 'var(--color-panel-text)' : 'var(--color-panel-text-muted)',
+              cursor: 'pointer',
+              textTransform: 'capitalize',
+            }}
+          >
+            {tab === 'functions' ? 'Functions Called' : tab}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+        {activeTab === 'execution' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <DetailRow label="Execution ID" value={executionId} />
+            <DetailRow label="Function" value={functionPath} />
+            <DetailRow label="Type" value={functionType} />
+            <DetailRow label="Started at" value={formatDateTime(startedAt)} />
+            <DetailRow label="Completed at" value={formatDateTime(completedAt)} />
+            <DetailRow label="Duration" value={`${duration}ms`} />
+            <DetailRow label="Environment" value={environment} withHelp />
+            
+            {/* Resources Used */}
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-panel-text)', marginBottom: '12px' }}>
+                Resources Used
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '12px' }}>
+                {usage && (
+                  <>
+                    <DetailRow label="Compute" value="0.0000000 GB-hr (0 MB for 0.00s)" withHelp small />
+                    <DetailRow 
+                      label="DB Bandwidth" 
+                      value={`Accessed 0 documents, ${formatBytes(usage.database_read_bytes || 0)} read, ${formatBytes(usage.database_write_bytes || 0)} written`}
+                      small
+                    />
+                    <DetailRow 
+                      label="File Bandwidth" 
+                      value={`${formatBytes(usage.file_storage_read_bytes || 0)} read, ${formatBytes(usage.file_storage_write_bytes || 0)} written`}
+                      small
+                    />
+                    <DetailRow 
+                      label="Vector Bandwidth" 
+                      value={`${formatBytes(usage.vector_storage_read_bytes || 0)} read, ${formatBytes(usage.vector_storage_write_bytes || 0)} written`}
+                      small
+                    />
+                    {returnBytes !== undefined && (
+                      <DetailRow label="Return Size" value={`${formatBytes(returnBytes)} returned`} withHelp small />
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'request' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <DetailRow label="Request ID" value={log.function?.request_id || 'N/A'} />
+            <DetailRow label="Function Path" value={functionPath} />
+            <DetailRow label="Type" value={functionType} />
+            {log.message && <DetailRow label="Message" value={log.message} />}
+          </div>
+        )}
+
+        {activeTab === 'functions' && (
+          <div style={{ color: 'var(--color-panel-text-muted)', fontSize: '12px' }}>
+            No functions called
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const DetailRow: React.FC<{ 
+  label: string; 
+  value: string; 
+  withHelp?: boolean;
+  small?: boolean;
+}> = ({ label, value, withHelp, small }) => (
+  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+    <div style={{ 
+      fontSize: small ? '11px' : '12px', 
+      color: 'var(--color-panel-text-muted)', 
+      minWidth: '120px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px',
+    }}>
+      {label}
+      {withHelp && <HelpCircle size={12} style={{ opacity: 0.6 }} />}
+    </div>
+    <div style={{ 
+      fontSize: small ? '11px' : '12px', 
+      color: 'var(--color-panel-text)', 
+      fontFamily: 'monospace',
+      flex: 1,
+      wordBreak: 'break-word',
+    }}>
+      {value}
+    </div>
+  </div>
+);
