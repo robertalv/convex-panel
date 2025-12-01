@@ -22,10 +22,112 @@ import { useComponents } from '../../hooks/useComponents';
 import { useCronJobs } from '../../hooks/useCronJobs';
 import { useFunctions } from '../../hooks/useFunctions';
 import { usePaginatedScheduledJobs } from '../../hooks/usePaginatedScheduledJobs';
-import { logsViewStyles } from '../../styles/panelStyles';
 import { getDeploymentUrl } from '../../utils/adminClient';
 import { formatCronSchedule, formatRelativeTime } from '../../utils/cronFormatters';
 import { ModuleFunction } from '../../utils/functionDiscovery';
+
+const logsViewStyles = {
+  container: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    height: '100%',
+    backgroundColor: 'var(--color-panel-bg)',
+    color: 'var(--color-panel-text)',
+    fontSize: '13px',
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '0 16px',
+    height: '48px',
+    borderBottom: '1px solid var(--color-panel-border)',
+    flexShrink: 0,
+  },
+  headerTitle: {
+    fontSize: '16px',
+    fontWeight: 600,
+    margin: 0,
+  },
+  searchContainer: {
+    padding: '8px 16px',
+    borderBottom: '1px solid var(--color-panel-border)',
+    display: 'flex',
+    gap: '8px',
+    alignItems: 'center',
+  },
+  tableHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: '0 16px',
+    height: '32px',
+    borderBottom: '1px solid var(--color-panel-border)',
+    backgroundColor: 'var(--color-panel-bg-secondary)',
+    color: 'var(--color-panel-text-secondary)',
+    fontSize: '12px',
+    fontWeight: 500,
+    textTransform: 'uppercase' as const,
+  },
+  tableHeaderCell: {
+    textAlign: 'left' as const,
+    paddingRight: '8px',
+    whiteSpace: 'nowrap' as const,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  logRow: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: '0 16px',
+    borderBottom: '1px solid var(--color-panel-border)',
+    fontSize: '13px',
+    lineHeight: '24px',
+  },
+  logRowHover: {
+    backgroundColor: 'var(--color-panel-hover)',
+  },
+  idCell: {
+    fontFamily: 'monospace',
+    color: 'var(--color-panel-text-secondary)',
+    flexShrink: 0,
+  },
+  idBadge: {
+    display: 'inline-block',
+    padding: '0 4px',
+    borderRadius: '4px',
+    backgroundColor: 'var(--color-panel-bg-tertiary)',
+    border: '1px solid var(--color-panel-border)',
+    fontSize: '11px',
+    lineHeight: '16px',
+  },
+  timestampCell: {
+    color: 'var(--color-panel-text-secondary)',
+    whiteSpace: 'nowrap' as const,
+    flexShrink: 0,
+  },
+  statusCell: {
+    flexShrink: 0,
+    fontWeight: 500,
+  },
+  functionCell: {
+    whiteSpace: 'nowrap' as const,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  functionPath: {
+    fontFamily: 'monospace',
+  },
+  emptyContainer: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    color: 'var(--color-panel-text-secondary)',
+  },
+};
 
 export interface SchedulesViewProps {
   adminClient?: any;

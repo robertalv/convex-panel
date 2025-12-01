@@ -6,11 +6,15 @@ import {
   X,
   Copy,
   HelpCircle,
+  ChevronUp,
+  ChevronDown,
+  Clock,
+  CheckCircle2,
+  ArrowUp,
 } from 'lucide-react';
 import { FixedSizeList } from 'react-window';
 import { useLogs } from '../../hooks/useLogs';
 import { LogEntry } from '../../types';
-import { logsViewStyles, searchInputStyles } from '../../styles/panelStyles';
 import { MultiSelectComponentSelector } from '../../components/function-runner/components/multi-select-component-selector';
 import { MultiSelectFunctionSelector } from '../../components/function-runner/components/multi-select-function-selector';
 import { MultiSelectLogTypeSelector } from '../../components/function-runner/components/multi-select-log-type-selector';
@@ -18,6 +22,8 @@ import { useComponents } from '../../hooks/useComponents';
 import { discoverFunctions, ModuleFunction } from '../../utils/functionDiscovery';
 import { CustomQuery } from '../../components/function-runner/function-runner';
 import { Sheet } from '../../components/shared/sheet';
+import { TooltipAction } from '../../components/shared/tooltip-action';
+import { copyToClipboard } from '../../utils/toast';
 
 export interface LogsViewProps {
   convexUrl?: string;
@@ -498,8 +504,8 @@ export const LogsView: React.FC<LogsViewProps> = ({
 
     // Determine log type color for badge
     let logTypeBadgeStyle: React.CSSProperties = {
-      backgroundColor: '#374151',
-      color: '#9ca3af',
+      backgroundColor: 'var(--color-panel-bg-tertiary)',
+      color: 'var(--color-panel-text-secondary)',
     };
     if (functionType === 'query') {
       logTypeBadgeStyle = { backgroundColor: '#1e3a5f', color: '#60a5fa' };
@@ -526,22 +532,33 @@ export const LogsView: React.FC<LogsViewProps> = ({
 
     return (
       <div
+        className="cp-logs-row"
         style={{
           ...style,
-          ...logsViewStyles.logRow,
-          ...(isSelected ? {
-            backgroundColor: 'rgba(52, 211, 153, 0.15)',
-            borderLeft: '3px solid var(--color-panel-accent)',
-          } : isHovered && isError && !isSelected ? {
-            backgroundColor: 'rgba(239, 68, 68, 0.25)',
-            color: '#f87171',
-          } : isHovered && !isError && !isSelected ? {
-            backgroundColor: 'rgba(28, 31, 38, 0.7)',
-          } : {}),
-          ...(isError && !isSelected && !isHovered ? {
-            backgroundColor: 'rgba(239, 68, 68, 0.15)',
-            color: '#f87171',
-          } : {}),
+          ...(isSelected
+            ? {
+                backgroundColor:
+                  'color-mix(in srgb, var(--color-panel-accent) 15%, transparent)',
+                borderLeft: '3px solid var(--color-panel-accent)',
+              }
+            : isHovered && isError && !isSelected
+            ? {
+                backgroundColor:
+                  'color-mix(in srgb, var(--color-panel-error) 25%, transparent)',
+                color: 'var(--color-panel-error)',
+              }
+            : isHovered && !isError && !isSelected
+            ? {
+                backgroundColor: 'var(--color-panel-hover)',
+              }
+            : {}),
+          ...(isError && !isSelected && !isHovered
+            ? {
+                backgroundColor:
+                  'color-mix(in srgb, var(--color-panel-error) 15%, transparent)',
+                color: 'var(--color-panel-error)',
+              }
+            : {}),
           cursor: 'pointer',
         }}
         onMouseEnter={() => setHoveredLogIndex(index)}
@@ -551,97 +568,116 @@ export const LogsView: React.FC<LogsViewProps> = ({
           setIsSheetOpen(true);
         }}
       >
-        <div style={{ 
-          ...logsViewStyles.timestampCell, 
-          ...(isError ? { color: '#f87171' } : { color: '#9ca3af' }) 
-        }}>
+        <div
+          className="cp-logs-timestamp"
+          style={isError ? { color: 'var(--color-panel-error)' } : undefined}
+        >
           {formatTimestamp(log.timestamp)}
         </div>
-        <div style={{ 
-          ...logsViewStyles.idCell, 
-          ...(isError ? { color: '#f87171' } : {}) 
-        }}>
+        <div
+          className="cp-logs-id"
+          style={isError ? { color: 'var(--color-panel-error)' } : undefined}
+        >
           {shortId !== '-' && (
-            <span style={{
-              ...logsViewStyles.idBadge,
-              ...(isError ? {
-                border: '1px solid rgba(248, 113, 113, 0.5)',
-                backgroundColor: 'rgba(248, 113, 113, 0.1)',
-                color: '#f87171',
-              } : {}),
-            }}>
+            <span
+              className="cp-logs-id-badge"
+              style={
+                isError
+                  ? {
+                      border:
+                        '1px solid color-mix(in srgb, var(--color-panel-error) 50%, transparent)',
+                      backgroundColor:
+                        'color-mix(in srgb, var(--color-panel-error) 10%, transparent)',
+                      color: 'var(--color-panel-error)',
+                    }
+                  : undefined
+              }
+            >
               {shortId}
             </span>
           )}
         </div>
-        <div style={logsViewStyles.statusCell}>
+        <div className="cp-logs-status">
           {statusDisplay && (
-            <span style={isError ? { color: '#f87171' } : status === 'success' ? { color: '#34d399' } : { color: '#d1d5db' }}>
+            <span style={isError ? { color: 'var(--color-panel-error)' } : status === 'success' ? { color: 'var(--color-panel-success)' } : { color: 'var(--color-panel-text-secondary)' }}>
               {statusDisplay}
             </span>
           )}
           {executionTime && (
-            <span style={{ 
-              ...logsViewStyles.executionTime, 
-              ...(isError ? { color: '#f87171' } : { color: '#6b7280' }),
-              marginLeft: '8px',
-            }}>
+            <span
+              className="cp-logs-execution-time"
+              style={{
+                ...(isError ? { color: 'var(--color-panel-error)' } : {}),
+                marginLeft: '8px',
+              }}
+            >
               {executionTime}
             </span>
           )}
         </div>
-        <div style={{ 
-          ...logsViewStyles.functionCell, 
-          ...(isError ? { color: '#f87171' } : {}) 
-        }}>
-          <span style={{
-            ...logsViewStyles.logTypeIcon,
-            ...logTypeBadgeStyle,
-            ...(isError ? { 
-              backgroundColor: 'rgba(248, 113, 113, 0.2)',
-              color: '#f87171',
-            } : {}),
-            borderRadius: '4px',
-            padding: '2px 6px',
-            fontSize: '11px',
-            fontWeight: 500,
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minWidth: '20px',
-          }}>
+        <div
+          className="cp-logs-function"
+          style={isError ? { color: 'var(--color-panel-error)' } : undefined}
+        >
+          <span
+            className="cp-logs-logtype"
+            style={{
+              ...logTypeBadgeStyle,
+              ...(isError
+                ? {
+                    backgroundColor:
+                      'color-mix(in srgb, var(--color-panel-error) 20%, transparent)',
+                    color: 'var(--color-panel-error)',
+                  }
+                : {}),
+              borderRadius: '4px',
+              padding: '2px 6px',
+              fontSize: '11px',
+              fontWeight: 500,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '20px',
+            }}
+          >
             {logTypeIcon}
           </span>
           {functionIdentifier && (
-            <span style={{ 
-              ...logsViewStyles.functionPath, 
-              color: isError ? '#f87171' : 'var(--color-panel-text-muted)', 
-              marginRight: '4px',
-              fontFamily: 'monospace',
-            }}>
+            <span
+              className="cp-logs-function-path"
+              style={{
+                color: isError
+                  ? 'var(--color-panel-error)'
+                  : 'var(--color-panel-text-muted)',
+                marginRight: '4px',
+                fontFamily: 'monospace',
+              }}
+            >
               {functionIdentifier}:
             </span>
           )}
-          <span style={{ 
-            ...logsViewStyles.functionPath, 
-            ...(isError ? { color: '#f87171' } : { color: '#d1d5db' }),
-            fontFamily: 'monospace',
-          }}>
+          <span
+            className="cp-logs-function-path"
+            style={{
+              ...(isError ? { color: 'var(--color-panel-error)' } : {}),
+              fontFamily: 'monospace',
+            }}
+          >
             {displayFunctionName}
           </span>
           {isError && log.error_message && (
-            <span style={{
-              marginLeft: '8px',
-              color: '#f87171',
-              fontSize: '11px',
-              opacity: 0.9,
-              fontFamily: 'monospace',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              flex: 1,
-              minWidth: 0,
-            }}>
+            <span
+              className="cp-logs-message"
+              style={{
+                marginLeft: '8px',
+                color: 'var(--color-panel-error)',
+                fontSize: '11px',
+                opacity: 0.9,
+                fontFamily: 'monospace',
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
               • {log.error_message}
             </span>
           )}
@@ -675,11 +711,18 @@ export const LogsView: React.FC<LogsViewProps> = ({
   LogRow.displayName = 'LogRow';
 
   return (
-    <div ref={logsContainerRef} style={{ ...logsViewStyles.container, position: 'relative', overflow: 'hidden' }}>
+    <div
+      ref={logsContainerRef}
+      className="cp-logs-container"
+      style={{ position: 'relative', overflow: 'hidden' }}
+    >
       {/* Header */}
-      <div style={logsViewStyles.header}>
-        <h2 style={logsViewStyles.headerTitle}>Logs</h2>
-        <div style={{ ...logsViewStyles.headerButtons, position: 'relative', zIndex: 1, gap: '8px', marginRight: '-8px' }}>
+      <div className="cp-logs-header">
+        <h2 className="cp-logs-header-title">Logs</h2>
+        <div
+          className="cp-logs-header-buttons"
+          style={{ position: 'relative', zIndex: 1, gap: '8px', marginRight: '-8px' }}
+        >
           <MultiSelectComponentSelector
             selectedComponents={selectedComponents}
             onSelect={(components) => {
@@ -711,34 +754,23 @@ export const LogsView: React.FC<LogsViewProps> = ({
       </div>
 
       {/* Search */}
-      <div style={logsViewStyles.searchContainer}>
+      <div className="cp-logs-search">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
-          <div style={{ ...searchInputStyles.container, flex: 1 }}>
-            <Search style={searchInputStyles.icon} />
+          <div style={{ flex: 1 }}>
+            <div className="cp-search-wrapper">
+              <Search className="cp-search-icon" />
             <input
               type="text"
               placeholder="Filter logs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={searchInputStyles.input}
-              onFocus={(e) => {
-                Object.assign(e.currentTarget.style, searchInputStyles.inputFocus);
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-panel-border)';
-                e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
-              }}
+              className="cp-search-input"
             />
+            </div>
           </div>
           <button
             onClick={clearLogs}
-            style={logsViewStyles.headerButton}
-            onMouseEnter={(e) => {
-              Object.assign(e.currentTarget.style, logsViewStyles.headerButtonHover);
-            }}
-            onMouseLeave={(e) => {
-              Object.assign(e.currentTarget.style, logsViewStyles.headerButton);
-            }}
+            className="cp-logs-header-button"
           >
             Clear Logs
           </button>
@@ -746,35 +778,21 @@ export const LogsView: React.FC<LogsViewProps> = ({
       </div>
 
       {/* Logs Table */}
-      <div style={{ ...logsViewStyles.logsTable, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div className="cp-logs-table" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
-        <div style={{ ...logsViewStyles.tableHeader, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginRight: '8px' }}>
+        <div
+          className="cp-logs-table-header"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginRight: '8px' }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-            <div style={{ ...logsViewStyles.tableHeaderCell, width: '160px' }}>Timestamp</div>
-            <div style={{ ...logsViewStyles.tableHeaderCell, width: '80px' }}>ID</div>
-            <div style={{ ...logsViewStyles.tableHeaderCell, width: '128px' }}>Status</div>
-            <div style={{ ...logsViewStyles.tableHeaderCell, flex: 1 }}>Function</div>
+            <div className="cp-logs-table-header-cell" style={{ width: '160px' }}>Timestamp</div>
+            <div className="cp-logs-table-header-cell" style={{ width: '80px' }}>ID</div>
+            <div className="cp-logs-table-header-cell" style={{ width: '128px' }}>Status</div>
+            <div className="cp-logs-table-header-cell" style={{ flex: 1 }}>Function</div>
           </div>
           <button
             onClick={() => setIsPaused(!isPaused)}
-            style={{
-              ...logsViewStyles.pauseButton,
-              ...(isPaused ? logsViewStyles.pauseButtonPaused : {}),
-            }}
-            onMouseEnter={(e) => {
-              const baseStyle = isPaused ? logsViewStyles.pauseButtonPaused : logsViewStyles.pauseButton;
-              const hoverStyle = isPaused ? logsViewStyles.pauseButtonPausedHover : logsViewStyles.pauseButtonHover;
-              Object.assign(e.currentTarget.style, {
-                ...baseStyle,
-                ...hoverStyle,
-              });
-            }}
-            onMouseLeave={(e) => {
-              const baseStyle = isPaused ? logsViewStyles.pauseButtonPaused : logsViewStyles.pauseButton;
-              Object.assign(e.currentTarget.style, {
-                ...baseStyle,
-              });
-            }}
+            className={`cp-logs-pause-btn${isPaused ? ' cp-logs-pause-btn-paused' : ''}`}
           >
             {isPaused ? (
               <>
@@ -790,18 +808,18 @@ export const LogsView: React.FC<LogsViewProps> = ({
 
         {/* Logs */}
         {isLoading && logs.length === 0 ? (
-          <div style={logsViewStyles.loadingContainer}>
-            <div style={logsViewStyles.loadingText}>Loading logs...</div>
+          <div className="cp-logs-loading">
+            <div className="cp-logs-loading-text">Loading logs...</div>
           </div>
         ) : error && logs.length === 0 ? (
-          <div style={logsViewStyles.errorContainer}>
-            <div style={logsViewStyles.errorText}>
+          <div className="cp-logs-error">
+            <div className="cp-logs-error-text">
               Error loading logs: {error instanceof Error ? error.message : String(error)}
             </div>
           </div>
         ) : filteredLogs.length === 0 ? (
-          <div style={logsViewStyles.emptyContainer}>
-            <div style={logsViewStyles.emptyText}>
+          <div className="cp-logs-empty">
+            <div className="cp-logs-empty-text">
               {searchQuery || (selectedComponents.length < componentNames.length) || selectedFunctions.length > 0 || selectedLogTypes.length < 6
                 ? 'No logs match your filters'
                 : 'No logs yet'}
@@ -852,6 +870,7 @@ type DetailTab = 'execution' | 'request' | 'functions';
 
 const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
   const [activeTab, setActiveTab] = useState<DetailTab>('execution');
+  const [isResourcesExpanded, setIsResourcesExpanded] = useState(true);
   const status = log.status || (log.function?.cached ? 'cached' : undefined);
   const isError = status === 'error' || status === 'failure' || !!log.error_message;
   const executionId = log.function?.request_id || log.raw?.execution_id || 'N/A';
@@ -862,11 +881,28 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
   const duration = log.execution_time_ms || 0;
   const usage = log.usage || log.raw?.usage_stats;
   const environment = log.raw?.environment || 'Convex';
-  const returnBytes = log.raw?.return_bytes;
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
+  const returnBytes = log.raw?.return_bytes || log.raw?.returnBytes;
+  const identity = log.raw?.identity || 'Admin';
+  const caller = log.raw?.caller || 'HTTP API';
+  
+  // Calculate compute (GB-hr and MB for duration)
+  const computeMemoryMB = usage?.action_memory_used_mb || log.raw?.usage_stats?.memory_used_mb || 0;
+  const durationSeconds = duration / 1000;
+  const computeGBHr = (computeMemoryMB * durationSeconds) / (1024 * 3600);
+  const computeDisplay = `${computeGBHr.toFixed(7)} GB-hr (${computeMemoryMB} MB for ${durationSeconds.toFixed(2)}s)`;
+  
+  // Get document count
+  const documentCount = usage?.database_read_documents || log.raw?.usage_stats?.database_read_documents || 0;
+  
+  // Get functions called (nested function calls)
+  // If no nested functions, show the current function itself
+  const functionsCalled = log.raw?.functions_called || log.raw?.functionsCalled || 
+    (log.function?.path ? [{
+      path: log.function.path,
+      execution_time_ms: duration,
+      success: status === 'success' || status !== 'error',
+      error: log.error_message
+    }] : []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -877,7 +913,7 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
             <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-panel-text)' }}>
               {formatTimestamp(log.timestamp)} ({formatRelativeTime(log.timestamp)})
             </div>
-            <div style={{ fontSize: '12px', color: isError ? '#f87171' : '#34d399', marginTop: '4px' }}>
+            <div style={{ fontSize: '12px', color: isError ? 'var(--color-panel-error)' : 'var(--color-panel-success)', marginTop: '4px' }}>
               {status || 'unknown'}
             </div>
           </div>
@@ -889,12 +925,12 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
         <div style={{
           margin: '16px 20px',
           padding: '12px',
-          backgroundColor: 'rgba(239, 68, 68, 0.1)',
-          border: '1px solid rgba(239, 68, 68, 0.3)',
+          backgroundColor: 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--color-panel-error) 30%, transparent)',
           borderRadius: '4px',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#f87171' }}>Error</div>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-panel-error)' }}>Error</div>
             <button
               onClick={() => copyToClipboard(log.error_message || '')}
               style={{
@@ -902,7 +938,7 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
                 border: 'none',
                 cursor: 'pointer',
                 padding: '4px',
-                color: '#f87171',
+                color: 'var(--color-panel-error)',
                 display: 'flex',
                 alignItems: 'center',
               }}
@@ -910,7 +946,7 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
               <Copy size={14} />
             </button>
           </div>
-          <div style={{ fontSize: '12px', color: '#f87171', fontFamily: 'monospace' }}>
+          <div style={{ fontSize: '12px', color: 'var(--color-panel-error)', fontFamily: 'monospace' }}>
             {log.error_message}
           </div>
         </div>
@@ -925,13 +961,16 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
             style={{
               padding: '10px 16px',
               fontSize: '12px',
-              fontWeight: 500,
+              fontWeight: activeTab === tab ? 600 : 500,
               border: 'none',
               borderBottom: activeTab === tab ? '2px solid var(--color-panel-accent)' : '2px solid transparent',
-              backgroundColor: 'transparent',
+              backgroundColor: activeTab === tab 
+                ? 'linear-gradient(to bottom, rgba(255, 255, 255, 0.05), transparent)' 
+                : 'transparent',
               color: activeTab === tab ? 'var(--color-panel-text)' : 'var(--color-panel-text-muted)',
               cursor: 'pointer',
               textTransform: 'capitalize',
+              position: 'relative',
             }}
           >
             {tab === 'functions' ? 'Functions Called' : tab}
@@ -940,63 +979,272 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
       </div>
 
       {/* Tab Content */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
         {activeTab === 'execution' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             <DetailRow label="Execution ID" value={executionId} />
             <DetailRow label="Function" value={functionPath} />
             <DetailRow label="Type" value={functionType} />
             <DetailRow label="Started at" value={formatDateTime(startedAt)} />
             <DetailRow label="Completed at" value={formatDateTime(completedAt)} />
             <DetailRow label="Duration" value={`${duration}ms`} />
-            <DetailRow label="Environment" value={environment} withHelp />
+            <DetailRow 
+              label="Environment" 
+              value={environment} 
+              withHelp 
+              helpText="This function was executed in Convex's isolated environment."
+            />
             
             {/* Resources Used */}
-            <div>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-panel-text)', marginBottom: '12px' }}>
+            <div style={{ borderTop: '1px solid var(--color-panel-border)', marginTop: '8px' }}>
+              <button
+                onClick={() => setIsResourcesExpanded(!isResourcesExpanded)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '12px 20px',
+                  marginBottom: isResourcesExpanded ? '0' : '0',
+                  color: 'var(--color-panel-text)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  width: '100%',
+                  textAlign: 'left',
+                }}
+              >
+                <Clock size={14} style={{ color: 'var(--color-panel-text-muted)' }} />
                 Resources Used
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '12px' }}>
-                {usage && (
-                  <>
-                    <DetailRow label="Compute" value="0.0000000 GB-hr (0 MB for 0.00s)" withHelp small />
-                    <DetailRow 
-                      label="DB Bandwidth" 
-                      value={`Accessed 0 documents, ${formatBytes(usage.database_read_bytes || 0)} read, ${formatBytes(usage.database_write_bytes || 0)} written`}
-                      small
-                    />
-                    <DetailRow 
-                      label="File Bandwidth" 
-                      value={`${formatBytes(usage.file_storage_read_bytes || 0)} read, ${formatBytes(usage.file_storage_write_bytes || 0)} written`}
-                      small
-                    />
-                    <DetailRow 
-                      label="Vector Bandwidth" 
-                      value={`${formatBytes(usage.vector_storage_read_bytes || 0)} read, ${formatBytes(usage.vector_storage_write_bytes || 0)} written`}
-                      small
-                    />
-                    {returnBytes !== undefined && (
-                      <DetailRow label="Return Size" value={`${formatBytes(returnBytes)} returned`} withHelp small />
-                    )}
-                  </>
+                {isResourcesExpanded ? (
+                  <ChevronUp size={14} style={{ color: 'var(--color-panel-text-muted)', marginLeft: 'auto' }} />
+                ) : (
+                  <ChevronDown size={14} style={{ color: 'var(--color-panel-text-muted)', marginLeft: 'auto' }} />
                 )}
-              </div>
+              </button>
+              {isResourcesExpanded && (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <DetailRow 
+                    label="Compute" 
+                    value={computeDisplay} 
+                    withHelp 
+                    small 
+                    helpText="Only compute from Actions incur additional cost. Query/Mutation compute are included."
+                  />
+                  <DetailRow 
+                    label="DB Bandwidth" 
+                    value={
+                      <span>
+                        Accessed <strong>{documentCount}</strong> {documentCount === 1 ? 'document' : 'documents'}, <strong>{formatBytes(usage?.database_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.database_write_bytes || 0)}</strong> written
+                      </span>
+                    }
+                    small
+                  />
+                  <DetailRow 
+                    label="File Bandwidth" 
+                    value={
+                      <span>
+                        <strong>{formatBytes(usage?.file_storage_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.file_storage_write_bytes || 0)}</strong> written
+                      </span>
+                    }
+                    small
+                  />
+                  <DetailRow 
+                    label="Vector Bandwidth" 
+                    value={
+                      <span>
+                        <strong>{formatBytes(usage?.vector_storage_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.vector_storage_write_bytes || 0)}</strong> written
+                      </span>
+                    }
+                    small
+                    noBorder={returnBytes === undefined}
+                  />
+                  <DetailRow 
+                    label="Return Size" 
+                    value={<span><strong>{formatBytes(returnBytes || 0)}</strong> returned</span>} 
+                    withHelp 
+                    small 
+                    noBorder 
+                    helpText="Bandwidth from sending the return value of a function call to the user does not incur costs."
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {activeTab === 'request' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             <DetailRow label="Request ID" value={log.function?.request_id || 'N/A'} />
-            <DetailRow label="Function Path" value={functionPath} />
-            <DetailRow label="Type" value={functionType} />
-            {log.message && <DetailRow label="Message" value={log.message} />}
+            <DetailRow label="Started at" value={formatDateTime(startedAt)} />
+            <DetailRow label="Completed at" value={formatDateTime(completedAt)} />
+            <DetailRow label="Duration" value={`${duration}ms`} />
+            <DetailRow 
+              label="Identity" 
+              value={identity} 
+              withHelp 
+              helpText="This request was initiated by a Convex Developer with access to this deployment."
+            />
+            <DetailRow 
+              label="Caller" 
+              value={caller} 
+              withHelp={caller === 'WebSocket'}
+              helpText={caller === 'WebSocket' ? "This function was called through a websocket connection." : undefined}
+            />
+            <DetailRow 
+              label="Environment" 
+              value={environment} 
+              withHelp 
+              helpText="This function was executed in Convex's isolated environment."
+            />
+            
+            {/* Resources Used */}
+            <div style={{ borderTop: '1px solid var(--color-panel-border)', marginTop: '8px' }}>
+              <button
+                onClick={() => setIsResourcesExpanded(!isResourcesExpanded)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '12px 20px',
+                  marginBottom: isResourcesExpanded ? '0' : '0',
+                  color: 'var(--color-panel-text)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  width: '100%',
+                  textAlign: 'left',
+                }}
+              >
+                <Clock size={14} style={{ color: 'var(--color-panel-text-muted)' }} />
+                Resources Used
+                {isResourcesExpanded ? (
+                  <ChevronUp size={14} style={{ color: 'var(--color-panel-text-muted)', marginLeft: 'auto' }} />
+                ) : (
+                  <ChevronDown size={14} style={{ color: 'var(--color-panel-text-muted)', marginLeft: 'auto' }} />
+                )}
+              </button>
+              {isResourcesExpanded && (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <DetailRow 
+                    label="Compute" 
+                    value={computeDisplay} 
+                    withHelp 
+                    small 
+                    helpText="Only compute from Actions incur additional cost. Query/Mutation compute are included."
+                  />
+                  <DetailRow 
+                    label="DB Bandwidth" 
+                    value={
+                      <span>
+                        Accessed <strong>{documentCount}</strong> {documentCount === 1 ? 'document' : 'documents'}, <strong>{formatBytes(usage?.database_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.database_write_bytes || 0)}</strong> written
+                      </span>
+                    }
+                    small
+                  />
+                  <DetailRow 
+                    label="File Bandwidth" 
+                    value={
+                      <span>
+                        <strong>{formatBytes(usage?.file_storage_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.file_storage_write_bytes || 0)}</strong> written
+                      </span>
+                    }
+                    small
+                  />
+                  <DetailRow 
+                    label="Vector Bandwidth" 
+                    value={
+                      <span>
+                        <strong>{formatBytes(usage?.vector_storage_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.vector_storage_write_bytes || 0)}</strong> written
+                      </span>
+                    }
+                    small
+                    noBorder={returnBytes === undefined}
+                  />
+                  <DetailRow 
+                    label="Return Size" 
+                    value={<span><strong>{formatBytes(returnBytes || 0)}</strong> returned</span>} 
+                    withHelp 
+                    small 
+                    noBorder 
+                    helpText="Bandwidth from sending the return value of a function call to the user does not incur costs."
+                  />
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {activeTab === 'functions' && (
-          <div style={{ color: 'var(--color-panel-text-muted)', fontSize: '12px' }}>
-            No functions called
+          <div style={{ padding: '20px' }}>
+            <div style={{ 
+              color: 'var(--color-panel-text-muted)', 
+              fontSize: '12px', 
+              marginBottom: '16px' 
+            }}>
+              This is an outline of the functions called in this request.
+            </div>
+            {functionsCalled.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {functionsCalled.map((func: any, index: number) => {
+                  const funcPath = func.path || func.identifier || func.function || 'Unknown';
+                  const pathParts = funcPath.split(':');
+                  const component = pathParts.length > 1 ? pathParts[0] : '';
+                  const functionName = pathParts.length > 1 ? pathParts[1] : funcPath;
+                  const execTime = func.execution_time_ms || func.executionTimeMs || func.duration || 0;
+                  const isSuccess = func.success !== false && !func.error;
+                  
+                  return (
+                    <div
+                      key={index}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px 16px',
+                        backgroundColor: 'color-mix(in srgb, var(--color-panel-warning) 10%, transparent)',
+                        border: '1px solid color-mix(in srgb, var(--color-panel-warning) 20%, transparent)',
+                        borderRadius: '8px',
+                        fontFamily: 'monospace',
+                        fontSize: '12px',
+                      }}
+                    >
+                      {isSuccess ? (
+                        <CheckCircle2 size={16} style={{ color: 'var(--color-panel-success)', flexShrink: 0 }} />
+                      ) : (
+                        <X size={16} style={{ color: 'var(--color-panel-error)', flexShrink: 0 }} />
+                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
+                        {component && (
+                          <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                            {component}:
+                          </span>
+                        )}
+                        <span style={{ color: 'var(--color-panel-text)', fontWeight: 500 }}>
+                          {functionName}
+                        </span>
+                        {execTime > 0 && (
+                          <span style={{ color: 'var(--color-panel-text-muted)', marginLeft: '4px' }}>
+                            ({execTime}ms)
+                          </span>
+                        )}
+                      </div>
+                      <ArrowUp size={14} style={{ color: 'var(--color-panel-text-muted)', flexShrink: 0 }} />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ 
+                color: 'var(--color-panel-text-muted)', 
+                fontSize: '12px' 
+              }}>
+                No functions called
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1006,11 +1254,19 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
 
 const DetailRow: React.FC<{ 
   label: string; 
-  value: string; 
+  value: string | React.ReactNode; 
   withHelp?: boolean;
   small?: boolean;
-}> = ({ label, value, withHelp, small }) => (
-  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+  noBorder?: boolean;
+  helpText?: string;
+}> = ({ label, value, withHelp, small, noBorder, helpText }) => (
+  <div style={{ 
+    display: 'flex', 
+    alignItems: 'flex-start', 
+    gap: '8px',
+    padding: '12px 20px',
+    borderBottom: noBorder ? 'none' : '1px solid var(--color-panel-border)',
+  }}>
     <div style={{ 
       fontSize: small ? '11px' : '12px', 
       color: 'var(--color-panel-text-muted)', 
@@ -1020,7 +1276,15 @@ const DetailRow: React.FC<{
       gap: '4px',
     }}>
       {label}
-      {withHelp && <HelpCircle size={12} style={{ opacity: 0.6 }} />}
+      {withHelp && helpText && (
+        <TooltipAction 
+          icon={<HelpCircle size={12} style={{ opacity: 0.6, color: 'var(--color-panel-text-muted)' }} />} 
+          text={helpText} 
+        />
+      )}
+      {withHelp && !helpText && (
+        <HelpCircle size={12} style={{ opacity: 0.6, color: 'var(--color-panel-text-muted)' }} />
+      )}
     </div>
     <div style={{ 
       fontSize: small ? '11px' : '12px', 

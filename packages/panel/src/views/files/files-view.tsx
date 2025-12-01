@@ -6,7 +6,6 @@ import { useFiles } from '../../hooks/useFiles';
 import { FileMetadata, deleteFile, uploadFileWithFallbacks } from '../../utils/api';
 import { useSheetSafe } from '../../contexts/sheet-context';
 import { FilePreview } from './components/file-preview';
-import { searchInputStyles } from '../../styles/panelStyles';
 import { DateFilterDropdown, DateFilter } from './components/date-filter-dropdown';
 import { Checkbox } from '../../components/shared/checkbox';
 
@@ -478,37 +477,17 @@ export const FilesView: React.FC<FilesViewProps> = ({
             />
           </div>
         )}
-<<<<<<< HEAD
         <div style={{ flex: 1, maxWidth: '384px' }}>
           <div className="cp-search-wrapper">
             <Search size={14} className="cp-search-icon" />
-=======
-        <div style={{ ...searchInputStyles.container, flex: 1, maxWidth: '384px' }}>
-          <Search
-            size={14}
-            style={searchInputStyles.icon}
-          />
->>>>>>> b2a4a8f8de8904a46f4a76f8476d7f39a6f12196
           <input
             type="text"
             placeholder="Lookup by ID"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-<<<<<<< HEAD
             className="cp-search-input"
           />
           </div>
-=======
-            style={searchInputStyles.input}
-            onFocus={(e) => {
-              Object.assign(e.currentTarget.style, searchInputStyles.inputFocus);
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-panel-border)';
-              e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
-            }}
-          />
->>>>>>> b2a4a8f8de8904a46f4a76f8476d7f39a6f12196
         </div>
         <DateFilterDropdown
           value={dateFilter}
@@ -1168,5 +1147,4 @@ export const FilesView: React.FC<FilesViewProps> = ({
     </div>
   );
 };
-
 
