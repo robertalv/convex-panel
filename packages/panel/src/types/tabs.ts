@@ -1,1 +1,1 @@
-export type TabId = 'health' | 'data' | 'functions' | 'files' | 'schedules' | 'logs' | 'settings';
+export type TabId = 'health' | 'data' | 'functions' | 'files' | 'schedules' | 'logs' | 'components' | 'settings';

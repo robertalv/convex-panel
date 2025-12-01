@@ -5,6 +5,7 @@ import { FunctionsView } from '../views/functions';
 import { SchedulesView } from '../views/schedules';
 import { FilesView } from '../views/files';
 import { LogsView } from '../views/logs';
+import { ComponentsView } from '../views/components';
 import { TabId } from '../types/tabs';
 
 interface MainViewsProps {
@@ -90,6 +91,7 @@ const tabRenderers: Record<TabId, TabRenderer> = {
       projectSlug={projectSlug}
     />
   ),
+  components: () => <ComponentsView />,
   settings: createComingSoonRenderer('Settings'),
 };
 

@@ -3,13 +3,6 @@ import {
   ChevronDown,
   ChevronUp,
   X,
-  Activity,
-  Database,
-  Code2,
-  FileCode,
-  CalendarClock,
-  ScrollText,
-  Settings,
   HelpCircle,
   Sun,
   Moon,
@@ -23,6 +16,7 @@ import { DeploymentDisplay } from './shared/deployment-display';
 import { ProjectSelector } from './shared/project-selector';
 import { GlobalFunctionTester } from './function-runner/global-function-tester';
 import { GlobalSheet } from './shared/global-sheet';
+import { Sidebar } from './sidebar';
 import { useActiveTab } from '../hooks/useActiveTab';
 import { useIsGlobalRunnerShown, useShowGlobalRunner } from '../lib/functionRunner';
 import { useFunctionRunnerShortcuts } from '../hooks/useFunctionRunnerShortcuts';
@@ -51,56 +45,11 @@ interface BottomSheetProps {
   project?: Project;
 }
 
-interface SidebarItemProps {
-  icon: React.ReactNode;
-  label: string;
-  isActive?: boolean;
-  onClick: () => void;
-}
-
 const PANEL_HEIGHT_STORAGE_KEY = 'convex-panel-bottom-sheet-height';
 const PANEL_MIN_HEIGHT = 40;
 const PANEL_COLLAPSED_HEIGHT = `${PANEL_MIN_HEIGHT}px`;
 const PANEL_MAX_HEIGHT_RATIO = 0.9;
 const PANEL_DEFAULT_HEIGHT = '60vh';
-
-interface TabDefinition {
-  id: TabId;
-  icon: React.ReactNode;
-  label: string;
-}
-
-const TAB_DEFINITIONS: TabDefinition[] = [
-  { id: 'health', icon: <Activity size={14} />, label: 'Health' },
-  { id: 'data', icon: <Database size={14} />, label: 'Data' },
-  { id: 'functions', icon: <Code2 size={14} />, label: 'Functions' },
-  { id: 'files', icon: <FileCode size={14} />, label: 'Files' },
-  { id: 'schedules', icon: <CalendarClock size={14} />, label: 'Schedules' },
-  { id: 'logs', icon: <ScrollText size={14} />, label: 'Logs' },
-  { id: 'settings', icon: <Settings size={14} />, label: 'Settings' },
-];
-
-const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, isActive, onClick }) => {
-  const [showTooltip, setShowTooltip] = useState(false);
-
-  return (
-    <div
-      className="cp-sidebar-item-wrapper"
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
-    >
-      {isActive && <div className="cp-sidebar-active-indicator" />}
-      <button
-        type="button"
-        onClick={onClick}
-        className={`cp-sidebar-btn ${isActive ? 'active' : ''}`}
-      >
-        {icon}
-      </button>
-      {showTooltip && <div className="cp-tooltip">{label}</div>}
-    </div>
-  );
-};
 
 export const BottomSheet: React.FC<BottomSheetProps> = ({
   isOpen,
@@ -388,17 +337,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
               />
             ) : (
               <>
-                <div className="cp-sidebar">
-                  {TAB_DEFINITIONS.map((tab) => (
-                    <SidebarItem
-                      key={tab.id}
-                      icon={tab.icon}
-                      label={tab.label}
-                      isActive={activeTab === tab.id}
-                      onClick={() => handleTabChange(tab.id)}
-                    />
-                  ))}
-                </div>
+                <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
 
                 <div className="cp-main-content" ref={mainContentRef} style={{ position: 'relative', overflow: 'hidden' }}>
                   {children}
