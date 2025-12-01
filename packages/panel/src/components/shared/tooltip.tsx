@@ -1,358 +1,247 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-export interface TooltipProps {
-  content: React.ReactNode;
-  children: React.ReactNode;
-  delay?: number;
-  placement?: 'top' | 'bottom' | 'left' | 'right';
-  maxWidth?: string;
+interface TooltipProps {
+  content: ReactNode;
+  children: ReactNode;
+  maxWidth?: number;
+  position?: 'top' | 'bottom' | 'left' | 'right';
 }
 
 export const Tooltip: React.FC<TooltipProps> = ({
   content,
   children,
-  delay = 500,
-  placement = 'bottom',
-  maxWidth = '400px',
+  maxWidth = 320,
+  position = 'top',
 }) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [position, setPosition] = useState<{ x: number; y: number; transform: string } | null>(null);
-  const timerRef = useRef<number | null>(null);
-  const closeTimerRef = useRef<number | null>(null);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearTimer = () => {
-    if (timerRef.current) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  };
+  useEffect(() => {
+    if (showTooltip && triggerRef.current) {
+      const updatePosition = () => {
+        if (!triggerRef.current) return;
+        const rect = triggerRef.current.getBoundingClientRect();
+        const tooltipRect = tooltipRef.current?.getBoundingClientRect();
+        const tooltipHeight = tooltipRect?.height || 60;
+        const tooltipWidth = tooltipRect?.width || maxWidth;
+        const margin = 8;
 
-  const clearCloseTimer = () => {
-    if (closeTimerRef.current) {
-      window.clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-  };
+        let left: number;
+        let top: number;
 
-  const calculatePosition = () => {
-    if (!triggerRef.current) return null;
-    
-    // Get the trigger element's position relative to the viewport
-    const rect = triggerRef.current.getBoundingClientRect();
-    
-    // Check if element is actually visible in viewport
-    if (rect.width === 0 && rect.height === 0) return null;
-    
-    // Get tooltip dimensions - use defaults if not yet measured
-    const tooltipRect = tooltipRef.current?.getBoundingClientRect();
-    const tooltipWidth = tooltipRect && tooltipRect.width > 0 ? tooltipRect.width : 400;
-    const tooltipHeight = tooltipRect && tooltipRect.height > 0 ? tooltipRect.height : 200;
-    
-    let x = 0;
-    let y = 0;
-    let transform = '';
-
-    switch (placement) {
-      case 'bottom':
-        x = rect.left + rect.width / 2;
-        y = rect.bottom + 8;
-        transform = 'translateX(-50%)';
-        break;
-      case 'top':
-        x = rect.left + rect.width / 2;
-        y = rect.top - 8;
-        transform = 'translateX(-50%) translateY(-100%)';
-        break;
-      case 'right':
-        x = rect.right + 8;
-        y = rect.top;
-        transform = '';
-        break;
-      case 'left':
-        x = rect.left - 8;
-        y = rect.top;
-        transform = 'translateX(-100%)';
-        break;
-    }
-
-    // Clamp to viewport with better margins
-    const margin = 12;
-    
-    // For right placement, ensure tooltip doesn't go off right edge
-    if (placement === 'right') {
-      // If tooltip would go off screen on the right, try left side instead
-      if (x + tooltipWidth > window.innerWidth - margin) {
-        x = rect.left - 8;
-        transform = 'translateX(-100%)';
-        // If left side also goes off screen, position at right edge
-        if (x - tooltipWidth < margin) {
-          x = window.innerWidth - tooltipWidth - margin;
-          transform = '';
+        if (position === 'top') {
+          left = rect.left + rect.width / 2 - tooltipWidth / 2;
+          top = rect.top - tooltipHeight - margin - 4; // 4px for arrow
+        } else if (position === 'bottom') {
+          left = rect.left + rect.width / 2 - tooltipWidth / 2;
+          top = rect.bottom + margin + 4;
+        } else if (position === 'left') {
+          left = rect.left - tooltipWidth - margin - 4;
+          top = rect.top + rect.height / 2 - tooltipHeight / 2;
+        } else {
+          // right
+          left = rect.right + margin + 4;
+          top = rect.top + rect.height / 2 - tooltipHeight / 2;
         }
+
+        setTooltipPosition({
+          top: Math.max(margin, Math.min(top, window.innerHeight - tooltipHeight - margin)),
+          left: Math.max(margin, Math.min(left, window.innerWidth - tooltipWidth - margin)),
+        });
+      };
+
+      // Set initial position
+      const rect = triggerRef.current.getBoundingClientRect();
+      const estimatedWidth = maxWidth;
+      const estimatedHeight = 60;
+      const margin = 8;
+
+      let initialLeft: number;
+      let initialTop: number;
+
+      if (position === 'top') {
+        initialLeft = rect.left + rect.width / 2 - estimatedWidth / 2;
+        initialTop = rect.top - estimatedHeight - margin - 4;
+      } else if (position === 'bottom') {
+        initialLeft = rect.left + rect.width / 2 - estimatedWidth / 2;
+        initialTop = rect.bottom + margin + 4;
+      } else if (position === 'left') {
+        initialLeft = rect.left - estimatedWidth - margin - 4;
+        initialTop = rect.top + rect.height / 2 - estimatedHeight / 2;
       } else {
-        // Ensure we don't go off left edge
-        x = Math.max(margin, x);
+        initialLeft = rect.right + margin + 4;
+        initialTop = rect.top + rect.height / 2 - estimatedHeight / 2;
       }
-    }
-    
-    // For left placement, ensure tooltip doesn't go off left edge
-    if (placement === 'left') {
-      const minX = margin;
-      if (x - tooltipWidth < minX) {
-        x = rect.right + 8;
-        transform = '';
-        // If right side also goes off screen, position at left edge
-        if (x + tooltipWidth > window.innerWidth - margin) {
-          x = margin;
-          transform = '';
-        }
-      }
-    }
-    
-    // Ensure vertical position stays within viewport
-    const maxY = window.innerHeight - tooltipHeight - margin;
-    y = Math.max(margin, Math.min(y, maxY));
 
-    return { x, y, transform };
-  };
-
-  const handleMouseEnter = () => {
-    clearTimer();
-    clearCloseTimer(); // Cancel any pending close
-    timerRef.current = window.setTimeout(() => {
-      setIsVisible(true);
-      // Calculate position after a brief delay to ensure DOM is ready
-      requestAnimationFrame(() => {
-        const initialPos = calculatePosition();
-        if (initialPos) {
-          setPosition(initialPos);
-        }
+      setTooltipPosition({
+        top: Math.max(margin, Math.min(initialTop, window.innerHeight - estimatedHeight - margin)),
+        left: Math.max(margin, Math.min(initialLeft, window.innerWidth - estimatedWidth - margin)),
       });
-    }, delay);
+
+      const raf1 = requestAnimationFrame(() => {
+        const raf2 = requestAnimationFrame(() => {
+          updatePosition();
+          setTimeout(updatePosition, 10);
+          setTimeout(updatePosition, 50);
+        });
+      });
+
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+
+      return () => {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    } else {
+      setTooltipPosition(null);
+    }
+  }, [showTooltip, maxWidth, position]);
+
+  const getArrowStyle = () => {
+    if (position === 'top') {
+      return {
+        position: 'absolute' as const,
+        bottom: '-4px',
+        left: '50%',
+        transform: 'translateX(-50%) rotate(45deg)',
+        width: '8px',
+        height: '8px',
+        backgroundColor: 'var(--color-panel-bg-tertiary)',
+        borderBottom: '1px solid var(--color-panel-border)',
+        borderRight: '1px solid var(--color-panel-border)',
+      };
+    } else if (position === 'bottom') {
+      return {
+        position: 'absolute' as const,
+        top: '-4px',
+        left: '50%',
+        transform: 'translateX(-50%) rotate(45deg)',
+        width: '8px',
+        height: '8px',
+        backgroundColor: 'var(--color-panel-bg-tertiary)',
+        borderTop: '1px solid var(--color-panel-border)',
+        borderLeft: '1px solid var(--color-panel-border)',
+      };
+    } else if (position === 'left') {
+      return {
+        position: 'absolute' as const,
+        right: '-4px',
+        top: '50%',
+        transform: 'translateY(-50%) rotate(45deg)',
+        width: '8px',
+        height: '8px',
+        backgroundColor: 'var(--color-panel-bg-tertiary)',
+        borderTop: '1px solid var(--color-panel-border)',
+        borderRight: '1px solid var(--color-panel-border)',
+      };
+    } else {
+      return {
+        position: 'absolute' as const,
+        left: '-4px',
+        top: '50%',
+        transform: 'translateY(-50%) rotate(45deg)',
+        width: '8px',
+        height: '8px',
+        backgroundColor: 'var(--color-panel-bg-tertiary)',
+        borderBottom: '1px solid var(--color-panel-border)',
+        borderLeft: '1px solid var(--color-panel-border)',
+      };
+    }
   };
 
-  const handleMouseLeave = () => {
-    clearTimer();
-    // Add a small delay before closing to allow moving to tooltip
-    clearCloseTimer();
-    closeTimerRef.current = window.setTimeout(() => {
-      setIsVisible(false);
-      setPosition(null);
-    }, 100); // 100ms delay to allow moving from trigger to tooltip
+  const handleTriggerMouseEnter = () => {
+    // Clear any pending hide timeout
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    setShowTooltip(true);
   };
 
-  const handleTooltipMouseEnter = () => {
-    clearCloseTimer(); // Cancel any pending close
-    setIsVisible(true);
-    const pos = calculatePosition();
-    if (pos) setPosition(pos);
-  };
-
-  const handleTooltipMouseLeave = () => {
-    clearCloseTimer();
-    closeTimerRef.current = window.setTimeout(() => {
-      setIsVisible(false);
-      setPosition(null);
+  const handleTriggerMouseLeave = () => {
+    // Add a small delay before hiding to allow mouse to move to tooltip
+    hideTimeoutRef.current = setTimeout(() => {
+      setShowTooltip(false);
+      hideTimeoutRef.current = null;
     }, 100);
   };
 
-  const handleTooltipClick = (e: React.MouseEvent) => {
-    // Prevent clicks inside tooltip from closing it
-    e.stopPropagation();
-    // Keep tooltip open when clicking inside
-    clearCloseTimer();
+  const handleTooltipMouseEnter = () => {
+    // Clear any pending hide timeout when mouse enters tooltip
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    setShowTooltip(true);
   };
 
-  // Update position on scroll/resize and when tooltip becomes visible
-  useEffect(() => {
-    if (!isVisible) return;
+  const handleTooltipMouseLeave = () => {
+    setShowTooltip(false);
+  };
 
-    const updatePosition = () => {
-      // Ensure tooltip ref is attached before calculating
-      if (!tooltipRef.current || !triggerRef.current) return;
-      const pos = calculatePosition();
-      if (pos) {
-        setPosition(pos);
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
       }
-    };
-
-    // Update position multiple times to account for content loading
-    // Use multiple requestAnimationFrame calls to ensure tooltip is in DOM
-    // The portal needs time to render the tooltip to document.body
-    const raf1 = requestAnimationFrame(() => {
-      const raf2 = requestAnimationFrame(() => {
-        updatePosition();
-        // Continue updating as content loads
-        const timeout1 = setTimeout(updatePosition, 10);
-        const timeout2 = setTimeout(updatePosition, 50);
-        const timeout3 = setTimeout(updatePosition, 150);
-        const timeout4 = setTimeout(updatePosition, 300);
-      });
-    });
-    
-    window.addEventListener('scroll', updatePosition, true);
-    window.addEventListener('resize', updatePosition);
-
-    return () => {
-      window.removeEventListener('scroll', updatePosition, true);
-      window.removeEventListener('resize', updatePosition);
-      clearCloseTimer();
-    };
-  }, [isVisible, placement]);
-
-  // Calculate position when visibility changes - render off-screen first to measure
-  useEffect(() => {
-    if (isVisible) {
-      // First render off-screen to measure, then position
-      const measureAndPosition = () => {
-        if (!tooltipRef.current || !triggerRef.current) return;
-        
-        // Force a layout calculation by accessing getBoundingClientRect
-        const tooltipRect = tooltipRef.current.getBoundingClientRect();
-        
-        // Now calculate the actual position
-        const pos = calculatePosition();
-        if (pos) {
-          setPosition(pos);
-        }
-      };
-      
-      // Use multiple RAFs to ensure DOM is ready
-      const raf1 = requestAnimationFrame(() => {
-        const raf2 = requestAnimationFrame(() => {
-          measureAndPosition();
-        });
-      });
-      
-      return () => {
-        // Cleanup handled by RAF cancellation
-      };
-    }
-  }, [isVisible]);
-
-  // Cleanup timers on unmount
-  useEffect(() => {
-    return () => {
-      clearTimer();
-      clearCloseTimer();
     };
   }, []);
-
-  // Prevent document clicks from closing tooltip when clicking inside it
-  useEffect(() => {
-    if (!isVisible) return;
-
-    const handleDocumentClick = (e: MouseEvent) => {
-      // If click is inside tooltip, don't close it
-      if (tooltipRef.current && tooltipRef.current.contains(e.target as Node)) {
-        e.stopPropagation();
-        clearCloseTimer();
-        return;
-      }
-      // If click is outside both trigger and tooltip, close tooltip
-      if (
-        triggerRef.current &&
-        !triggerRef.current.contains(e.target as Node) &&
-        tooltipRef.current &&
-        !tooltipRef.current.contains(e.target as Node)
-      ) {
-        setIsVisible(false);
-        setPosition(null);
-      }
-    };
-
-    // Use capture phase to catch clicks early
-    document.addEventListener('click', handleDocumentClick, true);
-
-    return () => {
-      document.removeEventListener('click', handleDocumentClick, true);
-    };
-  }, [isVisible]);
-
-  const tooltipContent = isVisible ? (
-    <div
-      ref={tooltipRef}
-      style={{
-        position: 'fixed',
-        left: position ? `${position.x}px` : '-9999px',
-        top: position ? `${position.y}px` : '-9999px',
-        transform: position?.transform || '',
-        zIndex: 99999,
-        pointerEvents: position ? 'auto' : 'none',
-        maxWidth,
-        opacity: position ? 1 : 0,
-        transition: position ? 'opacity 0.15s ease-out' : 'none',
-        visibility: position ? 'visible' : 'hidden',
-        // Ensure tooltip is always on top and not clipped
-        isolation: 'isolate',
-        contain: 'layout style paint',
-        // Always render (even off-screen) so we can measure it
-        display: 'block',
-      }}
-      onMouseEnter={handleTooltipMouseEnter}
-      onMouseLeave={handleTooltipMouseLeave}
-      onClick={handleTooltipClick}
-      onMouseDown={(e) => {
-        // Don't stop propagation on mousedown - let child elements handle it
-        // Only stop if it's not coming from an interactive element
-        const target = e.target as HTMLElement;
-        if (target.tagName === 'BUTTON' || target.closest('button')) {
-          // Let button handle its own mousedown
-          return;
-        }
-        e.stopPropagation();
-      }}
-      onFocus={(e) => {
-        // Keep tooltip open when it receives focus
-        clearCloseTimer();
-        e.stopPropagation();
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: 'var(--color-panel-bg-tertiary)',
-          border: '1px solid var(--color-panel-border)',
-          borderRadius: '8px',
-          padding: '12px',
-          boxShadow: '0 8px 24px var(--color-panel-shadow)',
-          maxWidth: '100%',
-          minWidth: '200px',
-          minHeight: '50px',
-          position: 'relative',
-          zIndex: 99999,
-        }}
-      >
-        {content}
-      </div>
-    </div>
-  ) : null;
 
   return (
     <>
       <div
         ref={triggerRef}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        style={{ display: 'inline-flex', alignItems: 'center' }}
+        onMouseEnter={handleTriggerMouseEnter}
+        onMouseLeave={handleTriggerMouseLeave}
+        style={{
+          display: 'inline-flex',
+        }}
       >
         {children}
       </div>
-      {typeof document !== 'undefined' && tooltipContent
-        ? createPortal(tooltipContent, document.body)
-        : tooltipContent}
-      <style>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-      `}</style>
+      {showTooltip && tooltipPosition && typeof document !== 'undefined' && (
+        createPortal(
+          <div
+            ref={tooltipRef}
+            style={{
+              position: 'fixed',
+              top: `${tooltipPosition.top}px`,
+              left: `${tooltipPosition.left}px`,
+              padding: '12px 16px',
+              backgroundColor: 'var(--color-panel-bg-tertiary)',
+              border: '1px solid var(--color-panel-border)',
+              color: 'var(--color-panel-text)',
+              fontSize: '12px',
+              borderRadius: '6px',
+              transition: 'opacity 0.2s',
+              pointerEvents: 'auto',
+              zIndex: 99999,
+              boxShadow: '0 10px 15px -3px var(--color-panel-shadow)',
+              minWidth: '200px',
+              maxWidth: `${maxWidth}px`,
+              lineHeight: '1.5',
+              whiteSpace: 'normal',
+              wordWrap: 'break-word',
+              overflowWrap: 'break-word',
+            }}
+            onMouseEnter={handleTooltipMouseEnter}
+            onMouseLeave={handleTooltipMouseLeave}
+          >
+            {content}
+            <div style={getArrowStyle()} />
+          </div>,
+          document.body
+        )
+      )}
     </>
   );
 };

@@ -22,7 +22,14 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+
+    /* Path resolution for workspace packages */
+    "baseUrl": ".",
+    "paths": {
+      "@convex-panel": ["../../packages/panel/dist/index.d.ts"],
+      "@convex-panel/*": ["../../packages/panel/dist/*"]
+    }
   },
   "include": ["src"]
 }

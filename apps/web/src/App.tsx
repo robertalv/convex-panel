@@ -13,6 +13,7 @@ function App() {
       <span>Hello World</span>
       {/* ConvexPanel automatically excludes itself in production builds */}
       {/* You can safely leave this in your code - it won't affect production */}
+      {/* ConvexPanel automatically reads CONVEX_ACCESS_TOKEN from .env */}
       <ConvexPanel />
     </ConvexProvider>
   );

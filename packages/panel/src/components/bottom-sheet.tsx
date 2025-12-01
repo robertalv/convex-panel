@@ -11,7 +11,10 @@ import {
 } from 'lucide-react';
 import { ConvexLogo } from './icons';
 import { AskAI } from './ask-ai';
-import { extractDeploymentName, extractProjectName, fetchDeploymentMetadata, fetchProjectInfo } from '../utils/api';
+import { extractDeploymentName, extractProjectName, fetchDeploymentMetadata, fetchProjectInfo, getConvexDeploymentState } from '../utils/api';
+import { getAdminClientInfo, validateAdminClientInfo } from '../utils/adminClient';
+import { setStorageItem, getStorageItem } from '../utils/storage';
+import { STORAGE_KEYS } from '../utils/constants';
 import { DeploymentDisplay } from './shared/deployment-display';
 import { ProjectSelector } from './shared/project-selector';
 import { GlobalFunctionTester } from './function-runner/global-function-tester';
@@ -118,6 +121,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     };
   } | null>(null);
 
+  const [deploymentState, setDeploymentState] = useState<'running' | 'paused' | null>(null);
+
   useEffect(() => {
     if (!isAuthenticated || !deploymentUrl) {
       setDeploymentMetadata(null);
@@ -129,7 +134,6 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         const metadata = await fetchDeploymentMetadata(adminClient, deploymentUrl, accessToken);
         setDeploymentMetadata(metadata);
       } catch (error) {
-        console.debug('Failed to fetch deployment metadata:', error);
         setDeploymentMetadata({
           deploymentName: extractDeploymentName(deploymentUrl),
           projectName: extractProjectName(deploymentUrl),
@@ -153,7 +157,6 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         const info = await fetchProjectInfo(adminClient, deploymentUrl, accessToken, teamSlug, projectSlug);
         setProjectInfo(info);
       } catch (error) {
-        console.debug('Failed to fetch project info:', error);
         if (team || project) {
           setProjectInfo({ team, project });
         } else {
@@ -164,6 +167,81 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
     fetchInfo();
   }, [isAuthenticated, deploymentUrl, adminClient, accessToken, teamSlug, projectSlug, team, project]);
+
+  // Fetch deployment state
+  useEffect(() => {
+    if (!isAuthenticated || !deploymentUrl || !adminClient) {
+      setDeploymentState(null);
+      return;
+    }
+
+    const fetchDeploymentState = async () => {
+      try {
+        const clientInfo = getAdminClientInfo(adminClient, deploymentUrl);
+        const validationError = validateAdminClientInfo(clientInfo);
+
+        if (validationError) {
+          return;
+        }
+
+        const { deploymentUrl: finalDeploymentUrl, adminKey } = clientInfo;
+        const finalAdminKey = accessToken || adminKey;
+
+        if (!finalDeploymentUrl || !finalAdminKey) {
+          return;
+        }
+
+        const state = await getConvexDeploymentState(finalDeploymentUrl, finalAdminKey);
+        setDeploymentState(state.state);
+      } catch (error) {
+        setDeploymentState(null);
+      }
+    };
+
+    fetchDeploymentState();
+    
+    // Check for immediate state changes (triggered by pause-deployment component)
+    const checkForStateChange = () => {
+      const lastChange = getStorageItem<number>(STORAGE_KEYS.DEPLOYMENT_STATE_CHANGED, 0);
+      const now = Date.now();
+      // If state was changed within the last 10 seconds, refresh immediately
+      if (lastChange > 0 && (now - lastChange) < 10000) {
+        fetchDeploymentState();
+      }
+    };
+
+    // Listen for custom deployment state change events for immediate updates
+    const handleDeploymentStateChange = () => {
+      fetchDeploymentState();
+    };
+
+    window.addEventListener('deploymentStateChanged', handleDeploymentStateChange);
+    
+    // Also poll every 2 seconds to keep state updated (as fallback)
+    const interval = setInterval(() => {
+      checkForStateChange();
+      fetchDeploymentState();
+    }, 2000);
+    
+    // Also check immediately on mount and when dependencies change
+    checkForStateChange();
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('deploymentStateChanged', handleDeploymentStateChange);
+    };
+  }, [isAuthenticated, deploymentUrl, adminClient, accessToken]);
+
+  const handleSettingsClick = () => {
+    // Navigate to settings tab
+    if (onTabChange) {
+      onTabChange('settings');
+    } else {
+      setInternalActiveTab('settings');
+    }
+    // Set the settings section to pause-deployment
+    setStorageItem(STORAGE_KEYS.SETTINGS_SECTION, 'pause-deployment');
+  };
 
   // Project name for future use
   const _projectName = deploymentMetadata?.projectName || providedProjectName || extractProjectName(deploymentUrl) || 'convex-panel';
@@ -326,7 +404,6 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       {isPanelExpanded && (
         <div onMouseDown={handleResizeStart} className="cp-resize-handle" />
       )}
-
       <div className="cp-header" style={{ borderBottom: isOpen ? undefined : 'none' }}>
         <div className="cp-header-section">{headerLeftContent}</div>
         <div className="cp-header-section">{headerRightContent}</div>
@@ -346,6 +423,48 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
                 <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
 
                 <div className="cp-main-content" ref={mainContentRef} style={{ position: 'relative', overflow: 'hidden' }}>
+                    {/* Deployment Paused Banner */}
+                    {isAuthenticated && deploymentState === 'paused' && (
+                      <div
+                        style={{
+                          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                          border: '1px solid rgba(239, 68, 68, 0.2)',
+                          color: '#f87171',
+                          padding: '12px 24px',
+                          textAlign: 'center',
+                          fontSize: '14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <span>This deployment is paused. Resume your deployment on the </span>
+                        <button
+                          type="button"
+                          onClick={handleSettingsClick}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#60a5fa',
+                            textDecoration: 'underline',
+                            cursor: 'pointer',
+                            padding: 0,
+                            fontSize: '14px',
+                            fontWeight: 500,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = '#93c5fd';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = '#60a5fa';
+                          }}
+                        >
+                          settings
+                        </button>
+                        <span> page.</span>
+                      </div>
+                    )}
                   {children}
                   {isPanelExpanded && <GlobalSheet container={sheetContainer} />}
                 </div>

@@ -14,6 +14,7 @@ interface MainViewsProps {
   containerProps: {
     convex: any;
     accessToken: string;
+    teamAccessToken?: string;
     deployUrl?: string;
     baseUrl?: string;
     adminClient: any;
@@ -93,11 +94,12 @@ const tabRenderers: Record<TabId, TabRenderer> = {
     />
   ),
   components: () => <ComponentsView />,
-  settings: ({ deployUrl, accessToken, adminClient }) => (
+  settings: ({ deployUrl, accessToken, adminClient, teamAccessToken }) => (
     <SettingsView
       adminClient={adminClient}
       accessToken={accessToken}
       deploymentUrl={deployUrl}
+      teamAccessToken={teamAccessToken}
     />
   ),
 };

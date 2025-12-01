@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type SettingsSection = 'environment-variables';
+export type SettingsSection = 'environment-variables' | 'url-deploy-key' | 'authentication' | 'components' | 'backup-restore' | 'integrations' | 'pause-deployment';
 
 export interface SettingsSidebarProps {
   selectedSection: SettingsSection;
@@ -12,7 +12,13 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   onSectionSelect,
 }) => {
   const sections: Array<{ id: SettingsSection; label: string }> = [
+    { id: 'url-deploy-key', label: 'URL & Deploy Key' },
     { id: 'environment-variables', label: 'Environment Variables' },
+    { id: 'authentication', label: 'Authentication' },
+    { id: 'components', label: 'Components' },
+    { id: 'backup-restore', label: 'Backup & Restore' },
+    { id: 'integrations', label: 'Integrations' },
+    { id: 'pause-deployment', label: 'Pause Deployment' },
   ];
 
   return (

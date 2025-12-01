@@ -505,8 +505,8 @@ export const LogsView: React.FC<LogsViewProps> = ({
 
     // Determine log type color for badge
     let logTypeBadgeStyle: React.CSSProperties = {
-      backgroundColor: '#374151',
-      color: '#9ca3af',
+      backgroundColor: 'var(--color-panel-bg-tertiary)',
+      color: 'var(--color-panel-text-secondary)',
     };
     if (functionType === 'query') {
       logTypeBadgeStyle = { backgroundColor: '#1e3a5f', color: '#60a5fa' };
@@ -537,17 +537,17 @@ export const LogsView: React.FC<LogsViewProps> = ({
           ...style,
           ...logsViewStyles.logRow,
           ...(isSelected ? {
-            backgroundColor: 'rgba(52, 211, 153, 0.15)',
+            backgroundColor: 'color-mix(in srgb, var(--color-panel-accent) 15%, transparent)',
             borderLeft: '3px solid var(--color-panel-accent)',
           } : isHovered && isError && !isSelected ? {
-            backgroundColor: 'rgba(239, 68, 68, 0.25)',
-            color: '#f87171',
+            backgroundColor: 'color-mix(in srgb, var(--color-panel-error) 25%, transparent)',
+            color: 'var(--color-panel-error)',
           } : isHovered && !isError && !isSelected ? {
-            backgroundColor: 'rgba(28, 31, 38, 0.7)',
+            backgroundColor: 'var(--color-panel-hover)',
           } : {}),
           ...(isError && !isSelected && !isHovered ? {
-            backgroundColor: 'rgba(239, 68, 68, 0.15)',
-            color: '#f87171',
+            backgroundColor: 'color-mix(in srgb, var(--color-panel-error) 15%, transparent)',
+            color: 'var(--color-panel-error)',
           } : {}),
           cursor: 'pointer',
         }}
@@ -560,21 +560,21 @@ export const LogsView: React.FC<LogsViewProps> = ({
       >
         <div style={{ 
           ...logsViewStyles.timestampCell, 
-          ...(isError ? { color: '#f87171' } : { color: '#9ca3af' }) 
+          ...(isError ? { color: 'var(--color-panel-error)' } : {}) 
         }}>
           {formatTimestamp(log.timestamp)}
         </div>
         <div style={{ 
           ...logsViewStyles.idCell, 
-          ...(isError ? { color: '#f87171' } : {}) 
+          ...(isError ? { color: 'var(--color-panel-error)' } : {}) 
         }}>
           {shortId !== '-' && (
             <span style={{
               ...logsViewStyles.idBadge,
               ...(isError ? {
-                border: '1px solid rgba(248, 113, 113, 0.5)',
-                backgroundColor: 'rgba(248, 113, 113, 0.1)',
-                color: '#f87171',
+                border: '1px solid color-mix(in srgb, var(--color-panel-error) 50%, transparent)',
+                backgroundColor: 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)',
+                color: 'var(--color-panel-error)',
               } : {}),
             }}>
               {shortId}
@@ -583,14 +583,14 @@ export const LogsView: React.FC<LogsViewProps> = ({
         </div>
         <div style={logsViewStyles.statusCell}>
           {statusDisplay && (
-            <span style={isError ? { color: '#f87171' } : status === 'success' ? { color: '#34d399' } : { color: '#d1d5db' }}>
+            <span style={isError ? { color: 'var(--color-panel-error)' } : status === 'success' ? { color: 'var(--color-panel-success)' } : { color: 'var(--color-panel-text-secondary)' }}>
               {statusDisplay}
             </span>
           )}
           {executionTime && (
             <span style={{ 
               ...logsViewStyles.executionTime, 
-              ...(isError ? { color: '#f87171' } : { color: '#6b7280' }),
+              ...(isError ? { color: 'var(--color-panel-error)' } : {}),
               marginLeft: '8px',
             }}>
               {executionTime}
@@ -599,14 +599,14 @@ export const LogsView: React.FC<LogsViewProps> = ({
         </div>
         <div style={{ 
           ...logsViewStyles.functionCell, 
-          ...(isError ? { color: '#f87171' } : {}) 
+          ...(isError ? { color: 'var(--color-panel-error)' } : {}) 
         }}>
           <span style={{
             ...logsViewStyles.logTypeIcon,
             ...logTypeBadgeStyle,
             ...(isError ? { 
-              backgroundColor: 'rgba(248, 113, 113, 0.2)',
-              color: '#f87171',
+              backgroundColor: 'color-mix(in srgb, var(--color-panel-error) 20%, transparent)',
+              color: 'var(--color-panel-error)',
             } : {}),
             borderRadius: '4px',
             padding: '2px 6px',
@@ -622,7 +622,7 @@ export const LogsView: React.FC<LogsViewProps> = ({
           {functionIdentifier && (
             <span style={{ 
               ...logsViewStyles.functionPath, 
-              color: isError ? '#f87171' : 'var(--color-panel-text-muted)', 
+              color: isError ? 'var(--color-panel-error)' : 'var(--color-panel-text-muted)', 
               marginRight: '4px',
               fontFamily: 'monospace',
             }}>
@@ -631,7 +631,7 @@ export const LogsView: React.FC<LogsViewProps> = ({
           )}
           <span style={{ 
             ...logsViewStyles.functionPath, 
-            ...(isError ? { color: '#f87171' } : { color: '#d1d5db' }),
+            ...(isError ? { color: 'var(--color-panel-error)' } : {}),
             fontFamily: 'monospace',
           }}>
             {displayFunctionName}
@@ -639,7 +639,7 @@ export const LogsView: React.FC<LogsViewProps> = ({
           {isError && log.error_message && (
             <span style={{
               marginLeft: '8px',
-              color: '#f87171',
+              color: 'var(--color-panel-error)',
               fontSize: '11px',
               opacity: 0.9,
               fontFamily: 'monospace',
@@ -902,7 +902,7 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
             <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-panel-text)' }}>
               {formatTimestamp(log.timestamp)} ({formatRelativeTime(log.timestamp)})
             </div>
-            <div style={{ fontSize: '12px', color: isError ? '#f87171' : '#34d399', marginTop: '4px' }}>
+            <div style={{ fontSize: '12px', color: isError ? 'var(--color-panel-error)' : 'var(--color-panel-success)', marginTop: '4px' }}>
               {status || 'unknown'}
             </div>
           </div>
@@ -914,12 +914,12 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
         <div style={{
           margin: '16px 20px',
           padding: '12px',
-          backgroundColor: 'rgba(239, 68, 68, 0.1)',
-          border: '1px solid rgba(239, 68, 68, 0.3)',
+          backgroundColor: 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--color-panel-error) 30%, transparent)',
           borderRadius: '4px',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#f87171' }}>Error</div>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-panel-error)' }}>Error</div>
             <button
               onClick={() => copyToClipboard(log.error_message || '')}
               style={{
@@ -927,7 +927,7 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
                 border: 'none',
                 cursor: 'pointer',
                 padding: '4px',
-                color: '#f87171',
+                color: 'var(--color-panel-error)',
                 display: 'flex',
                 alignItems: 'center',
               }}
@@ -935,7 +935,7 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
               <Copy size={14} />
             </button>
           </div>
-          <div style={{ fontSize: '12px', color: '#f87171', fontFamily: 'monospace' }}>
+          <div style={{ fontSize: '12px', color: 'var(--color-panel-error)', fontFamily: 'monospace' }}>
             {log.error_message}
           </div>
         </div>
@@ -1194,17 +1194,17 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
                         alignItems: 'center',
                         gap: '12px',
                         padding: '12px 16px',
-                        backgroundColor: 'rgba(180, 83, 9, 0.1)',
-                        border: '1px solid rgba(180, 83, 9, 0.2)',
+                        backgroundColor: 'color-mix(in srgb, var(--color-panel-warning) 10%, transparent)',
+                        border: '1px solid color-mix(in srgb, var(--color-panel-warning) 20%, transparent)',
                         borderRadius: '8px',
                         fontFamily: 'monospace',
                         fontSize: '12px',
                       }}
                     >
                       {isSuccess ? (
-                        <CheckCircle2 size={16} style={{ color: '#34d399', flexShrink: 0 }} />
+                        <CheckCircle2 size={16} style={{ color: 'var(--color-panel-success)', flexShrink: 0 }} />
                       ) : (
-                        <X size={16} style={{ color: '#f87171', flexShrink: 0 }} />
+                        <X size={16} style={{ color: 'var(--color-panel-error)', flexShrink: 0 }} />
                       )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
                         {component && (

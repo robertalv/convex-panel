@@ -7,13 +7,14 @@ import { MainViews } from './components/main-view';
 import { BottomSheet } from './components/bottom-sheet';
 import { AuthPanel } from './components/auth-panel';
 import { getConvexUrl, getOAuthConfigFromEnv, isDevelopment } from './utils/env';
-import { extractProjectName } from './utils/api';
+import { extractProjectName, getTeamTokenFromEnv } from './utils/api';
 import { Team, Project } from './types';
 import { useActiveTab } from './hooks/useActiveTab';
 import { ThemeProvider, Theme, useTheme } from './hooks/useTheme';
 import { SheetProvider } from './contexts/sheet-context';
 import { ConfirmDialogProvider } from './contexts/confirm-dialog-context';
-import { Helmet } from 'react-helmet';
+import { getStorageItem, setStorageItem } from './utils/storage';
+import { STORAGE_KEYS } from './utils/constants';
 
 const ThemedToaster: React.FC = () => {
   const { theme } = useTheme();
@@ -26,6 +27,7 @@ const ThemedToaster: React.FC = () => {
 export interface ConvexPanelProps {
   convex?: ConvexReactClient | any;
   accessToken?: string;
+  teamAccessToken?: string;
   deployUrl?: string;
   deployKey?: string;
   oauthConfig?: {
@@ -50,6 +52,7 @@ export interface ConvexPanelProps {
 const ConvexPanel: React.FC<ConvexPanelProps> = ({
   convex: providedConvex,
   accessToken: providedAccessToken,
+  teamAccessToken: providedTeamAccessToken,
   deployUrl: providedDeployUrl,
   deployKey: providedDeployKey,
   oauthConfig: providedOAuthConfig,
@@ -68,7 +71,12 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
   ...restProps
 }) => {
   const [isMounted, setIsMounted] = useState(false);
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return getStorageItem<boolean>(STORAGE_KEYS.BOTTOM_SHEET_EXPANDED, true);
+    }
+    return true;
+  });
   const [activeTab, setActiveTab] = useActiveTab();
 
   let convexFromContext: any;
@@ -92,6 +100,12 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
 
   const oauthConfig = providedOAuthConfig || envOAuthConfig;
 
+  // Automatically get teamAccessToken from environment if not provided
+  const envTeamAccessToken = useMemo(() => {
+    if (providedTeamAccessToken) return providedTeamAccessToken;
+    return getTeamTokenFromEnv() || undefined;
+  }, [providedTeamAccessToken]);
+
   // OAuth authentication (skip if mockup mode or auth provided)
   const internalAuth = useOAuth(mockup || providedAuth ? null : (oauthConfig || null));
   const oauth = providedAuth || internalAuth;
@@ -101,10 +115,31 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
   const effectiveAccessToken = mockup ? undefined : (oauth.token?.access_token || providedAccessToken || undefined);
   const isAuthenticated = mockup ? true : (oauth.isAuthenticated || !!providedAccessToken);
 
-  // Set mounted state
+  // Set mounted state and inject analytics script
   useEffect(() => {
     setIsMounted(true);
+
+    // Inject visitors.now analytics script
+    if (typeof document !== 'undefined') {
+      const scriptId = 'visitors-now-script';
+      // Check if script already exists
+      if (!document.getElementById(scriptId)) {
+        const script = document.createElement('script');
+        script.id = scriptId;
+        script.src = 'https://cdn.visitors.now/v.js';
+        script.setAttribute('data-token', 'f306f3ae-cc04-42bd-8d48-66531197290d');
+        script.async = true;
+        document.head.appendChild(script);
+      }
+    }
   }, []);
+
+  // Persist bottom sheet expanded state
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setStorageItem(STORAGE_KEYS.BOTTOM_SHEET_EXPANDED, isOpen);
+    }
+  }, [isOpen]);
 
   // Create admin client - use OAuth token or deployKey
   const adminClient = useMemo(() => {
@@ -159,9 +194,6 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
   // Root container with scoped styles - no CSS imports
   return (
     <ThemeProvider defaultTheme={defaultTheme}>
-      <Helmet>
-        <script src="https://cdn.visitors.now/v.js" data-token="f306f3ae-cc04-42bd-8d48-66531197290d"></script>
-      </Helmet>
       <SheetProvider>
         <ConfirmDialogProvider>
           <ThemedToaster />
@@ -196,6 +228,7 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
               containerProps={{
                 convex: convex,
                 accessToken: effectiveAccessToken || '',
+                teamAccessToken: envTeamAccessToken,
                 deployUrl: deployUrl,
                 baseUrl: deployUrl,
                 adminClient: adminClient,

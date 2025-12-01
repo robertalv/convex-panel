@@ -22,6 +22,9 @@ export const STORAGE_KEYS: Record<string, string> = {
   PANEL_HIDDEN: `${STORAGE_PREFIX}:panel-hidden`,
   THEME: `${STORAGE_PREFIX}:theme`,
   PANEL_HEIGHT: `${STORAGE_PREFIX}:panel-height`,
+  SETTINGS_SECTION: `${STORAGE_PREFIX}:settings-section`,
+  BOTTOM_SHEET_EXPANDED: `${STORAGE_PREFIX}:bottom-sheet-expanded`,
+  DEPLOYMENT_STATE_CHANGED: `${STORAGE_PREFIX}:deployment-state-changed`,
 }
 
 export const PANEL_MIN_HEIGHT = 40;
