@@ -10,9 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@erquhart/convex-oss-stats": "^0.8.2",
     "@radix-ui/react-slot": "^1.1.2",
     "@repo/backend": "workspace:*",
     "@tailwindcss/vite": "^4.1.17",
+    "@tanstack/react-router": "^1.139.12",
     "@vercel/analytics": "^1.5.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

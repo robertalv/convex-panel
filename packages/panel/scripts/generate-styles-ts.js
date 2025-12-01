@@ -37,7 +37,6 @@ export const panelStyles = \`${escapedCss}\`;
   }
 
   fs.writeFileSync(outputPath, tsContent, 'utf8');
-  console.log(`✅ Generated ${outputPath}`);
 }
 
 if (require.main === module) {

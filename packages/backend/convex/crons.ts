@@ -8,14 +8,14 @@ const crons = cronJobs();
 crons.interval(
   "archive old todos",
   { hours: 1 }, 
-  internal.todo.archiveOldTodos
+  internal.todos.archiveOldTodos
 );
 
 // Delete completed todos - runs every hour
 crons.interval(
   "delete completed todos",
   { hours: 1 }, 
-  internal.todo.deleteCompletedTodos
+  internal.todos.deleteCompletedTodos
 );
 
 

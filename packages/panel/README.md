@@ -36,24 +36,72 @@ bun add convex-panel --dev
 
 ## Environment Setup
 
-Create a `.env.local` file in your project root:
+Create a `.env.local` (or `.env`) file in your project root.
 
-### Next.js
+### Minimum configuration
+
+For Convex Panel to connect to your deployment you need a Convex URL:
+
+- **Next.js**
+
 ```bash
 NEXT_PUBLIC_CONVEX_URL="https://your-deployment.convex.cloud"
 ```
 
-### Vite / React
+- **Vite / React**
+
 ```bash
 VITE_CONVEX_URL="https://your-deployment.convex.cloud"
 ```
 
-### Create React App
+- **Create React App**
+
 ```bash
 REACT_APP_CONVEX_URL="https://your-deployment.convex.cloud"
 ```
 
-> **Note:** The panel auto-detects environment variables based on your framework. Authentication is handled via OAuth when you first open the panel.
+### Optional: OAuth + automatic setup
+
+Convex Panel can use OAuth to obtain a short‑lived admin token instead of manual tokens.  
+To make this easy, the package ships with setup scripts that:
+
+- Inject an OAuth HTTP action into your `convex/http.ts` (for code → token exchange).
+- Help you configure the required environment variables.
+
+From your app root (where `convex/` lives), add these scripts to your app's `package.json`:
+
+```json
+"scripts": {
+  "convex-panel:setup:oauth": "node ./node_modules/convex-panel/scripts/setup-oauth.js",
+  "convex-panel:setup:env": "node ./node_modules/convex-panel/scripts/setup-env.js"
+}
+```
+
+Then run:
+
+```bash
+npm run convex-panel:setup:oauth
+npm run convex-panel:setup:env
+```
+
+These scripts will:
+
+- Create or update `convex/http.ts` to add:
+  - `POST /oauth/exchange`
+  - `OPTIONS /oauth/exchange` (CORS preflight)
+- Prompt you for, and append to your env file (without overwriting existing values):
+  - `VITE_CONVEX_URL` – Convex deployment URL (e.g. `https://your-deployment.convex.cloud`)
+  - `VITE_OAUTH_CLIENT_ID` – Convex OAuth client ID from the Convex dashboard
+  - `VITE_CONVEX_TOKEN_EXCHANGE_URL` – usually `https://your-deployment.convex.site/oauth/exchange`
+
+In your Convex deployment settings you should also configure:
+
+- `CONVEX_CLIENT_ID` – same OAuth client ID
+- `CONVEX_CLIENT_SECRET` – OAuth client secret (server‑side only, never in frontend env)
+- Optionally `OAUTH_REDIRECT_URI` – your frontend origin (e.g. `https://your-site.com`)
+
+> **Note:** The panel auto‑detects environment variables based on your framework.  
+> If you don’t want OAuth, you can skip the setup scripts and use manual tokens instead (see `accessToken` / `deployKey` props below).
 
 ## Quick Start
 
@@ -117,7 +165,8 @@ That's it! The panel will appear at the bottom of your screen. Click to expand a
 
 ### OAuth Configuration (Advanced)
 
-For custom OAuth setups, you can provide an `oauthConfig`:
+For custom OAuth setups, you can provide an `oauthConfig`.  
+This is useful if you have your own backend endpoint for token exchange:
 
 ```tsx
 <ConvexPanel
@@ -125,7 +174,7 @@ For custom OAuth setups, you can provide an `oauthConfig`:
     clientId: "your-client-id",
     redirectUri: window.location.origin,
     scope: "project", // or "team"
-    tokenExchangeUrl: "/api/convex/exchange",
+    tokenExchangeUrl: "https://your-deployment.convex.site/oauth/exchange",
   }}
 />
 ```

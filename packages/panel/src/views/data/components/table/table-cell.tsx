@@ -11,6 +11,7 @@ export interface TableCellProps {
   width: number;
   rowId: string;
   columnMeta?: ColumnMeta;
+  isHighlighted: boolean;
   isHovered: boolean;
   isMenuOpen: boolean;
   isEditing: boolean;
@@ -43,6 +44,7 @@ export const TableCell: React.FC<TableCellProps> = ({
   width,
   rowId,
   columnMeta,
+  isHighlighted,
   isHovered,
   isMenuOpen,
   isEditing,
@@ -79,13 +81,16 @@ export const TableCell: React.FC<TableCellProps> = ({
         width,
         minWidth: width,
         maxWidth: width,
+        transition: 'background-color 0.35s ease',
         backgroundColor: isEditing
           ? 'var(--color-panel-bg-secondary)'
-          : isMenuOpen
-            ? 'var(--color-panel-active)'
-            : isHovered
-              ? 'var(--color-panel-hover)'
-              : 'transparent',
+          : isHighlighted
+            ? 'rgba(52, 211, 153, 0.18)'
+            : isMenuOpen
+              ? 'var(--color-panel-active)'
+              : isHovered
+                ? 'var(--color-panel-hover)'
+                : 'transparent',
         position: 'relative',
       }}
       onMouseEnter={onMouseEnter}

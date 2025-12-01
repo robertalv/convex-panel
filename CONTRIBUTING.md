@@ -57,7 +57,7 @@ convex-panel/
 │   ├── edge-extension      # Edge browser extension
 │   ├── firefox-extension   # Firefox browser extension
 │   ├── desktop             # Desktop application
-│   ├── dev-server          # Development server
+│   ├── api                 # API server
 │   └── web                 # Web application
 ├── packages/
 │   ├── panel               # Core convex-panel React component

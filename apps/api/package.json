@@ -1,5 +1,5 @@
 {
-  "name": "@convex-panel/api-server",
+  "name": "convex-panel/api",
   "version": "1.0.0",
   "description": "Production API server for Convex Panel - deployed to api.convexpanel.dev",
   "main": "server.js",

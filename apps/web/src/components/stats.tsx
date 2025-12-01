@@ -1,11 +1,9 @@
 "use client"
 
 import { useEffect, useState } from 'react';
+import { Star, Download, TrendingUp } from 'lucide-react';
 
 const fetchNpmPackageDownloadCount = async (name: string, created: number) => {
-  // The dates accepted in the endpoint url and returned in the data
-  // are date-only ISO's, eg., `2024-01-01`, so we use that format
-  // for all dates in this function
   const currentDateIso = new Date().toISOString().substring(0, 10);
   let nextDate = new Date(created);
   let totalDownloadCount = 0;
@@ -47,11 +45,10 @@ export default function StatsSection() {
         async function fetchData() {
             setIsLoading(true);
             try {
-                // Get the date for 7 days ago for weekly downloads
                 const lastWeek = new Date();
                 lastWeek.setDate(lastWeek.getDate() - 7);
                 const lastWeekStr = lastWeek.toISOString().split('T')[0];
-                
+
                 const [npmWeeklyResponse, githubResponse] = await Promise.all([
                     fetch(`https://api.npmjs.org/downloads/point/${lastWeekStr}:${today}/convex-panel`),
                     fetch("https://api.github.com/repos/robertalv/convex-panel")
@@ -66,8 +63,7 @@ export default function StatsSection() {
                     end: new Date(npmWeeklyData.end).toISOString().split('T')[0]
                 });
                 setGithubStars(githubData.stargazers_count || 0);
-                
-                // Fetch total download count
+
                 const packageCreationDate = new Date(2023, 0, 1).getTime();
                 const total = await fetchNpmPackageDownloadCount('convex-panel', packageCreationDate);
                 setTotalDownloads(total);
@@ -82,37 +78,60 @@ export default function StatsSection() {
     }, [today]);
 
     return (
-        <section className="py-12 md:py-20">
-            <div className="mx-auto max-w-5xl space-y-8 px-6 md:space-y-16">
-                <div className="relative z-10 mx-auto max-w-xl space-y-6 text-center">
-                    <h2 className="text-4xl font-medium lg:text-5xl">Convex Panel in numbers</h2>
-                    <p>Convex Panel is a tool that helps developers use their Convex database within their applications.</p>
+        <section className="py-16 md:py-24 relative">
+            {/* Section divider */}
+            <div className="section-divider mb-16 md:mb-20" />
+
+            <div className="mx-auto max-w-5xl space-y-12 px-6">
+                <div className="relative z-10 mx-auto max-w-xl space-y-4 text-center">
+                    <span className="text-[#34D399] text-sm font-medium uppercase tracking-wider">Stats</span>
+                    <h2 className="text-3xl font-medium lg:text-4xl">
+                        Convex Panel <span className="text-gradient-accent">in numbers</span>
+                    </h2>
+                    <p className="text-muted-foreground">Trusted by developers building with Convex</p>
                 </div>
 
                 {!isLoading ? (
-                <div className="grid gap-12 divide-y *:text-center md:grid-cols-3 md:gap-2 md:divide-x md:divide-y-0">
-                    <div className="space-y-4">
-                        <div className="text-5xl font-bold">
+                <div className="grid gap-6 md:grid-cols-3">
+                    <div className="stats-card text-center glow-accent">
+                        <div className="icon-container mx-auto mb-4">
+                            <Star className="size-5 text-[#34D399]" />
+                        </div>
+                        <div className="text-4xl lg:text-5xl font-bold text-gradient-accent mb-2">
                             {githubStars.toLocaleString()}
                         </div>
-                        <p>Stars on GitHub</p>
+                        <p className="text-muted-foreground text-sm">Stars on GitHub</p>
                     </div>
-                    <div className="space-y-4">
-                        <div className="text-5xl font-bold">{npmStats.downloads.toLocaleString()}</div>
-                        <p>Weekly Downloads</p>
+                    <div className="stats-card text-center">
+                        <div className="icon-container mx-auto mb-4">
+                            <TrendingUp className="size-5 text-[#34D399]" />
+                        </div>
+                        <div className="text-4xl lg:text-5xl font-bold text-gradient-accent mb-2">
+                            {npmStats.downloads.toLocaleString()}
+                        </div>
+                        <p className="text-muted-foreground text-sm">Weekly Downloads</p>
                     </div>
-                    <div className="space-y-4">
-                        <div className="text-5xl font-bold">{totalDownloads.toLocaleString()}</div>
-                        <p>Total Downloads</p>
+                    <div className="stats-card text-center">
+                        <div className="icon-container mx-auto mb-4">
+                            <Download className="size-5 text-[#34D399]" />
+                        </div>
+                        <div className="text-4xl lg:text-5xl font-bold text-gradient-accent mb-2">
+                            {totalDownloads.toLocaleString()}
+                        </div>
+                        <p className="text-muted-foreground text-sm">Total Downloads</p>
                     </div>
                 </div>
                 ) : (
-                    <div className="grid gap-12 divide-y *:text-center md:grid-cols-3 md:gap-2 md:divide-x md:divide-y-0">
-                        <div className="space-y-4">
-                            <div className="text-5xl font-bold">
-                                Loading...
+                    <div className="grid gap-6 md:grid-cols-3">
+                        {[1, 2, 3].map((i) => (
+                            <div key={i} className="stats-card text-center animate-pulse">
+                                <div className="icon-container mx-auto mb-4 opacity-50">
+                                    <div className="size-5 bg-muted rounded" />
+                                </div>
+                                <div className="h-12 bg-muted rounded w-24 mx-auto mb-2" />
+                                <div className="h-4 bg-muted rounded w-20 mx-auto" />
                             </div>
-                        </div>
+                        ))}
                     </div>
                 )}
             </div>

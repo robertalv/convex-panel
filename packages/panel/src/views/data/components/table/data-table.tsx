@@ -46,6 +46,7 @@ export interface DataTableProps {
   projectSlug?: string;
   filters?: FilterExpression;
   setFilters?: (filters: FilterExpression) => void;
+  onAddDocument?: () => void;
 }
 
 export const DataTable: React.FC<DataTableProps> = ({
@@ -66,6 +67,7 @@ export const DataTable: React.FC<DataTableProps> = ({
   projectSlug,
   filters,
   setFilters,
+  onAddDocument,
 }) => {
   const { confirm } = useConfirmSafe();
   const [columnOrder, setColumnOrder] = useState<string[]>([]);
@@ -99,6 +101,14 @@ export const DataTable: React.FC<DataTableProps> = ({
   const editorRef = useRef<HTMLDivElement>(null);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  // Track new/updated documents for visual highlighting
+  const previousDocumentsRef = useRef<TableDocument[]>([]);
+  const highlightTimeoutRef = useRef<number | null>(null);
+  const [highlightedRows, setHighlightedRows] = useState<string[]>([]);
+  const [highlightedCells, setHighlightedCells] = useState<
+    Record<string, string[]>
+  >({});
 
   const clampPosition = useCallback((x: number, y: number) => {
     const margin = 12;
@@ -153,8 +163,13 @@ export const DataTable: React.FC<DataTableProps> = ({
   const renderEmptyState = useCallback(() => {
     const columnsForEmptyState =
       orderedColumns.length > 0 ? orderedColumns : ['_id', '_creationTime'];
-    return <EmptyTableState columns={columnsForEmptyState} />;
-  }, [orderedColumns]);
+    return (
+      <EmptyTableState
+        columns={columnsForEmptyState}
+        onAddDocument={onAddDocument}
+      />
+    );
+  }, [orderedColumns, onAddDocument]);
 
   const getColumnWidth = useCallback(
     (column: string) => {
@@ -210,6 +225,20 @@ export const DataTable: React.FC<DataTableProps> = ({
     [documents],
   );
 
+  // Map of rowId -> Set of highlighted column keys
+  const highlightedColumnMap = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    Object.entries(highlightedCells).forEach(([rowId, columns]) => {
+      map[rowId] = new Set(columns);
+    });
+    return map;
+  }, [highlightedCells]);
+
+  const highlightedRowSet = useMemo(
+    () => new Set(highlightedRows),
+    [highlightedRows],
+  );
+
   const isAllSelected =
     allDocumentIds.length > 0 &&
     allDocumentIds.every((id) => selectedDocumentIds.includes(id));
@@ -231,6 +260,88 @@ export const DataTable: React.FC<DataTableProps> = ({
     },
     [selectedDocumentIds, onSelectionChange],
   );
+
+  // Reset highlights when switching tables
+  useEffect(() => {
+    previousDocumentsRef.current = documents;
+    setHighlightedRows([]);
+    setHighlightedCells({});
+    if (highlightTimeoutRef.current !== null) {
+      window.clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = null;
+    }
+  }, [selectedTable]);
+
+  // Detect new rows and updated cells whenever documents change
+  useEffect(() => {
+    const prevDocs = previousDocumentsRef.current;
+    const prevById = new Map(prevDocs.map((doc) => [doc._id, doc]));
+
+    const newRowIds: string[] = [];
+    const updatedCells: Record<string, string[]> = {};
+
+    for (const doc of documents) {
+      const prev = prevById.get(doc._id);
+
+      if (!prev) {
+        // New document: highlight all of its fields (except internal metadata)
+        newRowIds.push(doc._id);
+        const cols = Object.keys(doc).filter(
+          (key) => key !== '_id' && key !== '_creationTime',
+        );
+        if (cols.length) {
+          updatedCells[doc._id] = cols;
+        }
+      } else {
+        // Existing document: highlight only changed fields
+        const changedCols: string[] = [];
+        for (const key of Object.keys(doc)) {
+          if (key === '_id' || key === '_creationTime') continue;
+          if ((prev as any)[key] !== (doc as any)[key]) {
+            changedCols.push(key);
+          }
+        }
+        if (changedCols.length) {
+          updatedCells[doc._id] = changedCols;
+        }
+      }
+    }
+
+    const hasChanges =
+      newRowIds.length > 0 || Object.keys(updatedCells).length > 0;
+
+    if (hasChanges) {
+      // If we already have a pending timeout, reset it so the
+      // highlight duration starts from the most recent change.
+      if (highlightTimeoutRef.current !== null) {
+        window.clearTimeout(highlightTimeoutRef.current);
+        highlightTimeoutRef.current = null;
+      }
+
+      // Merge new highlights with any existing ones
+      setHighlightedRows((prev) =>
+        Array.from(new Set([...prev, ...newRowIds])),
+      );
+      setHighlightedCells((prev) => {
+        const next: Record<string, string[]> = { ...prev };
+        for (const [rowId, cols] of Object.entries(updatedCells)) {
+          const existing = new Set(next[rowId] ?? []);
+          cols.forEach((c) => existing.add(c));
+          next[rowId] = Array.from(existing);
+        }
+        return next;
+      });
+
+      // Automatically clear highlights after a short delay
+      highlightTimeoutRef.current = window.setTimeout(() => {
+        setHighlightedRows([]);
+        setHighlightedCells({});
+        highlightTimeoutRef.current = null;
+      }, 1200);
+    }
+
+    previousDocumentsRef.current = documents;
+  }, [documents]);
 
   const startResizing = useCallback(
     (column: string, event: React.PointerEvent<HTMLDivElement>) => {
@@ -747,6 +858,8 @@ export const DataTable: React.FC<DataTableProps> = ({
                     accessToken={accessToken}
                     teamSlug={teamSlug}
                     projectSlug={projectSlug}
+                    isNewRow={highlightedRowSet.has(doc._id)}
+                    highlightedColumns={highlightedColumnMap[doc._id]}
                   />
                 ))}
               </tbody>

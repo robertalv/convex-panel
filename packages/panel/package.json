@@ -1,6 +1,6 @@
 {
   "name": "convex-panel",
-  "version": "0.2.17",
+  "version": "0.2.18",
   "description": "A React component for monitoring and debugging Convex applications",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -35,6 +35,7 @@
     "dist",
     "examples",
     "vite.config.ts",
+    "scripts",
     "README.md"
   ],
   "scripts": {
@@ -46,6 +47,9 @@
     "dev:live": "vite --config dev/vite.config.ts",
     "dev:server": "node dev/server.js",
     "dev:all": "npm run dev:server & npm run dev:live",
+    "setup:oauth": "node scripts/setup-oauth.js",
+    "setup:env": "node scripts/setup-env.js",
+    "setup": "npm run setup:oauth && npm run setup:env",
     "clean": "rimraf dist",
     "prepublishOnly": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
