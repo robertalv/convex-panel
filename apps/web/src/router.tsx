@@ -89,14 +89,14 @@ const routeTree = rootRoute.addChildren([indexRoute, docsRoute, changelogRoute])
 
 export const router = new Router({ routeTree });
 
-declare module "@tanstack/react-router" {
-  interface Register {
-    router: typeof router;
-  }
-}
 
 export const AppRouterProvider: React.FC = () => {
   return <RouterProvider router={router} />;
 };
 
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router;
+  }
+}
 
