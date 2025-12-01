@@ -17,11 +17,9 @@ import { ComponentSelector } from '../../components/function-runner/components/c
 import { FunctionSelector } from '../../components/function-runner/components/function-selector';
 import { CustomQuery } from '../../components/function-runner/function-runner';
 import { ModuleFunction } from '../../utils/functionDiscovery';
-// import { fetchComponents } from '../../utils/api';
 import { useComponents } from '../../hooks/useComponents';
 import { useFunctions } from '../../hooks/useFunctions';
 import { usePaginatedScheduledJobs } from '../../hooks/usePaginatedScheduledJobs';
-// import { getDeploymentUrl } from 'src/utils/adminClient';
 import { FixedSizeList } from 'react-window';
 import { logsViewStyles } from '../../styles/panelStyles';
 import { getDeploymentUrl } from '../../utils/adminClient';
@@ -176,7 +174,6 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
     }
   });
 
-  ScheduleRow.displayName = 'ScheduleRow';
 
   return (
     <div ref={containerRef} className="cp-schedules-container" style={{ ...logsViewStyles.container, overflow: 'hidden' }}>
@@ -311,10 +308,12 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
           </div>
         )}
       </Activity>
+
+      {/* Crons jobs Activity */}
+
+      <Activity mode={selectedTab === "cron" ? "visible" : "hidden"}>
+        this is my crons job
+      </Activity>
     </div>
   );
 };
-
-
-
-export const CronJobsView = () => { }
