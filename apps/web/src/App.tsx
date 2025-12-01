@@ -1,6 +1,6 @@
 import { ConvexReactClient, ConvexProvider } from "convex/react";
-import ConvexPanel from"@convex-panel/panel";
-import "@convex-panel/panel/styles.css"
+import ConvexPanel from"convex-panel";
+import "convex-panel/styles.css"
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL;
 

@@ -8,7 +8,7 @@
         "lint": "eslint src/**/*.ts*"
     },
     "dependencies": {
-       "@convex-panel/panel": "workspace:*",
+       "convex-panel": "workspace:*",
         "convex-panel/shared": "workspace:*",
         "react": "^18.2.0",
         "react-dom": "^18.2.0"

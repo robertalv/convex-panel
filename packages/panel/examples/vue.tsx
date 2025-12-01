@@ -5,7 +5,7 @@
 
 import React from "react";
 import { ConvexReactClient, ConvexProvider } from "convex/react";
-import ConvexPanel from"@convex-panel/panel";
+import ConvexPanel from"convex-panel";
 import { createRoot } from "react-dom/client";
 
 // Vue types - uncomment when Vue is installed

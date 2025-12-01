@@ -8,7 +8,7 @@
     "scripts": {
         "build": "turbo run build",
         "dev": "turbo run dev --concurrency=11",
-        "dev:panel-only": "turbo dev --filter=web --filter=@convex-panel/panel --filter=@repo/backend --filter=dev-server --concurrency=11",
+        "dev:panel-only": "turbo dev --filter=web --filter=convex-panel --filter=@repo/backend --filter=dev-server --concurrency=11",
         "lint": "turbo run lint",
         "test": "turbo run test",
         "clean": "turbo run clean",

@@ -1,6 +1,6 @@
 import React from "react";
 import { ConvexReactClient, ConvexProvider } from "convex/react";
-import ConvexPanel from"@convex-panel/panel";
+import ConvexPanel from"convex-panel";
 
 // ConvexPanel auto-detects from VITE_CONVEX_URL, VITE_DEPLOY_KEY, etc.
 // Note: Add /// <reference types="vite/client" /> at the top for TypeScript support
