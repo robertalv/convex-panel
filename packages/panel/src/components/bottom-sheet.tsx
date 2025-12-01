@@ -218,16 +218,16 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     window.addEventListener('deploymentStateChanged', handleDeploymentStateChange);
     
     // Also poll every 2 seconds to keep state updated (as fallback)
-    const interval = setInterval(() => {
-      checkForStateChange();
-      fetchDeploymentState();
-    }, 2000);
+    // const interval = setInterval(() => {
+    //   checkForStateChange();
+    //   fetchDeploymentState();
+    // }, 2000);
     
     // Also check immediately on mount and when dependencies change
     checkForStateChange();
     
     return () => {
-      clearInterval(interval);
+      // clearInterval(interval);
       window.removeEventListener('deploymentStateChanged', handleDeploymentStateChange);
     };
   }, [isAuthenticated, deploymentUrl, adminClient, accessToken]);

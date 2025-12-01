@@ -1449,6 +1449,7 @@ export const panelStyles = `/*
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1em;
   padding: 0 16px;
 }
 

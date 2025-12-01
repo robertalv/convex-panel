@@ -26,15 +26,15 @@ export const PauseDeployment: React.FC<PauseDeploymentProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
-  useEffect(() => {
-    if (!adminClient) {
-      setError('Admin client not available');
-      setIsLoading(false);
-      return;
-    }
+  // useEffect(() => {
+  //   if (!adminClient) {
+  //     setError('Admin client not available');
+  //     setIsLoading(false);
+  //     return;
+  //   }
 
-    loadDeploymentState();
-  }, [adminClient]);
+  //   loadDeploymentState();
+  // }, [adminClient]);
 
   const loadDeploymentState = async () => {
     if (!adminClient) return;

@@ -13,7 +13,7 @@ import {
 import { getActiveTable } from './storage';
 import { FetchLogsOptions, FetchLogsResponse, FetchTablesOptions, FetchTablesResponse } from '../types';
 import { mockFetchLogsFromApi, mockFetchTablesFromApi, mockFetchCacheHitRate, mockFetchFailureRate, mockFetchSchedulerLag } from './mockData';
-import { getDeploymentUrl, getAdminKey } from './adminClient';
+import { getDeploymentUrl, getAdminKey, getAdminClientInfo } from './adminClient';
 
 // Cache to track deployments that return 403 for table columns endpoint
 // Persisted in sessionStorage to survive page reloads
@@ -3181,4 +3181,1420 @@ export async function deleteFile(
       error: err?.message || 'Failed to delete file',
     };
   }
+}
+
+export interface EnvironmentVariable {
+  name: string;
+  value: string;
+}
+
+/**
+ * Get a specific environment variable by name
+ */
+export async function getEnvironmentVariable(
+  adminClient: any,
+  name: string
+): Promise<EnvironmentVariable | null> {
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    const result = await adminClient.query(
+      '_system/cli/queryEnvironmentVariables:get' as any,
+      { name }
+    );
+    return result;
+  } catch (error: any) {
+    throw new Error(`Failed to get environment variable: ${error?.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Get all environment variables
+ */
+export async function getAllEnvironmentVariables(
+  adminClient: any
+): Promise<EnvironmentVariable[]> {
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    const result = await adminClient.query(
+      '_system/cli/queryEnvironmentVariables' as any,
+      {}
+    );
+    return result || [];
+  } catch (error: any) {
+    throw new Error(`Failed to get environment variables: ${error?.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Update environment variables via HTTP
+ * @param deploymentUrl - The deployment URL
+ * @param adminKey - The admin key for authentication
+ * @param changes - Array of changes, each with name and optional value (omit value to delete)
+ */
+export async function updateEnvironmentVariablesViaHTTP(
+  deploymentUrl: string,
+  adminKey: string,
+  changes: Array<{ name: string; value?: string }>
+): Promise<boolean> {
+  const response = await fetch(`${deploymentUrl}/api/update_environment_variables`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Convex ${adminKey}`,
+    },
+    body: JSON.stringify({ changes }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`HTTP error! status: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  return response.status === 200;
+}
+
+/**
+ * Set/update a single environment variable
+ */
+export async function setEnvironmentVariable(
+  deploymentUrl: string,
+  adminKey: string,
+  name: string,
+  value: string
+): Promise<boolean> {
+  return updateEnvironmentVariablesViaHTTP(deploymentUrl, adminKey, [
+    { name, value },
+  ]);
+}
+
+/**
+ * Delete an environment variable (set value to undefined/null)
+ */
+export async function deleteEnvironmentVariable(
+  deploymentUrl: string,
+  adminKey: string,
+  name: string
+): Promise<boolean> {
+  return updateEnvironmentVariablesViaHTTP(deploymentUrl, adminKey, [
+    { name }, // No value means delete
+  ]);
+}
+
+/**
+ * Batch update multiple environment variables
+ */
+export async function batchUpdateEnvironmentVariables(
+  deploymentUrl: string,
+  adminKey: string,
+  updates: Record<string, string>,
+  deletes: string[] = []
+): Promise<boolean> {
+  const changes = [
+    ...Object.entries(updates).map(([name, value]) => ({ name, value })),
+    ...deletes.map(name => ({ name })),
+  ];
+
+  return updateEnvironmentVariablesViaHTTP(deploymentUrl, adminKey, changes);
+}
+
+/**
+ * Deployment credentials and info
+ */
+export interface DeploymentCredentials {
+  deploymentUrl: string;
+  httpActionsUrl: string;
+  adminKey: string;
+}
+
+export interface DeploymentInfo {
+  deploymentName: string;
+  deploymentType: 'dev' | 'prod' | 'preview';
+  [key: string]: any;
+}
+
+export interface DeployKey {
+  id: string;
+  name?: string;
+  createdAt?: number;
+  expiresAt?: number;
+  [key: string]: any;
+}
+
+/**
+ * Get deployment credentials (cloud URL and site URL)
+ */
+export async function getDeploymentCredentials(
+  adminClient: any
+): Promise<DeploymentCredentials> {
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    // Get the canonical cloud URL (deployment URL)
+    const convexCloudUrl = await adminClient.query(
+      '_system/cli/convexUrl:cloudUrl' as any,
+      {}
+    );
+
+    // HTTP Actions URL is the deployment URL but with .site instead of .cloud
+    const convexSiteUrl = convexCloudUrl.replace('.convex.cloud', '.convex.site');
+
+    const { adminKey } = getAdminClientInfo(adminClient);
+
+    return {
+      deploymentUrl: convexCloudUrl,
+      httpActionsUrl: convexSiteUrl,
+      adminKey: adminKey || '',
+    };
+  } catch (error: any) {
+    throw new Error(`Failed to get deployment credentials: ${error?.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Get deployment info including type and name
+ */
+export async function getDeploymentInfo(
+  adminClient: any
+): Promise<DeploymentInfo> {
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    const result = await adminClient.query(
+      '_system/cli/deploymentInfo' as any,
+      {}
+    );
+    return result;
+  } catch (error: any) {
+    throw new Error(`Failed to get deployment info: ${error?.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Create a new deploy key using the Management API
+ * Note: Requires team access token (not admin key) and deployment name
+ */
+export async function createDeployKey(
+  deploymentName: string,
+  teamAccessToken: string,
+  keyName: string
+): Promise<{ deployKey: string }> {
+  const response = await fetch(`https://api.convex.dev/v1/deployments/${deploymentName}/create_deploy_key`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Convex ${teamAccessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: keyName,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to create deploy key: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  const result = await response.json();
+  return result;
+}
+
+/**
+ * Authentication provider types
+ */
+export interface OIDCProvider {
+  domain: string;
+  applicationID: string;
+}
+
+export interface CustomJWTProvider {
+  type: string;
+  issuer: string;
+  jwks: string;
+  algorithm: string;
+  applicationID?: string;
+}
+
+export type AuthProvider = OIDCProvider | CustomJWTProvider;
+
+/**
+ * Get authentication providers for a deployment
+ */
+export async function getAuthProviders(
+  adminClient: any
+): Promise<AuthProvider[]> {
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    const result = await adminClient.query(
+      '_system/frontend/listAuthProviders:default' as any,
+      {}
+    );
+
+    // The result might be directly an array, or wrapped in a status object
+    if (Array.isArray(result)) {
+      return result;
+    }
+    
+    if (result && typeof result === 'object') {
+      if (result.status === 'success' && result.value) {
+        return Array.isArray(result.value) ? result.value : [];
+      }
+      // If it's already an object with providers, try to return it directly
+      if (Array.isArray(result.providers)) {
+        return result.providers;
+      }
+    }
+    
+    return [];
+  } catch (error: any) {
+    throw new Error(`Failed to get auth providers: ${error?.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Component type
+ */
+export interface Component {
+  id: string;
+  name: string;
+  path: string;
+  args: Record<string, any>;
+  state: 'active' | 'inactive';
+}
+
+/**
+ * Get components for a deployment
+ */
+export async function getComponents(
+  adminClient: any
+): Promise<Component[]> {
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    const result = await adminClient.query(
+      '_system/frontend/components:list' as any,
+      {}
+    );
+
+    // The result might be directly an array, or wrapped in a status object
+    if (Array.isArray(result)) {
+      return result;
+    }
+    
+    if (result && typeof result === 'object') {
+      if (result.status === 'success' && result.value) {
+        return Array.isArray(result.value) ? result.value : [];
+      }
+      // If it's already an object with components, try to return it directly
+      if (Array.isArray(result.components)) {
+        return result.components;
+      }
+    }
+    
+    return [];
+  } catch (error: any) {
+    throw new Error(`Failed to get components: ${error?.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Delete a component
+ */
+export async function deleteComponent(
+  deploymentUrl: string,
+  adminKey: string,
+  componentId: string
+): Promise<boolean> {
+  const response = await fetch(`${deploymentUrl}/api/v1/delete_component`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Convex ${adminKey}`,
+    },
+    body: JSON.stringify({
+      componentId,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`HTTP error! status: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  return response.status === 200;
+}
+
+/**
+ * Backup-related types and interfaces
+ */
+export interface CloudBackupResponse {
+  id: number;
+  sourceDeploymentId: number;
+  sourceDeploymentName?: string;
+  state: 'requested' | 'inProgress' | 'complete' | 'failed' | 'canceled';
+  requestedTime: number;
+  includeStorage: boolean;
+  snapshotId?: string;
+  expirationTime?: number;
+}
+
+export interface PeriodicBackupConfig {
+  sourceDeploymentId: number;
+  cronspec: string;
+  expirationDeltaSecs: number;
+  nextRun: number;
+  includeStorage: boolean;
+}
+
+/**
+ * Create a backup for a deployment
+ * Follows the same pattern as list-backups.js CLI script
+ */
+export async function createBackup(
+  deploymentId: number,
+  accessToken: string,
+  includeStorage: boolean = false,
+  useBearerToken: boolean = true
+): Promise<CloudBackupResponse> {
+  // Use provision.convex.dev for backup endpoints - match CLI script pattern exactly
+  const baseUrl = "https://provision.convex.dev/";
+  const path = `api/dashboard/deployments/${deploymentId}/request_cloud_backup`;
+  const endpoint = `${baseUrl}${path}`;
+  
+  // Always use Bearer token format like the CLI script
+  const authHeader = `Bearer ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      includeStorage,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Unknown error';
+    try {
+      const error = JSON.parse(errorText);
+      errorMessage = error.message || errorText || 'Unknown error';
+    } catch {
+      // If not JSON, use errorText as-is
+      errorMessage = errorText || 'Unknown error';
+    }
+    throw new Error(`Failed to create backup: ${response.status}, message: ${errorMessage}`);
+  }
+
+  const result = await response.json();
+  // Normalize response to match CloudBackupResponse format
+  return {
+    id: result.id,
+    sourceDeploymentId: result.sourceDeploymentId || deploymentId,
+    sourceDeploymentName: result.sourceDeploymentName,
+    state: result.state,
+    requestedTime: result.requestedTime || result.createdTime || Date.now(),
+    includeStorage: result.includeStorage || includeStorage,
+    snapshotId: result.snapshotId,
+    expirationTime: result.expirationTime,
+  };
+}
+
+/**
+ * List existing backups for a team
+ * Uses the dashboard API endpoint which requires Bearer token authentication
+ * Follows the same pattern as list-backups.js CLI script
+ */
+export async function listBackups(
+  teamId: number,
+  accessToken: string,
+  useBearerToken: boolean = true
+): Promise<CloudBackupResponse[]> {
+  // Use provision.convex.dev for backup endpoints - match CLI script pattern exactly
+  const baseUrl = "https://provision.convex.dev/";
+  const path = `api/dashboard/teams/${teamId}/list_cloud_backups`;
+  const endpoint = `${baseUrl}${path}`;
+  
+  // Always use Bearer token format like the CLI script
+  const authHeader = `Bearer ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Unknown error';
+    try {
+      const error = JSON.parse(errorText);
+      errorMessage = error.message || errorText || 'Unknown error';
+    } catch {
+      // If not JSON, use errorText as-is
+    }
+    throw new Error(`Failed to list backups: ${response.status}, message: ${errorMessage}`);
+  }
+
+  const result = await response.json();
+  
+  // Dashboard API returns array directly (as shown in CLI script)
+  const backups = Array.isArray(result) ? result : [];
+  
+  // Map response fields to CloudBackupResponse format
+  return backups.map((backup: any) => ({
+    id: backup.id,
+    sourceDeploymentId: backup.sourceDeploymentId,
+    sourceDeploymentName: backup.sourceDeploymentName,
+    state: backup.state,
+    requestedTime: backup.requestedTime || backup.createdTime,
+    includeStorage: backup.includeStorage,
+    snapshotId: backup.snapshotId,
+    expirationTime: backup.expirationTime,
+  }));
+}
+
+/**
+ * Get a specific backup by ID
+ * Follows the same pattern as list-backups.js CLI script
+ */
+export async function getBackup(
+  backupId: number,
+  accessToken: string,
+  useBearerToken: boolean = true
+): Promise<CloudBackupResponse> {
+  // Use provision.convex.dev for backup endpoints - match CLI script pattern exactly
+  const baseUrl = "https://provision.convex.dev/";
+  const path = `api/dashboard/cloud_backups/${backupId}`;
+  const endpoint = `${baseUrl}${path}`;
+  
+  // Always use Bearer token format like the CLI script
+  const authHeader = `Bearer ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Unknown error';
+    try {
+      const error = JSON.parse(errorText);
+      errorMessage = error.message || errorText || 'Unknown error';
+    } catch {
+      // If not JSON, use errorText as-is
+      errorMessage = errorText || 'Unknown error';
+    }
+    throw new Error(`Failed to get backup: ${response.status}, message: ${errorMessage}`);
+  }
+
+  const result = await response.json();
+  
+  // Normalize response format
+  return {
+    id: result.id,
+    sourceDeploymentId: result.sourceDeploymentId,
+    sourceDeploymentName: result.sourceDeploymentName,
+    state: result.state,
+    requestedTime: result.requestedTime || result.createdTime,
+    includeStorage: result.includeStorage,
+    snapshotId: result.snapshotId,
+    expirationTime: result.expirationTime,
+  };
+}
+
+/**
+ * Delete a specific backup by ID
+ * Requires team access token (same as other backup operations)
+ */
+export async function deleteBackup(
+  teamId: number,
+  backupId: number,
+  accessToken: string
+): Promise<void> {
+  const baseUrl = "https://provision.convex.dev/";
+  const path = `api/dashboard/cloud_backups/${backupId}/delete`;
+  const endpoint = `${baseUrl}${path}`;
+  
+  const authHeader = `Bearer ${accessToken}`;
+  const response = await fetch(endpoint, {
+    method: 'POST', // Based on the dashboard code, it's a POST request
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Unknown error';
+    try {
+      const error = JSON.parse(errorText);
+      errorMessage = error.message || errorText || 'Unknown error';
+    } catch {
+      errorMessage = errorText || 'Unknown error';
+    }
+    throw new Error(`Failed to delete backup: ${response.status}, message: ${errorMessage}`);
+  }
+  // Success - no response body expected
+}
+
+/**
+ * Cancel a backup that's in progress or requested
+ * Only works for backups in "inProgress" or "requested" state
+ */
+export async function cancelBackup(
+  teamId: number,
+  backupId: number,
+  accessToken: string
+): Promise<void> {
+  const baseUrl = "https://provision.convex.dev/";
+  const path = `api/dashboard/cloud_backups/${backupId}/cancel`;
+  const endpoint = `${baseUrl}${path}`;
+  
+  const authHeader = `Bearer ${accessToken}`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Unknown error';
+    try {
+      const error = JSON.parse(errorText);
+      errorMessage = error.message || errorText || 'Unknown error';
+    } catch {
+      errorMessage = errorText || 'Unknown error';
+    }
+    throw new Error(`Failed to cancel backup: ${response.status}, message: ${errorMessage}`);
+  }
+}
+
+/**
+ * Restore a backup to a deployment
+ * Uses the correct endpoint: /api/dashboard/deployments/{id}/restore_from_cloud_backup
+ * Returns the importId from the response which can be used to track restore status
+ */
+export async function restoreBackup(
+  deploymentId: number,
+  backupId: number,
+  accessToken: string,
+  useBearerToken: boolean = true
+): Promise<{ importId: string }> {
+  // Use api.convex.dev (not provision.convex.dev) to match dashboard
+  const endpoint = `https://api.convex.dev/api/dashboard/deployments/${deploymentId}/restore_from_cloud_backup`;
+  
+  const authHeader = `Bearer ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-0.0.0',
+    },
+    body: JSON.stringify({
+      id: backupId, // Just the backup ID
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Unknown error';
+    try {
+      const error = JSON.parse(errorText);
+      errorMessage = error.message || errorText || 'Unknown error';
+    } catch {
+      // If not JSON, use errorText as-is
+      errorMessage = errorText || 'Unknown error';
+    }
+    throw new Error(`Failed to restore backup: ${response.status}, message: ${errorMessage}`);
+  }
+
+  const result = await response.json();
+  // Response contains { importId: "..." }
+  return { importId: result.importId };
+}
+
+/**
+ * List snapshot imports from a deployment
+ * Uses the system function _system/frontend/snapshot_import:list
+ * System functions cannot be called via adminClient, so we use HTTP API directly
+ */
+export async function listSnapshotImports(
+  adminClient: any,
+  deploymentUrl: string,
+  accessToken: string
+): Promise<any[]> {
+  // Use the system function path
+  // Note: System functions cannot be called via adminClient.query, so we use HTTP directly
+  const systemFunctionPath = '_system/frontend/snapshotImport:list';
+  
+  // Use HTTP API directly for system functions (they're not accessible via adminClient)
+  const requestBody = {
+    path: systemFunctionPath,
+    args: [{}],
+    format: 'convex_encoded_json',
+  };
+  
+  try {
+    const response = await fetch(`${deploymentUrl}/api/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Convex ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Convex-Client': 'dashboard-0.0.0',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      // If the function doesn't exist (404 or 400), return empty array instead of throwing
+      // This allows the UI to continue showing the temporary status
+      if (response.status === 404 || response.status === 400) {
+        console.warn('[listSnapshotImports] System function not available, returning empty array:', errorText);
+        return [];
+      }
+      throw new Error(`Failed to list snapshot imports: ${response.status}, ${errorText}`);
+    }
+
+    const result = await response.json();
+    // Handle both response formats: result.value or result directly
+    const imports = result.value !== undefined ? result.value : result;
+    return Array.isArray(imports) ? imports : [];
+  } catch (err: any) {
+    // If there's a network error or the system function isn't available, return empty array
+    // This prevents the restore status check from breaking the UI
+    console.warn('[listSnapshotImports] Error calling system function, returning empty array:', err);
+    return [];
+  }
+}
+
+/**
+ * Get the latest cloud restore from snapshot imports
+ * Returns the most recent restore by creation time
+ */
+export async function getLatestRestore(
+  adminClient: any,
+  deploymentUrl: string,
+  accessToken: string
+): Promise<any | null> {
+  const imports = await listSnapshotImports(adminClient, deploymentUrl, accessToken);
+  const cloudRestores = imports.filter((imp: any) => imp.requestor?.type === 'cloudRestore');
+  
+  if (cloudRestores.length === 0) {
+    return null;
+  }
+  
+  // Sort by creation time (most recent first) and return the latest
+  cloudRestores.sort((a: any, b: any) => {
+    const timeA = a._creationTime || 0;
+    const timeB = b._creationTime || 0;
+    return timeB - timeA; // Most recent first
+  });
+  
+  return cloudRestores[0] || null;
+}
+
+/**
+ * Confirm/perform a snapshot import
+ * Uses the /api/perform_import endpoint (matching dashboard behavior)
+ * This is needed to actually start the import process after getting importId from restore
+ */
+export async function confirmSnapshotImport(
+  adminClient: any,
+  deploymentUrl: string,
+  importId: string,
+  accessToken: string
+): Promise<void> {
+  // Prefer adminClient if available (though this endpoint might not be available via adminClient)
+  if (adminClient && typeof adminClient.mutation === 'function') {
+    try {
+      await adminClient.mutation('snapshotImport:confirm' as any, { importId });
+      return;
+    } catch (err: any) {
+      // Fall back to HTTP if adminClient mutation fails
+      console.warn('adminClient mutation failed, falling back to HTTP:', err);
+    }
+  }
+
+  // Use the /api/perform_import endpoint (matching dashboard)
+  const response = await fetch(`${deploymentUrl}/api/perform_import`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Convex ${accessToken}`,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-0.0.0',
+    },
+    body: JSON.stringify({
+      importId,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Unknown error';
+    try {
+      const error = JSON.parse(errorText);
+      errorMessage = error.message || errorText || 'Unknown error';
+    } catch {
+      // If not JSON, use errorText as-is
+    }
+    throw new Error(`Failed to perform import: ${response.status}, message: ${errorMessage}`);
+  }
+}
+
+/**
+ * Get download URL for a backup
+ * Based on useGetZipExport hook in the dashboard
+ */
+export function getBackupDownloadUrl(
+  deploymentUrl: string,
+  snapshotId: string,
+  accessToken: string,
+  includeStorage: boolean = true
+): string {
+  const params = new URLSearchParams({ 
+    adminKey: accessToken,
+    include_storage: includeStorage ? 'true' : 'false'
+  });
+  
+  return `${deploymentUrl}/api/export/zip/${snapshotId}?${params}`;
+}
+
+/**
+ * Download a backup
+ * Validates backup state and returns download URL
+ */
+export function downloadBackup(
+  backup: CloudBackupResponse,
+  deploymentUrl: string,
+  accessToken: string
+): string {
+  if (backup.state !== 'complete') {
+    throw new Error('Backup is not ready for download. Current state: ' + backup.state);
+  }
+  
+  if (!backup.snapshotId) {
+    throw new Error('Backup does not have a snapshot ID');
+  }
+  
+  return getBackupDownloadUrl(
+    deploymentUrl,
+    backup.snapshotId,
+    accessToken,
+    backup.includeStorage
+  );
+}
+
+/**
+ * Configure periodic/automatic backups for a deployment
+ */
+export async function configurePeriodicBackup(
+  deploymentId: number,
+  accessToken: string,
+  cronspec: string,
+  includeStorage: boolean = false,
+  expirationDeltaSecs?: number,
+  useBearerToken: boolean = false
+): Promise<void> {
+  const endpoint = `https://api.convex.dev/v1/deployments/${deploymentId}/configure_periodic_backup`;
+  const authHeader = useBearerToken
+    ? `Bearer ${accessToken}`
+    : `Convex ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      cronspec,
+      includeStorage,
+      ...(expirationDeltaSecs && { expirationDeltaSecs }),
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to configure periodic backup: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Get periodic backup configuration using the management API
+ * This is how the dashboard actually does it
+ */
+export async function getPeriodicBackupConfig(
+  deploymentId: number,
+  accessToken: string
+): Promise<PeriodicBackupConfig | null> {
+  try {
+    // Use the same endpoint as the dashboard
+    const response = await fetch(
+      `https://provision.convex.dev/api/dashboard/deployments/${deploymentId}/get_periodic_backup_config`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null; // No periodic backup configured
+      }
+      const errorText = await response.text();
+      throw new Error(`Failed to get periodic backup config: ${response.status} - ${errorText}`);
+    }
+
+    const config = await response.json();
+    return config;
+  } catch (error: any) {
+    if (error.message?.includes('404') || error.message?.includes('not found')) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Disable periodic backup for a deployment
+ */
+export async function disablePeriodicBackup(
+  deploymentId: number,
+  accessToken: string,
+  useBearerToken: boolean = false
+): Promise<void> {
+  const endpoint = `https://api.convex.dev/v1/deployments/${deploymentId}/disable_periodic_backup`;
+  const authHeader = useBearerToken
+    ? `Bearer ${accessToken}`
+    : `Convex ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to disable periodic backup: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Deployment response from Convex API
+ */
+export interface DeploymentResponse {
+  id: number;
+  name: string;
+  projectId: number;
+  deploymentType: 'dev' | 'prod' | 'preview';
+  kind: 'cloud' | 'local';
+  creator?: number;
+  isActive?: boolean;
+}
+
+/**
+ * Project response from Convex API
+ */
+export interface ProjectResponse {
+  id: number;
+  name: string;
+  slug: string;
+  teamId: number;
+}
+
+/**
+ * Team response from Convex API
+ */
+export interface TeamResponse {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+/**
+ * Profile response from Convex API
+ */
+export interface ProfileResponse {
+  id: number;
+  email?: string;
+  teams?: TeamResponse[];
+}
+
+/**
+ * Fetch user profile to get team information
+ */
+export async function fetchProfile(
+  accessToken: string,
+  useBearerToken: boolean = true
+): Promise<ProfileResponse | null> {
+  try {
+    const endpoint = `https://api.convex.dev/api/dashboard/profile`;
+    const authHeader = useBearerToken
+      ? `Bearer ${accessToken}`
+      : `Convex ${accessToken}`;
+
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      // For 403 errors (service accounts), return null instead of throwing
+      if (response.status === 403) {
+        return null;
+      }
+      const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+      throw new Error(`Failed to fetch profile: ${response.status}, message: ${error.message || 'Unknown error'}`);
+    }
+
+    return response.json();
+  } catch (error: any) {
+    // Don't log errors for service accounts (403) - it's expected
+    if (!error?.message?.includes('403') && !error?.message?.includes('service account')) {
+      console.error('Error fetching profile:', error);
+    }
+    return null;
+  }
+}
+
+/**
+ * Try to get team token from environment variables
+ * This is useful for backup operations which require team tokens
+ * Checks: process.env.CONVEX_ACCESS_TOKEN, import.meta.env.VITE_CONVEX_ACCESS_TOKEN, etc.
+ */
+export function getTeamTokenFromEnv(): string | null {
+  // Try build-time injected value first (from Vite define)
+  // Note: __CONVEX_ACCESS_TOKEN__ is replaced at build time, so we need to check it carefully
+  try {
+    // @ts-ignore - This is injected by Vite's define option at build time
+    const buildTimeToken = typeof __CONVEX_ACCESS_TOKEN__ !== 'undefined' ? __CONVEX_ACCESS_TOKEN__ : null;
+    if (buildTimeToken && typeof buildTimeToken === 'string' && buildTimeToken.trim()) {
+      return buildTimeToken.trim();
+    }
+  } catch {
+    // Ignore if __CONVEX_ACCESS_TOKEN__ is not defined (e.g., in non-Vite environments)
+  }
+
+  // Try Vite-style env variables (browser accessible with VITE_ prefix)
+  // This is the preferred method for runtime access
+  try {
+    const maybeImportMeta: any = typeof import.meta !== 'undefined' ? (import.meta as any) : null;
+    // Check VITE_CONVEX_ACCESS_TOKEN first (Vite exposes VITE_ prefixed vars)
+    if (maybeImportMeta?.env?.VITE_CONVEX_ACCESS_TOKEN) {
+      const token = maybeImportMeta.env.VITE_CONVEX_ACCESS_TOKEN;
+      if (token && typeof token === 'string' && token.trim()) {
+        return token.trim();
+      }
+    }
+    // Also check CONVEX_ACCESS_TOKEN (in case it's exposed via envPrefix)
+    if (maybeImportMeta?.env?.CONVEX_ACCESS_TOKEN) {
+      const token = maybeImportMeta.env.CONVEX_ACCESS_TOKEN;
+      if (token && typeof token === 'string' && token.trim()) {
+        return token.trim();
+      }
+    }
+  } catch {
+    // Ignore if import.meta is not available
+  }
+
+  // Try Node.js process.env (for server-side or build-time)
+  try {
+    const maybeProcess: any = typeof process !== 'undefined' ? process : null;
+    if (maybeProcess?.env?.CONVEX_ACCESS_TOKEN) {
+      const token = maybeProcess.env.CONVEX_ACCESS_TOKEN;
+      if (token && typeof token === 'string' && token.trim()) {
+        return token.trim();
+      }
+    }
+  } catch {
+    // Ignore env access errors
+  }
+
+
+  // Try window.env or window.__ENV__ (some bundlers expose env this way)
+  try {
+    if (typeof window !== 'undefined') {
+      const win = window as any;
+      if (win.env?.CONVEX_ACCESS_TOKEN) {
+        const token = win.env.CONVEX_ACCESS_TOKEN;
+        if (token && typeof token === 'string' && token.trim()) {
+          return token.trim();
+        }
+      }
+      if (win.__ENV__?.CONVEX_ACCESS_TOKEN) {
+        const token = win.__ENV__.CONVEX_ACCESS_TOKEN;
+        if (token && typeof token === 'string' && token.trim()) {
+          return token.trim();
+        }
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+
+  return null;
+}
+
+/**
+ * Get token details (works with both Team Access Tokens and OAuth tokens)
+ * Returns teamId directly from the token
+ * Note: This endpoint requires Bearer token format (not Convex format)
+ */
+export async function getTokenDetails(
+  accessToken: string,
+  useBearerToken: boolean = true
+): Promise<{ teamId?: number; [key: string]: any }> {
+  const endpoint = `https://api.convex.dev/v1/token_details`;
+  // The token_details endpoint requires Bearer format (as shown in CLI examples)
+  const authHeader = `Bearer ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Unknown error';
+    try {
+      const error = JSON.parse(errorText);
+      errorMessage = error.message || errorText || 'Unknown error';
+    } catch {
+      // If not JSON, use errorText as-is
+    }
+    throw new Error(`Failed to get token details: ${response.status}, message: ${errorMessage}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * List all teams (if using OAuth token or team access token)
+ */
+export async function listTeams(
+  accessToken: string,
+  useBearerToken: boolean = false
+): Promise<TeamResponse[]> {
+  const endpoint = `https://api.convex.dev/v1/teams`;
+  const authHeader = useBearerToken
+    ? `Bearer ${accessToken}`
+    : `Convex ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to list teams: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  const result = await response.json();
+  return Array.isArray(result) ? result : (result.teams || []);
+}
+
+/**
+ * Get team and project from deployment name
+ */
+export async function getTeamFromDeployment(
+  deploymentName: string,
+  accessToken: string,
+  useBearerToken: boolean = false
+): Promise<{ teamId: number; teamSlug?: string; projectId?: number; projectSlug?: string }> {
+  const endpoint = `https://api.convex.dev/v1/deployments/${deploymentName}/team_and_project`;
+  const authHeader = useBearerToken
+    ? `Bearer ${accessToken}`
+    : `Convex ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to get team from deployment: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  const result = await response.json();
+  return {
+    teamId: result.teamId,
+    teamSlug: result.team,
+    projectId: result.projectId,
+    projectSlug: result.project,
+  };
+}
+
+/**
+ * Fetch teams - get list of teams for the authenticated user (dashboard API)
+ */
+export async function fetchTeams(
+  accessToken: string,
+  useBearerToken: boolean = true
+): Promise<TeamResponse[]> {
+  const endpoint = `https://api.convex.dev/api/dashboard/teams`;
+  const authHeader = useBearerToken
+    ? `Bearer ${accessToken}`
+    : `Convex ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to fetch teams: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  const result = await response.json();
+  return Array.isArray(result) ? result : (result.teams || []);
+}
+
+/**
+ * Fetch projects for a team
+ */
+export async function fetchProjects(
+  teamId: number,
+  accessToken: string,
+  useBearerToken: boolean = true
+): Promise<ProjectResponse[]> {
+  const endpoint = `https://api.convex.dev/api/dashboard/teams/${teamId}/projects`;
+  const authHeader = useBearerToken
+    ? `Bearer ${accessToken}`
+    : `Convex ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to fetch projects: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  const result = await response.json();
+  return Array.isArray(result) ? result : (result.projects || []);
+}
+
+/**
+ * Fetch deployments (instances) for a project
+ */
+export async function fetchDeployments(
+  projectId: number,
+  accessToken: string,
+  useBearerToken: boolean = true
+): Promise<DeploymentResponse[]> {
+  const endpoint = `https://api.convex.dev/api/dashboard/projects/${projectId}/instances`;
+  const authHeader = useBearerToken
+    ? `Bearer ${accessToken}`
+    : `Convex ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to fetch deployments: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  const result = await response.json();
+  return Array.isArray(result) ? result : (result.deployments || []);
+}
+
+/**
+ * Get the current deployment state (running or paused)
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param adminKey - The admin key for authentication
+ * @returns The deployment state
+ */
+export async function getConvexDeploymentState(
+  deploymentUrl: string,
+  adminKey: string
+): Promise<{ state: "running" | "paused" }> {
+  const response = await fetch(`${deploymentUrl}/api/query`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Convex ${adminKey}`,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-0.0.0',
+    },
+    body: JSON.stringify({
+      path: '_system/frontend/deploymentState:deploymentState',
+      args: {},
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to get deployment state: ${response.status} - ${errorText}`);
+  }
+
+  const result = await response.json();
+  return result.value || result;
+}
+
+/**
+ * Change deployment state (pause/resume)
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param adminKey - The admin key for authentication
+ * @param newState - The new state: "paused" or "running"
+ */
+async function changeDeploymentState(
+  deploymentUrl: string,
+  adminKey: string,
+  newState: "paused" | "running"
+): Promise<void> {
+  const response = await fetch(`${deploymentUrl}/api/change_deployment_state`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Convex ${adminKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ newState }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to change deployment state: ${response.status} - ${errorText}`);
+  }
+}
+
+/**
+ * Pause a Convex deployment
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param adminKey - The admin key for authentication
+ */
+export async function pauseConvexDeployment(
+  deploymentUrl: string,
+  adminKey: string
+): Promise<void> {
+  await changeDeploymentState(deploymentUrl, adminKey, "paused");
+}
+
+/**
+ * Resume a Convex deployment
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param adminKey - The admin key for authentication
+ */
+export async function resumeConvexDeployment(
+  deploymentUrl: string,
+  adminKey: string
+): Promise<void> {
+  await changeDeploymentState(deploymentUrl, adminKey, "running");
+}
+
+/**
+ * Get deployment ID from deployment URL by matching deployment name
+ */
+export async function getDeploymentIdFromUrl(
+  deploymentUrl: string | undefined,
+  accessToken: string,
+  teamId?: number,
+  projectId?: number,
+  useBearerToken: boolean = true
+): Promise<number | null> {
+  if (!deploymentUrl) return null;
+
+  const deploymentName = extractDeploymentName(deploymentUrl);
+  if (!deploymentName) return null;
+
+  // If we have projectId, try to fetch deployments directly
+  if (projectId) {
+    try {
+      const deployments = await fetchDeployments(projectId, accessToken, useBearerToken);
+      const deployment = deployments.find(d => d.name === deploymentName || d.name.includes(deploymentName));
+      return deployment?.id || null;
+    } catch (err) {
+      console.error('Error fetching deployments:', err);
+    }
+  }
+
+  // If we have teamId but not projectId, try to find project first
+  if (teamId && !projectId) {
+    try {
+      const projects = await fetchProjects(teamId, accessToken, useBearerToken);
+      // Try each project to find the deployment
+      for (const project of projects) {
+        try {
+          const deployments = await fetchDeployments(project.id, accessToken, useBearerToken);
+          const deployment = deployments.find(d => d.name === deploymentName || d.name.includes(deploymentName));
+          if (deployment) {
+            return deployment.id;
+          }
+        } catch (err) {
+          // Continue to next project
+          continue;
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching projects:', err);
+    }
+  }
+
+  return null;
 }

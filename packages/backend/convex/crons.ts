@@ -15,7 +15,7 @@ crons.interval(
 crons.interval(
   "delete completed todos",
   { hours: 3 }, 
-  internal.todo.deleteCompletedTodos
+  internal.todos.deleteCompletedTodos
 );
 
 

@@ -1,5 +1,5 @@
 import { ConvexReactClient, usePaginatedQuery } from "convex/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { extractDeploymentName, extractProjectName, fetchDeploymentMetadata } from "../utils/api";
 
 export const SCHEDULED_JOBS_PAGE_SIZE = 50;
@@ -39,8 +39,8 @@ const fetchMetadata = async (adminClient: ConvexReactClient, deploymentUrl: stri
 };
 
 export function usePaginatedScheduledJobs(udfPath: string | undefined, adminClient: ConvexReactClient, deploymentUrl: string,) {
-  const { deployment, error: errorDeployment, loading: loadingDeployment } = useCurrentDeployment(adminClient, deploymentUrl)
-  const isPaused = useIsDeploymentPaused(adminClient)
+  // const { deployment, error: errorDeployment, loading: loadingDeployment } = useCurrentDeployment(adminClient, deploymentUrl)
+  const isPaused = useRef(false)
   const [results, setResults] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
