@@ -15,10 +15,10 @@ function removeConvexPanel(code: string, id: string): { code: string; map?: any 
   let hasChanges = false;
 
   const importPatterns = [
-    /import\s+ConvexPanel\s+from\s+["']@convex-panel["'];?\n?/g,
-    /import\s*{\s*ConvexPanel\s*}\s+from\s+["']@convex-panel["'];?\n?/g,
-    /import\s+ConvexPanel\s*,\s*\{[^}]*\}\s+from\s+["']@convex-panel["'];?\n?/g,
-    /import\s+.*\s+as\s+ConvexPanel\s+from\s+["']@convex-panel["'];?\n?/g,
+    /import\s+ConvexPanel\s+from\s+["']convex-panel["'];?\n?/g,
+    /import\s*{\s*ConvexPanel\s*}\s+from\s+["']convex-panel["'];?\n?/g,
+    /import\s+ConvexPanel\s*,\s*\{[^}]*\}\s+from\s+["']convex-panel["'];?\n?/g,
+    /import\s+.*\s+as\s+ConvexPanel\s+from\s+["']convex-panel["'];?\n?/g,
   ];
 
   importPatterns.forEach((pattern) => {
@@ -28,7 +28,7 @@ function removeConvexPanel(code: string, id: string): { code: string; map?: any 
     }
   });
 
-  const cssImportPattern = /import\s+["']@convex-panel\/styles\.css["'];?\n?/g;
+  const cssImportPattern = /import\s+["']convex-panel\/styles\.css["'];?\n?/g;
   if (cssImportPattern.test(transformed)) {
     transformed = transformed.replace(cssImportPattern, '');
     hasChanges = true;
@@ -84,7 +84,7 @@ export type ConvexPanelVitePluginConfig = {
  * ```ts
  * // vite.config.ts
  * import { defineConfig } from 'vite';
- * import { convexPanel } from '@convex-panel/vite';
+ * import { convexPanel } from 'convex-panel/vite';
  * 
  * export default defineConfig({
  *   plugins: [
@@ -99,7 +99,7 @@ export function convexPanel(config?: ConvexPanelVitePluginConfig): Plugin {
   const logging = config?.logging ?? false;
 
   return {
-    name: '@convex-panel:remove-on-build',
+    name: 'convex-panel:remove-on-build',
     enforce: 'pre',
     apply(config, { command }) {
       return (
@@ -116,7 +116,7 @@ export function convexPanel(config?: ConvexPanelVitePluginConfig): Plugin {
       if (logging) {
         const relativePath = id.replace(normalizePath(process.cwd()), '');
         console.log(
-          `[@convex-panel] Removed ConvexPanel code from: ${relativePath}`,
+          `[convex-panel] Removed ConvexPanel code from: ${relativePath}`,
         );
       }
 

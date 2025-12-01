@@ -49,7 +49,7 @@ export interface ConvexPanelProps {
   [key: string]: any;
 }
 
-const ConvexPanel: React.FC<ConvexPanelProps> = ({
+const ConvexPanel = ({
   convex: providedConvex,
   accessToken: providedAccessToken,
   teamAccessToken: providedTeamAccessToken,
@@ -69,7 +69,7 @@ const ConvexPanel: React.FC<ConvexPanelProps> = ({
   mergedTheme,
   settings,
   ...restProps
-}) => {
+}: ConvexPanelProps) => {
   const [isMounted, setIsMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(() => {
     if (typeof window !== 'undefined') {

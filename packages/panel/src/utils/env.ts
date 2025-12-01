@@ -2,6 +2,42 @@
  * Utility to check if the current environment is development
  */
 export const isDevelopment = (): boolean => {
+  // Check browser environment for development indicators
+  if (typeof window !== 'undefined') {
+    // Next.js development indicator
+    try {
+      // @ts-ignore - __NEXT_DATA__ is available in Next.js
+      if (window.__NEXT_DATA__) {
+        // @ts-ignore
+        const nextData = window.__NEXT_DATA__;
+        // @ts-ignore
+        if (nextData.dev !== undefined) {
+          // @ts-ignore
+          return nextData.dev === true;
+        }
+      }
+    } catch (e) {
+      // Ignore if __NEXT_DATA__ is not available
+    }
+
+    // Check for localhost/127.0.0.1 which typically indicates development
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') {
+      // Additional check: if not explicitly production, assume development
+      try {
+        if (typeof process !== 'undefined' && process.env) {
+          const nodeEnv = process.env.NODE_ENV;
+          // Only return false if explicitly production
+          if (nodeEnv === 'production') return false;
+        }
+      } catch (e) {
+        // Ignore process.env errors
+      }
+      // On localhost without explicit production flag, assume development
+      return true;
+    }
+  }
+
   // Try Vite style
   try {
     // @ts-ignore - import.meta.env is available in Vite

@@ -1,558 +1,251 @@
-# Convex Panel
+# convex-panel
 
-![NPM Version](https://img.shields.io/npm/v/convex-panel)
+[![NPM Version](https://img.shields.io/npm/v/convex-panel)](https://www.npmjs.com/package/convex-panel)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A development panel for Convex applications that provides real-time logs, data inspection, and more.
-
-![Convex Panel Data View](https://firebasestorage.googleapis.com/v0/b/relio-217bd.appspot.com/o/convex%2Flogs.png?alt=media&token=dd4bdff9-1e9a-41cc-a1da-aaae0f148517)
+A powerful development panel for [Convex](https://convex.dev) applications that provides real-time logs, data inspection, function testing, health monitoring, and more.
 
 ## Features
 
-- 📊 **Real-time Data View**: Browse and filter your Convex tables with ease
-- 📝 **Live Logs**: Monitor function calls, HTTP actions, and system events in real-time
-- 🔍 **Advanced Filtering**: Filter logs and data with query capabilities
-- 🔄 **Health Monitoring**: Track the health of your application with metrics for cache rates, scheduler health, database performance, and system latency
-- 📊 **Function Performance Monitoring**: Track invocation rates, error rates, execution times, and cache hit rates for your functions
-- 🔍 **Function Code Inspection**: View and analyze your function source code with syntax highlighting
-- 📈 **Performance Metrics Visualization**: See your function performance data with interactive charts and graphs
-- 🧪 **Function Testing**: Execute functions directly from the panel with custom inputs and view results
-- ✏️ **In-place Data Editing**: Directly edit your data values with double-click editing capability
-- 🎨 **Beautiful UI**: Sleek, developer-friendly interface that integrates with your app
-- 🔐 **Automatic Token Setup**: Automatically configures your Convex access token during installation
-- 💾 **State Persistence**: Automatically saves panel position, size, and preferences
-
-![Convex Panel Logs View](https://firebasestorage.googleapis.com/v0/b/relio-217bd.appspot.com/o/convex%2F683_1x_shots_so.png?alt=media&token=55f531d4-4fc9-4bc3-af9f-b1d4e01487dd)
+| Feature | Description |
+|---------|-------------|
+| **Data View** | Browse, filter, sort, and edit your Convex tables with an intuitive interface |
+| **Live Logs** | Monitor function calls, HTTP actions, and system events in real-time |
+| **Health Dashboard** | Track cache hit rates, scheduler health, database performance, and latency |
+| **Function Runner** | Execute queries, mutations, and actions directly with custom inputs |
+| **Code Inspection** | View function source code with syntax highlighting |
+| **Performance Metrics** | Interactive charts for invocation rates, error rates, and execution times |
+| **In-place Editing** | Double-click to edit data values directly in the table |
+| **Scheduled Jobs** | View and manage your cron jobs and scheduled functions |
+| **Components View** | Browse and manage installed Convex components |
+| **Theme Support** | Dark and light themes with customization options |
+| **State Persistence** | Automatically saves panel position, size, and preferences |
+| **OAuth & Token Auth** | Supports OAuth flow or manual token authentication |
 
 ## Installation
 
 ```bash
-bun add convex-panel --dev
-# or
 npm install convex-panel --save-dev
 # or
 yarn add convex-panel --dev
 # or
 pnpm add convex-panel --save-dev
-```
-
-During installation, the package will automatically:
-1. Check if you're logged in to Convex
-2. If not logged in, prompt you to run `npx convex login`
-3. Once logged in, detect your Convex access token from `~/.convex/config.json` (or `%USERPROFILE%\.convex\config.json` on Windows)
-4. Add it to your project's `.env` file as `CONVEX_ACCESS_TOKEN`
-
-The package will guide you through the login process if needed. You can also manually log in at any time by running:
-```bash
-npx convex login
+# or
+bun add convex-panel --dev
 ```
 
 ## Environment Setup
 
-Create a `.env.local` file in your project root with the following variables:
+Create a `.env.local` file in your project root:
 
+### Next.js
 ```bash
-# Nextjs
-NEXT_PUBLIC_CONVEX_URL="your_convex_url"
-NEXT_PUBLIC_ACCESS_TOKEN="your_access_token"
-NEXT_PUBLIC_DEPLOY_KEY="your_deploy_key"
-
-# React
-REACT_APP_CONVEX_URL="your_convex_url"
-REACT_APP_ACCESS_TOKEN="your_access_token"
-REACT_APP_DEPLOY_KEY="your_deploy_key"
+NEXT_PUBLIC_CONVEX_URL="https://your-deployment.convex.cloud"
 ```
 
-To get your access token, run:
+### Vite / React
 ```bash
-cat ~/.convex/config.json  # On Unix-based systems
-# or
-more %USERPROFILE%\.convex\config.json  # On Windows
+VITE_CONVEX_URL="https://your-deployment.convex.cloud"
 ```
 
-## Usage
-
-### Next.js Setup (Recommended)
-
-#### Option A: OAuth Authentication (Recommended)
-
-For OAuth authentication, you'll need to create a server-side endpoint to handle token exchange. See [OAUTH_SETUP.md](./OAUTH_SETUP.md) for detailed instructions.
-
-1. **Create the OAuth callback endpoint** (`app/api/convex/callback/route.ts`):
-
-```typescript
-import { NextRequest, NextResponse } from 'next/server';
-
-export async function GET(request: NextRequest) {
-  const code = request.nextUrl.searchParams.get('code');
-  
-  if (!code) {
-    return NextResponse.redirect(new URL('/?error=no_code', request.url));
-  }
-
-  // Exchange code for token
-  const tokenResponse = await fetch('https://api.convex.dev/oauth/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      client_id: process.env.CONVEX_CLIENT_ID!,
-      client_secret: process.env.CONVEX_CLIENT_SECRET!,
-      grant_type: 'authorization_code',
-      redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/convex/callback`,
-      code,
-    }),
-  });
-
-  if (!tokenResponse.ok) {
-    return NextResponse.redirect(new URL('/?error=oauth_failed', request.url));
-  }
-
-  const token = await tokenResponse.json();
-  
-  // Store token in cookie or session
-  const response = NextResponse.redirect(new URL('/', request.url));
-  response.cookies.set('convex_oauth_token', token.access_token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-  });
-  
-  return response;
-}
+### Create React App
+```bash
+REACT_APP_CONVEX_URL="https://your-deployment.convex.cloud"
 ```
 
-2. **Create the token exchange endpoint** (`app/api/convex/exchange/route.ts`):
+> **Note:** The panel auto-detects environment variables based on your framework. Authentication is handled via OAuth when you first open the panel.
 
-```typescript
-import { NextRequest, NextResponse } from 'next/server';
+## Quick Start
 
-export async function POST(request: NextRequest) {
-  const { code, codeVerifier, redirectUri } = await request.json();
-  
-  if (!code) {
-    return NextResponse.json({ error: 'No code provided' }, { status: 400 });
-  }
-
-  const body = new URLSearchParams({
-    client_id: process.env.CONVEX_CLIENT_ID!,
-    client_secret: process.env.CONVEX_CLIENT_SECRET!,
-    grant_type: 'authorization_code',
-    redirect_uri: redirectUri || process.env.NEXT_PUBLIC_APP_URL!,
-    code,
-    ...(codeVerifier && { code_verifier: codeVerifier }),
-  });
-
-  const tokenResponse = await fetch('https://api.convex.dev/oauth/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: body.toString(),
-  });
-
-  if (!tokenResponse.ok) {
-    const error = await tokenResponse.text();
-    return NextResponse.json({ error }, { status: tokenResponse.status });
-  }
-
-  const token = await tokenResponse.json();
-  return NextResponse.json(token);
-}
-```
-
-3. **Use the component with OAuth**:
+### Next.js (App Router)
 
 ```tsx
+// app/providers.tsx
 "use client";
 
-import { ConvexReactClient } from "convex/react";
-import { ConvexProvider } from "convex/react";
-import { ReactNode } from "react";
-import dynamic from 'next/dynamic';
-import type { ComponentProps } from 'react';
-
-import type ConvexPanelType from "convex-panel";
-
-// Use dynamic import to avoid SSR issues
-const ConvexPanel = dynamic<ComponentProps<typeof ConvexPanelType>>(() => import("convex-panel"), {
-  ssr: false
-});
-
-const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL! as string);
-
-export function ConvexClientProvider({ children }: { children: ReactNode }) {
-  return (
-    <ConvexProvider client={convex}>
-      {children}
-      <ConvexPanel
-        oauthConfig={{
-          clientId: process.env.NEXT_PUBLIC_CONVEX_CLIENT_ID!,
-          redirectUri: typeof window !== 'undefined' ? window.location.origin : '',
-          scope: 'project',
-          tokenExchangeUrl: '/api/convex/exchange', // Your server endpoint
-        }}
-        convex={convex}
-      />
-    </ConvexProvider>
-  )
-}
-```
-
-#### Option B: Manual Tokens (Fallback)
-
-If you prefer not to use OAuth, you can use manual tokens:
-
-```tsx
-"use client";
-
-import { ConvexReactClient } from "convex/react";
-import { ConvexProvider } from "convex/react";
-import { ReactNode } from "react";
-import dynamic from 'next/dynamic';
-import type { ComponentProps } from 'react';
-
-import type ConvexPanelType from "convex-panel";
-
-const ConvexPanel = dynamic<ComponentProps<typeof ConvexPanelType>>(() => import("convex-panel"), {
-  ssr: false
-});
-
-const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL! as string);
-
-export function ConvexClientProvider({ children }: { children: ReactNode }) {
-  return (
-    <ConvexProvider client={convex}>
-      {children}
-      <ConvexPanel
-        accessToken={process.env.NEXT_PUBLIC_ACCESS_TOKEN!}
-        deployKey={process.env.NEXT_PUBLIC_DEPLOY_KEY!}
-        convex={convex}
-      />
-    </ConvexProvider>
-  )
-}
-```
-
-### React Setup (Alternative)
-
-For non-Next.js React applications, you'll need to set up a server endpoint for OAuth token exchange. Here are options:
-
-#### Option A: OAuth with Express/Node.js Server
-
-1. **Create a server endpoint** (e.g., using Express):
-
-```javascript
-// server.js or your API server
-app.post('/api/convex/exchange', async (req, res) => {
-  const { code, codeVerifier, redirectUri } = req.body;
-  
-  const tokenResponse = await fetch('https://api.convex.dev/oauth/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      client_id: process.env.CONVEX_CLIENT_ID,
-      client_secret: process.env.CONVEX_CLIENT_SECRET,
-      grant_type: 'authorization_code',
-      redirect_uri: redirectUri,
-      code,
-      ...(codeVerifier && { code_verifier: codeVerifier }),
-    }),
-  });
-
-  const token = await tokenResponse.json();
-  res.json(token);
-});
-```
-
-2. **Use the component**:
-
-```tsx
-import { ConvexPanel } from 'convex-panel';
 import { ConvexReactClient, ConvexProvider } from "convex/react";
+import dynamic from "next/dynamic";
 
-export default function YourComponent() {
-  const convex = new ConvexReactClient(process.env.REACT_APP_CONVEX_URL);
+const ConvexPanel = dynamic(() => import("convex-panel"), { ssr: false });
 
+const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+
+export function ConvexClientProvider({ children }: { children: React.ReactNode }) {
   return (
     <ConvexProvider client={convex}>
-      {/* Your app content */}
-      <ConvexPanel
-        oauthConfig={{
-          clientId: process.env.REACT_APP_CONVEX_CLIENT_ID!,
-          redirectUri: window.location.origin,
-          scope: 'project',
-          tokenExchangeUrl: 'http://localhost:3001/api/convex/exchange', // Your server
-        }}
-        convex={convex}
-      />
+      {children}
+      <ConvexPanel />
     </ConvexProvider>
   );
 }
 ```
 
-#### Option B: Manual Tokens (No OAuth)
+### Vite / React
 
 ```tsx
-import { ConvexPanel } from 'convex-panel';
+// src/App.tsx
 import { ConvexReactClient, ConvexProvider } from "convex/react";
+import ConvexPanel from "convex-panel";
 
-export default function YourComponent() {
-  const convex = new ConvexReactClient(process.env.REACT_APP_CONVEX_URL);
+const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
 
+function App() {
   return (
     <ConvexProvider client={convex}>
-      {/* Your app content */}
-      <ConvexPanel
-        accessToken={process.env.REACT_APP_ACCESS_TOKEN}
-        deployUrl={process.env.REACT_APP_CONVEX_DEPLOYMENT}
-        convex={convex}
-      />
+      {/* Your app */}
+      <ConvexPanel />
     </ConvexProvider>
   );
 }
 ```
+
+That's it! The panel will appear at the bottom of your screen. Click to expand and authenticate with your Convex account via OAuth.
 
 ## Configuration
 
-### Authentication
-
-The component supports two authentication methods:
-
-1. **OAuth (Recommended)**: Provide `oauthConfig` with `tokenExchangeUrl` pointing to your server endpoint
-2. **Manual Tokens**: Provide `accessToken` (and optionally `deployKey`)
-
-See [USAGE_GUIDE.md](./USAGE_GUIDE.md) for detailed setup instructions.
-
-### Required Props
-
-**Either:**
-- `oauthConfig` + `tokenExchangeUrl` (OAuth authentication)
-- `accessToken` (Manual token authentication)
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `oauthConfig` | OAuthConfig | OAuth configuration object (see below) |
-| `tokenExchangeUrl` | string | Server endpoint URL for OAuth token exchange (required if using OAuth) |
-| `accessToken` | string | Your Convex access token (from `~/.convex/config.json`). Required if not using OAuth. |
-| `deployKey` | string | Optional. Convex deployment key for admin-level access. Enables additional admin capabilities. |
-
-### OAuth Configuration
-
-```typescript
-interface OAuthConfig {
-  clientId: string;              // Your OAuth application's client ID
-  redirectUri: string;            // Must match OAuth app settings
-  scope?: 'project' | 'team';     // OAuth scope
-  tokenExchangeUrl?: string;      // Your server endpoint for token exchange
-}
-```
-
-### Optional Props
+### Props
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `convex` | ConvexReactClient | Required | Initialized Convex client instance for API communication. |
-| `deployUrl` | string | process.env.NEXT_PUBLIC_CONVEX_URL | Your Convex deployment URL. |
-| `theme` | ThemeClasses | {} | Custom theme options (see Theme Customization below). |
-| `initialLimit` | number | 100 | Initial number of logs to fetch and display. |
-| `initialShowSuccess` | boolean | true | Whether to show success logs in the initial view. |
-| `initialLogType` | LogType | 'ALL' | Initial log type filter. Options: 'ALL', 'SUCCESS', 'FAILURE', 'DEBUG', 'LOGINFO', 'WARNING', 'ERROR', 'HTTP' |
-| `maxStoredLogs` | number | 500 | Maximum number of logs to store in memory. |
-| `onLogFetch` | (logs: LogEntry[]) => void | undefined | Callback when logs are fetched. |
-| `onError` | (error: string) => void | undefined | Callback when an error occurs. |
-| `buttonPosition` | ButtonPosition | 'bottom-right' | Position of the panel button. Options: 'bottom-left', 'bottom-center', 'bottom-right', 'right-center', 'top-right' |
-| `useMockData` | boolean | false | Use mock data instead of real API data. |
+| `convex` | `ConvexReactClient` | Auto-detected | Convex client instance (auto-detected from ConvexProvider) |
+| `deployUrl` | `string` | Auto-detected | Your Convex deployment URL |
+| `accessToken` | `string` | - | Manual access token (if not using OAuth) |
+| `deployKey` | `string` | - | Deploy key for admin-level access |
+| `defaultTheme` | `'dark' \| 'light'` | `'dark'` | Initial theme (persisted in localStorage) |
+| `useMockData` | `boolean` | `false` | Use mock data for development/testing |
+| `onError` | `(error: string) => void` | - | Error callback |
 
-### Theme Customization
+### OAuth Configuration (Advanced)
 
-The `theme` prop accepts a `ThemeClasses` object with the following structure:
-
-```typescript
-interface ThemeClasses {
-  colors?: {
-    primary?: string;
-    secondary?: string;
-    background?: string;
-    text?: string;
-    // ... other color options
-  };
-  spacing?: {
-    padding?: string;
-    margin?: string;
-    // ... other spacing options
-  };
-  components?: {
-    button?: {
-      backgroundColor?: string;
-      color?: string;
-      // ... other button styles
-    };
-    // ... other component styles
-  };
-}
-```
-
-Example theme usage:
+For custom OAuth setups, you can provide an `oauthConfig`:
 
 ```tsx
 <ConvexPanel
-  theme={{
-    colors: {
-      primary: '#6366f1',
-      background: '#1f2937'
-    },
-    components: {
-      button: {
-        backgroundColor: '#4f46e5'
-      }
-    }
+  oauthConfig={{
+    clientId: "your-client-id",
+    redirectUri: window.location.origin,
+    scope: "project", // or "team"
+    tokenExchangeUrl: "/api/convex/exchange",
   }}
-  // ... other props
 />
 ```
 
-### State Persistence
+### Custom Authentication
 
-The panel automatically persists several settings in localStorage:
-- Panel position on screen
-- Panel size (width/height)
-- Active tab selection
-- Log filter preferences
-- Table view configurations
+You can provide your own authentication implementation:
 
-These settings are restored when the panel is reopened.
+```tsx
+import { useOAuth } from "convex-panel";
 
-## Features Documentation
+const customAuth = useOAuth(oauthConfig);
 
-### Health Monitoring
+<ConvexPanel auth={customAuth} />
+```
 
-The health dashboard provides real-time insights into your Convex application's performance metrics:
+## Views
 
-- **Cache Rates**: Monitor your application's cache hit rates and efficiency
-- **Scheduler Health**: Track the health and performance of your scheduled functions
-- **Database Metrics**: View database throughput, operation counts, and response times
-- **System Latency**: Visualize overall system response times and identify bottlenecks
+### Data View
+Browse, filter, sort, and edit your Convex tables:
+- **Table Browser**: View all tables with paginated data display
+- **Advanced Filtering**: Query-based filtering with date ranges and full-text search
+- **In-place Editing**: Double-click any cell to edit (auto-converts types)
+- **Context Menu**: Right-click for quick actions (copy, delete, view details)
 
-### Data Editing
-
-The panel supports in-place editing of table data:
-
-- **Double-click Editing**: Simply double-click on any editable cell to modify its value
-- **Smart Value Parsing**: Automatically converts edited values to the appropriate type (number, boolean, array, object)
-- **Real-time Updates**: Changes are immediately reflected in your Convex database
-- **Validation**: Basic type checking and format validation for edited values
-
-### Log Management
-
-Advanced log filtering and management capabilities:
-
-- **Type Filtering**: Filter by log types (SUCCESS, FAILURE, DEBUG, etc.)
-- **Search**: Full-text search across log messages
-- **Time Range**: Filter logs by time period
+### Logs View
+Real-time function logs with powerful filtering:
+- **Type Filtering**: SUCCESS, FAILURE, DEBUG, WARNING, ERROR, HTTP
+- **Full-text Search**: Search across all log messages
+- **Time Range**: Filter logs by specific time periods
 - **Export**: Download logs in JSON format
-- **Auto-refresh**: Real-time log updates
-- **Memory Management**: Automatic cleanup of old logs based on `maxStoredLogs`
 
-## Troubleshooting
+### Health View
+Monitor your Convex application's performance:
+- **Cache Hit Rate**: Track caching efficiency
+- **Failure Rate**: Monitor function error rates
+- **Scheduler Status**: View scheduled function health
+- **Latency Charts**: Visualize system response times
 
-For detailed troubleshooting and setup instructions, see [USAGE_GUIDE.md](./USAGE_GUIDE.md).
+### Functions View
+Test and debug your Convex functions:
+- **Function Runner**: Execute queries, mutations, and actions
+- **Code Inspection**: View source code with syntax highlighting
+- **Input Editor**: Monaco editor with JSON support
+- **Performance Metrics**: Invocation counts, error rates, execution times
 
-### Common Errors
+### Schedules View
+Manage scheduled jobs and cron functions:
+- View all scheduled and cron jobs
+- Execution history and status
+- Manual trigger capability
 
-1. **"Convex authentication required"**:
-   - Ensure valid `accessToken` is provided (manual auth), or
-   - Ensure `oauthConfig` and `tokenExchangeUrl` are properly configured (OAuth)
-   - Check `.env.local` file configuration
-   - Verify Convex login status
+### Components View
+Browse installed Convex components:
+- View component metadata
+- Explore component functions
 
-2. **"CORS error" or "Token exchange failed"**:
-   - Make sure your server endpoint is running and accessible
-   - Verify that `tokenExchangeUrl` points to the correct endpoint
-   - Check that `CONVEX_CLIENT_SECRET` is set in your server environment
-   - See [USAGE_GUIDE.md](./USAGE_GUIDE.md) for server endpoint examples
+## Vite Configuration
 
-2. **No logs appearing**:
-   - Verify `deployKey` and `CONVEX_DEPLOYMENT` settings
-   - Check `convex` prop initialization
-   - Confirm access token validity
-   - Check network connectivity
+For Vite projects with Monaco Editor support:
 
-3. **Build warnings about "use client" directive**:
-   - Expected behavior for client components
-   - Won't affect functionality
-   - Use dynamic import as shown in setup examples
-
-4. **Panel not appearing**:
-   - Ensure component is mounted inside ConvexProvider
-   - Check z-index conflicts
-   - Verify styles are properly injected
-
-### Performance Optimization
-
-- Adjust `initialLimit` based on your needs
-- Set appropriate `maxStoredLogs` to prevent memory issues
-- Use `useMockData` for development/testing
-- Consider lazy loading for large datasets
-
-## Development
-
-To contribute to this package:
-
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Start the development server: `npm run dev`
-4. Run tests: `npm test`
-
-### Testing
-
-```bash
-# Run all tests
-npm test
-
-# Run specific test suite
-npm test -- --grep "feature-name"
-
-# Run tests in watch mode
-npm test -- --watch
-```
-
-## Publishing Updates
-
-To publish a new version:
-
-1. Update version in `package.json`
-2. Run tests: `npm test`
-3. Build the package: `npm run build`
-4. Commit changes
-5. Create a git tag: `git tag v1.x.x`
-6. Push changes and tags: `git push && git push --tags`
-7. Publish: `npm publish`
-
-## License
-
-MIT
-
-## Using with Vite
-
-If you're using Vite, you'll need to configure it to properly handle Monaco Editor. The package provides a pre-configured Vite configuration that you can extend:
-
-1. First, install the required Vite plugin:
-```bash
-npm install vite-plugin-monaco-editor --save-dev
-```
-
-2. In your `vite.config.js`, import and use the provided configuration:
 ```javascript
+// vite.config.js
 import { defineConfig } from 'vite';
 import convexPanelViteConfig from 'convex-panel/vite';
 
 export default defineConfig({
   ...convexPanelViteConfig,
-  // Your other Vite configurations...
+  // Your other configurations...
 });
 ```
 
-This will set up the necessary Monaco Editor configuration for Vite. 
+## Development
+
+### Local Development
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev:live
+
+# Build the package
+npm run build
+```
+
+### Package Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm run build` | Build the package for production |
+| `npm run dev` | Watch mode for development |
+| `npm run dev:live` | Start the live development server |
+| `npm run dev:server` | Start the development API server |
+| `npm run clean` | Remove dist folder |
+
+## Troubleshooting
+
+### Panel not appearing?
+- Ensure the component is inside a `ConvexProvider`
+- Check for z-index conflicts with your app
+- Use dynamic import for Next.js: `dynamic(() => import("convex-panel"), { ssr: false })`
+
+### Authentication issues?
+- The panel auto-redirects to OAuth login
+- Check browser console for errors
+- Ensure your Convex URL is correctly configured
+
+### Build warnings about "use client"?
+- This is expected for client components
+- Won't affect functionality
+
+## License
+
+MIT © [Robert Alvarez](https://github.com/robertalv)
+
+## Links
+
+- [Homepage](https://convexpanel.dev)
+- [GitHub Repository](https://github.com/robertalv/convex-panel)
+- [Issue Tracker](https://github.com/robertalv/convex-panel/issues)
+- [NPM Package](https://www.npmjs.com/package/convex-panel)

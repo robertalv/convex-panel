@@ -15,7 +15,6 @@ import {
 import { FixedSizeList } from 'react-window';
 import { useLogs } from '../../hooks/useLogs';
 import { LogEntry } from '../../types';
-import { logsViewStyles, searchInputStyles } from '../../styles/panelStyles';
 import { MultiSelectComponentSelector } from '../../components/function-runner/components/multi-select-component-selector';
 import { MultiSelectFunctionSelector } from '../../components/function-runner/components/multi-select-function-selector';
 import { MultiSelectLogTypeSelector } from '../../components/function-runner/components/multi-select-log-type-selector';
@@ -533,22 +532,33 @@ export const LogsView: React.FC<LogsViewProps> = ({
 
     return (
       <div
+        className="cp-logs-row"
         style={{
           ...style,
-          ...logsViewStyles.logRow,
-          ...(isSelected ? {
-            backgroundColor: 'color-mix(in srgb, var(--color-panel-accent) 15%, transparent)',
-            borderLeft: '3px solid var(--color-panel-accent)',
-          } : isHovered && isError && !isSelected ? {
-            backgroundColor: 'color-mix(in srgb, var(--color-panel-error) 25%, transparent)',
-            color: 'var(--color-panel-error)',
-          } : isHovered && !isError && !isSelected ? {
-            backgroundColor: 'var(--color-panel-hover)',
-          } : {}),
-          ...(isError && !isSelected && !isHovered ? {
-            backgroundColor: 'color-mix(in srgb, var(--color-panel-error) 15%, transparent)',
-            color: 'var(--color-panel-error)',
-          } : {}),
+          ...(isSelected
+            ? {
+                backgroundColor:
+                  'color-mix(in srgb, var(--color-panel-accent) 15%, transparent)',
+                borderLeft: '3px solid var(--color-panel-accent)',
+              }
+            : isHovered && isError && !isSelected
+            ? {
+                backgroundColor:
+                  'color-mix(in srgb, var(--color-panel-error) 25%, transparent)',
+                color: 'var(--color-panel-error)',
+              }
+            : isHovered && !isError && !isSelected
+            ? {
+                backgroundColor: 'var(--color-panel-hover)',
+              }
+            : {}),
+          ...(isError && !isSelected && !isHovered
+            ? {
+                backgroundColor:
+                  'color-mix(in srgb, var(--color-panel-error) 15%, transparent)',
+                color: 'var(--color-panel-error)',
+              }
+            : {}),
           cursor: 'pointer',
         }}
         onMouseEnter={() => setHoveredLogIndex(index)}
@@ -558,97 +568,116 @@ export const LogsView: React.FC<LogsViewProps> = ({
           setIsSheetOpen(true);
         }}
       >
-        <div style={{ 
-          ...logsViewStyles.timestampCell, 
-          ...(isError ? { color: 'var(--color-panel-error)' } : {}) 
-        }}>
+        <div
+          className="cp-logs-timestamp"
+          style={isError ? { color: 'var(--color-panel-error)' } : undefined}
+        >
           {formatTimestamp(log.timestamp)}
         </div>
-        <div style={{ 
-          ...logsViewStyles.idCell, 
-          ...(isError ? { color: 'var(--color-panel-error)' } : {}) 
-        }}>
+        <div
+          className="cp-logs-id"
+          style={isError ? { color: 'var(--color-panel-error)' } : undefined}
+        >
           {shortId !== '-' && (
-            <span style={{
-              ...logsViewStyles.idBadge,
-              ...(isError ? {
-                border: '1px solid color-mix(in srgb, var(--color-panel-error) 50%, transparent)',
-                backgroundColor: 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)',
-                color: 'var(--color-panel-error)',
-              } : {}),
-            }}>
+            <span
+              className="cp-logs-id-badge"
+              style={
+                isError
+                  ? {
+                      border:
+                        '1px solid color-mix(in srgb, var(--color-panel-error) 50%, transparent)',
+                      backgroundColor:
+                        'color-mix(in srgb, var(--color-panel-error) 10%, transparent)',
+                      color: 'var(--color-panel-error)',
+                    }
+                  : undefined
+              }
+            >
               {shortId}
             </span>
           )}
         </div>
-        <div style={logsViewStyles.statusCell}>
+        <div className="cp-logs-status">
           {statusDisplay && (
             <span style={isError ? { color: 'var(--color-panel-error)' } : status === 'success' ? { color: 'var(--color-panel-success)' } : { color: 'var(--color-panel-text-secondary)' }}>
               {statusDisplay}
             </span>
           )}
           {executionTime && (
-            <span style={{ 
-              ...logsViewStyles.executionTime, 
-              ...(isError ? { color: 'var(--color-panel-error)' } : {}),
-              marginLeft: '8px',
-            }}>
+            <span
+              className="cp-logs-execution-time"
+              style={{
+                ...(isError ? { color: 'var(--color-panel-error)' } : {}),
+                marginLeft: '8px',
+              }}
+            >
               {executionTime}
             </span>
           )}
         </div>
-        <div style={{ 
-          ...logsViewStyles.functionCell, 
-          ...(isError ? { color: 'var(--color-panel-error)' } : {}) 
-        }}>
-          <span style={{
-            ...logsViewStyles.logTypeIcon,
-            ...logTypeBadgeStyle,
-            ...(isError ? { 
-              backgroundColor: 'color-mix(in srgb, var(--color-panel-error) 20%, transparent)',
-              color: 'var(--color-panel-error)',
-            } : {}),
-            borderRadius: '4px',
-            padding: '2px 6px',
-            fontSize: '11px',
-            fontWeight: 500,
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minWidth: '20px',
-          }}>
+        <div
+          className="cp-logs-function"
+          style={isError ? { color: 'var(--color-panel-error)' } : undefined}
+        >
+          <span
+            className="cp-logs-logtype"
+            style={{
+              ...logTypeBadgeStyle,
+              ...(isError
+                ? {
+                    backgroundColor:
+                      'color-mix(in srgb, var(--color-panel-error) 20%, transparent)',
+                    color: 'var(--color-panel-error)',
+                  }
+                : {}),
+              borderRadius: '4px',
+              padding: '2px 6px',
+              fontSize: '11px',
+              fontWeight: 500,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '20px',
+            }}
+          >
             {logTypeIcon}
           </span>
           {functionIdentifier && (
-            <span style={{ 
-              ...logsViewStyles.functionPath, 
-              color: isError ? 'var(--color-panel-error)' : 'var(--color-panel-text-muted)', 
-              marginRight: '4px',
-              fontFamily: 'monospace',
-            }}>
+            <span
+              className="cp-logs-function-path"
+              style={{
+                color: isError
+                  ? 'var(--color-panel-error)'
+                  : 'var(--color-panel-text-muted)',
+                marginRight: '4px',
+                fontFamily: 'monospace',
+              }}
+            >
               {functionIdentifier}:
             </span>
           )}
-          <span style={{ 
-            ...logsViewStyles.functionPath, 
-            ...(isError ? { color: 'var(--color-panel-error)' } : {}),
-            fontFamily: 'monospace',
-          }}>
+          <span
+            className="cp-logs-function-path"
+            style={{
+              ...(isError ? { color: 'var(--color-panel-error)' } : {}),
+              fontFamily: 'monospace',
+            }}
+          >
             {displayFunctionName}
           </span>
           {isError && log.error_message && (
-            <span style={{
-              marginLeft: '8px',
-              color: 'var(--color-panel-error)',
-              fontSize: '11px',
-              opacity: 0.9,
-              fontFamily: 'monospace',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              flex: 1,
-              minWidth: 0,
-            }}>
+            <span
+              className="cp-logs-message"
+              style={{
+                marginLeft: '8px',
+                color: 'var(--color-panel-error)',
+                fontSize: '11px',
+                opacity: 0.9,
+                fontFamily: 'monospace',
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
               • {log.error_message}
             </span>
           )}
@@ -682,11 +711,18 @@ export const LogsView: React.FC<LogsViewProps> = ({
   LogRow.displayName = 'LogRow';
 
   return (
-    <div ref={logsContainerRef} style={{ ...logsViewStyles.container, position: 'relative', overflow: 'hidden' }}>
+    <div
+      ref={logsContainerRef}
+      className="cp-logs-container"
+      style={{ position: 'relative', overflow: 'hidden' }}
+    >
       {/* Header */}
-      <div style={logsViewStyles.header}>
-        <h2 style={logsViewStyles.headerTitle}>Logs</h2>
-        <div style={{ ...logsViewStyles.headerButtons, position: 'relative', zIndex: 1, gap: '8px', marginRight: '-8px' }}>
+      <div className="cp-logs-header">
+        <h2 className="cp-logs-header-title">Logs</h2>
+        <div
+          className="cp-logs-header-buttons"
+          style={{ position: 'relative', zIndex: 1, gap: '8px', marginRight: '-8px' }}
+        >
           <MultiSelectComponentSelector
             selectedComponents={selectedComponents}
             onSelect={(components) => {
@@ -718,34 +754,23 @@ export const LogsView: React.FC<LogsViewProps> = ({
       </div>
 
       {/* Search */}
-      <div style={logsViewStyles.searchContainer}>
+      <div className="cp-logs-search">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
-          <div style={{ ...searchInputStyles.container, flex: 1 }}>
-            <Search style={searchInputStyles.icon} />
+          <div style={{ flex: 1 }}>
+            <div className="cp-search-wrapper">
+              <Search className="cp-search-icon" />
             <input
               type="text"
               placeholder="Filter logs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={searchInputStyles.input}
-              onFocus={(e) => {
-                Object.assign(e.currentTarget.style, searchInputStyles.inputFocus);
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-panel-border)';
-                e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
-              }}
+              className="cp-search-input"
             />
+            </div>
           </div>
           <button
             onClick={clearLogs}
-            style={logsViewStyles.headerButton}
-            onMouseEnter={(e) => {
-              Object.assign(e.currentTarget.style, logsViewStyles.headerButtonHover);
-            }}
-            onMouseLeave={(e) => {
-              Object.assign(e.currentTarget.style, logsViewStyles.headerButton);
-            }}
+            className="cp-logs-header-button"
           >
             Clear Logs
           </button>
@@ -753,35 +778,21 @@ export const LogsView: React.FC<LogsViewProps> = ({
       </div>
 
       {/* Logs Table */}
-      <div style={{ ...logsViewStyles.logsTable, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div className="cp-logs-table" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
-        <div style={{ ...logsViewStyles.tableHeader, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginRight: '8px' }}>
+        <div
+          className="cp-logs-table-header"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginRight: '8px' }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-            <div style={{ ...logsViewStyles.tableHeaderCell, width: '160px' }}>Timestamp</div>
-            <div style={{ ...logsViewStyles.tableHeaderCell, width: '80px' }}>ID</div>
-            <div style={{ ...logsViewStyles.tableHeaderCell, width: '128px' }}>Status</div>
-            <div style={{ ...logsViewStyles.tableHeaderCell, flex: 1 }}>Function</div>
+            <div className="cp-logs-table-header-cell" style={{ width: '160px' }}>Timestamp</div>
+            <div className="cp-logs-table-header-cell" style={{ width: '80px' }}>ID</div>
+            <div className="cp-logs-table-header-cell" style={{ width: '128px' }}>Status</div>
+            <div className="cp-logs-table-header-cell" style={{ flex: 1 }}>Function</div>
           </div>
           <button
             onClick={() => setIsPaused(!isPaused)}
-            style={{
-              ...logsViewStyles.pauseButton,
-              ...(isPaused ? logsViewStyles.pauseButtonPaused : {}),
-            }}
-            onMouseEnter={(e) => {
-              const baseStyle = isPaused ? logsViewStyles.pauseButtonPaused : logsViewStyles.pauseButton;
-              const hoverStyle = isPaused ? logsViewStyles.pauseButtonPausedHover : logsViewStyles.pauseButtonHover;
-              Object.assign(e.currentTarget.style, {
-                ...baseStyle,
-                ...hoverStyle,
-              });
-            }}
-            onMouseLeave={(e) => {
-              const baseStyle = isPaused ? logsViewStyles.pauseButtonPaused : logsViewStyles.pauseButton;
-              Object.assign(e.currentTarget.style, {
-                ...baseStyle,
-              });
-            }}
+            className={`cp-logs-pause-btn${isPaused ? ' cp-logs-pause-btn-paused' : ''}`}
           >
             {isPaused ? (
               <>
@@ -797,18 +808,18 @@ export const LogsView: React.FC<LogsViewProps> = ({
 
         {/* Logs */}
         {isLoading && logs.length === 0 ? (
-          <div style={logsViewStyles.loadingContainer}>
-            <div style={logsViewStyles.loadingText}>Loading logs...</div>
+          <div className="cp-logs-loading">
+            <div className="cp-logs-loading-text">Loading logs...</div>
           </div>
         ) : error && logs.length === 0 ? (
-          <div style={logsViewStyles.errorContainer}>
-            <div style={logsViewStyles.errorText}>
+          <div className="cp-logs-error">
+            <div className="cp-logs-error-text">
               Error loading logs: {error instanceof Error ? error.message : String(error)}
             </div>
           </div>
         ) : filteredLogs.length === 0 ? (
-          <div style={logsViewStyles.emptyContainer}>
-            <div style={logsViewStyles.emptyText}>
+          <div className="cp-logs-empty">
+            <div className="cp-logs-empty-text">
               {searchQuery || (selectedComponents.length < componentNames.length) || selectedFunctions.length > 0 || selectedLogTypes.length < 6
                 ? 'No logs match your filters'
                 : 'No logs yet'}

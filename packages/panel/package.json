@@ -1,6 +1,6 @@
 {
-  "name": "@convex-panel",
-  "version": "0.2.14",
+  "name": "convex-panel",
+  "version": "0.2.15",
   "description": "A React component for monitoring and debugging Convex applications",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -39,7 +39,8 @@
   ],
   "scripts": {
     "copy-src": "node copy-src.js",
-    "build": "npm run copy-src && tsup",
+    "build:css": "node process-css.js",
+    "build": "npm run copy-src && npm run build:css && tsup",
     "dev": "tsup --watch",
     "dev:live": "vite --config dev/vite.config.ts",
     "dev:server": "node dev/server.js",
@@ -112,7 +113,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/robertalv/convex-panel.git"
+    "url": "git+https://github.com/robertalv/convex-panel.git"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",

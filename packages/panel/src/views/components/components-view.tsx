@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { Search } from 'lucide-react';
 import { ComponentCard } from './components/component-card';
 import { ComponentDetailSheet } from './components/component-detail-sheet';
-import { searchInputStyles } from '../../styles/panelStyles';
 import { useSheetSafe } from '../../contexts/sheet-context';
 import { ALL_COMPONENTS } from './data';
 import { CATEGORIES } from './constants';
@@ -55,29 +54,21 @@ export const ComponentsView: React.FC = () => {
       {/* Sidebar */}
       <div className="cp-components-sidebar">
         {/* Search Bar */}
-        <div style={{ 
-          padding: '8px', 
-          borderBottom: '1px solid var(--color-panel-border)',
-          backgroundColor: 'var(--color-panel-bg)'
-        }}>
-          <div style={searchInputStyles.container}>
-            <Search 
-              size={14} 
-              style={searchInputStyles.icon}
-            />
+        <div
+          style={{
+            padding: '8px',
+            borderBottom: '1px solid var(--color-panel-border)',
+            backgroundColor: 'var(--color-panel-bg)',
+          }}
+        >
+          <div className="cp-search-wrapper">
+            <Search size={14} className="cp-search-icon" />
             <input
               type="text"
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={searchInputStyles.input}
-              onFocus={(e) => {
-                Object.assign(e.currentTarget.style, searchInputStyles.inputFocus);
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-panel-border)';
-                e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
-              }}
+              className="cp-search-input"
             />
           </div>
         </div>

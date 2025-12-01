@@ -1,6 +1,6 @@
 import React from "react";
 import { ConvexReactClient, ConvexProvider } from "convex/react";
-import ConvexPanel from "@convex-panel";
+import ConvexPanel from "convex-panel";
 
 // ConvexPanel auto-detects from CONVEX_URL, CONVEX_DEPLOY_KEY, etc.
 const convex = new ConvexReactClient(process.env.CONVEX_URL!);
