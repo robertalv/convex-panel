@@ -122,10 +122,9 @@ function getLineClassName(line: string): string {
   return '';
 }
 
-function highlightSyntax(line: string): React.ReactNode {
+function highlightSyntax(line: React.ReactNode extends never ? never : string): React.ReactNode {
   // Simple syntax highlighting
   const keywords = ['import', 'export', 'const', 'async', 'await', 'return', 'if', 'throw', 'new'];
-  const types = ['query', 'mutation', 'v', 'ctx', 'id'];
   
   let result = line;
   

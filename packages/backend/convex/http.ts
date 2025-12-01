@@ -19,7 +19,7 @@ const http = httpRouter();
  *   redirectUri?: string;
  * }
  */
-export const exchangeOAuthCode = httpAction(async (ctx, request) => {
+export const exchangeOAuthCode = httpAction(async (_ctx, request) => {
   const origin = request.headers.get("Origin") ?? "*";
   const corsHeaders: Record<string, string> = {
     "Access-Control-Allow-Origin": origin,
