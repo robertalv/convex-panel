@@ -2,9 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 
 export interface EmptyTableStateProps {
   columns: string[];
+  onAddDocument?: () => void;
 }
 
-export const EmptyTableState: React.FC<EmptyTableStateProps> = ({ columns }) => {
+export const EmptyTableState: React.FC<EmptyTableStateProps> = ({ columns, onAddDocument }) => {
   const placeholderColumns = columns.length ? columns : ['_id', '_creationTime'];
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [fakeRows, setFakeRows] = useState(18);
@@ -162,6 +163,7 @@ export const EmptyTableState: React.FC<EmptyTableStateProps> = ({ columns }) => 
                 fontSize: '13px',
                 cursor: 'pointer',
               }}
+              onClick={onAddDocument}
             >
               + Add Documents
             </button>

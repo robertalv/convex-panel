@@ -115,10 +115,11 @@ export const useTableData = ({
   const requestCacheRef = useRef<Map<string, number>>(new Map());
   
   /**
-   * Cache expiration time in milliseconds
-   * This ensures we don't completely prevent refetches for too long
+   * Cache expiration time in milliseconds.
+   * Keep this shorter than our periodic refresh interval so that
+   * real-time polling is never suppressed by the dedupe cache.
    */
-  const CACHE_EXPIRY_TIME = 2000; // 2 seconds
+  const CACHE_EXPIRY_TIME = 250; // 0.25 seconds
   
   /**
    * Track fetch debounce timers by table name
@@ -127,9 +128,10 @@ export const useTableData = ({
   const debounceTimersRef = useRef<Record<string, number>>({});
   
   /**
-   * Debounce time in milliseconds for table data fetches
+   * Debounce time in milliseconds for table data fetches.
+   * Kept small so filter/sort changes feel snappy.
    */
-  const DEBOUNCE_TIME = 300; // 300ms
+  const DEBOUNCE_TIME = 150; // 150ms
   
   /**
    * Function to clean up expired cache entries
@@ -972,6 +974,29 @@ export const useTableData = ({
       }
     };
   }, []);
+
+  /**
+   * Lightweight "real-time" refresh:
+   * Periodically refetch the current table so external writes
+   * (for example, from an app using Convex directly) are reflected
+   * in the panel without manual reload.
+   */
+  useEffect(() => {
+    if (!selectedTable || useMockData || !adminClient) return;
+
+    // Short interval to feel "instant" when other apps write data,
+    // while still avoiding an excessive load on the admin endpoint.
+    const REFRESH_INTERVAL_MS = 500;
+
+    const intervalId = window.setInterval(() => {
+      // Use the first page (cursor null) so we always see the latest data.
+      fetchTableData(selectedTable, null);
+    }, REFRESH_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [selectedTable, fetchTableData, useMockData, adminClient]);
 
   return {
     tables,

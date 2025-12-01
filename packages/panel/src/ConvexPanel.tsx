@@ -6,6 +6,7 @@ import { useOAuth, UseOAuthReturn } from './hooks/useOAuth';
 import { MainViews } from './components/main-view';
 import { BottomSheet } from './components/bottom-sheet';
 import { AuthPanel } from './components/auth-panel';
+import { OAuthErrorPopup } from './components/oauth-error-popup';
 import { getConvexUrl, getOAuthConfigFromEnv, isDevelopment } from './utils/env';
 import { extractProjectName, getTeamTokenFromEnv } from './utils/api';
 import { Team, Project } from './types';
@@ -15,7 +16,7 @@ import { SheetProvider } from './contexts/sheet-context';
 import { ConfirmDialogProvider } from './contexts/confirm-dialog-context';
 import { getStorageItem, setStorageItem } from './utils/storage';
 import { STORAGE_KEYS } from './utils/constants';
-// CSS injection removed - handled by Shadow DOM wrapper in ConvexPanelShadow
+
 export interface ConvexPanelProps {
   convex?: ConvexReactClient | any;
   accessToken?: string;
@@ -89,7 +90,6 @@ const ConvexPanel = ({
   const envOAuthConfig = useMemo(() => {
     if (mockup) return undefined;
     const config = getOAuthConfigFromEnv();
-    // Return undefined if no config, otherwise return a stable object
     return config || undefined;
   }, [mockup]); // Only recalculate if mockup changes
 
@@ -101,6 +101,9 @@ const ConvexPanel = ({
     return getTeamTokenFromEnv() || undefined;
   }, [providedTeamAccessToken]);
 
+  // Track if we should allow automatic OAuth callback handling
+  const [allowAutoCallback, setAllowAutoCallback] = useState(false);
+  
   // OAuth authentication (skip if mockup mode or auth provided)
   const internalAuth = useOAuth(mockup || providedAuth ? null : (oauthConfig || null));
   const oauth = providedAuth || internalAuth;
@@ -165,10 +168,8 @@ const ConvexPanel = ({
 
   // Check development mode (allow override with forceDisplay prop)
   const isDevMode = isDevelopment();
+
   if (!isDevMode && !forceDisplay) {
-    if (typeof window !== 'undefined' && window.console) {
-      console.debug('[ConvexPanel] Not displaying: not in development mode. Set forceDisplay={true} to override.');
-    }
     return null;
   }
 
@@ -178,17 +179,71 @@ const ConvexPanel = ({
     setIsOpen(prev => !prev);
   }, [isAuthenticated]);
 
+  const [validationError, setValidationError] = useState<{
+    errors: string[];
+    warnings: string[];
+  } | null>(null);
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
+
   const handleConnect = useCallback(async () => {
     if (!oauthConfig) {
+      setValidationError({
+        errors: ['OAuth configuration is missing. Please provide oauthConfig with at least a clientId.'],
+        warnings: [],
+      });
+      setShowErrorPopup(true);
       return;
     }
     if (!oauth.authenticate) {
       return;
     }
+
+    // Validate configuration and endpoint before connecting
     try {
+      const { validateOAuthSetup } = await import('./utils/oauthValidation');
+      const validation = await validateOAuthSetup(oauthConfig);
+      
+      if (!validation.isValid || validation.errors.length > 0) {
+        setValidationError({
+          errors: validation.errors,
+          warnings: validation.warnings,
+        });
+        setShowErrorPopup(true);
+        return;
+      }
+
+      // If there are only warnings, show them but allow continuation
+      if (validation.warnings.length > 0) {
+        setValidationError({
+          errors: [],
+          warnings: validation.warnings,
+        });
+        setShowErrorPopup(true);
+        // User can click "Continue" to proceed
+        return;
+      }
+
+      // Proceed with authentication
       await oauth.authenticate();
     } catch (error) {
-      console.error('[ConvexPanel] Authentication error:', error);
+      console.error('[ConvexPanel] Validation error:', error);
+      setValidationError({
+        errors: [error instanceof Error ? error.message : 'Failed to validate OAuth configuration'],
+        warnings: [],
+      });
+      setShowErrorPopup(true);
+    }
+  }, [oauthConfig, oauth]);
+
+  // Handle continuing after warnings
+  const handleContinueAfterWarnings = useCallback(async () => {
+    setShowErrorPopup(false);
+    if (oauthConfig && oauth.authenticate) {
+      try {
+        await oauth.authenticate();
+      } catch (error) {
+        console.error('[ConvexPanel] Authentication error:', error);
+      }
     }
   }, [oauthConfig, oauth]);
 
@@ -247,6 +302,24 @@ const ConvexPanel = ({
           )}
           </BottomSheet>
           </ToastProvider>
+          {showErrorPopup && validationError && (
+            <OAuthErrorPopup
+              isOpen={showErrorPopup}
+              onClose={() => {
+                setShowErrorPopup(false);
+              }}
+              onContinue={
+                validationError.errors.length === 0 && validationError.warnings.length > 0
+                  ? () => {
+                      setShowErrorPopup(false);
+                      handleContinueAfterWarnings();
+                    }
+                  : undefined
+              }
+              errors={validationError.errors}
+              warnings={validationError.warnings}
+            />
+          )}
         </ConfirmDialogProvider>
       </SheetProvider>
     </ThemeProvider>

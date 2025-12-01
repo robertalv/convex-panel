@@ -210,6 +210,8 @@ export async function exchangeCodeForToken(
         code,
         codeVerifier,
         redirectUri: config.redirectUri,
+        // Include clientId so the backend can correctly validate and route the request.
+        clientId: config.clientId,
       }),
     });
 

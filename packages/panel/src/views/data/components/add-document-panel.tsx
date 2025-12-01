@@ -3,9 +3,8 @@ import { X, Plus, AlertCircle, CheckCircle2, Loader2, Info } from 'lucide-react'
 import Editor, { BeforeMount, OnMount } from '@monaco-editor/react';
 import { useThemeSafe } from '../../../hooks/useTheme';
 import { insertDocuments } from '../../../utils/functions';
-import { toast } from '../../../components/toast';
+import { toast } from 'sonner';
 import { TableSchema } from '../../../types';
-import { UpgradePopup } from '../../../components/upgrade-popup';
 
 export interface AddDocumentPanelProps {
   selectedTable: string;
@@ -78,7 +77,6 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [showUpgradePopup, setShowUpgradePopup] = useState(false);
   const [monaco, setMonaco] = useState<Parameters<BeforeMount>[0]>();
   const editorRef = useRef<any>(null);
 
@@ -388,16 +386,9 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
         }
       }, 1500);
     } catch (err: any) {
-      // Check if this is an upgrade required error
-      if (err?.isUpgradeError || err?.code === 'UPGRADE_REQUIRED' || 
-          (err?.message && err.message.includes('unavailable on your plan'))) {
-        setShowUpgradePopup(true);
-        setError(null);
-      } else {
-        const errorMessage = err?.message || 'Failed to insert documents';
-        setError(errorMessage);
-        toast.error(errorMessage);
-      }
+      const errorMessage = err?.message || 'Failed to insert documents';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -405,6 +396,7 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
 
   return (
     <div
+      className="cp-add-document-panel"
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -704,7 +696,7 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
         </div>
       </div>
 
-      {/* Spinner animation */}
+      {/* Spinner animation & editor overrides */}
       <style>{`
         @keyframes spin {
           from {
@@ -714,13 +706,39 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
             transform: rotate(360deg);
           }
         }
-      `}</style>
 
-      {/* Upgrade Popup */}
-      <UpgradePopup
-        isOpen={showUpgradePopup}
-        onClose={() => setShowUpgradePopup(false)}
-      />
+        /* Ensure Monaco's internal IME textarea doesn't show up as an extra text area */
+        .cp-add-document-panel .monaco-editor textarea.ime-text-area {
+          position: absolute !important;
+          width: 0 !important;
+          height: 0 !important;
+          opacity: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          border: none !important;
+          background: transparent !important;
+          color: transparent !important;
+          resize: none !important;
+          pointer-events: none !important;
+        }
+
+        /* Hide Monaco's native edit context div that otherwise looks like an empty input row */
+        .cp-add-document-panel .monaco-editor .native-edit-context {
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 0 !important;
+          height: 0 !important;
+          opacity: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          border: none !important;
+          background: transparent !important;
+          color: transparent !important;
+          overflow: hidden !important;
+          pointer-events: none !important;
+        }
+      `}</style>
     </div>
   );
 };

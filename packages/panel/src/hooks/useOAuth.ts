@@ -55,15 +55,35 @@ export function useOAuth(config: OAuthConfig | null): UseOAuthReturn {
     const checkCallback = async () => {
       try {
         const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has('code')) {
-          // Handle OAuth callback
+        const hasCode = urlParams.has('code');
+        
+        // If we have a code in the URL, validate config first before exchanging
+        if (hasCode) {
+          try {
+            const { validateOAuthConfig } = await import('../utils/oauthValidation');
+            const validation = validateOAuthConfig(config);
+            
+            if (!validation.isValid || validation.errors.length > 0) {
+              // Don't exchange token if config is invalid - wait for user to fix it
+              setError(`Configuration error: ${validation.errors.join('; ')}`);
+              setIsLoading(false);
+              hasProcessedRef.current = true;
+              // Don't clean URL - let user see what happened and fix config
+              return;
+            }
+          } catch (validationError) {
+            // If validation fails to load/run, still try to exchange (might be network issue)
+            console.warn('[useOAuth] Validation check failed, proceeding with token exchange:', validationError);
+          }
+          
+          // Config is valid, proceed with token exchange
           const newToken = await handleOAuthCallback(config);
           if (newToken) {
             setToken(newToken);
             setError(null);
           }
         } else {
-          // Check for stored token
+          // No code in URL, just check for stored token
           const storedToken = getStoredToken();
           if (storedToken) {
             setToken(storedToken);

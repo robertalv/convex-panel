@@ -79,6 +79,11 @@ export const DataView: React.FC<DataViewProps> = ({
   const lastTableRef = useRef<string | null>(null);
   const lastFieldsStringRef = useRef<string>('');
 
+  const handleOpenAddDocument = () => {
+    if (!tableData.selectedTable) return;
+    setIsAddDocumentOpen(true);
+  };
+
   useEffect(() => {
     const currentTable = tableData.selectedTable;
     const fieldsString = JSON.stringify([...allFields].sort());
@@ -144,7 +149,7 @@ export const DataView: React.FC<DataViewProps> = ({
             documentCount={tableData.documentCount}
             onFilterToggle={() => setIsFilterOpen(!isFilterOpen)}
             isFilterOpen={isFilterOpen}
-            onAddDocument={() => setIsAddDocumentOpen(true)}
+            onAddDocument={handleOpenAddDocument}
             onColumnVisibilityToggle={() => {
               setIsColumnVisibilityOpen(!isColumnVisibilityOpen);
               // Also open filter panel if not already open
@@ -243,6 +248,7 @@ export const DataView: React.FC<DataViewProps> = ({
             componentId={selectedComponentId}
             filters={tableData.filters}
             setFilters={tableData.setFilters}
+            onAddDocument={handleOpenAddDocument}
             onNavigateToTable={(tableName: string, documentId: string) => {
               // Create filter to show only this document by _id
               const filter = {

@@ -10,6 +10,8 @@ export interface TableRowProps {
   getColumnWidth: (column: string) => number;
   columnMeta: Record<string, ColumnMeta>;
   selectedDocumentIds: string[];
+  isNewRow?: boolean;
+  highlightedColumns?: Set<string>;
   hoveredCell: { rowId: string; column: string } | null;
   cellMenuState: { rowId: string; column: string; value: any; position: { x: number; y: number } } | null;
   editingCell: { rowId: string; column: string; value: any } | null;
@@ -45,6 +47,8 @@ export const TableRow: React.FC<TableRowProps> = ({
   getColumnWidth,
   columnMeta,
   selectedDocumentIds,
+  isNewRow,
+  highlightedColumns,
   hoveredCell,
   cellMenuState,
   editingCell,
@@ -79,10 +83,15 @@ export const TableRow: React.FC<TableRowProps> = ({
     <tr
       style={{
         borderBottom: '1px solid var(--color-panel-border)',
-        transition: 'background-color 0.15s ease',
+        transition: 'background-color 0.35s ease, box-shadow 0.35s ease',
         backgroundColor: isSelected
           ? 'var(--color-panel-active)'
-          : 'transparent',
+          : isNewRow
+            ? 'rgba(52, 211, 153, 0.12)'
+            : 'transparent',
+        boxShadow: isNewRow
+          ? '0 0 0 1px rgba(52, 211, 153, 0.25)'
+          : 'none',
       }}
     >
       <td
@@ -130,6 +139,8 @@ export const TableRow: React.FC<TableRowProps> = ({
           editingCell?.rowId === document._id &&
           editingCell?.column === column;
         const isEditable = isEditableColumn(column);
+        const isHighlighted =
+          highlightedColumns?.has(column) ?? false;
 
         return (
           <TableCell
@@ -139,6 +150,7 @@ export const TableRow: React.FC<TableRowProps> = ({
             width={width}
             rowId={document._id}
             columnMeta={columnMeta[column]}
+            isHighlighted={isHighlighted}
             isHovered={isHovered}
             isMenuOpen={isMenuOpen}
             isEditing={isEditing}

@@ -14,10 +14,38 @@ const app = express();
 
 const PORT = process.env.PORT || 3001;
 
+// Helper to resolve environment variables from multiple possible keys
+// (e.g. CONVEX_CLIENT_ID, OAUTH_CLIENT_ID, VITE_OAUTH_CLIENT_ID, NEXT_PUBLIC_OAUTH_CLIENT_ID)
+const resolveEnvVar = (keys, fallbackKey) => {
+  for (const key of keys) {
+    if (process.env[key]) {
+      return { key, value: process.env[key] };
+    }
+  }
+  return { key: fallbackKey || keys[0], value: undefined };
+};
+
+const CLIENT_ID_ENV_KEYS = [
+  'CONVEX_CLIENT_ID',
+  'OAUTH_CLIENT_ID',
+  'VITE_OAUTH_CLIENT_ID',
+  'NEXT_PUBLIC_OAUTH_CLIENT_ID',
+  'REACT_APP_OAUTH_CLIENT_ID',
+];
+
+const CLIENT_SECRET_ENV_KEYS = [
+  'CONVEX_CLIENT_SECRET',
+  'OAUTH_CLIENT_SECRET',
+  'VITE_OAUTH_CLIENT_SECRET',
+  'NEXT_PUBLIC_OAUTH_CLIENT_SECRET',
+  'REACT_APP_OAUTH_CLIENT_SECRET',
+];
+
 // CORS configuration - allow requests from convexpanel.dev and subdomains
 const allowedOrigins = [
   'https://convexpanel.dev',
   'https://www.convexpanel.dev',
+  'https://api.convexpanel.dev',
   'http://localhost:5173',
   'http://localhost:3000',
   'http://localhost:14200', // Tauri
@@ -54,7 +82,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-app.options('/api/convex/exchange', cors(corsOptions), (req, res) => {
+app.options('/v1/convex/oauth', cors(corsOptions), (req, res) => {
   res.sendStatus(204);
 });
 
@@ -79,12 +107,12 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       health: '/health',
-      oauthExchange: '/api/convex/exchange',
+      oauthExchange: '/v1/convex/oauth',
     },
   });
 });
 
-app.post('/api/convex/exchange', async (req, res) => {
+app.post('/v1/convex/oauth', async (req, res) => {
   console.debug('Token exchange request received');
   console.debug('Request body:', { 
     hasCode: !!req.body.code, 
@@ -92,25 +120,63 @@ app.post('/api/convex/exchange', async (req, res) => {
     redirectUri: req.body.redirectUri 
   });
   
-  const { code, codeVerifier, redirectUri } = req.body;
+  const { code, codeVerifier, redirectUri, clientId: clientIdFromBody } = req.body;
   
   if (!code) {
     return res.status(400).json({ error: 'No authorization code provided' });
   }
 
   // Get OAuth credentials from environment (no hardcoded defaults in production)
-  const clientId = process.env.CONVEX_CLIENT_ID;
-  const clientSecret = process.env.CONVEX_CLIENT_SECRET;
+  // Prefer clientId from the request body (so frontend and backend stay in sync),
+  // but fall back to any of the supported env vars for existing deployments.
+  const { key: clientIdEnvKey, value: clientIdEnvValue } = resolveEnvVar(
+    CLIENT_ID_ENV_KEYS,
+    'CONVEX_CLIENT_ID'
+  );
+  const { key: clientSecretEnvKey, value: clientSecretEnvValue } = resolveEnvVar(
+    CLIENT_SECRET_ENV_KEYS,
+    'CONVEX_CLIENT_SECRET'
+  );
+
+  const clientId = clientIdFromBody || clientIdEnvValue;
+  const clientSecret = clientSecretEnvValue;
   const finalRedirectUri = redirectUri || process.env.DEFAULT_REDIRECT_URI || 'https://convexpanel.dev';
 
-  if (!clientSecret) {
-    console.error('CONVEX_CLIENT_SECRET not set in environment');
-    console.error('Current env vars:', {
-      hasClientId: !!process.env.CONVEX_CLIENT_ID,
-      hasClientSecret: !!process.env.CONVEX_CLIENT_SECRET,
+  // Extra diagnostics to confirm which env vars are being used (without logging full secrets)
+  console.debug('[OAuth] Credential resolution:', {
+    clientIdFromBodyPreview: clientIdFromBody
+      ? `${String(clientIdFromBody).substring(0, 6)}…${String(clientIdFromBody).substring(
+          String(clientIdFromBody).length - 4
+        )}`
+      : null,
+    clientIdEnvKey,
+    clientIdEnvValuePresent: !!clientIdEnvValue,
+    clientIdPreview: clientId
+      ? `${String(clientId).substring(0, 6)}…${String(clientId).substring(
+          String(clientId).length - 4
+        )}`
+      : null,
+    clientSecretEnvKey,
+    clientSecretEnvValuePresent: !!clientSecretEnvValue,
+    clientSecretLength: clientSecret ? String(clientSecret).length : 0,
+    clientSecretPreview: clientSecret
+      ? `${String(clientSecret).substring(0, 4)}…${String(clientSecret).substring(
+          String(clientSecret).length - 4
+        )}`
+      : null,
+  });
+
+  if (!clientId || !clientSecret) {
+    console.error('OAuth client credentials not fully configured');
+    console.error('Current env lookup:', {
+      clientIdFromBody: !!clientIdFromBody,
+      clientIdEnvKey,
+      clientIdEnvValuePresent: !!clientIdEnvValue,
+      clientSecretEnvKey,
+      clientSecretEnvValuePresent: !!clientSecretEnvValue,
     });
     return res.status(500).json({ 
-      error: 'OAuth client secret not configured. Set CONVEX_CLIENT_SECRET environment variable.' 
+      error: 'OAuth client credentials not configured. Provide clientId in request body or set CONVEX_CLIENT_ID and CONVEX_CLIENT_SECRET environment variables.' 
     });
   }
 
@@ -219,14 +285,35 @@ if (process.env.VERCEL !== '1') {
   app.listen(PORT, () => {
     console.log(`Convex Panel API Server running on port ${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/health`);
-    console.log(`OAuth exchange: http://localhost:${PORT}/api/convex/exchange`);
+    console.log(`OAuth exchange: http://localhost:${PORT}/v1/convex/oauth`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`Client ID: ${process.env.CONVEX_CLIENT_ID ? 'Set' : 'Missing'}`);
-    console.log(`Client Secret: ${process.env.CONVEX_CLIENT_SECRET ? 'Set' : 'Missing'}`);
+
+    const { key: resolvedClientIdKey, value: resolvedClientIdValue } = resolveEnvVar(
+      CLIENT_ID_ENV_KEYS,
+      'CONVEX_CLIENT_ID'
+    );
+    const { key: resolvedClientSecretKey, value: resolvedClientSecretValue } = resolveEnvVar(
+      CLIENT_SECRET_ENV_KEYS,
+      'CONVEX_CLIENT_SECRET'
+    );
+
+    console.log(
+      `Client ID (${CLIENT_ID_ENV_KEYS.join(
+        ' | '
+      )}) -> using "${resolvedClientIdKey}": ${resolvedClientIdValue ? 'Set' : 'Missing'}`
+    );
+    console.log(
+      `Client Secret (${CLIENT_SECRET_ENV_KEYS.join(
+        ' | '
+      )}) -> using "${resolvedClientSecretKey}": ${resolvedClientSecretValue ? 'Set' : 'Missing'}`
+    );
     
-    if (!process.env.CONVEX_CLIENT_SECRET) {
-      console.warn(`CONVEX_CLIENT_SECRET is not set!`);
-      console.warn(`Set the CONVEX_CLIENT_SECRET environment variable to enable OAuth token exchange.`);
+    if (!resolvedClientSecretValue) {
+      console.warn(
+        `No client secret found. Checked keys: ${CLIENT_SECRET_ENV_KEYS.join(
+          ', '
+        )}. Set one of these (e.g. CONVEX_CLIENT_SECRET) to enable OAuth token exchange.`
+      );
     }
   });
 }

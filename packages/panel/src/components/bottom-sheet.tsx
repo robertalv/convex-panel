@@ -294,13 +294,17 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   useFunctionRunnerShortcuts();
 
   const getHeight = () => {
-    if (!isAuthenticated) return PANEL_COLLAPSED_HEIGHT;
-    if (!isOpen) return PANEL_COLLAPSED_HEIGHT;
+    // Always show at least the collapsed height (40px) so header is always visible
+    const minHeight = PANEL_COLLAPSED_HEIGHT;
+    if (!isAuthenticated) return minHeight;
+    if (!isOpen) return minHeight;
     if (customHeight !== null) return `${customHeight}px`;
     return PANEL_DEFAULT_HEIGHT;
   };
 
   const height = getHeight();
+  // Ensure height is never less than collapsed height
+  const finalHeight = height === '0px' || !height ? PANEL_COLLAPSED_HEIGHT : height;
 
   const headerLeftContent = isAuthenticated ? (
     <>
@@ -392,11 +396,13 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     </>
   );
 
+  // Always render the BottomSheet - it should always be visible
   return (
     <div
       className={`cp-bottom-sheet cp-theme-${theme}`}
       style={{
-        height,
+        height: finalHeight,
+        minHeight: PANEL_COLLAPSED_HEIGHT,
         transition: isResizing ? 'none' : 'height 0.3s ease',
         userSelect: isResizing ? 'none' : 'auto',
         position: 'fixed',
@@ -404,6 +410,10 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         left: 0,
         right: 0,
         zIndex: 99998,
+        display: 'flex',
+        flexDirection: 'column',
+        visibility: 'visible',
+        opacity: 1,
       }}
     >
       {isPanelExpanded && (

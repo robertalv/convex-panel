@@ -132,6 +132,8 @@ export const getConvexUrl = (provided?: string): string | undefined => {
   return provided || getEnvVar('CONVEX_URL');
 };
 
+const DEFAULT_TOKEN_EXCHANGE_URL = 'https://api.convexpanel.dev/v1/convex/oauth';
+
 /**
  * Get OAuth config from environment variables
  */
@@ -150,12 +152,13 @@ export const getOAuthConfigFromEnv = (): {
         : window.location.origin + window.location.pathname)
     : 'http://localhost:3000';
 
-  const tokenExchangeUrl = getEnvVar('CONVEX_TOKEN_EXCHANGE_URL');
+  const envTokenExchangeUrl = getEnvVar('CONVEX_TOKEN_EXCHANGE_URL');
+  const tokenExchangeUrl = envTokenExchangeUrl || DEFAULT_TOKEN_EXCHANGE_URL;
 
   return {
     clientId,
     redirectUri,
-    ...(tokenExchangeUrl && { tokenExchangeUrl }),
+    tokenExchangeUrl,
   };
 };
 
