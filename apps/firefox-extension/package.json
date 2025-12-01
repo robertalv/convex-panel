@@ -1,0 +1,21 @@
+{
+    "name": "convex-panel/firefox-extension",
+    "version": "0.0.0",
+    "private": true,
+    "scripts": {
+        "build": "vite build",
+        "dev": "vite build --watch",
+        "lint": "eslint src/**/*.ts*"
+    },
+    "dependencies": {
+        "convex-panel": "workspace:*",
+        "convex-panel/shared": "workspace:*",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0"
+    },
+    "devDependencies": {
+        "@vitejs/plugin-react": "^4.2.1",
+        "typescript": "^5.9.3",
+        "vite": "^5.0.12"
+    }
+}

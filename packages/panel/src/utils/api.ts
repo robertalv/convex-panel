@@ -1,0 +1,4600 @@
+import { ROUTES } from '../utils/constants';
+import {
+  LogEntry,
+  TableDefinition,
+  TableField,
+  FunctionExecutionStats,
+  StreamUdfExecutionResponse,
+  AggregatedFunctionStats,
+  FunctionExecutionJson,
+  FunctionExecutionLog,
+  ModuleFunction,
+} from '../types';
+import { getActiveTable } from './storage';
+import { FetchLogsOptions, FetchLogsResponse, FetchTablesOptions, FetchTablesResponse } from '../types';
+import { mockFetchLogsFromApi, mockFetchTablesFromApi, mockFetchCacheHitRate, mockFetchFailureRate, mockFetchSchedulerLag } from './mockData';
+import { getDeploymentUrl, getAdminKey, getAdminClientInfo } from './adminClient';
+
+// Cache to track deployments that return 403 for table columns endpoint
+// Persisted in sessionStorage to survive page reloads
+const getTableColumnsForbiddenCache = (): Set<string> => {
+  try {
+    const cached = sessionStorage.getItem('tableColumnsForbiddenCache');
+    return cached ? new Set(JSON.parse(cached)) : new Set<string>();
+  } catch {
+    return new Set<string>();
+  }
+};
+
+const setTableColumnsForbiddenCache = (cache: Set<string>) => {
+  try {
+    sessionStorage.setItem('tableColumnsForbiddenCache', JSON.stringify(Array.from(cache)));
+  } catch {
+    // Ignore storage errors
+  }
+};
+
+/**
+ * Fetch logs from the Convex API
+ * @param FetchLogsOptions
+ * @returns FetchLogsResponse
+ */
+export async function fetchLogsFromApi({
+  cursor,
+  convexUrl,
+  accessToken,
+  signal,
+  functionId,
+  limit,
+  useMockData = false
+}: FetchLogsOptions & { 
+  useMockData?: boolean;
+  functionId?: string;
+  limit?: number;
+}): Promise<FetchLogsResponse> {
+  // Use mock data if useMockData is true
+  if (useMockData) {
+    return mockFetchLogsFromApi(cursor);
+  }
+
+  // Create URL object based on convex url
+  const urlObj = new URL(convexUrl);
+  const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
+  
+  // Build URL with query parameters - use the correct endpoint
+  const url = new URL(`${baseUrl}/api/app_metrics/stream_function_logs`);
+  // Always set cursor - use 0 for initial fetch or 'now', otherwise use the provided cursor
+  const cursorValue = (cursor === 'now' || cursor === '' || !cursor) ? '0' : String(cursor);
+  url.searchParams.set('cursor', cursorValue);
+  if (functionId) {
+    url.searchParams.set('function', functionId);
+  }
+  if (limit) {
+    url.searchParams.set('limit', String(limit));
+  }
+  
+  // Normalize token format
+  const normalizedToken =
+    accessToken && accessToken.startsWith('Convex ')
+      ? accessToken
+      : `Convex ${accessToken}`;
+  
+  // Fetch logs from /api/app_metrics/stream_function_logs endpoint
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      'Authorization': normalizedToken,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-0.0.0',
+    },
+    signal,
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to fetch logs: HTTP ${response.status} - ${errorText}`);
+  }
+  
+  const data = await response.json();
+  
+  // Format logs to our log format
+  // The API returns entries that may have different field names
+  const formattedLogs: LogEntry[] = (data.entries || []).map((entry: any) => {
+    // Handle different timestamp formats (seconds vs milliseconds)
+    const timestamp = entry.timestamp 
+      ? (entry.timestamp > 1e12 ? entry.timestamp : entry.timestamp * 1000)
+      : Date.now();
+    
+    // Extract function information
+    const udfType = entry.udfType || entry.udf_type || entry.type;
+    const identifier = entry.identifier || entry.udf_path || entry.function;
+    const requestId = entry.requestId || entry.request_id || entry.execution_id;
+    
+    // Handle execution time (may be in seconds or milliseconds)
+    const executionTime = entry.executionTime 
+      ? (entry.executionTime < 1000 ? entry.executionTime * 1000 : entry.executionTime)
+      : (entry.execution_time_ms || entry.executionTimeMs);
+    
+    // Determine success status
+    const success = entry.success;
+    let status: string | undefined;
+    
+    // Check if raw entry has a status field first
+    if (entry.status) {
+      status = entry.status;
+    } else if (success === null || success === undefined) {
+      status = undefined;
+    } else if (typeof success === 'object' && success !== null) {
+      status = 'success'; // Object like {status: "200"} indicates success
+    } else if (success === true) {
+      status = 'success';
+    } else {
+      status = 'error';
+    }
+    
+    return {
+      timestamp,
+      topic: entry.topic || 'console',
+      function: identifier ? {
+        type: udfType,
+        path: identifier,
+        cached: entry.cachedResult || entry.cached || false,
+        request_id: requestId
+      } : undefined,
+      log_level: entry.level || entry.log_level || 'INFO',
+      message: entry.message || entry.logLines?.join('\n') || JSON.stringify(entry),
+      execution_time_ms: executionTime,
+      status,
+      error_message: entry.error || entry.error_message,
+      raw: entry
+    };
+  });
+
+  return {
+    logs: formattedLogs,
+    newCursor: data.newCursor || data.new_cursor,
+    hostname: urlObj.hostname
+  };
+}
+
+/**
+ * Fetch logs from another Convex deployment
+ * Similar to fetchLogsFromApi but with explicit parameter naming
+ */
+export async function fetchLogsFromAnotherApp(
+  deploymentUrl: string,
+  deployKey: string,
+  options?: {
+    functionId?: string;
+    cursor?: string;
+    limit?: number;
+  }
+): Promise<{ entries: any[]; newCursor?: string }> {
+  const url = new URL(`${deploymentUrl}/api/app_metrics/stream_function_logs`);
+  
+  if (options?.cursor) {
+    url.searchParams.set('cursor', options.cursor);
+  }
+  if (options?.functionId) {
+    url.searchParams.set('function', options.functionId);
+  }
+  if (options?.limit) {
+    url.searchParams.set('limit', options.limit.toString());
+  }
+
+  const normalizedToken =
+    deployKey && deployKey.startsWith('Convex ')
+      ? deployKey
+      : `Convex ${deployKey}`;
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      'Authorization': normalizedToken,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-0.0.0',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch logs: ${response.status} ${response.statusText}`);
+  }
+
+  return await response.json();
+}
+
+export async function streamUdfExecution(
+  deploymentUrl: string,
+  authToken: string,
+  cursor: number | string = 0,
+): Promise<{ entries: FunctionExecutionJson[]; newCursor: number | string }> {
+  const url = `${deploymentUrl}${ROUTES.STREAM_UDF_EXECUTION}?cursor=${cursor}`;
+
+  const normalizedToken =
+    authToken && authToken.startsWith('Convex ')
+      ? authToken
+      : `Convex ${authToken}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: normalizedToken,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-1.0.0',
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Failed to stream UDF executions: HTTP ${response.status} - ${text}`);
+  }
+
+  const data = await response.json();
+
+  return {
+    entries: (data.entries || []) as FunctionExecutionJson[],
+    newCursor: data.new_cursor ?? cursor,
+  };
+}
+
+export async function streamFunctionLogs(
+  deploymentUrl: string,
+  authToken: string,
+  cursor: number | string = 0,
+  sessionId?: string,
+  clientRequestCounter?: number,
+): Promise<{ entries: FunctionExecutionJson[]; newCursor: number | string }> {
+  const params = new URLSearchParams({
+    cursor: String(cursor),
+  });
+
+  if (sessionId && clientRequestCounter !== undefined) {
+    params.set('session_id', sessionId);
+    params.set('client_request_counter', String(clientRequestCounter));
+  }
+
+  const url = `${deploymentUrl}${ROUTES.STREAM_FUNCTION_LOGS}?${params.toString()}`;
+
+  const normalizedToken =
+    authToken && authToken.startsWith('Convex ')
+      ? authToken
+      : `Convex ${authToken}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: normalizedToken,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-1.0.0',
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Failed to stream function logs: HTTP ${response.status} - ${text}`);
+  }
+
+  const data = await response.json();
+
+  return {
+    entries: (data.entries || []) as FunctionExecutionJson[],
+    newCursor: data.new_cursor ?? cursor,
+  };
+}
+
+export function processFunctionLogs(
+  entries: FunctionExecutionJson[],
+  selectedFunction: ModuleFunction | null,
+): FunctionExecutionLog[] {
+  if (!entries || entries.length === 0) return [];
+
+  const targetIdentifier = selectedFunction?.identifier;
+
+  const normalizeIdentifier = (id: string | undefined | null) =>
+    (id || '').replace(/\.js:/g, ':').replace(/\.js$/g, '');
+
+  const matchesSelected = (entry: FunctionExecutionJson) => {
+    if (!selectedFunction) return true;
+
+    const raw: any = entry as any;
+    // Prefer Convex's full UDF path if present; otherwise identifier as-is.
+    const entryPath: string | undefined =
+      raw.udf_path || raw.identifier;
+
+    const normalizedEntryId = normalizeIdentifier(entryPath);
+    const normalizedTargetId = normalizeIdentifier(targetIdentifier);
+
+    return (
+      normalizedEntryId.length > 0 &&
+      normalizedTargetId.length > 0 &&
+      normalizedEntryId === normalizedTargetId
+    );
+  };
+
+  const matchingEntries = entries.filter(matchesSelected);
+  const effectiveEntries =
+    selectedFunction ? matchingEntries : entries;
+
+  if (typeof window !== 'undefined' && selectedFunction) {
+    const matchesSample = matchingEntries.slice(0, 20).map((e: any) => ({
+      identifier: e.identifier,
+      udf_path: e.udf_path,
+      component_path: e.component_path,
+    }));
+  }
+
+  return effectiveEntries
+    .map((entry) => {
+      const raw: any = entry as any;
+
+      const udfTypeRaw = (raw.udf_type || raw.udfType || 'query') as string;
+      const componentPath = raw.component_path || raw.componentPath;
+
+      const identifierRaw =
+        raw.identifier ||
+        raw.udf_path ||
+        (componentPath ? `${componentPath}:${raw.identifier}` : '');
+
+      const timestampSec = raw.timestamp ?? raw.execution_timestamp ?? 0;
+      const startedAtMs =
+        timestampSec > 1e12 ? timestampSec : timestampSec * 1000;
+
+      const executionTimeSeconds =
+        raw.execution_time ??
+        (raw.execution_time_ms != null
+          ? raw.execution_time_ms / 1000
+          : raw.executionTimeMs != null
+          ? raw.executionTimeMs / 1000
+          : 0);
+      const durationMs = executionTimeSeconds * 1000;
+      const completedAtMs = startedAtMs + durationMs;
+
+      const logLines = (raw.log_lines || raw.logLines || []).map((line: any) =>
+        typeof line === 'string' ? line : JSON.stringify(line),
+      );
+
+      const success =
+        raw.error == null &&
+        (raw.success === undefined ||
+          raw.success === null ||
+          raw.success === true ||
+          (typeof raw.success === 'object' && raw.success !== null));
+
+      const functionName =
+        typeof identifierRaw === 'string' && identifierRaw.includes(':')
+          ? identifierRaw.split(':').slice(-1)[0]
+          : identifierRaw;
+
+      const functionIdentifier =
+        componentPath && identifierRaw
+          ? `${componentPath}:${identifierRaw}`
+          : identifierRaw;
+
+      return {
+        id: raw.execution_id || raw.executionId || `${identifierRaw}-${startedAtMs}`,
+        functionIdentifier,
+        functionName,
+        udfType: (udfTypeRaw.toLowerCase() || 'query') as any,
+        componentPath,
+        timestamp: startedAtMs,
+        startedAt: startedAtMs,
+        completedAt: completedAtMs,
+        durationMs,
+        success,
+        error: raw.error || raw.error_message,
+        logLines,
+        usageStats: raw.usage_stats || raw.usageStats || {
+          database_read_bytes: 0,
+          database_write_bytes: 0,
+          database_read_documents: 0,
+          storage_read_bytes: 0,
+          storage_write_bytes: 0,
+          vector_index_read_bytes: 0,
+          vector_index_write_bytes: 0,
+          memory_used_mb: 0,
+        },
+        requestId: raw.request_id || raw.requestId || '',
+        executionId: raw.execution_id || raw.executionId || '',
+        caller: raw.caller,
+        environment: raw.environment,
+        identityType: raw.identity_type || raw.identityType || '',
+        returnBytes: raw.return_bytes || raw.returnBytes,
+        raw: raw,
+      } as FunctionExecutionLog;
+    });
+  }
+
+/**
+ * Fetch all field names for a table using the getAllTableFields system query
+ * This is more efficient than sampling documents and handles pagination limits better
+ */
+async function getAllTableFields(
+  adminClient: any,
+  tableName: string,
+  componentId: string | null,
+  sampleSize: number = 200
+): Promise<string[]> {
+  if (!adminClient) {
+    return [];
+  }
+
+  try {
+    const fieldsResult = await adminClient.query("_system/frontend/getAllTableFields:default" as any, {
+      table: tableName,
+      sampleSize,
+      componentId
+    });
+
+    // Handle different response formats
+    if (fieldsResult instanceof Set) {
+      return Array.from(fieldsResult);
+    } else if (Array.isArray(fieldsResult)) {
+      return fieldsResult;
+    } else if (fieldsResult && typeof fieldsResult === 'object' && 'value' in fieldsResult) {
+      // Handle wrapped response
+      const value = fieldsResult.value;
+      if (value instanceof Set) {
+        return Array.from(value);
+      } else if (Array.isArray(value)) {
+        return value;
+      }
+    }
+
+    return [];
+  } catch (err) {
+    console.warn('[getAllTableFields] Query not available or failed:', err);
+    return [];
+  }
+}
+
+/**
+ * Fetch all tables from the Convex instance
+ */
+export async function fetchTablesFromApi({
+  convexUrl,
+  accessToken,
+  adminClient,
+  useMockData = false,
+  componentId = null
+}: FetchTablesOptions & { useMockData?: boolean; componentId?: string | null }): Promise<FetchTablesResponse> {
+  if (useMockData) {
+    return mockFetchTablesFromApi();
+  }
+
+  if (!convexUrl || !accessToken) {
+    throw new Error('Missing URL or access token');
+  }
+
+  const normalizedComponentId = componentId === 'app' || componentId === null ? null : componentId;
+
+  let tableNames: string[] = [];
+  let shapesData: any = {};
+  
+  if (adminClient) {
+    try {
+      const tableMapping = await adminClient.query("_system/frontend/getTableMapping" as any, {
+        componentId: normalizedComponentId
+      }).catch(() => null);
+
+      if (tableMapping && typeof tableMapping === 'object') {
+        tableNames = Object.values(tableMapping) as string[];
+        tableNames = tableNames.filter(name => name !== '_scheduled_jobs' && name !== '_file_storage');
+        
+      }
+    } catch (err) {
+      console.warn('Failed to get table mapping, will try shapes data:', err);
+    }
+  }
+
+  const response = await fetch(`${convexUrl}${ROUTES.SHAPES2}`, {
+    headers: {
+      authorization: `Convex ${accessToken}`,
+      'convex-client': 'dashboard-0.0.0',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch tables: HTTP ${response.status}`);
+  }
+
+  shapesData = await response.json();
+
+  if (!shapesData || typeof shapesData !== 'object') {
+    throw new Error('Invalid data structure received');
+  }
+
+  const columnMap = await fetchTableColumnsFromApi(convexUrl, accessToken, normalizedComponentId).catch(
+    () => ({}),
+  );
+
+  let filteredShapesData = shapesData;
+  
+  if (tableNames.length > 0) {
+    const componentTableSet = new Set(tableNames);
+    filteredShapesData = Object.fromEntries(
+      Object.entries(shapesData).filter(([tableName]) => componentTableSet.has(tableName))
+    );
+    
+    if (adminClient && normalizedComponentId !== null) {
+      const missingTables = tableNames.filter(tableName => !filteredShapesData[tableName]);
+      for (const tableName of missingTables) {
+        try {
+          const allKeys = new Set<string>();
+          const sampleDocuments: any[] = [];
+          let cursor: string | null = null;
+          let pagesFetched = 0;
+          const maxPages = 5;
+          const itemsPerPage = 50;
+          
+          while (pagesFetched < maxPages) {
+            try {
+              const pageData: any = await adminClient.query("_system/frontend/paginatedTableDocuments:default" as any, {
+                componentId: normalizedComponentId,
+                table: tableName,
+                filters: null,
+                paginationOpts: {
+                  numItems: itemsPerPage,
+                  cursor: cursor
+                }
+              }).catch((err: any) => {
+                console.warn('Error querying paginatedTableDocuments for', tableName, ':', err);
+                return null;
+              });
+              
+              if (!pageData || !pageData.page || !Array.isArray(pageData.page) || pageData.page.length === 0) {
+                break;
+              }
+              
+              pageData.page.forEach((doc: any) => {
+                sampleDocuments.push(doc);
+                Object.keys(doc).forEach(key => {
+                  if (key !== '_id' && key !== '_creationTime') {
+                    allKeys.add(key);
+                  }
+                });
+              });
+              
+              if (pageData.continuationCursor) {
+                cursor = pageData.continuationCursor;
+                pagesFetched++;
+              } else {
+                break;
+              }
+            } catch (err) {
+              console.warn('[fetchTablesFromApi] Error fetching page', pagesFetched + 1, 'for', tableName, ':', err);
+              break;
+            }
+          }
+          
+          const allFields = Array.from(allKeys);
+          if (allFields.length > 0 && sampleDocuments.length > 0) {
+            
+            const inferredFields: TableField[] = [];
+            
+            allFields.forEach(fieldName => {
+              if (fieldName === '_id' || fieldName === '_creationTime') {
+                return;
+              }
+              
+              let fieldType = 'any';
+              let isOptional = true;
+              
+              let value: any = null;
+              for (const doc of sampleDocuments) {
+                if (doc[fieldName] !== null && doc[fieldName] !== undefined) {
+                  value = doc[fieldName];
+                  isOptional = false;
+                  break;
+                }
+              }
+              
+              if (value !== null && value !== undefined) {
+                if (typeof value === 'string') {
+                  fieldType = 'string';
+                } else if (typeof value === 'number') {
+                  fieldType = 'number';
+                } else if (typeof value === 'boolean') {
+                  fieldType = 'boolean';
+                } else if (Array.isArray(value)) {
+                  fieldType = 'array';
+                } else if (typeof value === 'object') {
+                  fieldType = 'object';
+                }
+              }
+              
+              if (!isOptional) {
+                isOptional = sampleDocuments.every((doc: any) => 
+                  doc[fieldName] === null || doc[fieldName] === undefined
+                );
+              }
+              
+              inferredFields.push({
+                fieldName,
+                optional: isOptional,
+                shape: {
+                  type: fieldType
+                }
+              });
+            });
+            
+            filteredShapesData[tableName] = {
+              type: 'table',
+              fields: inferredFields
+            };
+          } else {
+            filteredShapesData[tableName] = {
+              type: 'table',
+              fields: []
+            };
+          }
+        } catch (err) {
+          console.warn('[fetchTablesFromApi] Error fetching fields for', tableName, ':', err);
+          filteredShapesData[tableName] = {
+            type: 'table',
+            fields: []
+          };
+        }
+      }
+    } else {
+      tableNames.forEach(tableName => {
+        if (!filteredShapesData[tableName]) {
+          filteredShapesData[tableName] = {
+            type: 'table',
+            fields: []
+          };
+        }
+      });
+    }
+    
+  }
+
+  const tableData = Object.entries(filteredShapesData).reduce(
+    (acc, [tableName, tableSchema]) => {
+      if (!tableSchema || typeof tableSchema !== 'object') {
+        return acc;
+      }
+
+      const normalizedFields = mergeFieldsWithColumns(
+        (tableSchema as TableDefinition[string])?.fields || [],
+        (columnMap && typeof columnMap === 'object' && !Array.isArray(columnMap) && tableName in columnMap)
+          ? (columnMap as Record<string, string[]>)[tableName]
+          : undefined,
+      );
+
+      acc[tableName] = {
+        type: (tableSchema as any)?.type ?? 'table',
+        fields: normalizedFields,
+      };
+
+      return acc;
+    },
+    {} as TableDefinition,
+  );
+
+  Object.entries(columnMap).forEach(([tableName, columns]) => {
+    if (tableData[tableName]) {
+      return;
+    }
+    tableData[tableName] = {
+      type: 'table',
+      fields: mergeFieldsWithColumns([], columns),
+    };
+  });
+
+  const storedActiveTable = getActiveTable();
+  let selectedTable = '';
+
+  if (storedActiveTable && tableData[storedActiveTable]) {
+    selectedTable = storedActiveTable;
+  } else if (Object.keys(tableData).length > 0 && adminClient) {
+    try {
+      await adminClient.query("_system/frontend/tableSize:default" as any, {
+        componentId: normalizedComponentId,
+        tableName: Object.keys(tableData)[0]
+      });
+    } catch (err) {
+      console.error('Error fetching table size:', err);
+    }
+
+    selectedTable = Object.keys(tableData)[0] || '';
+  }
+
+  return {
+    tables: tableData,
+    selectedTable
+  };
+}
+
+async function fetchTableColumnsFromApi(
+  convexUrl: string,
+  accessToken: string,
+  componentId?: string | null
+): Promise<Record<string, string[]>> {
+  const result: Record<string, string[]> = {};
+
+  // Skip request if we've already seen a 403 for this deployment
+  const cache = getTableColumnsForbiddenCache();
+  if (cache.has(convexUrl)) {
+    return result;
+  }
+
+  try {
+    const response = await fetch(`${convexUrl}${ROUTES.TABLE_COLUMNS}`, {
+      headers: {
+        authorization: `Convex ${accessToken}`,
+        'convex-client': 'dashboard-0.0.0',
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 403) {
+        // Cache this deployment as forbidden to skip future requests
+        cache.add(convexUrl);
+        setTableColumnsForbiddenCache(cache);
+        return result;
+      }
+
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    const addColumns = (tableName?: string, columns?: string[]) => {
+      if (!tableName || !Array.isArray(columns)) {
+        return;
+      }
+      const existing = new Set(result[tableName] ?? []);
+      columns.forEach((column) => {
+        if (column) {
+          existing.add(column);
+        }
+      });
+      result[tableName] = Array.from(existing);
+    };
+
+    if (Array.isArray(data.tables)) {
+      data.tables.forEach((table: any) => addColumns(table?.name, table?.columns));
+    }
+
+    if (data.by_component && typeof data.by_component === 'object') {
+      Object.values(data.by_component).forEach((tables: any) => {
+        if (Array.isArray(tables)) {
+          tables.forEach((table) => addColumns(table?.name, table?.columns));
+        }
+      });
+    }
+  } catch (error) {
+    if (error instanceof Error && !error.message.includes('403')) {
+      console.warn('fetchTableColumnsFromApi failed', error);
+    }
+  }
+
+  return result;
+}
+
+function mergeFieldsWithColumns(
+  existingFields: TableField[],
+  extraColumns?: string[],
+): TableField[] {
+  const fieldMap = new Map<string, TableField>();
+  existingFields.forEach((field) => {
+    if (field?.fieldName) {
+      fieldMap.set(field.fieldName, field);
+    }
+  });
+
+  const addPlaceholderField = (fieldName?: string) => {
+    if (!fieldName || fieldMap.has(fieldName)) {
+      return;
+    }
+    fieldMap.set(fieldName, {
+      fieldName,
+      optional: true,
+      shape: { type: 'string' },
+    });
+  };
+
+  ['_id', '_creationTime'].forEach(addPlaceholderField);
+  extraColumns?.forEach(addPlaceholderField);
+
+  return Array.from(fieldMap.values());
+}
+
+/**
+ * Fetch the cache hit rate from the Convex API
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param authToken - The authentication token for the Convex deployment
+ * @param useMockData - Whether to use mock data instead of making API calls
+ * @returns The cache hit rate
+ */
+export const fetchFailureRate = async (
+  deploymentUrl: string, 
+  authToken: string, 
+  useMockData = false
+) => {
+  // Use mock data if useMockData is true
+  if (useMockData) {
+    return mockFetchFailureRate();
+  }
+
+  // Calculate timestamps for the last hour
+  const now = Math.floor(Date.now() / 1000); // Current time in seconds
+  const oneHourAgo = now - 3600; // One hour ago
+
+  const window = {
+    start: {
+      secs_since_epoch: oneHourAgo,
+      nanos_since_epoch: 0
+    },
+    end: {
+      secs_since_epoch: now,
+      nanos_since_epoch: 0
+    },
+    num_buckets: 60 // 1 minute intervals
+  };
+
+  const params = new URLSearchParams({
+    window: JSON.stringify(window),
+    k: '3'
+  });
+
+  // Ensure token has the 'Convex ' prefix
+  const normalizedToken = authToken.startsWith('Convex ') ? authToken : `Convex ${authToken}`;
+
+  const response = await fetch(
+    `${deploymentUrl}${ROUTES.FAILURE_RATE}?${params}`,
+    {
+      headers: {
+        'Authorization': normalizedToken,
+        'Content-Type': 'application/json',
+        'Convex-Client': 'dashboard-0.0.0',
+        'Origin': 'https://dashboard.convex.dev',
+        'Referer': 'https://dashboard.convex.dev/'
+      }
+    }
+  );
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(`Failed to fetch failure rate: ${response.statusText}`);
+  }
+
+  return response.json();
+};
+
+
+/**
+ * Fetch the cache hit rate from the Convex API
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param authToken - The authentication token for the Convex deployment
+ * @param useMockData - Whether to use mock data instead of making API calls
+ * @returns The cache hit rate
+ */
+export const fetchCacheHitRate = async (
+  deploymentUrl: string, 
+  authToken: string, 
+  useMockData = false
+) => {
+  // Use mock data if useMockData is true
+  if (useMockData) {
+    return mockFetchCacheHitRate();
+  }
+
+  // Calculate timestamps for the last hour
+  const now = Math.floor(Date.now() / 1000); // Current time in seconds
+  const oneHourAgo = now - 3600; // One hour ago
+
+  const window = {
+    start: {
+      secs_since_epoch: oneHourAgo,
+      nanos_since_epoch: 0
+    },
+    end: {
+      secs_since_epoch: now,
+      nanos_since_epoch: 0
+    },
+    num_buckets: 60 // 1 minute intervals
+  };
+
+  const params = new URLSearchParams({
+    window: JSON.stringify(window),
+    k: '3'
+  });
+
+  // Ensure token has the 'Convex ' prefix
+  const normalizedToken = authToken.startsWith('Convex ') ? authToken : `Convex ${authToken}`;
+
+  const response = await fetch(
+    `${deploymentUrl}${ROUTES.CACHE_HIT_RATE}?${params}`,
+    {
+      headers: {
+        'Authorization': normalizedToken,
+        'Content-Type': 'application/json',
+        'Convex-Client': 'dashboard-0.0.0',
+        'Origin': 'https://dashboard.convex.dev',
+        'Referer': 'https://dashboard.convex.dev/'
+      }
+    }
+  );
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(`Failed to fetch cache hit rate: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+
+  return data;
+};
+
+
+/**
+ * Fetch the failure rate from the Convex API
+ */
+export const fetchPerformanceFailureRate = async (
+  deploymentUrl: string,
+  authToken: string,
+  functionPath: string,
+  udfType: string,
+  window: any
+) => {
+  const params = new URLSearchParams({
+    metric: 'errors',
+    path: functionPath,
+    window: JSON.stringify(window),
+    udfType
+  });
+
+  const response = await fetch(
+    `${deploymentUrl}${ROUTES.UDF_RATE}?${params}`,
+    {
+      headers: {
+        'Authorization': `Convex ${authToken}`,
+        'Content-Type': 'application/json',
+        'Convex-Client': 'dashboard-0.0.0',
+        'Origin': 'https://dashboard.convex.dev',
+        'Referer': 'https://dashboard.convex.dev/'
+      }
+    }
+  );
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(`Failed to fetch failure rate: HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  return data;
+};
+
+/**
+ * Fetch the scheduler lag from the Convex API
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param authToken - The authentication token for the Convex deployment
+ * @param useMockData - Whether to use mock data instead of making API calls
+ * @returns The scheduler lag
+ */
+export async function fetchSchedulerLag(
+  deploymentUrl: string,
+  authToken: string,
+  useMockData = false
+): Promise<any> {
+  // Use mock data if useMockData is true
+  if (useMockData) {
+    return mockFetchSchedulerLag();
+  }
+
+  // Create a window object (start: 1 hour ago, end: now)
+  const end = new Date();
+  const start = new Date(end.getTime() - 60 * 60 * 1000); // 1 hour before
+  
+  const window = {
+    start: {
+      secs_since_epoch: Math.floor(start.getTime() / 1000),
+      nanos_since_epoch: (start.getTime() % 1000) * 1000000
+    },
+    end: {
+      secs_since_epoch: Math.floor(end.getTime() / 1000),
+      nanos_since_epoch: (end.getTime() % 1000) * 1000000
+    },
+    num_buckets: 60
+  };
+
+  try {
+    const response = await fetch(
+      `${deploymentUrl}/api/app_metrics/scheduled_job_lag?window=${encodeURIComponent(JSON.stringify(window))}`,
+      {
+        headers: {
+          'Authorization': `Convex ${authToken}`,
+          'Content-Type': 'application/json',
+          'Convex-Client': 'dashboard-0.0.0',
+          'Origin': 'https://dashboard.convex.dev',
+          'Referer': 'https://dashboard.convex.dev/'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * Fetch the API spec for all functions in the Convex deployment
+ * @param adminClient - The Convex admin client instance
+ * @param useMockData - Whether to use mock data instead of making API calls
+ * @param componentId - Optional component ID to fetch functions for a specific component
+ * @returns Array of function specifications
+ */
+export async function fetchFunctionSpec(
+  adminClient: any,
+  useMockData = false,
+  componentId?: string | null
+): Promise<any[]> {
+  if (useMockData) {
+    return []; // TODO: Add mock data implementation
+  }
+
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    // Call the API spec endpoint with optional componentId parameter
+    // Passing componentId allows us to fetch functions for a specific component
+    const args: any = {};
+    if (componentId !== undefined && componentId !== null) {
+      args.componentId = componentId;
+    }
+    
+    const results = await adminClient.query("_system/cli/modules:apiSpec" as any, args) as any[];
+
+    if (!Array.isArray(results)) {
+      return [];
+    }
+
+    return results;
+  } catch (err: any) {
+    // Don't throw - return empty array so we can continue with other components
+    return [];
+  }
+}
+
+/**
+ * Fetch the list of components from the Convex deployment
+ * @param adminClient - The Convex admin client instance
+ * @param useMockData - Whether to use mock data instead of making API calls
+ * @returns Array of component definitions
+ */
+export async function fetchComponents(
+  adminClient: any,
+  useMockData = false
+): Promise<any[]> {
+  if (useMockData) {
+    return []; // TODO: Add mock data implementation
+  }
+
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    // Call the components list endpoint
+    // Returns an array of component objects with id, name, path, args, state
+    const results = await adminClient.query("_system/frontend/components:list" as any, {}) as any[];
+
+    if (!Array.isArray(results)) {
+      return [];
+    }
+
+    return results;
+  } catch (err) {
+    // Don't throw - components might not be available in all deployments
+    return [];
+  }
+}
+
+/**
+ * Call a Convex query function via HTTP API
+ * Convex HTTP API format: POST to /api/query with function path and args
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param authToken - The authentication token
+ * @param functionPath - The path to the function (e.g., "_system/frontend/deploymentEvents:lastPushEvent")
+ * @param args - Arguments to pass to the function
+ * @returns The query result
+ */
+async function callConvexQuery(
+  deploymentUrl: string,
+  authToken: string,
+  functionPath: string,
+  args: any = {}
+): Promise<any> {
+  try {
+    // Convex HTTP API format for queries
+    // The path format should be: "module:function" 
+    // For system functions: "_system/frontend/module:function"
+    // Try different formats in case the API expects a different format
+    
+    // Format 1: Direct path with args as array
+    let requestBody = {
+      path: functionPath,
+      args: [args],
+    };
+    
+    let response = await fetch(`${deploymentUrl}/api/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Convex ${authToken}`,
+        'Content-Type': 'application/json',
+        'Convex-Client': 'dashboard-0.0.0',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    // If that fails, try format 2: args as object
+    if (!response.ok && response.status !== 404) {
+      requestBody = {
+        path: functionPath,
+        args: args,
+      };
+      
+      response = await fetch(`${deploymentUrl}/api/query`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Convex ${authToken}`,
+          'Content-Type': 'application/json',
+          'Convex-Client': 'dashboard-0.0.0',
+        },
+        body: JSON.stringify(requestBody),
+      });
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      
+      if (response.status === 404 || response.status === 400) {
+        return null;
+      }
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * Fetch the last push event (deployment) from Convex
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param authToken - The authentication token for the Convex deployment
+ * @param useMockData - Whether to use mock data instead of making API calls
+ * @returns The last push event with creation time, or null if never deployed
+ */
+export async function fetchLastPushEvent(
+  deploymentUrl: string,
+  authToken: string,
+  useMockData = false
+): Promise<{ _creationTime: number } | null> {
+  if (useMockData) {
+    // Return mock data - 39 minutes ago
+    const date = new Date();
+    date.setMinutes(date.getMinutes() - 39);
+    return {
+      _creationTime: date.getTime(),
+    };
+  }
+
+  try {
+    // Call the system function: _system/frontend/deploymentEvents:lastPushEvent
+    // Note: The function path format should match how Convex expects it
+    // Based on Convex code: udfs.deploymentEvents.lastPushEvent maps to _system/frontend/deploymentEvents:lastPushEvent
+    
+    // Try the function path as specified in Convex
+    let data = await callConvexQuery(
+      deploymentUrl,
+      authToken,
+      '_system/frontend/deploymentEvents:lastPushEvent',
+      {}
+    );
+    
+    // If that fails, try without the colon (some APIs use different formats)
+    if (data === null || data === undefined) {
+      data = await callConvexQuery(
+        deploymentUrl,
+        authToken,
+        '_system/frontend/deploymentEvents.lastPushEvent',
+        {}
+      );
+    }
+
+    // Handle different response formats
+    if (data === null || data === undefined) {
+      return null;
+    }
+    
+    // The API returns {status: 'success', value: {...}}
+    // Extract the actual value from the response wrapper
+    let eventData = data;
+    if (data && typeof data === 'object' && 'value' in data) {
+      eventData = data.value;
+    }
+    
+    // If the value itself is null/undefined, no deployment event exists
+    if (eventData === null || eventData === undefined) {
+      return null;
+    }
+    
+    // Check for _creationTime in the event data
+    if (eventData && typeof eventData === 'object' && '_creationTime' in eventData) {
+      const creationTime = eventData._creationTime;
+      // Handle both milliseconds and seconds timestamps
+      const timestamp = typeof creationTime === 'number' 
+        ? (creationTime < 1e12 ? creationTime * 1000 : creationTime) // Convert seconds to ms if needed
+        : new Date(creationTime).getTime();
+      return { _creationTime: timestamp };
+    }
+    
+    // If it's a different format, try to extract timestamp
+    if (eventData && typeof eventData === 'object') {
+      if ('timestamp' in eventData || 'time' in eventData || 'date' in eventData) {
+        const timestamp = eventData.timestamp || eventData.time || eventData.date;
+        const ms = typeof timestamp === 'number' 
+          ? (timestamp < 1e12 ? timestamp * 1000 : timestamp)
+          : new Date(timestamp).getTime();
+        return { _creationTime: ms };
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    // Return null on error (treat as never deployed)
+    return null;
+  }
+}
+
+/**
+ * Fetch the Convex server version
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param authToken - The authentication token for the Convex deployment
+ * @param useMockData - Whether to use mock data instead of making API calls
+ * @returns The server version string, or null if unavailable
+ */
+export async function fetchServerVersion(
+  deploymentUrl: string,
+  authToken: string,
+  useMockData = false
+): Promise<string | null> {
+  if (useMockData) {
+    return '1.29.3';
+  }
+
+  try {
+    // Call the system function: _system/frontend/getVersion:default
+    // Based on Convex code: udfs.getVersion.default maps to _system/frontend/getVersion:default
+    
+    let data = await callConvexQuery(
+      deploymentUrl,
+      authToken,
+      '_system/frontend/getVersion:default',
+      {}
+    );
+    
+    // If that fails, try without the colon
+    if (data === null || data === undefined) {
+      data = await callConvexQuery(
+        deploymentUrl,
+        authToken,
+        '_system/frontend/getVersion.default',
+        {}
+      );
+    }
+
+    // Handle different response formats
+    // The API returns {status: 'success', value: '1.29.3'}
+    if (data && typeof data === 'object' && 'value' in data) {
+      const versionValue = data.value;
+      if (typeof versionValue === 'string') {
+        return versionValue;
+      }
+      if (versionValue && typeof versionValue === 'object' && versionValue.version) {
+        return String(versionValue.version);
+      }
+    }
+    
+    // Fallback: check if data is directly a string
+    if (typeof data === 'string') {
+      return data;
+    }
+    
+    // Fallback: check if data has a version property
+    if (data && typeof data === 'object' && data.version) {
+      return String(data.version);
+    }
+    
+    return null;
+  } catch (error) {
+    // Return null on error
+    return null;
+  }
+}
+
+/**
+ * Insight type definition based on Convex dashboard
+ */
+export interface Insight {
+  kind: 'bytesReadLimit' | 'bytesReadThreshold' | 'documentsReadLimit' | 'documentsReadThreshold' | 'occFailedPermanently' | 'occRetried';
+  functionId: string;
+  componentPath?: string | null;
+  [key: string]: any; // Allow additional properties
+}
+
+/**
+ * Fetch insights from Convex
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param authToken - The authentication token for the Convex deployment
+ * @param useMockData - Whether to use mock data instead of making API calls
+ * @returns Array of insights, or empty array if none found
+ */
+export async function fetchInsights(
+  deploymentUrl: string,
+  authToken: string,
+  useMockData = false
+): Promise<Insight[]> {
+  if (useMockData) {
+    // Return empty array for mock (no insights = all clear)
+    return [];
+  }
+
+  try {
+    // Try to fetch insights from system function
+    // Based on Convex dashboard, insights might be in _system/frontend/insights or similar
+    const data = await callConvexQuery(
+      deploymentUrl,
+      authToken,
+      '_system/frontend/insights:list',
+      {}
+    );
+
+    // Handle response format
+    if (data === null || data === undefined) {
+      return [];
+    }
+
+    // Extract value from response wrapper
+    let insightsData = data;
+    if (data && typeof data === 'object' && 'value' in data) {
+      insightsData = data.value;
+    }
+
+    // Handle different response formats
+    if (Array.isArray(insightsData)) {
+      return insightsData;
+    }
+
+    if (insightsData && typeof insightsData === 'object' && 'insights' in insightsData) {
+      return Array.isArray(insightsData.insights) ? insightsData.insights : [];
+    }
+
+    return [];
+  } catch (error) {
+    // Return empty array on error (treat as no insights)
+    return [];
+  }
+}
+
+interface MetricsWindow {
+  start: {
+    secs_since_epoch: number;
+    nanos_since_epoch: number;
+  };
+  end: {
+    secs_since_epoch: number;
+    nanos_since_epoch: number;
+  };
+  num_buckets: number;
+}
+
+/**
+ * Serialize a Date to the format expected by Convex metrics API
+ */
+function serializeDate(date: Date): { secs_since_epoch: number; nanos_since_epoch: number } {
+  const unixTsSeconds = date.getTime() / 1000;
+  const secsSinceEpoch = Math.floor(unixTsSeconds);
+  const nanosSinceEpoch = Math.floor((unixTsSeconds - secsSinceEpoch) * 1e9);
+  return {
+    secs_since_epoch: secsSinceEpoch,
+    nanos_since_epoch: nanosSinceEpoch,
+  };
+}
+
+/**
+ * Parse a serialized date from Convex metrics API
+ */
+function parseDate(date: { secs_since_epoch: number; nanos_since_epoch: number }): Date {
+  let unixTsMs = date.secs_since_epoch * 1000;
+  unixTsMs += date.nanos_since_epoch / 1_000_000;
+  return new Date(unixTsMs);
+}
+
+export type TableMetric = 'rowsRead' | 'rowsWritten';
+
+export interface TimeseriesBucket {
+  time: Date;
+  metric: number | null;
+}
+
+/**
+ * Fetch table rate metrics from the Convex API
+ */
+export async function fetchTableRate(
+  deploymentUrl: string,
+  tableName: string,
+  metric: TableMetric,
+  start: Date,
+  end: Date,
+  numBuckets: number,
+  authToken: string,
+): Promise<TimeseriesBucket[]> {
+  const windowArgs = {
+    start: serializeDate(start),
+    end: serializeDate(end),
+    num_buckets: numBuckets,
+  };
+
+  const name = encodeURIComponent(tableName);
+  const window = encodeURIComponent(JSON.stringify(windowArgs));
+  const url = `${deploymentUrl}/api/app_metrics/table_rate?name=${name}&metric=${metric}&window=${window}`;
+
+  const normalizedToken = authToken.startsWith('Convex ') ? authToken : `Convex ${authToken}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: normalizedToken,
+      'Convex-Client': 'dashboard-0.0.0',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch table rate: ${response.statusText}`);
+  }
+
+  const respJSON: Array<[{ secs_since_epoch: number; nanos_since_epoch: number }, number | null]> = await response.json();
+  
+  return respJSON.map(([time, metricValue]) => ({
+    time: parseDate(time),
+    metric: metricValue,
+  }));
+}
+
+/**
+ * Fetch performance metrics for a specific function from the Convex API
+ */
+const fetchPerformanceMetric = async (
+  baseUrl: string,
+  authToken: string,
+  functionPath: string,
+  metric: string,
+  udfType: string,
+  window: MetricsWindow
+) => {
+  // Extract just the file path (e.g., "users.js" from "users.js:viewer")
+  const path = functionPath.split(':')[0];
+
+  // Ensure token has the 'Convex ' prefix
+  const normalizedToken = authToken.startsWith('Convex ') ? authToken : `Convex ${authToken}`;
+
+  // Format window parameter to match dashboard format
+  // Ensure timestamps are in the past and limit to 30 minutes to reduce load
+  const now = Math.floor(Date.now() / 1000);
+  const thirtyMinutesAgo = now - 1800; // 30 minutes instead of 1 hour
+  
+  const formattedWindow = {
+    start: {
+      secs_since_epoch: thirtyMinutesAgo,
+      nanos_since_epoch: 0
+    },
+    end: {
+      secs_since_epoch: now,
+      nanos_since_epoch: 0
+    },
+    num_buckets: 30 // 1 minute intervals for 30 minutes
+  };
+
+  // Build the URL with properly encoded parameters
+  const url = new URL(`${baseUrl}/api/app_metrics/${metric}_top_k`);
+  url.searchParams.append('path', path);
+  url.searchParams.append('window', JSON.stringify(formattedWindow));
+  url.searchParams.append('udfType', udfType);
+  url.searchParams.append('k', '3');
+
+  // Maximum number of retries
+  const MAX_RETRIES = 3;
+  let retryCount = 0;
+  let lastError: Error | null = null;
+
+  while (retryCount < MAX_RETRIES) {
+    try {
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Authorization': normalizedToken,
+          'Content-Type': 'application/json',
+          'Convex-Client': 'convex-panel-extension',
+          'Origin': baseUrl,
+          'Referer': baseUrl
+        }
+      });
+
+      if (response.status === 429) {
+        // Rate limited - wait and retry
+        const retryAfter = response.headers.get('Retry-After');
+        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 1000 * (retryCount + 1);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        retryCount++;
+        continue;
+      }
+
+      if (!response.ok) {
+        const responseText = await response.text();
+        
+        if (response.status === 500) {
+          throw new Error(`Internal server error: ${responseText}`);
+        }
+        
+        throw new Error(`Failed to fetch performance metric: HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      return data;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (retryCount < MAX_RETRIES - 1) {
+        // Wait before retrying, using exponential backoff
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+        retryCount++;
+        continue;
+      }
+      break;
+    }
+  }
+
+  throw lastError || new Error('Failed to fetch performance metric after retries');
+};
+
+/**
+ * Fetch performance cache hit rate for a specific function
+ */
+export const fetchPerformanceCacheHitRate = async (
+  baseUrl: string,
+  authToken: string,
+  functionPath: string,
+  udfType: string,
+  window: MetricsWindow
+) => {
+
+  const udfTypeCapitalized = udfType.charAt(0).toUpperCase() + udfType.slice(1);
+  
+  const windowStart = new Date(window.start.secs_since_epoch * 1000).toISOString();
+  const windowEnd = new Date(window.end.secs_since_epoch * 1000).toISOString();
+  
+  const params = new URLSearchParams({
+    component_path: '',
+    udf_path: functionPath,
+    udf_type: udfTypeCapitalized,
+    window: JSON.stringify({ start: windowStart, end: windowEnd })
+  });
+  
+  const url = `${baseUrl}${ROUTES.CACHE_HIT_PERCENTAGE}?${params}`;
+
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Convex ${authToken}`,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-1.0.0',
+    }
+  });
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(`Failed to fetch cache hit rate: HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  return data;
+};
+
+/**
+ * Fetch performance invocation rate for a specific function
+ */
+export async function fetchPerformanceInvocationRate(
+  baseUrl: string,
+  authToken: string,
+  functionPath: string,
+  udfType: string,
+  window: {
+    start: { secs_since_epoch: number; nanos_since_epoch: number };
+    end: { secs_since_epoch: number; nanos_since_epoch: number };
+    num_buckets: number;
+  }
+) { 
+
+  const udfTypeCapitalized = udfType.charAt(0).toUpperCase() + udfType.slice(1);
+
+  const windowStart = new Date(window.start.secs_since_epoch * 1000).toISOString();
+  const windowEnd = new Date(window.end.secs_since_epoch * 1000).toISOString();
+  
+  const params = new URLSearchParams({
+    component_path: '',
+    udf_path: functionPath,
+    udf_type: udfTypeCapitalized,
+    metric: 'invocations',
+    window: JSON.stringify({ start: windowStart, end: windowEnd })
+  });
+  
+  const url = `${baseUrl}${ROUTES.PERFORMANCE_INVOCATION_UDF_RATE}?${params}`;
+  
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Convex ${authToken}`,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-1.0.0',
+    },
+  });
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(`Failed to fetch invocation rate: HTTP ${response.status} - ${responseText}`);
+  }
+
+  const data = await response.json();
+
+  return data;
+}
+
+/**
+ * Fetch execution time (latency) metrics for a specific function
+ */
+export const fetchPerformanceExecutionTime = async (
+  baseUrl: string,
+  authToken: string,
+  functionPath: string,
+  udfType: string,
+  window: any
+) => {
+
+  const udfTypeCapitalized = udfType.charAt(0).toUpperCase() + udfType.slice(1);
+  
+  const windowStart = new Date(window.start.secs_since_epoch * 1000).toISOString();
+  const windowEnd = new Date(window.end.secs_since_epoch * 1000).toISOString();
+  
+  const params = new URLSearchParams({
+    component_path: '',
+    udf_path: functionPath,
+    udf_type: udfTypeCapitalized,
+    percentiles: [50, 90, 95, 99].join(','),
+    window: JSON.stringify({ start: windowStart, end: windowEnd })
+  });
+
+  const url = `${baseUrl}${ROUTES.PERFORMANCE_EXECUTION_TIME}?${params}`;
+
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Convex ${authToken}`,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-1.0.0',
+    }
+  });
+
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(`Failed to fetch execution time: HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  return data;
+};
+
+/**
+ * Fetch function statistics using system metrics queries
+ * Uses the adminClient to query _system/metrics and _system/logs functions
+ */
+export async function fetchFunctionStatistics(
+  adminClient: any,
+  functionIdentifier: string,
+  timeWindow: { start: number; end: number },
+  useMockData = false
+): Promise<{
+  cacheHitPercentage?: any;
+  latencyPercentiles?: any;
+  executions?: any[];
+  invocationRate?: any;
+}> {
+  if (useMockData || !adminClient) {
+    return {
+      cacheHitPercentage: null,
+      latencyPercentiles: null,
+      executions: [],
+      invocationRate: null,
+    };
+  }
+
+  try {
+    const results = await Promise.allSettled([
+      // Get cache hit percentage for queries
+      adminClient.query("_system/metrics:cache_hit_percentage" as any, {
+        identifier: functionIdentifier,
+        window: timeWindow,
+      }),
+      
+      // Get latency percentiles
+      adminClient.query("_system/metrics:latency_percentiles" as any, {
+        identifier: functionIdentifier,
+        percentiles: [50, 90, 95, 99],
+        window: timeWindow,
+      }),
+      
+      // Get function executions for detailed stats
+      adminClient.query("_system/logs:stream_udf_execution" as any, {
+        cursor: timeWindow.start,
+      }),
+    ]);
+
+    const cacheStats = results[0].status === 'fulfilled' ? results[0].value : null;
+    const latencyStats = results[1].status === 'fulfilled' ? results[1].value : null;
+    const executionsResult = results[2].status === 'fulfilled' ? results[2].value : null;
+
+    if (results[0].status === 'rejected') {
+      console.error('[fetchFunctionStatistics] Cache hit query failed:', results[0].reason);
+    } else {
+    }
+
+    if (results[1].status === 'rejected') {
+      console.error('[fetchFunctionStatistics] Latency query failed:', results[1].reason);
+    }
+
+    if (results[2].status === 'rejected') {
+      console.error('[fetchFunctionStatistics] Executions query failed:', results[2].reason);
+    }
+
+    // Get invocation rate (try different query names if needed)
+    let invocationRate = null;
+    try {
+      invocationRate = await adminClient.query("_system/metrics:invocation_rate" as any, {
+        identifier: functionIdentifier,
+        window: timeWindow,
+      });
+    } catch (err1) {
+      console.warn('[fetchFunctionStatistics] invocation_rate failed:', err1);
+      // Try alternative name
+      try {
+        invocationRate = await adminClient.query("_system/metrics:invocations" as any, {
+          identifier: functionIdentifier,
+          window: timeWindow,
+        });
+      } catch (err2) {
+        console.warn('[fetchFunctionStatistics] invocations also failed:', err2);
+        // If both fail, invocationRate stays null
+      }
+    }
+
+    // Handle executions - it might be an array or an object with entries
+    let executions: any[] = [];
+    if (executionsResult) {
+      if (Array.isArray(executionsResult)) {
+        executions = executionsResult;
+      } else if (executionsResult.entries && Array.isArray(executionsResult.entries)) {
+        executions = executionsResult.entries;
+      } else if (executionsResult.logs && Array.isArray(executionsResult.logs)) {
+        executions = executionsResult.logs;
+      }
+    }
+
+    const returnValue = {
+      cacheHitPercentage: cacheStats,
+      latencyPercentiles: latencyStats,
+      executions: executions,
+      invocationRate: invocationRate,
+    };
+
+    return returnValue;
+  } catch (error) {
+    return {
+      cacheHitPercentage: null,
+      latencyPercentiles: null,
+      executions: [],
+      invocationRate: null,
+    };
+  }
+}
+
+/**
+ * Analyze function executions to extract statistics
+ */
+export function analyzeExecutions(executions: any[]): {
+  totalInvocations: number;
+  successCount: number;
+  errorCount: number;
+  totalExecutionTime: number;
+  avgExecutionTime: number;
+  usageStats: {
+    totalDatabaseReads: number;
+    totalDatabaseWrites: number;
+    totalStorageReads: number;
+    totalStorageWrites: number;
+    totalMemoryUsed: number;
+  };
+} {
+  const stats = {
+    totalInvocations: executions.length,
+    successCount: 0,
+    errorCount: 0,
+    totalExecutionTime: 0,
+    avgExecutionTime: 0,
+    usageStats: {
+      totalDatabaseReads: 0,
+      totalDatabaseWrites: 0,
+      totalStorageReads: 0,
+      totalStorageWrites: 0,
+      totalMemoryUsed: 0,
+    },
+  };
+
+  executions.forEach((execution) => {
+    if (execution.params?.result?.is_ok) {
+      stats.successCount++;
+    } else {
+      stats.errorCount++;
+    }
+
+    stats.totalExecutionTime += execution.execution_time || 0;
+    stats.usageStats.totalDatabaseReads +=
+      execution.usage_stats?.database_read_bytes || 0;
+    stats.usageStats.totalDatabaseWrites +=
+      execution.usage_stats?.database_write_bytes || 0;
+    stats.usageStats.totalStorageReads +=
+      execution.usage_stats?.storage_read_bytes || 0;
+    stats.usageStats.totalStorageWrites +=
+      execution.usage_stats?.storage_write_bytes || 0;
+    stats.usageStats.totalMemoryUsed += execution.memory_used_mb || 0;
+  });
+
+  stats.avgExecutionTime =
+    stats.totalInvocations > 0
+      ? stats.totalExecutionTime / stats.totalInvocations
+      : 0;
+
+  return stats;
+}
+
+/**
+ * Fetch source code for a function
+ */
+export const fetchSourceCode = async (
+  deploymentUrl: string,
+  authToken: string,
+  modulePath: string,
+  componentId?: string | null
+) => {
+  const params = new URLSearchParams({ path: modulePath });
+  
+  if (componentId) {
+    params.append('component', componentId);
+  }
+  
+  const normalizedToken = authToken.startsWith('Convex ') ? authToken : `Convex ${authToken}`;
+  const url = `${deploymentUrl}${ROUTES.GET_SOURCE_CODE}?${params}`;
+
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': normalizedToken,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-0.0.0',
+    }
+  });
+
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(`Failed to fetch source code: HTTP ${response.status} - ${responseText}`);
+  }
+
+  const text = await response.text();
+  
+  if (text === 'null' || text.trim() === '') {
+    return null;
+  }
+  
+  try {
+    const json = JSON.parse(text);
+    
+    if (json === null || json === undefined) {
+      return null;
+    }
+    if (typeof json === 'object' && 'code' in json) {
+      return json.code || null;
+    }
+    if (typeof json === 'object' && 'source' in json) {
+      return json.source || null;
+    }
+    if (typeof json === 'string') {
+      return json;
+    }
+  } catch (parseError) {
+    // Not JSON, return as text
+  }
+  
+  return text;
+};
+
+/**
+ * Extract deployment name from deployment URL
+ * @param deploymentUrl - The full deployment URL (e.g., https://my-deployment.convex.cloud)
+ * @returns The deployment name (e.g., "my-deployment")
+ */
+export function extractDeploymentName(deploymentUrl: string | undefined): string | undefined {
+  if (!deploymentUrl) return undefined;
+  
+  try {
+    const url = new URL(deploymentUrl);
+    // Extract deployment name from hostname
+    // Format: https://[deployment-name].convex.cloud
+    const hostname = url.hostname;
+    const match = hostname.match(/^([^.]+)\.convex\.cloud$/);
+    return match ? match[1] : undefined;
+  } catch {
+    // Fallback: try to extract from string directly
+    const match = deploymentUrl.match(/https?:\/\/([^.]+)\.convex\.cloud/);
+    return match ? match[1] : undefined;
+  }
+}
+
+/**
+ * Extract project name from deployment URL
+ * For most deployments, the project name is the first part of the deployment name
+ * Format: [project-name]-[random-id] or just [project-name]
+ * @param deploymentUrl - The full deployment URL
+ * @returns The project name (best guess from deployment name)
+ */
+export function extractProjectName(deploymentUrl: string | undefined): string | undefined {
+  const deploymentName = extractDeploymentName(deploymentUrl);
+  if (!deploymentName) return undefined;
+  
+  // Try to extract project name from deployment name
+  // Common patterns:
+  // - "my-project-1234" -> "my-project"
+  // - "my-project" -> "my-project"
+  // - "dev:my-project-1234" -> "my-project"
+  
+  // Remove "dev:" prefix if present
+  let name = deploymentName.replace(/^dev:/, '');
+  
+  // Try to extract project name (everything before the last dash and number sequence)
+  // This is a heuristic - actual project names may vary
+  const projectMatch = name.match(/^(.+?)(?:-\d+)?$/);
+  if (projectMatch) {
+    return projectMatch[1];
+  }
+  
+  return name;
+}
+
+/**
+ * Fetch deployment metadata from Convex API
+ * Attempts to get deployment information using system queries
+ * @param adminClient - The Convex admin client instance
+ * @param deploymentUrl - The deployment URL
+ * @param authToken - Authentication token
+ * @returns Deployment metadata including name, type, and project info
+ */
+export async function fetchDeploymentMetadata(
+  adminClient: any,
+  deploymentUrl: string | undefined,
+  authToken: string | undefined
+): Promise<{
+  deploymentName?: string;
+  projectName?: string;
+  deploymentType?: 'dev' | 'prod' | 'preview';
+  kind?: 'cloud' | 'local';
+}> {
+  const deploymentName = extractDeploymentName(deploymentUrl);
+  const projectName = extractProjectName(deploymentUrl);
+  
+  // Default response with extracted info
+  const defaultResponse = {
+    deploymentName,
+    projectName,
+    deploymentType: 'dev' as const,
+    kind: 'cloud' as const,
+  };
+
+  // If we have an admin client, try to query system functions for more info
+  if (adminClient) {
+    try {
+      // Try to get deployment info from system functions
+      // Note: These are internal Convex system functions that may not be available
+      // in all deployments or may require specific permissions
+      const deploymentInfo = await adminClient.query("_system/deployment:info" as any, {}) as any;
+      
+      if (deploymentInfo) {
+        return {
+          deploymentName: deploymentInfo.name || deploymentName,
+          projectName: deploymentInfo.projectName || projectName,
+          deploymentType: deploymentInfo.deploymentType || 'dev',
+          kind: deploymentInfo.kind || 'cloud',
+        };
+      }
+    } catch (err) {
+      // System query failed, fall back to extracted info
+    }
+  }
+
+  // Try to determine deployment type from URL or name
+  let deploymentType: 'dev' | 'prod' | 'preview' = 'dev';
+  if (deploymentName) {
+    if (deploymentName.startsWith('prod-') || deploymentName.includes('production')) {
+      deploymentType = 'prod';
+    } else if (deploymentName.startsWith('preview-') || deploymentName.includes('preview')) {
+      deploymentType = 'preview';
+    } else if (deploymentName.startsWith('dev-') || deploymentName.startsWith('dev:')) {
+      deploymentType = 'dev';
+    }
+  }
+
+  return {
+    ...defaultResponse,
+    deploymentType,
+  };
+}
+
+/**
+ * Fetch project information from Convex API
+ * Attempts to get project and team information
+ * @param adminClient - The Convex admin client instance
+ * @param deploymentUrl - The deployment URL
+ * @param authToken - Authentication token
+ * @param teamSlug - Optional team slug
+ * @param projectSlug - Optional project slug
+ * @returns Project and team information
+ */
+/**
+ * Parse team and project slugs from access token
+ * Token format: "project:{teamSlug}:{projectSlug}|{token}"
+ */
+export function parseAccessToken(authToken: string | undefined): { teamSlug?: string; projectSlug?: string } {
+  if (!authToken) return {};
+  
+  // Token format: "project:{teamSlug}:{projectSlug}|{token}"
+  const match = authToken.match(/^project:([^:]+):([^|]+)\|/);
+  if (match) {
+    return {
+      teamSlug: match[1],
+      projectSlug: match[2],
+    };
+  }
+  
+  return {};
+}
+
+export async function fetchProjectInfo(
+  adminClient: any,
+  deploymentUrl: string | undefined,
+  authToken: string | undefined,
+  teamSlug?: string,
+  projectSlug?: string
+): Promise<{
+  team?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  project?: {
+    id: string;
+    name: string;
+    slug: string;
+    teamId: string;
+  };
+}> {
+  const deploymentName = extractDeploymentName(deploymentUrl);
+  const projectName = extractProjectName(deploymentUrl);
+
+  // Parse team and project from access token if not provided
+  const tokenInfo = parseAccessToken(authToken);
+  const effectiveTeamSlug = teamSlug || tokenInfo.teamSlug;
+  const effectiveProjectSlug = projectSlug || tokenInfo.projectSlug;
+
+  // If we have slugs (from props or token), we can construct basic info
+  if (effectiveTeamSlug && effectiveProjectSlug) {
+    const result = {
+      team: effectiveTeamSlug ? {
+        id: effectiveTeamSlug, // Using slug as ID placeholder
+        name: effectiveTeamSlug, // Can be improved with actual API call
+        slug: effectiveTeamSlug,
+      } : undefined,
+      project: effectiveProjectSlug ? {
+        id: effectiveProjectSlug, // Using slug as ID placeholder
+        name: effectiveProjectSlug, // Use project slug as name (e.g., "deskforge")
+        slug: effectiveProjectSlug,
+        teamId: effectiveTeamSlug, // Using slug as teamId placeholder
+      } : undefined,
+    };
+    return result;
+  }
+
+  // If we have an admin client, try to query system functions for more info
+  if (adminClient) {
+    try {
+      // Try to get project info from system functions
+      // Note: These are internal Convex system functions that may not be available
+      // in all deployments or may require specific permissions
+      const projectInfo = await adminClient.query("_system/project:info" as any, {}) as any;
+      
+      if (projectInfo) {
+        const result = {
+          team: projectInfo.team ? {
+            id: projectInfo.team.id?.toString() || '',
+            name: projectInfo.team.name || '',
+            slug: projectInfo.team.slug || '',
+          } : undefined,
+          project: projectInfo.project ? {
+            id: projectInfo.project.id?.toString() || '',
+            name: projectInfo.project.name || projectName || '',
+            slug: projectInfo.project.slug || projectSlug || '',
+            teamId: projectInfo.project.teamId?.toString() || projectInfo.team?.id?.toString() || '',
+          } : undefined,
+        };
+        return result;
+      }
+    } catch (err) {
+      // System query failed, fall back to extracted info
+    }
+  }
+
+  // Fallback: construct from available data
+  if (projectName) {
+    const result = {
+      project: {
+        id: deploymentName || '',
+        name: projectName,
+        slug: projectSlug || projectName,
+        teamId: teamSlug || '',
+      },
+    };
+    return result;
+  }
+
+  return {};
+}
+
+/**
+ * Fetch UDF execution statistics from the Convex API
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param authToken - The authentication token for the Convex deployment
+ * @param cursor - The cursor position to fetch from (in milliseconds, defaults to 0)
+ * @returns StreamUdfExecutionResponse with execution entries and new cursor
+ */
+export async function fetchUdfExecutionStats(
+  deploymentUrl: string,
+  authToken: string,
+  cursor: number = 0
+): Promise<StreamUdfExecutionResponse> {
+  const url = `${deploymentUrl}${ROUTES.STREAM_UDF_EXECUTION}?cursor=${cursor}`;
+
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Convex ${authToken}`,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-1.0.0',
+    },
+  });
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(`Failed to fetch UDF execution stats: HTTP ${response.status} - ${responseText}`);
+  }
+
+  const data = await response.json();
+
+  return {
+    entries: data.entries || [],
+    new_cursor: data.new_cursor || cursor,
+  };
+}
+
+/**
+ * Aggregate function execution statistics into time-bucketed data
+ * @param entries - Array of function execution entries
+ * @param functionIdentifier - The function identifier to filter by
+ * @param functionName - The function name (for fallback matching)
+ * @param functionPath - The module path (for fallback matching)
+ * @param timeStart - Start of time window in seconds
+ * @param timeEnd - End of time window in seconds
+ * @param numBuckets - Number of time buckets (default 30)
+ * @returns AggregatedFunctionStats with arrays of metrics per bucket
+ */
+export function aggregateFunctionStats(
+  entries: FunctionExecutionStats[],
+  functionIdentifier: string,
+  functionName: string,
+  functionPath: string,
+  timeStart: number,
+  timeEnd: number,
+  numBuckets: number = 30
+): AggregatedFunctionStats {
+  const functionEntries = entries.filter((entry) => {
+    return (
+      entry.identifier === functionIdentifier ||
+      entry.identifier === functionName ||
+      entry.identifier === functionPath ||
+      entry.identifier.includes(functionName) ||
+      entry.identifier.includes(functionPath) ||
+      (entry.identifier.includes(':') && entry.identifier.split(':')[0] === functionPath)
+    );
+  });
+
+  const invocations: number[] = Array(numBuckets).fill(0);
+  const errors: number[] = Array(numBuckets).fill(0);
+  const executionTimes: number[] = Array(numBuckets).fill(0);
+  const cacheHits: number[] = Array(numBuckets).fill(0);
+  const cacheMisses: number[] = Array(numBuckets).fill(0);
+
+  const bucketSizeSeconds = (timeEnd - timeStart) / numBuckets;
+
+  const executionTimesByBucket: number[][] = Array(numBuckets).fill(null).map(() => []);
+
+  functionEntries.forEach((entry) => {
+    let entryTime = entry.timestamp;
+    if (entryTime > 1e12) {
+      entryTime = Math.floor(entryTime / 1000);
+    }
+
+    if (entryTime < timeStart || entryTime > timeEnd) {
+      return;
+    }
+
+    const bucketIndex = Math.floor((entryTime - timeStart) / bucketSizeSeconds);
+    const clampedIndex = Math.max(0, Math.min(numBuckets - 1, bucketIndex));
+
+    invocations[clampedIndex]++;
+
+    if (!entry.success) {
+      errors[clampedIndex]++;
+    }
+
+    if (entry.execution_time_ms != null && entry.execution_time_ms > 0) {
+      executionTimesByBucket[clampedIndex].push(entry.execution_time_ms);
+    }
+
+    if (entry.udf_type === 'query' || entry.udf_type === 'Query') {
+      if (entry.cachedResult === true) {
+        cacheHits[clampedIndex]++;
+      } else if (entry.cachedResult === false) {
+        cacheMisses[clampedIndex]++;
+      }
+    }
+  });
+
+  executionTimesByBucket.forEach((times, index) => {
+    if (times.length > 0) {
+      const sorted = times.sort((a, b) => a - b);
+      const medianIndex = Math.floor(sorted.length / 2);
+      executionTimes[index] = sorted.length % 2 === 0
+        ? (sorted[medianIndex - 1] + sorted[medianIndex]) / 2
+        : sorted[medianIndex];
+    }
+  });
+
+  const cacheHitRates: number[] = Array(numBuckets).fill(0);
+  for (let i = 0; i < numBuckets; i++) {
+    const totalCacheOps = cacheHits[i] + cacheMisses[i];
+    if (totalCacheOps > 0) {
+      cacheHitRates[i] = (cacheHits[i] / totalCacheOps) * 100;
+    }
+  }
+
+  return {
+    invocations,
+    errors,
+    executionTimes,
+    cacheHits: cacheHitRates,
+  };
+}
+
+/**
+ * File metadata interface
+ */
+export interface FileMetadata {
+  _id: string;
+  _creationTime: number;
+  storageId: string;
+  contentType?: string;
+  size?: number;
+  name?: string;
+  sha256?: string;
+  url?: string;
+}
+
+/**
+ * Fetch file metadata using system UDF
+ * @param adminClient - The Convex admin client instance
+ * @param storageId - The storage ID of the file
+ * @param useMockData - Whether to use mock data
+ * @returns File metadata or null if not found
+ */
+export async function fetchFileMetadata(
+  adminClient: any,
+  storageId: string,
+  useMockData = false
+): Promise<FileMetadata | null> {
+  if (useMockData) {
+    return null;
+  }
+
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    const file = await adminClient.query("_system/frontend/fileStorageV2:getFile" as any, {
+      storageId,
+    });
+    return file || null;
+  } catch (err: any) {
+    return null;
+  }
+}
+
+/**
+ * Alternative approach using system UDFs that might be available
+ */
+async function fetchFilesAlternative(
+  deploymentUrl: string,
+  authToken: string,
+  componentId: string | null = null,
+  paginationOpts: { numItems?: number; cursor?: string } = {}
+): Promise<{ page: FileMetadata[]; isDone: boolean; continueCursor?: string }> {
+  try {
+    // Try using the system table query UDF directly
+    const response = await fetch(`${deploymentUrl}/api/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Convex ${authToken}`,
+        'Convex-Client': 'dashboard-admin',
+      },
+      body: JSON.stringify({
+        path: 'system:listDocuments',
+        args: {
+          table: '_storage',
+          limit: paginationOpts.numItems || 100,
+        },
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+
+      if (result && (result.value || result.success)) {
+        const files = result.value || result;
+        const filesArray = Array.isArray(files) ? files : [];
+
+        const filesWithUrls: FileMetadata[] = filesArray.map((file: any) => ({
+          _id: file._id,
+          _creationTime: file._creationTime,
+          storageId: file._id,
+          contentType: file.contentType || null,
+          size: file.size || null,
+          name: file.name || null,
+          sha256: file.sha256 || null,
+          url: `${deploymentUrl}/api/storage/${file._id}`,
+        }));
+
+        return {
+          page: filesWithUrls,
+          isDone: true,
+          continueCursor: undefined,
+        };
+      }
+    }
+
+    // Last resort: try to use the dashboard's internal API
+    return await fetchFilesLastResort(deploymentUrl, authToken, componentId, paginationOpts);
+  } catch (err: any) {
+    return await fetchFilesLastResort(deploymentUrl, authToken, componentId, paginationOpts);
+  }
+}
+
+/**
+ * Last resort: try to mimic what the dashboard does
+ */
+async function fetchFilesLastResort(
+  deploymentUrl: string,
+  authToken: string,
+  componentId: string | null = null,
+  paginationOpts: { numItems?: number; cursor?: string } = {}
+): Promise<{ page: FileMetadata[]; isDone: boolean; continueCursor?: string }> {
+  try {
+    // This mimics what the Convex dashboard might do
+    const response = await fetch(`${deploymentUrl}/api/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Convex ${authToken}`,
+        'Convex-Client': 'dashboard-0.0.0',
+      },
+      body: JSON.stringify({
+        path: '_system/frontend/fileStorageV2:fileMetadata',
+        args: {
+          componentId: componentId,
+          paginationOpts: {
+            numItems: paginationOpts.numItems || 100,
+            cursor: paginationOpts.cursor || null, // cursor is REQUIRED
+          },
+        },
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+
+      if (result && result.value) {
+        const data = result.value;
+        const files = data.page || [];
+
+        const filesWithUrls: FileMetadata[] = files.map((file: any) => ({
+          _id: file._id,
+          _creationTime: file._creationTime,
+          storageId: file._id,
+          contentType: file.contentType || null,
+          size: file.size || null,
+          name: file.name || null,
+          sha256: file.sha256 || null,
+          url: file.url || `${deploymentUrl}/api/storage/${file._id}`,
+        }));
+
+        return {
+          page: filesWithUrls,
+          isDone: data.isDone !== false,
+          continueCursor: data.continueCursor,
+        };
+      }
+    }
+
+    // If everything fails, return empty
+    return {
+      page: [],
+      isDone: true,
+      continueCursor: undefined,
+    };
+  } catch (err: any) {
+    return {
+      page: [],
+      isDone: true,
+      continueCursor: undefined,
+    };
+  }
+}
+
+/**
+ * List files using admin API to query system tables directly
+ * @param deploymentUrl - The deployment URL
+ * @param authToken - The authentication token
+ * @param componentId - Optional component ID
+ * @param paginationOpts - Pagination options
+ * @returns Array of file metadata with URLs
+ */
+export async function fetchFilesDirectAPI(
+  deploymentUrl: string,
+  authToken: string,
+  componentId: string | null = null,
+  paginationOpts: { numItems?: number; cursor?: string } = {}
+): Promise<{ page: FileMetadata[]; isDone: boolean; continueCursor?: string }> {
+  try {
+    // Use the admin API to query the _storage table directly
+    const response = await fetch(`${deploymentUrl}/api/admin/query_batch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Convex ${authToken}`,
+        'Convex-Client': 'dashboard-admin',
+      },
+      body: JSON.stringify({
+        queries: [{
+          udf: {
+            identifier: "system:query",
+            args: {
+              table: "_storage",
+              limit: paginationOpts.numItems || 100,
+            }
+          }
+        }]
+      }),
+    });
+
+    if (!response.ok) {
+      // Try alternative approach
+      return await fetchFilesAlternative(deploymentUrl, authToken, componentId, paginationOpts);
+    }
+
+    const result = await response.json();
+
+    if (result && result.results && result.results[0]) {
+      const queryResult = result.results[0];
+      if (queryResult.success && queryResult.value) {
+        const files = Array.isArray(queryResult.value) ? queryResult.value : [];
+
+        const filesWithUrls: FileMetadata[] = files.map((file: any) => ({
+          _id: file._id,
+          _creationTime: file._creationTime,
+          storageId: file._id,
+          contentType: file.contentType || null,
+          size: file.size || null,
+          name: file.name || null,
+          sha256: file.sha256 || null,
+          url: `${deploymentUrl}/api/storage/${file._id}`,
+        }));
+
+        return {
+          page: filesWithUrls,
+          isDone: true,
+          continueCursor: undefined,
+        };
+      }
+    }
+
+    // If admin API didn't work, try alternative
+    return await fetchFilesAlternative(deploymentUrl, authToken, componentId, paginationOpts);
+  } catch (err: any) {
+    return await fetchFilesAlternative(deploymentUrl, authToken, componentId, paginationOpts);
+  }
+}
+
+/**
+ * Fetch files using admin client direct methods
+ */
+async function fetchFilesUsingAdminClient(
+  adminClient: any,
+  componentId: string | null = null,
+  paginationOpts: { numItems?: number; cursor?: string } = {}
+): Promise<{ page: FileMetadata[]; isDone: boolean; continueCursor?: string }> {
+  // Return empty for now - this is a placeholder for future admin client methods
+  return { page: [], isDone: true };
+}
+
+/**
+ * List all files with metadata
+ * Tries multiple approaches: admin client, system functions, and direct API
+ * @param adminClient - The Convex admin client instance
+ * @param componentId - Optional component ID to filter files
+ * @param useMockData - Whether to use mock data
+ * @param paginationOpts - Pagination options
+ * @returns Array of file metadata with URLs
+ */
+export async function fetchFiles(
+  adminClient: any,
+  componentId: string | null = null,
+  useMockData = false,
+  paginationOpts: { numItems?: number; cursor?: string } = {}
+): Promise<{ page: FileMetadata[]; isDone: boolean; continueCursor?: string }> {
+  if (useMockData) {
+    return { page: [], isDone: true };
+  }
+
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  const normalizedComponentId = componentId === 'app' || componentId === null ? null : componentId;
+  const deploymentUrl = getDeploymentUrl(adminClient);
+  const adminKey = getAdminKey(adminClient);
+
+  // Approach 1: Try admin client direct methods
+  try {
+    const result = await fetchFilesUsingAdminClient(adminClient, normalizedComponentId, paginationOpts);
+    if (result.page.length > 0) {
+      return result;
+    }
+  } catch (err) {
+    // Continue to next approach
+  }
+
+  // Approach 2: Try system functions with admin client
+  try {
+    // First try fileMetadata - this is the correct function that exists
+    try {
+      const result = await adminClient.query("_system/frontend/fileStorageV2:fileMetadata" as any, {
+        componentId: normalizedComponentId,
+        paginationOpts: {
+          numItems: paginationOpts.numItems || 100,
+          cursor: paginationOpts.cursor || null, // cursor is REQUIRED, can be null for first page
+        },
+      });
+
+      if (result && typeof result === 'object') {
+        const page = result.page || (Array.isArray(result) ? result : []);
+
+        const filesWithUrls: FileMetadata[] = page.map((file: any) => ({
+          _id: file._id || file.storageId,
+          _creationTime: file._creationTime || file.creationTime || Date.now(),
+          storageId: file.storageId || file._id,
+          contentType: file.contentType || file.content_type || null,
+          size: file.size || null,
+          name: file.name || null,
+          sha256: file.sha256 || null,
+          url: file.url || (deploymentUrl ? `${deploymentUrl}/api/storage/${file.storageId || file._id}` : undefined),
+        }));
+
+        return {
+          page: filesWithUrls,
+          isDone: result.isDone !== false,
+          continueCursor: result.continueCursor,
+        };
+      }
+    } catch (err: any) {
+      // Continue to try other approaches
+    }
+  } catch (err) {
+    // Continue to next approach
+  }
+
+  // Approach 3: Try direct API calls
+  if (deploymentUrl && adminKey) {
+    try {
+      const result = await fetchFilesDirectAPI(deploymentUrl, adminKey, normalizedComponentId, paginationOpts);
+      if (result.page.length > 0) {
+        return result;
+      }
+    } catch (err) {
+      // Continue
+    }
+  }
+
+  return { page: [], isDone: true };
+}
+
+/**
+ * Simple test to check if files exist and what APIs are available
+ * @param adminClient - The admin client instance
+ */
+export async function testFileAccess(adminClient: any): Promise<void> {
+  // Diagnostic function - kept for debugging but logs removed
+  const deploymentUrl = getDeploymentUrl(adminClient);
+  const adminKey = getAdminKey(adminClient);
+
+  if (!deploymentUrl || !adminKey) {
+    return;
+  }
+
+  // Test functions are available but logging removed
+  // This function can be called manually for debugging if needed
+}
+
+/**
+ * Debug function to test file fetching capabilities (alias for testFileAccess)
+ * @param adminClient - The admin client instance
+ */
+export async function debugFetchFiles(adminClient: any): Promise<void> {
+  return testFileAccess(adminClient);
+}
+
+/**
+ * Get file download URL
+ * @param deploymentUrl - The deployment URL
+ * @param authToken - The authentication token
+ * @param storageId - The storage ID of the file
+ * @param componentId - Optional component ID
+ * @returns File URL or null
+ */
+export async function getFileUrl(
+  deploymentUrl: string,
+  authToken: string,
+  storageId: string,
+  componentId?: string | null
+): Promise<string | null> {
+  try {
+    const url = `${deploymentUrl}/api/storage/${storageId}`;
+    const headers: Record<string, string> = {
+      'Authorization': `Convex ${authToken}`,
+    };
+
+    if (componentId) {
+      headers['X-Convex-Component'] = componentId;
+    }
+
+    // Just return the URL - the actual download happens when accessing it
+    return url;
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Generate an upload URL for file storage
+ * @param adminClient - The admin client instance (optional if deploymentUrl and accessToken are provided)
+ * @param componentId - Optional component ID
+ * @param deploymentUrl - Optional deployment URL (takes priority over extracting from adminClient)
+ * @param accessToken - Optional access token (takes priority over extracting from adminClient)
+ * @returns Upload URL with token or null
+ */
+/**
+ * Extract upload URL from various response formats
+ */
+function extractUploadUrl(result: any): string | null {
+  if (!result) return null;
+  
+  // Try different response formats
+  // The URL should contain '/api/storage/upload' and a token parameter
+  const checkForUploadUrl = (str: string): boolean => {
+    return str.includes('/api/storage/upload') || str.includes('storage/upload');
+  };
+  
+  if (typeof result === 'string') {
+    if (checkForUploadUrl(result)) {
+      return result;
+    }
+  }
+  
+  if (result.value) {
+    const value = result.value;
+    if (typeof value === 'string' && checkForUploadUrl(value)) {
+      return value;
+    }
+    if (value.uploadUrl && checkForUploadUrl(value.uploadUrl)) return value.uploadUrl;
+    if (value.url && checkForUploadUrl(value.url)) return value.url;
+    // Sometimes the value might be an object with the URL
+    if (typeof value === 'object') {
+      if (value.uploadUrl && checkForUploadUrl(value.uploadUrl)) return value.uploadUrl;
+      if (value.url && checkForUploadUrl(value.url)) return value.url;
+    }
+  }
+  
+  if (result.uploadUrl && checkForUploadUrl(result.uploadUrl)) return result.uploadUrl;
+  if (result.url && checkForUploadUrl(result.url)) return result.url;
+  
+  // Check if result itself is an object with uploadUrl property
+  if (typeof result === 'object' && result !== null) {
+    // Check all string properties
+    for (const key in result) {
+      if (typeof result[key] === 'string' && checkForUploadUrl(result[key])) {
+        return result[key];
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Make URL absolute if it's relative
+ */
+function makeAbsoluteUrl(uploadUrl: string, deploymentUrl: string): string {
+  if (uploadUrl.startsWith('http')) {
+    return uploadUrl;
+  }
+  if (uploadUrl.startsWith('/')) {
+    return `${deploymentUrl}${uploadUrl}`;
+  }
+  return uploadUrl;
+}
+
+export async function generateUploadUrl(
+  adminClient: any,
+  componentId: string | null = null,
+  deploymentUrl?: string,
+  accessToken?: string
+): Promise<{ uploadUrl: string | null; error?: string }> {
+  const normalizedComponentId = componentId === 'app' || componentId === null ? null : componentId;
+  
+  const finalDeploymentUrl = deploymentUrl || (adminClient ? getDeploymentUrl(adminClient) : null);
+  const finalAdminKey = accessToken || (adminClient ? getAdminKey(adminClient) : null);
+
+  if (!finalDeploymentUrl) {
+    return { uploadUrl: null, error: 'Missing deployment URL' };
+  }
+
+  if (!finalAdminKey) {
+    return { uploadUrl: null, error: 'Missing admin key/access token' };
+  }
+
+  const functionPath = '_system/frontend/fileStorageV2:generateUploadUrl';
+  
+  const componentVariations = [
+    normalizedComponentId,
+    null,
+  ].filter((id, index, arr) => arr.indexOf(id) === index);
+
+  if (adminClient && adminClient.mutation) {
+    for (const compId of componentVariations) {
+      try {
+        const result = await adminClient.mutation(functionPath as any, {
+          componentId: compId,
+        });
+
+        if (typeof result === 'string' && result.includes('/api/storage/upload')) {
+          const uploadUrl = result.startsWith('http') ? result : `${finalDeploymentUrl}${result.startsWith('/') ? result : '/' + result}`;
+          return { uploadUrl };
+        }
+      } catch (err: any) {
+        // Continue to next attempt
+      }
+    }
+  }
+  
+  if (adminClient && adminClient.query) {
+    for (const compId of componentVariations) {
+      try {
+        const result = await adminClient.query(functionPath as any, {
+          componentId: compId,
+        });
+
+        if (typeof result === 'string' && result.includes('/api/storage/upload')) {
+          const uploadUrl = result.startsWith('http') ? result : `${finalDeploymentUrl}${result.startsWith('/') ? result : '/' + result}`;
+          return { uploadUrl };
+        }
+      } catch (err: any) {
+        // Continue to next attempt
+      }
+    }
+  }
+
+  for (const compId of componentVariations) {
+    try {
+      const response = await fetch(`${finalDeploymentUrl}/api/mutation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Convex ${finalAdminKey}`,
+          'Convex-Client': 'dashboard-admin',
+        },
+        body: JSON.stringify({
+          path: functionPath,
+          args: compId !== null ? { componentId: compId } : {},
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        
+        // The result might be wrapped in { value: ... } or be a direct string
+        let uploadUrl: string | null = null;
+        
+        if (result.value && typeof result.value === 'string') {
+          uploadUrl = result.value;
+        } else if (typeof result === 'string') {
+          uploadUrl = result;
+        }
+        
+        if (uploadUrl && uploadUrl.includes('/api/storage/upload')) {
+          // Make sure it's an absolute URL
+          if (uploadUrl.startsWith('/')) {
+            uploadUrl = `${finalDeploymentUrl}${uploadUrl}`;
+          } else if (!uploadUrl.startsWith('http')) {
+            uploadUrl = `${finalDeploymentUrl}/${uploadUrl}`;
+          }
+          
+          return { uploadUrl };
+        }
+      }
+    } catch (err: any) {
+      // Continue to next attempt
+    }
+  }
+  
+  for (const compId of componentVariations) {
+    try {
+      const response = await fetch(`${finalDeploymentUrl}/api/query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Convex ${finalAdminKey}`,
+          'Convex-Client': 'dashboard-admin',
+        },
+        body: JSON.stringify({
+          path: functionPath,
+          args: compId !== null ? { componentId: compId } : {},
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        
+        // The result might be wrapped in { value: ... } or be a direct string
+        let uploadUrl: string | null = null;
+        
+        if (result.value && typeof result.value === 'string') {
+          uploadUrl = result.value;
+        } else if (typeof result === 'string') {
+          uploadUrl = result;
+        }
+        
+        if (uploadUrl && uploadUrl.includes('/api/storage/upload')) {
+          // Make sure it's an absolute URL
+          if (uploadUrl.startsWith('/')) {
+            uploadUrl = `${finalDeploymentUrl}${uploadUrl}`;
+          } else if (!uploadUrl.startsWith('http')) {
+            uploadUrl = `${finalDeploymentUrl}/${uploadUrl}`;
+          }
+          
+          return { uploadUrl };
+        }
+      }
+    } catch (err: any) {
+      // Continue to next attempt
+    }
+  }
+
+  return { uploadUrl: null, error: 'Unable to generate upload URL. File storage may not be available for this deployment.' };
+}
+
+/**
+ * Diagnose file storage availability
+ * @param adminClient - The admin client instance
+ * @param deploymentUrl - Optional deployment URL
+ * @param accessToken - Optional access token
+ * @returns Diagnostic information
+ */
+export async function diagnoseFileStorageAvailability(
+  adminClient: any,
+  deploymentUrl?: string,
+  accessToken?: string
+): Promise<{ available: boolean; details: string[] }> {
+  const finalDeploymentUrl = deploymentUrl || (adminClient ? getDeploymentUrl(adminClient) : null);
+  const finalAdminKey = accessToken || (adminClient ? getAdminKey(adminClient) : null);
+  
+  const details: string[] = [];
+  
+  if (!finalDeploymentUrl) {
+    details.push('❌ No deployment URL available');
+    return { available: false, details };
+  }
+  
+  if (!finalAdminKey) {
+    details.push('❌ No admin key available');
+    return { available: false, details };
+  }
+  
+  details.push(`✅ Deployment URL: ${finalDeploymentUrl}`);
+  details.push(`✅ Admin key: ${finalAdminKey.substring(0, 10)}...`);
+  
+  // Test basic connectivity
+  try {
+    const response = await fetch(`${finalDeploymentUrl}/api/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Convex ${finalAdminKey}`,
+      },
+      body: JSON.stringify({
+        path: '_system/frontend/fileStorageV2:generateUploadUrl',
+        args: { componentId: null },
+      }),
+    });
+    
+    details.push(`📡 API Response: ${response.status} ${response.statusText}`);
+    
+    if (response.ok) {
+      const result = await response.json();
+      details.push(`✅ File storage is available`);
+      details.push(`📄 Response: ${JSON.stringify(result, null, 2)}`);
+      return { available: true, details };
+    } else {
+      const errorText = await response.text();
+      details.push(`❌ File storage not available: ${errorText}`);
+      return { available: false, details };
+    }
+  } catch (error: any) {
+    details.push(`❌ Network error: ${error?.message || 'Unknown error'}`);
+    return { available: false, details };
+  }
+}
+
+/**
+ * Upload file with multiple fallback methods
+ * @param file - The file to upload
+ * @param adminClient - The admin client instance
+ * @param componentId - Optional component ID
+ * @param deploymentUrl - Optional deployment URL
+ * @param accessToken - Optional access token
+ * @param onProgress - Optional progress callback
+ * @returns Upload result with method used
+ */
+export async function uploadFileWithFallbacks(
+  file: File,
+  adminClient: any,
+  componentId: string | null = null,
+  deploymentUrl?: string,
+  accessToken?: string,
+  onProgress?: (progress: number) => void
+): Promise<{ storageId: string | null; error?: string; method?: string }> {
+
+  const { uploadUrl, error: urlError } = await generateUploadUrl(
+    adminClient, 
+    componentId, 
+    deploymentUrl, 
+    accessToken
+  );
+  
+  if (uploadUrl) {
+    try {
+      const storageId = await uploadFile(file, uploadUrl, onProgress);
+      if (storageId) {
+        return { storageId, method: 'upload-url' };
+      }
+    } catch (error: any) {
+      console.error('Upload failed:', error);
+    }
+  }
+  
+  return { 
+    storageId: null, 
+    error: `Upload failed: ${urlError || 'Unable to generate upload URL'}`,
+    method: 'none'
+  };
+}
+
+/**
+ * Upload a file to Convex storage
+ * @param file - The file to upload
+ * @param uploadUrl - The upload URL with token
+ * @param onProgress - Optional progress callback (0-100)
+ * @returns Storage ID or null
+ */
+export async function uploadFile(
+  file: File,
+  uploadUrl: string,
+  onProgress?: (progress: number) => void
+): Promise<string | null> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable && onProgress) {
+        const percentComplete = (e.loaded / e.total) * 100;
+        onProgress(percentComplete);
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status === 200) {
+        try {
+          const responseText = xhr.responseText.trim();
+          
+          if (!responseText) {
+            // Empty response - try to get storage ID from URL or headers
+            const location = xhr.getResponseHeader('Location');
+            if (location) {
+              const match = location.match(/\/([^\/]+)$/);
+              if (match) {
+                resolve(match[1]);
+                return;
+              }
+            }
+            resolve(null);
+            return;
+          }
+          
+          const response = JSON.parse(responseText);
+          
+          // Convex returns the storage ID in JSON format
+          let storageId: string | null = null;
+          
+          if (typeof response === 'string') {
+            storageId = response;
+          } else if (response.storageId) {
+            storageId = response.storageId;
+          } else if (response.id) {
+            storageId = response.id;
+          } else if (response._id) {
+            storageId = response._id;
+          } else if (response.value) {
+            // Nested value
+            storageId = typeof response.value === 'string' 
+              ? response.value 
+              : response.value.storageId || response.value.id || response.value._id || null;
+          }
+          
+          resolve(storageId);
+        } catch (err) {
+          // If response is not JSON, try to extract storage ID from headers or URL
+          const location = xhr.getResponseHeader('Location');
+          if (location) {
+            const match = location.match(/\/([^\/]+)$/);
+            if (match) {
+              resolve(match[1]);
+              return;
+            }
+          }
+          // If we can't parse the response, still resolve (upload might have succeeded)
+          resolve(null);
+        }
+      } else {
+        reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+      }
+    });
+
+    xhr.addEventListener('error', () => {
+      reject(new Error('Upload failed: network error'));
+    });
+
+    xhr.addEventListener('abort', () => {
+      reject(new Error('Upload aborted'));
+    });
+
+    xhr.open('POST', uploadUrl);
+    
+    // Set the file's content type - Convex expects the file directly, not FormData
+    // Don't set Content-Type if it's empty, let the browser set it
+    if (file.type) {
+      xhr.setRequestHeader('Content-Type', file.type);
+    }
+    
+    // Send the file directly (not as FormData)
+    xhr.send(file);
+  });
+}
+
+/**
+ * Delete files from storage using adminClient mutation
+ * @param adminClient - The Convex admin client instance
+ * @param storageIds - Array of storage IDs to delete (or single string)
+ * @param componentId - Optional component ID
+ * @returns Success status
+ */
+export async function deleteFile(
+  adminClient: any,
+  storageIds: string | string[],
+  componentId?: string | null
+): Promise<{ success: boolean; error?: string }> {
+  if (!adminClient) {
+    return {
+      success: false,
+      error: 'Admin client not available',
+    };
+  }
+
+  try {
+    // Normalize to array
+    const idsArray = Array.isArray(storageIds) ? storageIds : [storageIds];
+    const normalizedComponentId = componentId === 'app' || componentId === null ? null : componentId;
+
+    // Use adminClient.mutation to call the system function
+    // componentId is passed as part of the args object
+    const result = await adminClient.mutation(
+      '_system/frontend/fileStorageV2:deleteFiles' as any,
+      {
+        storageIds: idsArray,
+        componentId: normalizedComponentId,
+      }
+    );
+
+    return { success: true };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Failed to delete file',
+    };
+  }
+}
+
+export interface EnvironmentVariable {
+  name: string;
+  value: string;
+}
+
+/**
+ * Get a specific environment variable by name
+ */
+export async function getEnvironmentVariable(
+  adminClient: any,
+  name: string
+): Promise<EnvironmentVariable | null> {
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    const result = await adminClient.query(
+      '_system/cli/queryEnvironmentVariables:get' as any,
+      { name }
+    );
+    return result;
+  } catch (error: any) {
+    throw new Error(`Failed to get environment variable: ${error?.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Get all environment variables
+ */
+export async function getAllEnvironmentVariables(
+  adminClient: any
+): Promise<EnvironmentVariable[]> {
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    const result = await adminClient.query(
+      '_system/cli/queryEnvironmentVariables' as any,
+      {}
+    );
+    return result || [];
+  } catch (error: any) {
+    throw new Error(`Failed to get environment variables: ${error?.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Update environment variables via HTTP
+ * @param deploymentUrl - The deployment URL
+ * @param adminKey - The admin key for authentication
+ * @param changes - Array of changes, each with name and optional value (omit value to delete)
+ */
+export async function updateEnvironmentVariablesViaHTTP(
+  deploymentUrl: string,
+  adminKey: string,
+  changes: Array<{ name: string; value?: string }>
+): Promise<boolean> {
+  const response = await fetch(`${deploymentUrl}/api/update_environment_variables`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Convex ${adminKey}`,
+    },
+    body: JSON.stringify({ changes }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`HTTP error! status: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  return response.status === 200;
+}
+
+/**
+ * Set/update a single environment variable
+ */
+export async function setEnvironmentVariable(
+  deploymentUrl: string,
+  adminKey: string,
+  name: string,
+  value: string
+): Promise<boolean> {
+  return updateEnvironmentVariablesViaHTTP(deploymentUrl, adminKey, [
+    { name, value },
+  ]);
+}
+
+/**
+ * Delete an environment variable (set value to undefined/null)
+ */
+export async function deleteEnvironmentVariable(
+  deploymentUrl: string,
+  adminKey: string,
+  name: string
+): Promise<boolean> {
+  return updateEnvironmentVariablesViaHTTP(deploymentUrl, adminKey, [
+    { name }, // No value means delete
+  ]);
+}
+
+/**
+ * Batch update multiple environment variables
+ */
+export async function batchUpdateEnvironmentVariables(
+  deploymentUrl: string,
+  adminKey: string,
+  updates: Record<string, string>,
+  deletes: string[] = []
+): Promise<boolean> {
+  const changes = [
+    ...Object.entries(updates).map(([name, value]) => ({ name, value })),
+    ...deletes.map(name => ({ name })),
+  ];
+
+  return updateEnvironmentVariablesViaHTTP(deploymentUrl, adminKey, changes);
+}
+
+/**
+ * Deployment credentials and info
+ */
+export interface DeploymentCredentials {
+  deploymentUrl: string;
+  httpActionsUrl: string;
+  adminKey: string;
+}
+
+export interface DeploymentInfo {
+  deploymentName: string;
+  deploymentType: 'dev' | 'prod' | 'preview';
+  [key: string]: any;
+}
+
+export interface DeployKey {
+  id: string;
+  name?: string;
+  createdAt?: number;
+  expiresAt?: number;
+  [key: string]: any;
+}
+
+/**
+ * Get deployment credentials (cloud URL and site URL)
+ */
+export async function getDeploymentCredentials(
+  adminClient: any
+): Promise<DeploymentCredentials> {
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    // Get the canonical cloud URL (deployment URL)
+    const convexCloudUrl = await adminClient.query(
+      '_system/cli/convexUrl:cloudUrl' as any,
+      {}
+    );
+
+    // HTTP Actions URL is the deployment URL but with .site instead of .cloud
+    const convexSiteUrl = convexCloudUrl.replace('.convex.cloud', '.convex.site');
+
+    const { adminKey } = getAdminClientInfo(adminClient);
+
+    return {
+      deploymentUrl: convexCloudUrl,
+      httpActionsUrl: convexSiteUrl,
+      adminKey: adminKey || '',
+    };
+  } catch (error: any) {
+    throw new Error(`Failed to get deployment credentials: ${error?.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Get deployment info including type and name
+ */
+export async function getDeploymentInfo(
+  adminClient: any
+): Promise<DeploymentInfo> {
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    const result = await adminClient.query(
+      '_system/cli/deploymentInfo' as any,
+      {}
+    );
+    return result;
+  } catch (error: any) {
+    throw new Error(`Failed to get deployment info: ${error?.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Create a new deploy key using the Management API
+ * Note: Requires team access token (not admin key) and deployment name
+ */
+export async function createDeployKey(
+  deploymentName: string,
+  teamAccessToken: string,
+  keyName: string
+): Promise<{ deployKey: string }> {
+  const response = await fetch(`https://api.convex.dev/v1/deployments/${deploymentName}/create_deploy_key`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Convex ${teamAccessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: keyName,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to create deploy key: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  const result = await response.json();
+  return result;
+}
+
+/**
+ * Authentication provider types
+ */
+export interface OIDCProvider {
+  domain: string;
+  applicationID: string;
+}
+
+export interface CustomJWTProvider {
+  type: string;
+  issuer: string;
+  jwks: string;
+  algorithm: string;
+  applicationID?: string;
+}
+
+export type AuthProvider = OIDCProvider | CustomJWTProvider;
+
+/**
+ * Get authentication providers for a deployment
+ */
+export async function getAuthProviders(
+  adminClient: any
+): Promise<AuthProvider[]> {
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    const result = await adminClient.query(
+      '_system/frontend/listAuthProviders:default' as any,
+      {}
+    );
+
+    // The result might be directly an array, or wrapped in a status object
+    if (Array.isArray(result)) {
+      return result;
+    }
+    
+    if (result && typeof result === 'object') {
+      if (result.status === 'success' && result.value) {
+        return Array.isArray(result.value) ? result.value : [];
+      }
+      // If it's already an object with providers, try to return it directly
+      if (Array.isArray(result.providers)) {
+        return result.providers;
+      }
+    }
+    
+    return [];
+  } catch (error: any) {
+    throw new Error(`Failed to get auth providers: ${error?.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Component type
+ */
+export interface Component {
+  id: string;
+  name: string;
+  path: string;
+  args: Record<string, any>;
+  state: 'active' | 'inactive';
+}
+
+/**
+ * Get components for a deployment
+ */
+export async function getComponents(
+  adminClient: any
+): Promise<Component[]> {
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    const result = await adminClient.query(
+      '_system/frontend/components:list' as any,
+      {}
+    );
+
+    // The result might be directly an array, or wrapped in a status object
+    if (Array.isArray(result)) {
+      return result;
+    }
+    
+    if (result && typeof result === 'object') {
+      if (result.status === 'success' && result.value) {
+        return Array.isArray(result.value) ? result.value : [];
+      }
+      // If it's already an object with components, try to return it directly
+      if (Array.isArray(result.components)) {
+        return result.components;
+      }
+    }
+    
+    return [];
+  } catch (error: any) {
+    throw new Error(`Failed to get components: ${error?.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Delete a component
+ */
+export async function deleteComponent(
+  deploymentUrl: string,
+  adminKey: string,
+  componentId: string
+): Promise<boolean> {
+  const response = await fetch(`${deploymentUrl}/api/v1/delete_component`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Convex ${adminKey}`,
+    },
+    body: JSON.stringify({
+      componentId,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`HTTP error! status: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  return response.status === 200;
+}
+
+/**
+ * Backup-related types and interfaces
+ */
+export interface CloudBackupResponse {
+  id: number;
+  sourceDeploymentId: number;
+  sourceDeploymentName?: string;
+  state: 'requested' | 'inProgress' | 'complete' | 'failed' | 'canceled';
+  requestedTime: number;
+  includeStorage: boolean;
+  snapshotId?: string;
+  expirationTime?: number;
+}
+
+export interface PeriodicBackupConfig {
+  sourceDeploymentId: number;
+  cronspec: string;
+  expirationDeltaSecs: number;
+  nextRun: number;
+  includeStorage: boolean;
+}
+
+/**
+ * Create a backup for a deployment
+ * Follows the same pattern as list-backups.js CLI script
+ */
+export async function createBackup(
+  deploymentId: number,
+  accessToken: string,
+  includeStorage: boolean = false,
+  useBearerToken: boolean = true
+): Promise<CloudBackupResponse> {
+  // Use provision.convex.dev for backup endpoints - match CLI script pattern exactly
+  const baseUrl = "https://provision.convex.dev/";
+  const path = `api/dashboard/deployments/${deploymentId}/request_cloud_backup`;
+  const endpoint = `${baseUrl}${path}`;
+  
+  // Always use Bearer token format like the CLI script
+  const authHeader = `Bearer ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      includeStorage,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Unknown error';
+    try {
+      const error = JSON.parse(errorText);
+      errorMessage = error.message || errorText || 'Unknown error';
+    } catch {
+      // If not JSON, use errorText as-is
+      errorMessage = errorText || 'Unknown error';
+    }
+    throw new Error(`Failed to create backup: ${response.status}, message: ${errorMessage}`);
+  }
+
+  const result = await response.json();
+  // Normalize response to match CloudBackupResponse format
+  return {
+    id: result.id,
+    sourceDeploymentId: result.sourceDeploymentId || deploymentId,
+    sourceDeploymentName: result.sourceDeploymentName,
+    state: result.state,
+    requestedTime: result.requestedTime || result.createdTime || Date.now(),
+    includeStorage: result.includeStorage || includeStorage,
+    snapshotId: result.snapshotId,
+    expirationTime: result.expirationTime,
+  };
+}
+
+/**
+ * List existing backups for a team
+ * Uses the dashboard API endpoint which requires Bearer token authentication
+ * Follows the same pattern as list-backups.js CLI script
+ */
+export async function listBackups(
+  teamId: number,
+  accessToken: string,
+  useBearerToken: boolean = true
+): Promise<CloudBackupResponse[]> {
+  // Use provision.convex.dev for backup endpoints - match CLI script pattern exactly
+  const baseUrl = "https://provision.convex.dev/";
+  const path = `api/dashboard/teams/${teamId}/list_cloud_backups`;
+  const endpoint = `${baseUrl}${path}`;
+  
+  // Always use Bearer token format like the CLI script
+  const authHeader = `Bearer ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Unknown error';
+    try {
+      const error = JSON.parse(errorText);
+      errorMessage = error.message || errorText || 'Unknown error';
+    } catch {
+      // If not JSON, use errorText as-is
+    }
+    throw new Error(`Failed to list backups: ${response.status}, message: ${errorMessage}`);
+  }
+
+  const result = await response.json();
+  
+  // Dashboard API returns array directly (as shown in CLI script)
+  const backups = Array.isArray(result) ? result : [];
+  
+  // Map response fields to CloudBackupResponse format
+  return backups.map((backup: any) => ({
+    id: backup.id,
+    sourceDeploymentId: backup.sourceDeploymentId,
+    sourceDeploymentName: backup.sourceDeploymentName,
+    state: backup.state,
+    requestedTime: backup.requestedTime || backup.createdTime,
+    includeStorage: backup.includeStorage,
+    snapshotId: backup.snapshotId,
+    expirationTime: backup.expirationTime,
+  }));
+}
+
+/**
+ * Get a specific backup by ID
+ * Follows the same pattern as list-backups.js CLI script
+ */
+export async function getBackup(
+  backupId: number,
+  accessToken: string,
+  useBearerToken: boolean = true
+): Promise<CloudBackupResponse> {
+  // Use provision.convex.dev for backup endpoints - match CLI script pattern exactly
+  const baseUrl = "https://provision.convex.dev/";
+  const path = `api/dashboard/cloud_backups/${backupId}`;
+  const endpoint = `${baseUrl}${path}`;
+  
+  // Always use Bearer token format like the CLI script
+  const authHeader = `Bearer ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Unknown error';
+    try {
+      const error = JSON.parse(errorText);
+      errorMessage = error.message || errorText || 'Unknown error';
+    } catch {
+      // If not JSON, use errorText as-is
+      errorMessage = errorText || 'Unknown error';
+    }
+    throw new Error(`Failed to get backup: ${response.status}, message: ${errorMessage}`);
+  }
+
+  const result = await response.json();
+  
+  // Normalize response format
+  return {
+    id: result.id,
+    sourceDeploymentId: result.sourceDeploymentId,
+    sourceDeploymentName: result.sourceDeploymentName,
+    state: result.state,
+    requestedTime: result.requestedTime || result.createdTime,
+    includeStorage: result.includeStorage,
+    snapshotId: result.snapshotId,
+    expirationTime: result.expirationTime,
+  };
+}
+
+/**
+ * Delete a specific backup by ID
+ * Requires team access token (same as other backup operations)
+ */
+export async function deleteBackup(
+  teamId: number,
+  backupId: number,
+  accessToken: string
+): Promise<void> {
+  const baseUrl = "https://provision.convex.dev/";
+  const path = `api/dashboard/cloud_backups/${backupId}/delete`;
+  const endpoint = `${baseUrl}${path}`;
+  
+  const authHeader = `Bearer ${accessToken}`;
+  const response = await fetch(endpoint, {
+    method: 'POST', // Based on the dashboard code, it's a POST request
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Unknown error';
+    try {
+      const error = JSON.parse(errorText);
+      errorMessage = error.message || errorText || 'Unknown error';
+    } catch {
+      errorMessage = errorText || 'Unknown error';
+    }
+    throw new Error(`Failed to delete backup: ${response.status}, message: ${errorMessage}`);
+  }
+  // Success - no response body expected
+}
+
+/**
+ * Cancel a backup that's in progress or requested
+ * Only works for backups in "inProgress" or "requested" state
+ */
+export async function cancelBackup(
+  teamId: number,
+  backupId: number,
+  accessToken: string
+): Promise<void> {
+  const baseUrl = "https://provision.convex.dev/";
+  const path = `api/dashboard/cloud_backups/${backupId}/cancel`;
+  const endpoint = `${baseUrl}${path}`;
+  
+  const authHeader = `Bearer ${accessToken}`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Unknown error';
+    try {
+      const error = JSON.parse(errorText);
+      errorMessage = error.message || errorText || 'Unknown error';
+    } catch {
+      errorMessage = errorText || 'Unknown error';
+    }
+    throw new Error(`Failed to cancel backup: ${response.status}, message: ${errorMessage}`);
+  }
+}
+
+/**
+ * Restore a backup to a deployment
+ * Uses the correct endpoint: /api/dashboard/deployments/{id}/restore_from_cloud_backup
+ * Returns the importId from the response which can be used to track restore status
+ */
+export async function restoreBackup(
+  deploymentId: number,
+  backupId: number,
+  accessToken: string,
+  useBearerToken: boolean = true
+): Promise<{ importId: string }> {
+  // Use api.convex.dev (not provision.convex.dev) to match dashboard
+  const endpoint = `https://api.convex.dev/api/dashboard/deployments/${deploymentId}/restore_from_cloud_backup`;
+  
+  const authHeader = `Bearer ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-0.0.0',
+    },
+    body: JSON.stringify({
+      id: backupId, // Just the backup ID
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Unknown error';
+    try {
+      const error = JSON.parse(errorText);
+      errorMessage = error.message || errorText || 'Unknown error';
+    } catch {
+      // If not JSON, use errorText as-is
+      errorMessage = errorText || 'Unknown error';
+    }
+    throw new Error(`Failed to restore backup: ${response.status}, message: ${errorMessage}`);
+  }
+
+  const result = await response.json();
+  // Response contains { importId: "..." }
+  return { importId: result.importId };
+}
+
+/**
+ * List snapshot imports from a deployment
+ * Uses the system function _system/frontend/snapshot_import:list
+ * System functions cannot be called via adminClient, so we use HTTP API directly
+ */
+export async function listSnapshotImports(
+  adminClient: any,
+  deploymentUrl: string,
+  accessToken: string
+): Promise<any[]> {
+  // Use the system function path
+  // Note: System functions cannot be called via adminClient.query, so we use HTTP directly
+  const systemFunctionPath = '_system/frontend/snapshotImport:list';
+  
+  // Use HTTP API directly for system functions (they're not accessible via adminClient)
+  const requestBody = {
+    path: systemFunctionPath,
+    args: [{}],
+    format: 'convex_encoded_json',
+  };
+  
+  try {
+    const response = await fetch(`${deploymentUrl}/api/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Convex ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Convex-Client': 'dashboard-0.0.0',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      // If the function doesn't exist (404 or 400), return empty array instead of throwing
+      // This allows the UI to continue showing the temporary status
+      if (response.status === 404 || response.status === 400) {
+        console.warn('[listSnapshotImports] System function not available, returning empty array:', errorText);
+        return [];
+      }
+      throw new Error(`Failed to list snapshot imports: ${response.status}, ${errorText}`);
+    }
+
+    const result = await response.json();
+    // Handle both response formats: result.value or result directly
+    const imports = result.value !== undefined ? result.value : result;
+    return Array.isArray(imports) ? imports : [];
+  } catch (err: any) {
+    // If there's a network error or the system function isn't available, return empty array
+    // This prevents the restore status check from breaking the UI
+    console.warn('[listSnapshotImports] Error calling system function, returning empty array:', err);
+    return [];
+  }
+}
+
+/**
+ * Get the latest cloud restore from snapshot imports
+ * Returns the most recent restore by creation time
+ */
+export async function getLatestRestore(
+  adminClient: any,
+  deploymentUrl: string,
+  accessToken: string
+): Promise<any | null> {
+  const imports = await listSnapshotImports(adminClient, deploymentUrl, accessToken);
+  const cloudRestores = imports.filter((imp: any) => imp.requestor?.type === 'cloudRestore');
+  
+  if (cloudRestores.length === 0) {
+    return null;
+  }
+  
+  // Sort by creation time (most recent first) and return the latest
+  cloudRestores.sort((a: any, b: any) => {
+    const timeA = a._creationTime || 0;
+    const timeB = b._creationTime || 0;
+    return timeB - timeA; // Most recent first
+  });
+  
+  return cloudRestores[0] || null;
+}
+
+/**
+ * Confirm/perform a snapshot import
+ * Uses the /api/perform_import endpoint (matching dashboard behavior)
+ * This is needed to actually start the import process after getting importId from restore
+ */
+export async function confirmSnapshotImport(
+  adminClient: any,
+  deploymentUrl: string,
+  importId: string,
+  accessToken: string
+): Promise<void> {
+  // Prefer adminClient if available (though this endpoint might not be available via adminClient)
+  if (adminClient && typeof adminClient.mutation === 'function') {
+    try {
+      await adminClient.mutation('snapshotImport:confirm' as any, { importId });
+      return;
+    } catch (err: any) {
+      // Fall back to HTTP if adminClient mutation fails
+      console.warn('adminClient mutation failed, falling back to HTTP:', err);
+    }
+  }
+
+  // Use the /api/perform_import endpoint (matching dashboard)
+  const response = await fetch(`${deploymentUrl}/api/perform_import`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Convex ${accessToken}`,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-0.0.0',
+    },
+    body: JSON.stringify({
+      importId,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Unknown error';
+    try {
+      const error = JSON.parse(errorText);
+      errorMessage = error.message || errorText || 'Unknown error';
+    } catch {
+      // If not JSON, use errorText as-is
+    }
+    throw new Error(`Failed to perform import: ${response.status}, message: ${errorMessage}`);
+  }
+}
+
+/**
+ * Get download URL for a backup
+ * Based on useGetZipExport hook in the dashboard
+ */
+export function getBackupDownloadUrl(
+  deploymentUrl: string,
+  snapshotId: string,
+  accessToken: string,
+  includeStorage: boolean = true
+): string {
+  const params = new URLSearchParams({ 
+    adminKey: accessToken,
+    include_storage: includeStorage ? 'true' : 'false'
+  });
+  
+  return `${deploymentUrl}/api/export/zip/${snapshotId}?${params}`;
+}
+
+/**
+ * Download a backup
+ * Validates backup state and returns download URL
+ */
+export function downloadBackup(
+  backup: CloudBackupResponse,
+  deploymentUrl: string,
+  accessToken: string
+): string {
+  if (backup.state !== 'complete') {
+    throw new Error('Backup is not ready for download. Current state: ' + backup.state);
+  }
+  
+  if (!backup.snapshotId) {
+    throw new Error('Backup does not have a snapshot ID');
+  }
+  
+  return getBackupDownloadUrl(
+    deploymentUrl,
+    backup.snapshotId,
+    accessToken,
+    backup.includeStorage
+  );
+}
+
+/**
+ * Configure periodic/automatic backups for a deployment
+ */
+export async function configurePeriodicBackup(
+  deploymentId: number,
+  accessToken: string,
+  cronspec: string,
+  includeStorage: boolean = false,
+  expirationDeltaSecs?: number,
+  useBearerToken: boolean = false
+): Promise<void> {
+  const endpoint = `https://api.convex.dev/v1/deployments/${deploymentId}/configure_periodic_backup`;
+  const authHeader = useBearerToken
+    ? `Bearer ${accessToken}`
+    : `Convex ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      cronspec,
+      includeStorage,
+      ...(expirationDeltaSecs && { expirationDeltaSecs }),
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to configure periodic backup: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Get periodic backup configuration using the management API
+ * This is how the dashboard actually does it
+ */
+export async function getPeriodicBackupConfig(
+  deploymentId: number,
+  accessToken: string
+): Promise<PeriodicBackupConfig | null> {
+  try {
+    // Use the same endpoint as the dashboard
+    const response = await fetch(
+      `https://provision.convex.dev/api/dashboard/deployments/${deploymentId}/get_periodic_backup_config`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null; // No periodic backup configured
+      }
+      const errorText = await response.text();
+      throw new Error(`Failed to get periodic backup config: ${response.status} - ${errorText}`);
+    }
+
+    const config = await response.json();
+    return config;
+  } catch (error: any) {
+    if (error.message?.includes('404') || error.message?.includes('not found')) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Disable periodic backup for a deployment
+ */
+export async function disablePeriodicBackup(
+  deploymentId: number,
+  accessToken: string,
+  useBearerToken: boolean = false
+): Promise<void> {
+  const endpoint = `https://api.convex.dev/v1/deployments/${deploymentId}/disable_periodic_backup`;
+  const authHeader = useBearerToken
+    ? `Bearer ${accessToken}`
+    : `Convex ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to disable periodic backup: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Deployment response from Convex API
+ */
+export interface DeploymentResponse {
+  id: number;
+  name: string;
+  projectId: number;
+  deploymentType: 'dev' | 'prod' | 'preview';
+  kind: 'cloud' | 'local';
+  creator?: number;
+  isActive?: boolean;
+}
+
+/**
+ * Project response from Convex API
+ */
+export interface ProjectResponse {
+  id: number;
+  name: string;
+  slug: string;
+  teamId: number;
+}
+
+/**
+ * Team response from Convex API
+ */
+export interface TeamResponse {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+/**
+ * Profile response from Convex API
+ */
+export interface ProfileResponse {
+  id: number;
+  email?: string;
+  teams?: TeamResponse[];
+}
+
+/**
+ * Fetch user profile to get team information
+ */
+export async function fetchProfile(
+  accessToken: string,
+  useBearerToken: boolean = true
+): Promise<ProfileResponse | null> {
+  try {
+    const endpoint = `https://api.convex.dev/api/dashboard/profile`;
+    const authHeader = useBearerToken
+      ? `Bearer ${accessToken}`
+      : `Convex ${accessToken}`;
+
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      // For 403 errors (service accounts), return null instead of throwing
+      if (response.status === 403) {
+        return null;
+      }
+      const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+      throw new Error(`Failed to fetch profile: ${response.status}, message: ${error.message || 'Unknown error'}`);
+    }
+
+    return response.json();
+  } catch (error: any) {
+    // Don't log errors for service accounts (403) - it's expected
+    if (!error?.message?.includes('403') && !error?.message?.includes('service account')) {
+      console.error('Error fetching profile:', error);
+    }
+    return null;
+  }
+}
+
+/**
+ * Try to get team token from environment variables
+ * This is useful for backup operations which require team tokens
+ * Checks: process.env.CONVEX_ACCESS_TOKEN, import.meta.env.VITE_CONVEX_ACCESS_TOKEN, etc.
+ */
+export function getTeamTokenFromEnv(): string | null {
+  // Try build-time injected value first (from Vite define)
+  // Note: __CONVEX_ACCESS_TOKEN__ is replaced at build time, so we need to check it carefully
+  try {
+    // @ts-ignore - This is injected by Vite's define option at build time
+    const buildTimeToken = typeof __CONVEX_ACCESS_TOKEN__ !== 'undefined' ? __CONVEX_ACCESS_TOKEN__ : null;
+    if (buildTimeToken && typeof buildTimeToken === 'string' && buildTimeToken.trim()) {
+      return buildTimeToken.trim();
+    }
+  } catch {
+    // Ignore if __CONVEX_ACCESS_TOKEN__ is not defined (e.g., in non-Vite environments)
+  }
+
+  // Try Vite-style env variables (browser accessible with VITE_ prefix)
+  // This is the preferred method for runtime access
+  try {
+    const maybeImportMeta: any = typeof import.meta !== 'undefined' ? (import.meta as any) : null;
+    // Check VITE_CONVEX_ACCESS_TOKEN first (Vite exposes VITE_ prefixed vars)
+    if (maybeImportMeta?.env?.VITE_CONVEX_ACCESS_TOKEN) {
+      const token = maybeImportMeta.env.VITE_CONVEX_ACCESS_TOKEN;
+      if (token && typeof token === 'string' && token.trim()) {
+        return token.trim();
+      }
+    }
+    // Also check CONVEX_ACCESS_TOKEN (in case it's exposed via envPrefix)
+    if (maybeImportMeta?.env?.CONVEX_ACCESS_TOKEN) {
+      const token = maybeImportMeta.env.CONVEX_ACCESS_TOKEN;
+      if (token && typeof token === 'string' && token.trim()) {
+        return token.trim();
+      }
+    }
+  } catch {
+    // Ignore if import.meta is not available
+  }
+
+  // Try Node.js process.env (for server-side or build-time)
+  try {
+    const maybeProcess: any = typeof process !== 'undefined' ? process : null;
+    if (maybeProcess?.env?.CONVEX_ACCESS_TOKEN) {
+      const token = maybeProcess.env.CONVEX_ACCESS_TOKEN;
+      if (token && typeof token === 'string' && token.trim()) {
+        return token.trim();
+      }
+    }
+  } catch {
+    // Ignore env access errors
+  }
+
+
+  // Try window.env or window.__ENV__ (some bundlers expose env this way)
+  try {
+    if (typeof window !== 'undefined') {
+      const win = window as any;
+      if (win.env?.CONVEX_ACCESS_TOKEN) {
+        const token = win.env.CONVEX_ACCESS_TOKEN;
+        if (token && typeof token === 'string' && token.trim()) {
+          return token.trim();
+        }
+      }
+      if (win.__ENV__?.CONVEX_ACCESS_TOKEN) {
+        const token = win.__ENV__.CONVEX_ACCESS_TOKEN;
+        if (token && typeof token === 'string' && token.trim()) {
+          return token.trim();
+        }
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+
+  return null;
+}
+
+/**
+ * Get token details (works with both Team Access Tokens and OAuth tokens)
+ * Returns teamId directly from the token
+ * Note: This endpoint requires Bearer token format (not Convex format)
+ */
+export async function getTokenDetails(
+  accessToken: string,
+  useBearerToken: boolean = true
+): Promise<{ teamId?: number; [key: string]: any }> {
+  const endpoint = `https://api.convex.dev/v1/token_details`;
+  // The token_details endpoint requires Bearer format (as shown in CLI examples)
+  const authHeader = `Bearer ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Unknown error';
+    try {
+      const error = JSON.parse(errorText);
+      errorMessage = error.message || errorText || 'Unknown error';
+    } catch {
+      // If not JSON, use errorText as-is
+    }
+    throw new Error(`Failed to get token details: ${response.status}, message: ${errorMessage}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * List all teams (if using OAuth token or team access token)
+ */
+export async function listTeams(
+  accessToken: string,
+  useBearerToken: boolean = false
+): Promise<TeamResponse[]> {
+  const endpoint = `https://api.convex.dev/v1/teams`;
+  const authHeader = useBearerToken
+    ? `Bearer ${accessToken}`
+    : `Convex ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to list teams: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  const result = await response.json();
+  return Array.isArray(result) ? result : (result.teams || []);
+}
+
+/**
+ * Get team and project from deployment name
+ */
+export async function getTeamFromDeployment(
+  deploymentName: string,
+  accessToken: string,
+  useBearerToken: boolean = false
+): Promise<{ teamId: number; teamSlug?: string; projectId?: number; projectSlug?: string }> {
+  const endpoint = `https://api.convex.dev/v1/deployments/${deploymentName}/team_and_project`;
+  const authHeader = useBearerToken
+    ? `Bearer ${accessToken}`
+    : `Convex ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to get team from deployment: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  const result = await response.json();
+  return {
+    teamId: result.teamId,
+    teamSlug: result.team,
+    projectId: result.projectId,
+    projectSlug: result.project,
+  };
+}
+
+/**
+ * Fetch teams - get list of teams for the authenticated user (dashboard API)
+ */
+export async function fetchTeams(
+  accessToken: string,
+  useBearerToken: boolean = true
+): Promise<TeamResponse[]> {
+  const endpoint = `https://api.convex.dev/api/dashboard/teams`;
+  const authHeader = useBearerToken
+    ? `Bearer ${accessToken}`
+    : `Convex ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to fetch teams: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  const result = await response.json();
+  return Array.isArray(result) ? result : (result.teams || []);
+}
+
+/**
+ * Fetch projects for a team
+ */
+export async function fetchProjects(
+  teamId: number,
+  accessToken: string,
+  useBearerToken: boolean = true
+): Promise<ProjectResponse[]> {
+  const endpoint = `https://api.convex.dev/api/dashboard/teams/${teamId}/projects`;
+  const authHeader = useBearerToken
+    ? `Bearer ${accessToken}`
+    : `Convex ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to fetch projects: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  const result = await response.json();
+  return Array.isArray(result) ? result : (result.projects || []);
+}
+
+/**
+ * Fetch deployments (instances) for a project
+ */
+export async function fetchDeployments(
+  projectId: number,
+  accessToken: string,
+  useBearerToken: boolean = true
+): Promise<DeploymentResponse[]> {
+  const endpoint = `https://api.convex.dev/api/dashboard/projects/${projectId}/instances`;
+  const authHeader = useBearerToken
+    ? `Bearer ${accessToken}`
+    : `Convex ${accessToken}`;
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to fetch deployments: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  const result = await response.json();
+  return Array.isArray(result) ? result : (result.deployments || []);
+}
+
+/**
+ * Get the current deployment state (running or paused)
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param adminKey - The admin key for authentication
+ * @returns The deployment state
+ */
+export async function getConvexDeploymentState(
+  deploymentUrl: string,
+  adminKey: string
+): Promise<{ state: "running" | "paused" }> {
+  const response = await fetch(`${deploymentUrl}/api/query`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Convex ${adminKey}`,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-0.0.0',
+    },
+    body: JSON.stringify({
+      path: '_system/frontend/deploymentState:deploymentState',
+      args: {},
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to get deployment state: ${response.status} - ${errorText}`);
+  }
+
+  const result = await response.json();
+  return result.value || result;
+}
+
+/**
+ * Change deployment state (pause/resume)
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param adminKey - The admin key for authentication
+ * @param newState - The new state: "paused" or "running"
+ */
+async function changeDeploymentState(
+  deploymentUrl: string,
+  adminKey: string,
+  newState: "paused" | "running"
+): Promise<void> {
+  const response = await fetch(`${deploymentUrl}/api/change_deployment_state`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Convex ${adminKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ newState }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to change deployment state: ${response.status} - ${errorText}`);
+  }
+}
+
+/**
+ * Pause a Convex deployment
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param adminKey - The admin key for authentication
+ */
+export async function pauseConvexDeployment(
+  deploymentUrl: string,
+  adminKey: string
+): Promise<void> {
+  await changeDeploymentState(deploymentUrl, adminKey, "paused");
+}
+
+/**
+ * Resume a Convex deployment
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param adminKey - The admin key for authentication
+ */
+export async function resumeConvexDeployment(
+  deploymentUrl: string,
+  adminKey: string
+): Promise<void> {
+  await changeDeploymentState(deploymentUrl, adminKey, "running");
+}
+
+/**
+ * Get deployment ID from deployment URL by matching deployment name
+ */
+export async function getDeploymentIdFromUrl(
+  deploymentUrl: string | undefined,
+  accessToken: string,
+  teamId?: number,
+  projectId?: number,
+  useBearerToken: boolean = true
+): Promise<number | null> {
+  if (!deploymentUrl) return null;
+
+  const deploymentName = extractDeploymentName(deploymentUrl);
+  if (!deploymentName) return null;
+
+  // If we have projectId, try to fetch deployments directly
+  if (projectId) {
+    try {
+      const deployments = await fetchDeployments(projectId, accessToken, useBearerToken);
+      const deployment = deployments.find(d => d.name === deploymentName || d.name.includes(deploymentName));
+      return deployment?.id || null;
+    } catch (err) {
+      console.error('Error fetching deployments:', err);
+    }
+  }
+
+  // If we have teamId but not projectId, try to find project first
+  if (teamId && !projectId) {
+    try {
+      const projects = await fetchProjects(teamId, accessToken, useBearerToken);
+      // Try each project to find the deployment
+      for (const project of projects) {
+        try {
+          const deployments = await fetchDeployments(project.id, accessToken, useBearerToken);
+          const deployment = deployments.find(d => d.name === deploymentName || d.name.includes(deploymentName));
+          if (deployment) {
+            return deployment.id;
+          }
+        } catch (err) {
+          // Continue to next project
+          continue;
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching projects:', err);
+    }
+  }
+
+  return null;
+}

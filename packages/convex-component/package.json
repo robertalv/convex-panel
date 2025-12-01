@@ -1,0 +1,22 @@
+{
+    "name": "convex-panel/convex-component",
+    "version": "0.0.0",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsup",
+        "dev": "tsup --watch",
+        "lint": "eslint src/**/*.ts*"
+    },
+    "dependencies": {
+        "convex-panel/shared": "workspace:*"
+    },
+    "devDependencies": {
+        "convex": "^1.10.0",
+        "tsup": "^8.0.2",
+        "typescript": "^5.9.3"
+    },
+    "peerDependencies": {
+        "convex": ">=1.10.0"
+    }
+}

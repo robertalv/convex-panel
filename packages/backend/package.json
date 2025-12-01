@@ -1,0 +1,20 @@
+{
+  "name": "@repo/backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The convex backend",
+  "scripts": {
+    "dev": "pnpm dlx convex dev"
+  },
+  "keywords": [
+    "convex",
+    "convex-panel",
+    "components"
+  ],
+  "license": "ISC",
+  "dependencies": {
+    "convex": "^1.29.3",
+    "convex-helpers": "^0.1.106",
+    "typescript": "^5.9.3"
+  }
+}

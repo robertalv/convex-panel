@@ -1,0 +1,28 @@
+{
+  "name": "@convex-panel/api-server",
+  "version": "1.0.0",
+  "description": "Production API server for Convex Panel - deployed to api.convexpanel.dev",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "convex",
+    "panel",
+    "api",
+    "oauth"
+  ],
+  "author": "Robert Alvarez",
+  "license": "MIT",
+  "packageManager": "pnpm@10.24.0",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2"
+  }
+}
