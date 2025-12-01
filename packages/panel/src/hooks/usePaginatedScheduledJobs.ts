@@ -38,8 +38,6 @@ const fetchMetadata = async (adminClient: ConvexReactClient, deploymentUrl: stri
   return metadata;
 };
 
-
-
 export function usePaginatedScheduledJobs(udfPath: string | undefined, adminClient: ConvexReactClient, deploymentUrl: string,) {
   const { deployment, error: errorDeployment, loading: loadingDeployment } = useCurrentDeployment(adminClient, deploymentUrl)
   const isPaused = useIsDeploymentPaused(adminClient)
@@ -166,7 +164,6 @@ type BackendStateTableDoc = {
   state: "paused" | "running" | "disabled"
 }
 
-
 export function useIsDeploymentPaused(adminClient: ConvexReactClient) {
   const [deploymentState, setDeploymentState] = useState<BackendStateTableDoc | undefined>(undefined);
   const [loading, setLoading] = useState(true);
@@ -204,4 +201,20 @@ export function useIsDeploymentPaused(adminClient: ConvexReactClient) {
   }
 
   return deploymentState.state === "paused";
+}
+
+export const useCronsJobsHistory =(adminClient: ConvexReactClient)=>{
+  if(!adminClient) return [];
+  const data = pullDataQuery(adminClient, "_system/frontend/listCronJobRuns:default")
+  return data;
+}
+
+export const pullDataQuery = async (adminClient: ConvexReactClient, fnPath:string) => {
+  try{
+    // if this returns an error, you need to check the path
+    const queryResult = await adminClient.query(fnPath as any);
+    return queryResult;
+  } catch(e){
+    console.error(e, "at" + fnPath)
+  }
 }
