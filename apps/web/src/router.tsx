@@ -61,7 +61,7 @@ const rootRoute = new RootRoute({
     <RootLayout>
       <Suspense fallback={null}>
         <Outlet />
-        <ConvexPanel />
+        <ConvexPanel forceDisplay={true} />
       </Suspense>
     </RootLayout>
   ),
