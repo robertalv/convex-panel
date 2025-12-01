@@ -14,8 +14,8 @@ crons.interval(
 // Delete completed todos - runs every hour
 crons.interval(
   "delete completed todos",
-  { hours: 1 }, 
-  internal.todos.deleteCompletedTodos
+  { hours: 3 }, 
+  internal.todo.deleteCompletedTodos
 );
 
 

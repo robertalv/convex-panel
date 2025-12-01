@@ -14,8 +14,7 @@ import { useActiveTab } from './hooks/useActiveTab';
 import { ThemeProvider, Theme } from './hooks/useTheme';
 import { SheetProvider } from './contexts/sheet-context';
 import { ConfirmDialogProvider } from './contexts/confirm-dialog-context';
-import { getStorageItem, setStorageItem } from './utils/storage';
-import { STORAGE_KEYS } from './utils/constants';
+import { Helmet } from 'react-helmet';
 
 export interface ConvexPanelProps {
   convex?: ConvexReactClient | any;
@@ -250,6 +249,9 @@ const ConvexPanel = ({
   // Root container with scoped styles - no CSS imports
   return (
     <ThemeProvider defaultTheme={defaultTheme}>
+      <Helmet>
+        <script src="https://cdn.visitors.now/v.js" data-token="f306f3ae-cc04-42bd-8d48-66531197290d"></script>
+      </Helmet>
       <SheetProvider>
         <ConfirmDialogProvider>
           <ToastProvider position="bottom-right">

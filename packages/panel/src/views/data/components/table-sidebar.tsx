@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Search, Plus } from 'lucide-react';
 import { TableDefinition } from '../../../types';
 import { ComponentSelector } from '../../../components/function-runner/components/component-selector';
+import { searchInputStyles } from '../../../styles/panelStyles';
 
 export interface TableSidebarProps {
   tables: TableDefinition;
@@ -59,21 +60,29 @@ export const TableSidebar: React.FC<TableSidebarProps> = ({
       )}
 
       {/* Search Input */}
-      <div
-        style={{
-          padding: '8px',
-          borderBottom: '1px solid var(--color-panel-border)',
-          backgroundColor: 'var(--color-panel-bg)',
-        }}
-      >
-        <div className="cp-search-wrapper">
-          <Search size={14} className="cp-search-icon" />
+      <div style={{ 
+        padding: '8px', 
+        borderBottom: '1px solid var(--color-panel-border)',
+        backgroundColor: 'var(--color-panel-bg)'
+      }}>
+        <div style={searchInputStyles.container}>
+          <Search 
+            size={14} 
+            style={searchInputStyles.icon}
+          />
           <input
             type="text"
             placeholder="Search tables..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="cp-search-input"
+            style={searchInputStyles.input}
+            onFocus={(e) => {
+              Object.assign(e.currentTarget.style, searchInputStyles.inputFocus);
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = 'var(--color-panel-border)';
+              e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
+            }}
           />
         </div>
       </div>

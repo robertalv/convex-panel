@@ -5,8 +5,6 @@ import { FunctionsView } from '../views/functions';
 import { SchedulesView } from '../views/schedules';
 import { FilesView } from '../views/files';
 import { LogsView } from '../views/logs';
-import { ComponentsView } from '../views/components';
-import { SettingsView } from '../views/settings';
 import { TabId } from '../types/tabs';
 
 interface MainViewsProps {
@@ -93,6 +91,7 @@ const tabRenderers: Record<TabId, TabRenderer> = {
       projectSlug={projectSlug}
     />
   ),
+<<<<<<< HEAD
   components: () => <ComponentsView />,
   settings: ({ deployUrl, accessToken, adminClient, teamAccessToken }) => (
     <SettingsView
@@ -102,6 +101,9 @@ const tabRenderers: Record<TabId, TabRenderer> = {
       teamAccessToken={teamAccessToken}
     />
   ),
+=======
+  settings: createComingSoonRenderer('Settings'),
+>>>>>>> b2a4a8f8de8904a46f4a76f8476d7f39a6f12196
 };
 
 export const MainViews: React.FC<MainViewsProps> = ({ activeTab, containerProps }) => {

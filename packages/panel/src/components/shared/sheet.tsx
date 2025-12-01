@@ -52,22 +52,22 @@ export const Sheet: React.FC<SheetProps> = ({
 
   const sheetContent = (
     <>
-      {/* Backdrop - show for both container and non-container cases */}
-      <div
-        onClick={onClose}
-        style={{
-          position: positionType,
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: isInContainer 
-            ? 'rgba(0, 0, 0, 0.3)' 
-            : 'color-mix(in srgb, var(--color-panel-bg) 80%, transparent)',
-          zIndex: 9999,
-          animation: 'fadeIn 0.2s ease-out',
-        }}
-      />
+      {/* Backdrop - only show when not in container */}
+      {!isInContainer && (
+        <div
+          onClick={onClose}
+          style={{
+            position: positionType,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'color-mix(in srgb, var(--color-panel-bg) 80%, transparent)',
+            zIndex: 9999,
+            animation: 'fadeIn 0.2s ease-out',
+          }}
+        />
+      )}
 
       {/* Sheet */}
       <div

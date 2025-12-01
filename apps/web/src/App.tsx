@@ -1,7 +1,6 @@
-import { useEffect } from "react";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
-import { Analytics } from "@vercel/analytics/react";
-import { AppRouterProvider } from "./router";
+import { ConvexReactClient, ConvexProvider } from "convex/react";
+import ConvexPanel from"@convex-panel/panel";
+import "@convex-panel/panel/styles.css"
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL;
 
