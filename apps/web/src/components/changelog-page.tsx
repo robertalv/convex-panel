@@ -1,4 +1,3 @@
-import React from "react";
 import { HeroHeader } from "./hero5-header";
 import { AnimatedGroup } from "./motion-primitives/animated-group";
 import { CopyLinkButton } from "./copy-link-button";
