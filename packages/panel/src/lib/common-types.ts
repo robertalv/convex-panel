@@ -52,7 +52,7 @@ export type CronJobLog = {
   ts: bigint;
   udfPath: string;
   udfArgs: ArrayBuffer;
-  status: CronJobStatus;
+  status: {type: CronJobStatus, result:{type:string, value:string}};
   logLines: {
     logLines: string[];
     isTruncated: boolean;
