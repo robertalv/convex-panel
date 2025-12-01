@@ -60,9 +60,9 @@ convex-panel/
 │   ├── dev-server          # Development server
 │   └── web                 # Web application
 ├── packages/
-│   ├── panel               # Core @convex-panel React component
-│   ├── shared              # @convex-panel/shared utilities and types
-│   ├── convex-component    # @convex-panel/convex-component server-side
+│   ├── panel               # Core convex-panel React component
+│   ├── shared              # convex-panel/shared utilities and types
+│   ├── convex-component    # convex-panel/convex-component server-side
 │   └── backend             # Backend utilities
 ├── turbo.json              # Turborepo configuration
 └── pnpm-workspace.yaml     # pnpm workspace configuration
@@ -97,10 +97,10 @@ When working on a specific package, you can use Turborepo's filtering:
 
 ```bash
 # Build only the panel package
-pnpm build --filter=@convex-panel
+pnpm build --filter=convex-panel
 
 # Run dev for panel and its dependencies
-pnpm dev --filter=@convex-panel...
+pnpm dev --filter=convex-panel...
 ```
 
 ## Submitting Changes

@@ -22,7 +22,7 @@ export const isDevelopment = (): boolean => {
 
     // Check for localhost/127.0.0.1 which typically indicates development
     const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') {
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '0.0.0.0') {
       // Additional check: if not explicitly production, assume development
       try {
         if (typeof process !== 'undefined' && process.env) {
@@ -34,6 +34,21 @@ export const isDevelopment = (): boolean => {
         // Ignore process.env errors
       }
       // On localhost without explicit production flag, assume development
+      return true;
+    }
+
+    // Check if running on a development port (common Next.js dev ports)
+    const port = window.location.port;
+    if (port && (port === '3000' || port === '3001' || port === '5173' || port === '5174')) {
+      // Likely a development server, but double-check NODE_ENV
+      try {
+        if (typeof process !== 'undefined' && process.env) {
+          const nodeEnv = process.env.NODE_ENV;
+          if (nodeEnv === 'production') return false;
+        }
+      } catch (e) {
+        // Ignore process.env errors
+      }
       return true;
     }
   }
@@ -66,6 +81,13 @@ export const isDevelopment = (): boolean => {
     }
   } catch (e) {
     // Ignore if process is not defined
+  }
+
+  // Last resort: if we're in a browser and can't determine, default to true
+  // This ensures the panel shows up for testing and development
+  if (typeof window !== 'undefined') {
+    // In browser environment, default to true unless explicitly production
+    return true;
   }
 
   return false;

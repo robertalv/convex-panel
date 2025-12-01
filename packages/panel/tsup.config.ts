@@ -8,7 +8,7 @@ export default defineConfig([
     dts: true,
     splitting: false,
     sourcemap: true,
-    clean: true,
+    clean: false,
     external: [
       'react',
       'react-dom',
@@ -17,6 +17,8 @@ export default defineConfig([
       'monaco-editor',
       '@monaco-editor/react',
       'vite',
+      // Exclude CSS files from bundle - they are injected at runtime
+      '**/*.css',
     ],
     injectStyle: false,
     outExtension({ format }) {
@@ -28,9 +30,8 @@ export default defineConfig([
       options.banner = {
         js: '"use client";',
       };
-    },
-    loader: {
-      '.css': 'css',
+      // Mark CSS files as external to prevent bundling
+      options.external = [...(options.external || []), '*.css'];
     },
   },
   // Vite plugin entry point

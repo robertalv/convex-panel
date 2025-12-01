@@ -3,7 +3,7 @@ import { X, Plus, AlertCircle, CheckCircle2, Loader2, Info } from 'lucide-react'
 import Editor, { BeforeMount, OnMount } from '@monaco-editor/react';
 import { useThemeSafe } from '../../../hooks/useTheme';
 import { insertDocuments } from '../../../utils/functions';
-import { toast } from 'sonner';
+import { toast } from '../../../components/toast';
 import { TableSchema } from '../../../types';
 import { UpgradePopup } from '../../../components/upgrade-popup';
 

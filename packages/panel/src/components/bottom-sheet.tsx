@@ -399,6 +399,11 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         height,
         transition: isResizing ? 'none' : 'height 0.3s ease',
         userSelect: isResizing ? 'none' : 'auto',
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 99998,
       }}
     >
       {isPanelExpanded && (

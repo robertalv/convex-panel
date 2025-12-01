@@ -1,5 +1,5 @@
 {
-    "name": "@convex-panel/convex-component",
+    "name": "convex-panel/convex-component",
     "version": "0.0.0",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
@@ -9,7 +9,7 @@
         "lint": "eslint src/**/*.ts*"
     },
     "dependencies": {
-        "@convex-panel/shared": "workspace:*"
+        "convex-panel/shared": "workspace:*"
     },
     "devDependencies": {
         "convex": "^1.10.0",

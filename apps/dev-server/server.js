@@ -12,10 +12,39 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
-const corsOptions = { 
-  origin: 'http://localhost:5173',
+// CORS configuration - allow requests from convexpanel.dev and subdomains
+const allowedOrigins = [
+  'https://convexpanel.dev',
+  'https://www.convexpanel.dev',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:14200', // Tauri
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : []),
+];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is allowed
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (allowed.startsWith('http://localhost') || allowed.startsWith('https://localhost')) {
+        return origin.startsWith(allowed);
+      }
+      // Allow any subdomain of convexpanel.dev
+      return origin === allowed || origin.endsWith('.convexpanel.dev');
+    });
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -33,9 +62,27 @@ app.options('/api/convex/exchange', cors(corsOptions), (req, res) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.get('/api/hello', async (req, res) => {
-  res.send("I am working! ")
-})
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    service: 'convex-panel-api',
+    version: process.env.npm_package_version || '1.0.0',
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    service: 'Convex Panel API',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      oauthExchange: '/api/convex/exchange',
+    },
+  });
+});
 
 app.post('/api/convex/exchange', async (req, res) => {
   console.debug('Token exchange request received');
@@ -51,9 +98,10 @@ app.post('/api/convex/exchange', async (req, res) => {
     return res.status(400).json({ error: 'No authorization code provided' });
   }
 
-  const clientId = process.env.CONVEX_CLIENT_ID || '5f0e41228dd54e70';
-  const clientSecret = process.env.CONVEX_CLIENT_SECRET || '008aabd7eb094a3baa77c56162163bbd';
-  const finalRedirectUri = redirectUri || 'http://localhost:5173';
+  // Get OAuth credentials from environment (no hardcoded defaults in production)
+  const clientId = process.env.CONVEX_CLIENT_ID;
+  const clientSecret = process.env.CONVEX_CLIENT_SECRET;
+  const finalRedirectUri = redirectUri || process.env.DEFAULT_REDIRECT_URI || 'https://convexpanel.dev';
 
   if (!clientSecret) {
     console.error('CONVEX_CLIENT_SECRET not set in environment');
@@ -144,14 +192,52 @@ app.post('/api/convex/exchange', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`OAuth proxy server running on http://localhost:${PORT}`);
-  console.log(`Client ID: ${process.env.CONVEX_CLIENT_ID || '5f0e41228dd54e70'}`);
-  console.log(`Client Secret: ${process.env.CONVEX_CLIENT_SECRET ? '***SET***' : 'NOT SET'}`);
-  if (!process.env.CONVEX_CLIENT_SECRET) {
-    console.warn(`⚠️  CONVEX_CLIENT_SECRET is not set!`);
-    console.warn(`Create a .env file in the dev/ directory with:`);
-    console.warn(`   CONVEX_CLIENT_SECRET=your-secret-here`);
-  }
-  console.log(`Configure your app to use: http://localhost:${PORT}/api/convex/exchange`);
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    error: 'Internal server error',
+    code: 'INTERNAL_ERROR',
+    ...(process.env.NODE_ENV === 'development' && { details: err.message }),
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Endpoint not found',
+    code: 'NOT_FOUND',
+    path: req.path,
+  });
+});
+
+// Export the app for Vercel serverless functions
+module.exports = app;
+
+// Start server only if not in Vercel environment
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`Convex Panel API Server running on port ${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/health`);
+    console.log(`OAuth exchange: http://localhost:${PORT}/api/convex/exchange`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Client ID: ${process.env.CONVEX_CLIENT_ID ? 'Set' : 'Missing'}`);
+    console.log(`Client Secret: ${process.env.CONVEX_CLIENT_SECRET ? 'Set' : 'Missing'}`);
+    
+    if (!process.env.CONVEX_CLIENT_SECRET) {
+      console.warn(`CONVEX_CLIENT_SECRET is not set!`);
+      console.warn(`Set the CONVEX_CLIENT_SECRET environment variable to enable OAuth token exchange.`);
+    }
+  });
+}
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully...');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully...');
+  process.exit(0);
 });

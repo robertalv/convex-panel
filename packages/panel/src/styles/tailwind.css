@@ -1,51 +1,14 @@
 /*
- * Convex Panel - Tailwind CSS v4
+ * Convex Panel - Scoped CSS
  *
- * This file contains Tailwind's utility classes scoped with the 'cp-' prefix.
+ * This file contains custom CSS for the Convex Panel component.
+ * All styles are scoped to prevent affecting the parent app.
  * Import this in your app: import 'convex-panel/dist/styles.css'
+ *
+ * IMPORTANT: We don't import Tailwind directly here to prevent CSS leakage.
+ * All classes are prefixed with 'cp-' for scoping.
+ * Uses CSS custom properties for theming.
  */
-
-@import "tailwindcss";
-
-/*
- * Tailwind v4 CSS-first configuration
- * Using @theme to define custom design tokens
- */
-@theme {
-  /* Convex Panel color palette - These are defaults, overridden by theme classes */
-  --color-panel-bg: #0F1115;
-  --color-panel-bg-secondary: #16181D;
-  --color-panel-bg-tertiary: #1C1F26;
-  --color-panel-border: #2D313A;
-  --color-panel-text: #ffffff;
-  --color-panel-text-secondary: #9ca3af;
-  --color-panel-text-muted: #6b7280;
-  --color-panel-accent: #34D399;
-  --color-panel-accent-hover: #26a878;
-  --color-panel-success: #10b981;
-  --color-panel-warning: #f59e0b;
-  --color-panel-error: #ef4444;
-
-  /* Custom font sizes */
-  --font-size-panel-xs: 10px;
-  --font-size-panel-sm: 11px;
-  --font-size-panel-base: 12px;
-  --font-size-panel-md: 14px;
-  --font-size-panel-lg: 16px;
-
-  /* Custom border radius */
-  --radius-panel-sm: 4px;
-  --radius-panel-md: 6px;
-  --radius-panel-lg: 8px;
-
-  /* Custom spacing */
-  --spacing-panel-1: 4px;
-  --spacing-panel-2: 8px;
-  --spacing-panel-3: 12px;
-  --spacing-panel-4: 16px;
-  --spacing-panel-5: 20px;
-  --spacing-panel-6: 24px;
-}
 
 /* ================================
    Theme Variables
@@ -340,8 +303,10 @@
   background-color: var(--color-panel-scrollbar-hover);
 }
 
-/* Toast/Sonner styling - theme-aware */
-[data-sonner-toaster] {
+/* Toast/Sonner styling - theme-aware - scoped to panel */
+.cp-theme-dark [data-sonner-toaster],
+.cp-theme-light [data-sonner-toaster],
+.cp-bottom-sheet [data-sonner-toaster] {
   --normal-bg: var(--color-panel-bg-tertiary);
   --normal-border: var(--color-panel-border);
   --normal-text: var(--color-panel-text);
@@ -359,7 +324,9 @@
   --info-text: var(--color-panel-text);
 }
 
-[data-sonner-toast] {
+.cp-theme-dark [data-sonner-toast],
+.cp-theme-light [data-sonner-toast],
+.cp-bottom-sheet [data-sonner-toast] {
   background-color: var(--normal-bg) !important;
   border: 1px solid var(--normal-border) !important;
   color: var(--normal-text) !important;
@@ -367,25 +334,33 @@
   border-radius: 8px !important;
 }
 
-[data-sonner-toast][data-type="success"] {
+.cp-theme-dark [data-sonner-toast][data-type="success"],
+.cp-theme-light [data-sonner-toast][data-type="success"],
+.cp-bottom-sheet [data-sonner-toast][data-type="success"] {
   background-color: var(--success-bg) !important;
   border-color: var(--success-border) !important;
   color: var(--success-text) !important;
 }
 
-[data-sonner-toast][data-type="error"] {
+.cp-theme-dark [data-sonner-toast][data-type="error"],
+.cp-theme-light [data-sonner-toast][data-type="error"],
+.cp-bottom-sheet [data-sonner-toast][data-type="error"] {
   background-color: var(--error-bg) !important;
   border-color: var(--error-border) !important;
   color: var(--error-text) !important;
 }
 
-[data-sonner-toast][data-type="warning"] {
+.cp-theme-dark [data-sonner-toast][data-type="warning"],
+.cp-theme-light [data-sonner-toast][data-type="warning"],
+.cp-bottom-sheet [data-sonner-toast][data-type="warning"] {
   background-color: var(--warning-bg) !important;
   border-color: var(--warning-border) !important;
   color: var(--warning-text) !important;
 }
 
-[data-sonner-toast][data-type="info"] {
+.cp-theme-dark [data-sonner-toast][data-type="info"],
+.cp-theme-light [data-sonner-toast][data-type="info"],
+.cp-bottom-sheet [data-sonner-toast][data-type="info"] {
   background-color: var(--info-bg) !important;
   border-color: var(--info-border) !important;
   color: var(--info-text) !important;
@@ -395,9 +370,12 @@
    Bottom Sheet Component Styles
    ================================ */
 
-/* Root panel container */
+/* Root panel container - fully isolated to prevent affecting parent app */
 .cp-bottom-sheet {
+  /* CSS Containment: Isolate styles, layout, and paint within this container */
   contain: style layout paint;
+  /* Prevent style leakage to parent */
+  isolation: isolate;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 14px;
   line-height: 1.5;

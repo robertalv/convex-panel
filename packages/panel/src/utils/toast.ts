@@ -1,4 +1,4 @@
-import { toast as sonnerToast } from 'sonner';
+import { toast as customToast } from '../components/toast';
 
 type ToastType = "success" | "error" | "info" | "warning";
 
@@ -10,19 +10,19 @@ type ToastType = "success" | "error" | "info" | "warning";
 export const toast = (type: ToastType, message: string) => {
   switch (type) {
     case 'success':
-      sonnerToast.success(message);
+      customToast.success(message);
       break;
     case 'error':
-      sonnerToast.error(message);
+      customToast.error(message);
       break;
     case 'info':
-      sonnerToast.info(message);
+      customToast.info(message);
       break;
     case 'warning':
-      sonnerToast.warning(message);
+      customToast.warning(message);
       break;
     default:
-      sonnerToast(message);
+      customToast.info(message);
   }
 };
 

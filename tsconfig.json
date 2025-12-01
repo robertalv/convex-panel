@@ -20,13 +20,13 @@
         "jsx": "react-jsx",
         "baseUrl": ".",
         "paths": {
-            "@convex-panel/shared": [
+            "convex-panel/shared": [
                 "./packages/shared/src"
             ],
-            "@convex-panel": [
+            "convex-panel": [
                 "./packages/panel/src"
             ],
-            "@convex-panel/convex-component": [
+            "convex-panel/convex-component": [
                 "./packages/convex-component/src"
             ]
         }

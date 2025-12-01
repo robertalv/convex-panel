@@ -1,6 +1,6 @@
 {
   "name": "convex-panel",
-  "version": "0.2.15",
+  "version": "0.2.17",
   "description": "A React component for monitoring and debugging Convex applications",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -40,7 +40,8 @@
   "scripts": {
     "copy-src": "node copy-src.js",
     "build:css": "node process-css.js",
-    "build": "npm run copy-src && npm run build:css && tsup",
+    "build:styles-ts": "node scripts/generate-styles-ts.js",
+    "build": "npm run copy-src && npm run build:css && npm run build:styles-ts && tsup",
     "dev": "tsup --watch",
     "dev:live": "vite --config dev/vite.config.ts",
     "dev:server": "node dev/server.js",

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ConvexReactClient, useConvex } from 'convex/react';
 import { ConvexClient } from 'convex/browser';
-import { Toaster } from 'sonner';
+import { ToastProvider } from './components/toast';
 import { useOAuth, UseOAuthReturn } from './hooks/useOAuth';
 import { MainViews } from './components/main-view';
 import { BottomSheet } from './components/bottom-sheet';
@@ -10,20 +10,12 @@ import { getConvexUrl, getOAuthConfigFromEnv, isDevelopment } from './utils/env'
 import { extractProjectName, getTeamTokenFromEnv } from './utils/api';
 import { Team, Project } from './types';
 import { useActiveTab } from './hooks/useActiveTab';
-import { ThemeProvider, Theme, useTheme } from './hooks/useTheme';
+import { ThemeProvider, Theme } from './hooks/useTheme';
 import { SheetProvider } from './contexts/sheet-context';
 import { ConfirmDialogProvider } from './contexts/confirm-dialog-context';
 import { getStorageItem, setStorageItem } from './utils/storage';
 import { STORAGE_KEYS } from './utils/constants';
-
-const ThemedToaster: React.FC = () => {
-  const { theme } = useTheme();
-  return (
-    <div className={`cp-theme-${theme}`}>
-      <Toaster position="bottom-right" />
-    </div>
-  );
-};
+// CSS injection removed - handled by Shadow DOM wrapper in ConvexPanelShadow
 export interface ConvexPanelProps {
   convex?: ConvexReactClient | any;
   accessToken?: string;
@@ -40,6 +32,8 @@ export interface ConvexPanelProps {
   auth?: UseOAuthReturn;
   useMockData?: boolean;
   mockup?: boolean;
+  /** Force display the panel even if not in development mode (useful for testing) */
+  forceDisplay?: boolean;
   teamSlug?: string;
   projectSlug?: string;
   team?: Team;
@@ -59,6 +53,7 @@ const ConvexPanel = ({
   auth: providedAuth,
   useMockData = false,
   mockup = false,
+  forceDisplay = false,
   teamSlug,
   projectSlug,
   team,
@@ -116,6 +111,7 @@ const ConvexPanel = ({
   const isAuthenticated = mockup ? true : (oauth.isAuthenticated || !!providedAccessToken);
 
   // Set mounted state and inject analytics script
+  // Note: CSS injection is handled by Shadow DOM wrapper if using ConvexPanelShadow
   useEffect(() => {
     setIsMounted(true);
 
@@ -167,7 +163,12 @@ const ConvexPanel = ({
     return null;
   }
 
-  if (!isDevelopment()) {
+  // Check development mode (allow override with forceDisplay prop)
+  const isDevMode = isDevelopment();
+  if (!isDevMode && !forceDisplay) {
+    if (typeof window !== 'undefined' && window.console) {
+      console.debug('[ConvexPanel] Not displaying: not in development mode. Set forceDisplay={true} to override.');
+    }
     return null;
   }
 
@@ -196,7 +197,7 @@ const ConvexPanel = ({
     <ThemeProvider defaultTheme={defaultTheme}>
       <SheetProvider>
         <ConfirmDialogProvider>
-          <ThemedToaster />
+          <ToastProvider position="bottom-right">
           <BottomSheet
           isOpen={isAuthenticated ? isOpen : false}
           onClose={toggleOpen}
@@ -244,7 +245,8 @@ const ConvexPanel = ({
               }}
             />
           )}
-        </BottomSheet>
+          </BottomSheet>
+          </ToastProvider>
         </ConfirmDialogProvider>
       </SheetProvider>
     </ThemeProvider>
