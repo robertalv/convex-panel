@@ -24,6 +24,7 @@ import { TabId } from '../types/tabs';
 import { Team, Project, EnvType } from '../types';
 import { useThemeSafe } from '../hooks/useTheme';
 import { useHasSubscription } from '../hooks/useTeamOrbSubscription';
+import { SupportPopup } from './support-popup';
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -74,6 +75,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   const [internalActiveTab, setInternalActiveTab] = useActiveTab();
   const activeTab = externalActiveTab ?? internalActiveTab;
   const [isResizing, setIsResizing] = useState(false);
+  const [isSupportPopupOpen, setIsSupportPopupOpen] = useState(false);
   const [customHeight, setCustomHeight] = useState<number | null>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(PANEL_HEIGHT_STORAGE_KEY);
@@ -284,7 +286,11 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         </button>
       )}
       <AskAI />
-      <button type="button" className="cp-support-btn">
+      <button
+        type="button"
+        className="cp-support-btn"
+        onClick={() => setIsSupportPopupOpen(true)}
+      >
         <HelpCircle size={14} /> Support
       </button>
       <button
@@ -361,6 +367,13 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
           )}
         </>
       )}
+
+      {/* Support Popup */}
+      <SupportPopup
+        isOpen={isSupportPopupOpen}
+        onClose={() => setIsSupportPopupOpen(false)}
+        hasProAccess={hasSubscription === true}
+      />
     </div>
   );
 };

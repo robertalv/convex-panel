@@ -3182,3 +3182,123 @@ export async function deleteFile(
     };
   }
 }
+
+export interface EnvironmentVariable {
+  name: string;
+  value: string;
+}
+
+/**
+ * Get a specific environment variable by name
+ */
+export async function getEnvironmentVariable(
+  adminClient: any,
+  name: string
+): Promise<EnvironmentVariable | null> {
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    const result = await adminClient.query(
+      '_system/cli/queryEnvironmentVariables:get' as any,
+      { name }
+    );
+    return result;
+  } catch (error: any) {
+    throw new Error(`Failed to get environment variable: ${error?.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Get all environment variables
+ */
+export async function getAllEnvironmentVariables(
+  adminClient: any
+): Promise<EnvironmentVariable[]> {
+  if (!adminClient) {
+    throw new Error('Admin client not available');
+  }
+
+  try {
+    const result = await adminClient.query(
+      '_system/cli/queryEnvironmentVariables' as any,
+      {}
+    );
+    return result || [];
+  } catch (error: any) {
+    throw new Error(`Failed to get environment variables: ${error?.message || 'Unknown error'}`);
+  }
+}
+
+/**
+ * Update environment variables via HTTP
+ * @param deploymentUrl - The deployment URL
+ * @param adminKey - The admin key for authentication
+ * @param changes - Array of changes, each with name and optional value (omit value to delete)
+ */
+export async function updateEnvironmentVariablesViaHTTP(
+  deploymentUrl: string,
+  adminKey: string,
+  changes: Array<{ name: string; value?: string }>
+): Promise<boolean> {
+  const response = await fetch(`${deploymentUrl}/api/update_environment_variables`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Convex ${adminKey}`,
+    },
+    body: JSON.stringify({ changes }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`HTTP error! status: ${response.status}, message: ${error.message || 'Unknown error'}`);
+  }
+
+  return response.status === 200;
+}
+
+/**
+ * Set/update a single environment variable
+ */
+export async function setEnvironmentVariable(
+  deploymentUrl: string,
+  adminKey: string,
+  name: string,
+  value: string
+): Promise<boolean> {
+  return updateEnvironmentVariablesViaHTTP(deploymentUrl, adminKey, [
+    { name, value },
+  ]);
+}
+
+/**
+ * Delete an environment variable (set value to undefined/null)
+ */
+export async function deleteEnvironmentVariable(
+  deploymentUrl: string,
+  adminKey: string,
+  name: string
+): Promise<boolean> {
+  return updateEnvironmentVariablesViaHTTP(deploymentUrl, adminKey, [
+    { name }, // No value means delete
+  ]);
+}
+
+/**
+ * Batch update multiple environment variables
+ */
+export async function batchUpdateEnvironmentVariables(
+  deploymentUrl: string,
+  adminKey: string,
+  updates: Record<string, string>,
+  deletes: string[] = []
+): Promise<boolean> {
+  const changes = [
+    ...Object.entries(updates).map(([name, value]) => ({ name, value })),
+    ...deletes.map(name => ({ name })),
+  ];
+
+  return updateEnvironmentVariablesViaHTTP(deploymentUrl, adminKey, changes);
+}
