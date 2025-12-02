@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Code as CodeIcon } from 'lucide-react';
-import { ModuleFunction } from '../../../utils/functionDiscovery';
-import { CustomQuery } from '../function-runner';
+import { isCustomQueryValue, ModuleFunction } from '../../utils/functionDiscovery';
+import { CustomQuery } from '../../types/functions';
 import {
   SearchableDropdown,
   SearchableDropdownOption,
-} from '../../shared/searchable-dropdown';
+} from '../shared/searchable-dropdown';
 
 interface FunctionSelectorProps {
   selectedFunction: ModuleFunction | CustomQuery | null;
@@ -13,9 +13,6 @@ interface FunctionSelectorProps {
   functions: ModuleFunction[];
   componentId?: string | null;
 }
-
-const isCustomQueryValue = (value: ModuleFunction | CustomQuery): value is CustomQuery =>
-  'type' in value && value.type === 'customQuery';
 
 export const FunctionSelector: React.FC<FunctionSelectorProps> = ({
   selectedFunction,
@@ -51,7 +48,6 @@ export const FunctionSelector: React.FC<FunctionSelectorProps> = ({
     const functionOptions = filteredFunctions.map((fn, index) => {
       const filePath = fn.file?.path || '';
       let fileName = filePath.split('/').pop() || filePath;
-      // Remove .js extension if present
       if (fileName.endsWith('.js')) {
         fileName = fileName.slice(0, -3);
       }

@@ -1,12 +1,7 @@
 import { useCallback } from "react";
 import { createGlobalState } from "react-use";
 import { ModuleFunction } from "../utils/functionDiscovery";
-
-export type CustomQuery = {
-  type: "customQuery";
-  table: string | null;
-  componentId?: string | null;
-};
+import { CustomQuery } from "../types/functions";
 
 const useGlobalRunnerShown = createGlobalState(false);
 export const useGlobalRunnerSelectedItem = createGlobalState<{

@@ -3,7 +3,8 @@ import { Code as CodeIcon } from 'lucide-react';
 import {
   SearchableDropdown,
   SearchableDropdownOption,
-} from '../../shared/searchable-dropdown';
+} from './shared/searchable-dropdown';
+import { isComponentId } from '../utils/components';
 
 interface ComponentSelectorProps {
   selectedComponent: string | null;
@@ -17,27 +18,9 @@ export const ComponentSelector: React.FC<ComponentSelectorProps> = ({
   components = ['app'],
 }) => {
   const options = useMemo<SearchableDropdownOption<string>[]>(() => {
-    // Filter out components that are just IDs (long alphanumeric strings without meaningful names)
-    const isComponentId = (component: string): boolean => {
-      // Check if it's a long alphanumeric string (likely an ID)
-      // IDs are typically 20+ characters of alphanumeric characters
-      const trimmed = component.trim();
-      if (trimmed.length < 20) return false;
-      
-      // Check if it's mostly alphanumeric with minimal special characters
-      const alphanumericRatio = trimmed.replace(/[^a-zA-Z0-9]/g, '').length / trimmed.length;
-      
-      // If it's mostly alphanumeric and long, it's likely an ID
-      // Also check if it doesn't contain common words that would indicate it's a name
-      const hasCommonWords = /\b(app|component|module|lib|util|helper|service|api|auth|db|data|ui|view|page|layout|widget|plugin|addon|extension)\b/i.test(trimmed);
-      
-      return alphanumericRatio > 0.8 && !hasCommonWords;
-    };
-
     return components
       .filter(component => {
         const trimmed = component?.trim();
-        // Filter out empty strings and component IDs
         return trimmed && trimmed !== '' && !isComponentId(trimmed);
       })
       .map(component => ({

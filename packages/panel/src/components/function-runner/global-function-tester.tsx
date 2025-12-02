@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FunctionRunner, CustomQuery } from './function-runner';
+import { FunctionRunner } from './function-runner';
 import { ModuleFunction, discoverFunctions } from '../../utils/functionDiscovery';
 import { fetchComponents } from '../../utils/api';
 import { useIsGlobalRunnerShown, useHideGlobalRunner, useGlobalRunnerSelectedItem, useGlobalRunnerAutoRun } from '../../lib/functionRunner';
+import { CustomQuery } from '../../types/functions';
 
 interface GlobalFunctionTesterProps {
   adminClient: any;

@@ -11,7 +11,7 @@ import {
   fetchSourceCode,
 } from '../../utils/api';
 import { getAdminKey } from '../../utils/adminClient';
-import { ComponentSelector } from '../../components/function-runner/components/component-selector';
+import { ComponentSelector } from '../../components/component-selector';
 import { useComponents } from '../../hooks/useComponents';
 import { useFunctionLogStream } from '../../hooks';
 import { Card } from '../../components/shared/card';
@@ -671,7 +671,7 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 16px',
+            padding: '0 8px',
             backgroundColor: 'var(--color-panel-bg)',
           }}
         >

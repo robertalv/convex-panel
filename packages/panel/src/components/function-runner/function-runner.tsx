@@ -1,23 +1,19 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Play, Settings, Code as CodeIcon, ChevronDown, Copy, Maximize2, ArrowLeft, ArrowRight, ChevronUp } from 'lucide-react';
-import Editor, { BeforeMount, OnMount } from '@monaco-editor/react';
 import { copyToClipboard } from '../../utils/toast';
 import { ModuleFunction } from '../../utils/functionDiscovery';
 import { useFunctionResult } from '../../hooks/useFunctionResult';
 import { useFunctionEditor } from '../../hooks/useFunctionEditor';
-import { Result } from './components/result';
-import { QueryResult } from './components/query-result';
+import { Result } from './result';
+import { QueryResult } from './query-result';
 import { useRunHistory, RunHistoryItem } from '../../hooks/useRunHistory';
-import { ComponentSelector } from './components/component-selector';
-import { FunctionSelector } from './components/function-selector';
+import { ComponentSelector } from '../component-selector';
+import { FunctionSelector } from './function-selector';
 import { useThemeSafe } from '../../hooks/useTheme';
 import { Value } from 'convex/values';
-
-export type CustomQuery = {
-  type: 'customQuery';
-  table: string | null;
-  componentId?: string | null;
-};
+import { CustomQuery } from '../../types/functions';
+import { ExecutableUdfType } from 'src/types/convex';
+import { ObjectEditor } from '../editor';
 
 export interface FunctionRunnerProps {
   onClose: () => void;
@@ -27,7 +23,7 @@ export interface FunctionRunnerProps {
   componentId?: string | null;
   availableFunctions?: ModuleFunction[];
   availableComponents?: string[];
-  componentIdMap?: Map<string, string>; // displayName -> componentId
+  componentIdMap?: Map<string, string>;
   onFunctionSelect?: (fn: ModuleFunction | CustomQuery) => void;
   autoRun?: boolean;
   onAutoRunComplete?: () => void;
@@ -53,8 +49,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
   const [impersonatedUser, setImpersonatedUser] = useState<any>(null);
   const [runHistoryItem, setRunHistoryItem] = useState<RunHistoryItem | undefined>();
   const [historyIndex, setHistoryIndex] = useState(0);
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [argsMonaco, setArgsMonaco] = useState<Parameters<BeforeMount>[0]>();
+  const [argsError, setArgsError] = useState<string[]>([]);
   const { theme } = useThemeSafe();
 
   useEffect(() => {
@@ -116,7 +111,6 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
         return true;
       }
       
-      // FALLBACK: Check componentId (should be component name, not ID)
       if (fn.componentId === selectedComponent) {
         return true;
       }
@@ -135,7 +129,6 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
     } else if (componentIdMap) {
       componentName = componentIdMap.get(component) || component;
     } else {
-      // FALLBACK: assume component is already a name
       componentName = component;
     }
     
@@ -167,7 +160,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
     adminClient,
     moduleFunction: moduleFunction || null,
     args,
-    udfType: moduleFunction?.udfType === 'httpAction' ? undefined : (moduleFunction?.udfType as 'query' | 'mutation' | 'action' | undefined),
+    udfType: moduleFunction?.udfType === 'httpAction' ? undefined : (moduleFunction?.udfType as ExecutableUdfType | undefined),
     componentId: currentComponentId,
     runHistoryItem,
     impersonatedUser: isImpersonating ? impersonatedUser : undefined,
@@ -219,78 +212,6 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
     }
   };
 
-  const handleArgsEditorWillMount: BeforeMount = (monacoInstance) => {
-    setArgsMonaco(monacoInstance);
-
-    const getThemeColor = (varName: string, fallback: string = '#0F1115') => {
-      const themeElement = document.querySelector('.cp-theme-dark, .cp-theme-light') || document.documentElement;
-      const color = getComputedStyle(themeElement).getPropertyValue(varName).trim();
-      return color || fallback;
-    };
-
-    const toMonacoColor = (hex: string) => hex.replace('#', '');
-
-    try {
-      monacoInstance.editor.defineTheme('convex-dark', {
-        base: 'vs-dark',
-        inherit: true,
-        rules: [
-          { token: 'comment', foreground: toMonacoColor(getThemeColor('--color-panel-text-muted', '#6b7280')), fontStyle: 'italic' },
-          { token: 'keyword', foreground: 'c084fc' },
-          { token: 'string', foreground: 'fbbf24' },
-          { token: 'number', foreground: 'fb923c' },
-        ],
-        colors: {
-          'editor.background': getThemeColor('--color-panel-bg-secondary', '#16181D'),
-          'editor.foreground': getThemeColor('--color-panel-warning', '#fbbf24'),
-          'editor.lineHighlightBackground': getThemeColor('--color-panel-bg-secondary', '#16181D'),
-          'editor.selectionBackground': getThemeColor('--color-panel-active', 'rgba(255, 255, 255, 0.1)'),
-          'editorCursor.foreground': getThemeColor('--color-panel-warning', '#fbbf24'),
-          'editorLineNumber.foreground': getThemeColor('--color-panel-text-muted', '#6b7280'),
-          'editorLineNumber.activeForeground': getThemeColor('--color-panel-text', '#d1d5db'),
-          'editorIndentGuide.background': getThemeColor('--color-panel-border', '#2D313A'),
-          'editorIndentGuide.activeBackground': getThemeColor('--color-panel-text-muted', '#6b7280'),
-          'editorWhitespace.foreground': getThemeColor('--color-panel-border', '#2D313A'),
-        },
-      });
-    } catch {
-    }
-
-    try {
-      monacoInstance.editor.defineTheme('convex-light', {
-        base: 'vs',
-        inherit: true,
-        rules: [
-          { token: 'comment', foreground: toMonacoColor(getThemeColor('--color-panel-text-muted', '#9ca3af')), fontStyle: 'italic' },
-          { token: 'keyword', foreground: '7c3aed' },
-          { token: 'string', foreground: 'd97706' },
-          { token: 'number', foreground: 'ea580c' },
-        ],
-        colors: {
-          'editor.background': getThemeColor('--color-panel-bg-secondary', '#f9fafb'),
-          'editor.foreground': getThemeColor('--color-panel-warning', '#d97706'),
-          'editor.lineHighlightBackground': getThemeColor('--color-panel-bg-secondary', '#f9fafb'),
-          'editor.selectionBackground': getThemeColor('--color-panel-active', 'rgba(0, 0, 0, 0.1)'),
-          'editorCursor.foreground': getThemeColor('--color-panel-warning', '#d97706'),
-          'editorLineNumber.foreground': getThemeColor('--color-panel-text-muted', '#9ca3af'),
-          'editorLineNumber.activeForeground': getThemeColor('--color-panel-text', '#111827'),
-          'editorIndentGuide.background': getThemeColor('--color-panel-border', '#e5e7eb'),
-          'editorIndentGuide.activeBackground': getThemeColor('--color-panel-text-muted', '#9ca3af'),
-          'editorWhitespace.foreground': getThemeColor('--color-panel-border', '#e5e7eb'),
-        },
-      });
-    } catch {
-      console.debug('Theme already defined, ignoring');
-    }
-  };
-
-  useEffect(() => {
-    if (argsMonaco) {
-      const monacoTheme = theme === 'light' ? 'convex-light' : 'convex-dark';
-      argsMonaco.editor.setTheme(monacoTheme);
-    }
-  }, [theme, argsMonaco]);
-
   const isRunning = isCustomQuery ? customQueryLoading : loading;
   const currentResult = isCustomQuery ? customQueryResult : result;
   const currentTiming = isCustomQuery ? customQueryTiming : lastRequestTiming;
@@ -312,6 +233,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
 
   return (
     <div
+      className="cp-function-runner"
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -384,7 +306,14 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                     marginBottom: '8px',
                   }}
                 >
-                  <span style={{ fontSize: '12px', color: 'var(--color-panel-text-secondary)', fontWeight: 500 }}>Arguments</span>
+                  <span style={{ fontSize: '12px', color: 'var(--color-panel-text-secondary)', fontWeight: 500 }}>
+                    Arguments
+                    {argsError.length > 0 && (
+                      <span style={{ marginLeft: '8px', color: 'var(--color-panel-error)', fontSize: '11px' }}>
+                        ({argsError[0]})
+                      </span>
+                    )}
+                  </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <button
                       style={{
@@ -463,53 +392,27 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                 <div
                   style={{
                     flex: 1,
-                    backgroundColor: 'var(--color-panel-bg-secondary)',
-                    border: '1px solid var(--color-panel-border)',
-                    borderRadius: '4px',
-                    overflow: 'hidden',
-                    position: 'relative',
                     minHeight: '200px',
                   }}
                 >
-                  <Editor
-                    height="100%"
-                    defaultLanguage="json"
-                    theme={theme === 'light' ? 'convex-light' : 'convex-dark'}
-                    value={JSON.stringify(args, null, 2)}
-                    beforeMount={handleArgsEditorWillMount}
+                  <ObjectEditor
+                    defaultValue={args}
                     onChange={(value) => {
-                      if (value !== null && value !== undefined) {
-                        try {
-                          const parsed = JSON.parse(value);
-                          if (typeof parsed === 'object' && parsed !== null) {
-                            setArgs(parsed);
-                          }
-                        } catch {
-                          // Invalid JSON, keep current args
-                          console.debug('Invalid JSON, keeping current args');
-                        }
+                      if (value !== undefined) {
+                        setArgs(value as Record<string, Value>);
+                      } else {
+                        setArgs({});
                       }
                     }}
-                    options={{
-                      automaticLayout: true,
-                      minimap: { enabled: false },
-                      scrollBeyondLastLine: false,
-                      fontSize: 13,
-                      fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
-                      lineNumbers: 'on',
-                      lineNumbersMinChars: 3,
-                      scrollbar: {
-                        horizontalScrollbarSize: 8,
-                        verticalScrollbarSize: 8,
-                      },
-                      wordWrap: 'on',
-                      tabSize: 2,
-                      readOnly: false,
-                      domReadOnly: false,
-                      contextmenu: true,
-                      formatOnPaste: true,
-                      formatOnType: true,
+                    onError={(errors) => {
+                      setArgsError(errors);
                     }}
+                    path="function-arguments"
+                    language="json"
+                    showLineNumbers={true}
+                    fullHeight
+                    className=""
+                    editorClassname=""
                   />
                 </div>
               </div>
@@ -779,7 +682,15 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
             </div>
           </div>
 
-          <div style={{ flex: 1, padding: '16px', overflow: 'auto' }}>
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
             {isCustomQuery ? (
               <Result
                 result={customQueryResult}

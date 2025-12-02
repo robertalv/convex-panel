@@ -15,9 +15,9 @@ import {
 import { FixedSizeList } from 'react-window';
 import { useLogs } from '../../hooks/useLogs';
 import { LogEntry } from '../../types';
-import { MultiSelectComponentSelector } from '../../components/function-runner/components/multi-select-component-selector';
-import { MultiSelectFunctionSelector } from '../../components/function-runner/components/multi-select-function-selector';
-import { MultiSelectLogTypeSelector } from '../../components/function-runner/components/multi-select-log-type-selector';
+import { MultiSelectComponentSelector } from '../../components/function-runner/multi-select-component-selector';
+import { MultiSelectFunctionSelector } from '../../components/function-runner/multi-select-function-selector';
+import { MultiSelectLogTypeSelector } from '../../components/function-runner/multi-select-log-type-selector';
 import { useComponents } from '../../hooks/useComponents';
 import { discoverFunctions, ModuleFunction } from '../../utils/functionDiscovery';
 import { CustomQuery } from '../../components/function-runner/function-runner';

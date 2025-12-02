@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Search, Upload, Calendar, FileCode, ExternalLink, Pause, Trash2, Loader2, Check, AlertCircle, X } from 'lucide-react';
-import { ComponentSelector } from '../../components/function-runner/components/component-selector';
+import { ComponentSelector } from '../../components/component-selector';
 import { useComponents } from '../../hooks/useComponents';
 import { useFiles } from '../../hooks/useFiles';
 import { FileMetadata, deleteFile, uploadFileWithFallbacks } from '../../utils/api';

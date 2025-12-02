@@ -5,8 +5,8 @@ import {
   Pause,
   Trash2,
 } from 'lucide-react';
-import { ComponentSelector } from '../../components/function-runner/components/component-selector';
-import { FunctionSelector } from '../../components/function-runner/components/function-selector';
+import { ComponentSelector } from '../../components/component-selector';
+import { FunctionSelector } from '../../components/function-runner/function-selector';
 import { discoverFunctions, ModuleFunction } from '../../utils/functionDiscovery';
 import { CustomQuery } from '../../components/function-runner/function-runner';
 import { fetchComponents } from '../../utils/api';

@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import Editor, { BeforeMount, OnMount } from '@monaco-editor/react';
-import { FunctionResult as FunctionResultType } from '../../../utils/functionExecution';
-import { copyToClipboard } from '../../../utils/toast';
-import { useThemeSafe } from '../../../hooks/useTheme';
+import { FunctionResult as FunctionResultType } from '../../utils/functionExecution';
+import { copyToClipboard } from '../../utils/toast';
+import { useThemeSafe } from '../../hooks/useTheme';
 
 interface ResultProps {
   result?: FunctionResultType;
@@ -108,22 +108,22 @@ export const Result: React.FC<ResultProps> = ({
   }, [theme, monaco]);
 
   const monacoTheme = theme === 'light' ? 'convex-light' : 'convex-dark';
-
-  const editorHeight = useMemo(() => {
-    if (!resultString) return 200;
-    const lineCount = resultString.split('\n').length;
-    const calculatedHeight = Math.max(200, Math.min(600, lineCount * 20 + 40));
-    return calculatedHeight;
-  }, [resultString]);
+  const hasLogs = !!(result?.logLines && result.logLines.length > 0);
 
   return (
     <div
       style={{
         flex: 1,
-        overflow: 'auto',
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
         padding: '16px',
+        gap: '12px',
         fontFamily: 'monospace',
         fontSize: '14px',
+        minWidth: 0,
+        overflow: 'hidden',
       }}
     >
         {!result && !loading ? (
@@ -150,11 +150,21 @@ export const Result: React.FC<ResultProps> = ({
             <span>Running function...</span>
           </div>
         ) : result ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <>
             {/* Log Lines */}
-            {result.logLines && result.logLines.length > 0 && (
-              <>
-                {result.logLines.map((log, index) => (
+            {hasLogs && (
+              <div
+                style={{
+                  flexShrink: 0,
+                  maxHeight: '35%',
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  paddingRight: '8px',
+                }}
+              >
+                {result.logLines!.map((log, index) => (
                   <div
                     key={index}
                     style={{
@@ -182,19 +192,14 @@ export const Result: React.FC<ResultProps> = ({
                     </span>
                   </div>
                 ))}
-              </>
+              </div>
             )}
 
             {/* Result Value */}
             {result.success ? (
-              <div
-                style={{
-                  overflow: 'hidden',
-                  height: `${editorHeight}px`,
-                }}
-              >
+              <div style={{ flex: 1, minHeight: 0 }}>
                 <Editor
-                  height={`${editorHeight}px`}
+                  height="100%"
                   language="json"
                   theme={monacoTheme}
                   value={resultString}
@@ -242,7 +247,7 @@ export const Result: React.FC<ResultProps> = ({
                 {resultString}
               </div>
             )}
-          </div>
+          </>
         ) : null}
     </div>
   );

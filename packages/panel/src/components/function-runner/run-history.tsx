@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowLeft, ArrowRight, Code } from 'lucide-react';
-import { RunHistoryItem } from '../../../hooks/useRunHistory';
+import { RunHistoryItem } from '../../hooks/useRunHistory';
 
 interface RunHistoryProps {
   functionIdentifier: string;

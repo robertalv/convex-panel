@@ -1,4 +1,5 @@
 import { fetchFunctionSpec } from './api';
+import { CustomQuery } from '../types/functions';
 
 export interface ModuleFunction {
   name: string;
@@ -265,4 +266,9 @@ export function findFunctionByIdentifier(
   );
 }
 
-
+/**
+ * Check if a value is a CustomQuery
+ */
+export const isCustomQueryValue = (
+  value: ModuleFunction | CustomQuery
+): value is CustomQuery => 'type' in value && value.type === 'customQuery';

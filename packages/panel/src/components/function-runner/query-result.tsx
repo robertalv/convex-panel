@@ -1,6 +1,6 @@
 import React from 'react';
 import { Result } from './result';
-import { FunctionResult } from '../../../utils/functionExecution';
+import { FunctionResult } from '../../utils/functionExecution';
 
 interface QueryResultProps {
   result?: FunctionResult;

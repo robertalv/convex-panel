@@ -758,6 +758,36 @@ export const panelStyles = `/*
   border-color: var(--color-panel-accent);
 }
 
+.cp-function-runner .monaco-editor textarea.ime-text-area {
+  position: absolute !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  color: transparent !important;
+  resize: none !important;
+  pointer-events: none !important;
+}
+
+.cp-function-runner .monaco-editor .native-edit-context {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  color: transparent !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
 /* ================================
    Utility Classes
    ================================ */
