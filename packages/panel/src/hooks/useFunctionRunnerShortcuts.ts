@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useIsGlobalRunnerShown, useShowGlobalRunner, useHideGlobalRunner } from '../lib/functionRunner';
 
@@ -13,9 +12,9 @@ export function useFunctionRunnerShortcuts() {
     (e) => {
       e.preventDefault();
       if (isShowing) {
-        hideGlobalRunner('keyboard');
+        hideGlobalRunner();
       } else {
-        showGlobalRunner(null, 'keyboard');
+        showGlobalRunner(null);
       }
     },
     { enableOnFormTags: true }
@@ -27,9 +26,9 @@ export function useFunctionRunnerShortcuts() {
     (e) => {
       e.preventDefault();
       if (isShowing) {
-        hideGlobalRunner('keyboard');
+        hideGlobalRunner();
       } else {
-        showGlobalRunner(null, 'keyboard');
+        showGlobalRunner(null);
       }
     },
     { enableOnFormTags: true }

@@ -98,21 +98,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     (item): item is ContextMenuItemDescriptor => !('type' in item && (item as { type: string }).type === 'divider')
   );
   
-  // Map item index to actual index in items array
-  const getItemIndex = useCallback((actionableIndex: number): number => {
-    let actionableCount = 0;
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (!('type' in item && (item as { type: string }).type === 'divider')) {
-        if (actionableCount === actionableIndex) {
-          return i;
-        }
-        actionableCount++;
-      }
-    }
-    return -1;
-  }, [items]);
-
   // Execute selected item
   const executeSelected = useCallback(() => {
     if (selectedIndex >= 0 && selectedIndex < actionableItems.length) {

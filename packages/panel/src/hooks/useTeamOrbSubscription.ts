@@ -39,11 +39,6 @@ export function useTeamOrbSubscription(teamId?: number | string | null): UseTeam
       try {
         setIsLoading(true);
         setError(null);
-
-        // Try to fetch subscription from dashboard API
-        // Note: This requires dashboard API authentication which may not be available
-        // If unavailable, we'll gracefully handle it and return null
-        const teamIdStr = typeof teamId === 'number' ? teamId.toString() : teamId;
         
         // For now, we'll return null as subscription data is typically only available
         // through the dashboard API with proper authentication

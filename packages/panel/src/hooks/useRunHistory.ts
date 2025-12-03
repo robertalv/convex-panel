@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect, Dispatch, SetStateAction } from 'react';
+import { useCallback } from 'react';
 import { useLocalStorage } from 'react-use';
-import { Value } from 'convex/values';
+import type { Dispatch, SetStateAction } from 'react';
+import type { Value } from 'convex/values';
 
 export interface UserIdentityAttributes {
   subject: string;

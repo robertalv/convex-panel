@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ComponentInfo } from '../../../types/components';
-import { fetchMultipleNpmDownloads, NpmPackageInfo } from '../utils/npm';
+import type { ComponentInfo } from '../../../types/components';
+import { fetchMultipleNpmDownloads } from '../utils/npm';
 
 interface UseNpmDownloadsOptions {
   components: ComponentInfo[];

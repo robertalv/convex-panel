@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp, Copy, Check, AlertCircle, Plus } from 'lucide-react';
 import {
   getDeploymentCredentials,
-  getDeploymentInfo,
-  DeploymentCredentials,
-  DeploymentInfo,
-} from '../../../utils/api';
+  getDeploymentInfo
+} from '../../../utils/api/deployments';
+import type { DeploymentCredentials, DeploymentInfo } from '../../../utils/api/types';
 import { getAdminClientInfo, validateAdminClientInfo } from '../../../utils/adminClient';
 
 export interface UrlDeployKeyProps {
@@ -25,7 +24,6 @@ export const UrlDeployKey: React.FC<UrlDeployKeyProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(true);
   const [copiedValue, setCopiedValue] = useState<string | null>(null);
-  const [isCreatingKey, setIsCreatingKey] = useState(false);
 
   useEffect(() => {
     if (!adminClient) {
@@ -609,22 +607,7 @@ export const UrlDeployKey: React.FC<UrlDeployKeyProps> = ({
                     {isDev && (
                       <button
                         onClick={handleCreateDeployKey}
-                        disabled={isCreatingKey}
                         className="cp-btn"
-                        style={{
-                          opacity: isCreatingKey ? 0.5 : 1,
-                          cursor: isCreatingKey ? 'not-allowed' : 'pointer',
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isCreatingKey) {
-                            e.currentTarget.style.backgroundColor = 'var(--color-panel-accent-hover)';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isCreatingKey) {
-                            e.currentTarget.style.backgroundColor = 'var(--color-panel-accent)';
-                          }
-                        }}
                       >
                         <Plus size={14} /> Generate Development Deploy Key
                       </button>

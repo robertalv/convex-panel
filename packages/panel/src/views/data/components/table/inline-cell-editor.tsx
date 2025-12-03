@@ -154,9 +154,8 @@ export const InlineCellEditor: React.FC<InlineCellEditorProps> = ({
                   projectSlug={projectSlug}
                 />
               }
-              placement="right"
-              maxWidth="500px"
-              delay={300}
+              position="right"
+              maxWidth={500}
             >
               <div
                 style={{

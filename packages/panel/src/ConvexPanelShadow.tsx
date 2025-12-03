@@ -1,6 +1,8 @@
-import React, { useEffect, useRef } from 'react';
-import { createRoot, Root } from 'react-dom/client';
-import ConvexPanel, { ConvexPanelProps } from './ConvexPanel';
+import { useEffect, useRef } from 'react';
+import { createRoot } from 'react-dom/client';
+import type { Root } from 'react-dom/client';
+import ConvexPanel from './ConvexPanel';
+import type { ConvexPanelProps } from './ConvexPanel';
 import { panelStyles } from './styles/runtime';
 
 /**
@@ -9,7 +11,7 @@ import { panelStyles } from './styles/runtime';
  * Styles inside Shadow DOM cannot leak out, and parent app styles cannot affect the panel.
  * This is the recommended wrapper for maximum isolation.
  */
-export const ConvexPanelShadow: React.FC<ConvexPanelProps> = (props) => {
+export const ConvexPanelShadow = (props: ConvexPanelProps) => {
   const shadowHostRef = useRef<HTMLDivElement>(null);
   const shadowRootRef = useRef<ShadowRoot | null>(null);
   const reactRootRef = useRef<Root | null>(null);

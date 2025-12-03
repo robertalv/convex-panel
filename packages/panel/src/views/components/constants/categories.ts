@@ -1,4 +1,4 @@
-import { ComponentCategory } from '../../../types/components';
+import type { ComponentCategory } from '../../../types/components';
 
 export const CATEGORIES: (ComponentCategory | 'All')[] = [
   'All',

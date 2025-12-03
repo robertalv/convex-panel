@@ -14,13 +14,14 @@ import {
 } from 'lucide-react';
 import { FixedSizeList } from 'react-window';
 import { useLogs } from '../../hooks/useLogs';
-import { LogEntry } from '../../types';
-import { MultiSelectComponentSelector } from '../../components/function-runner/components/multi-select-component-selector';
-import { MultiSelectFunctionSelector } from '../../components/function-runner/components/multi-select-function-selector';
-import { MultiSelectLogTypeSelector } from '../../components/function-runner/components/multi-select-log-type-selector';
+import type { LogEntry } from '../../types';
+import { MultiSelectComponentSelector } from '../../components/function-runner/multi-select-component-selector';
+import { MultiSelectFunctionSelector } from '../../components/function-runner/multi-select-function-selector';
+import { MultiSelectLogTypeSelector } from '../../components/function-runner/multi-select-log-type-selector';
 import { useComponents } from '../../hooks/useComponents';
-import { discoverFunctions, ModuleFunction } from '../../utils/functionDiscovery';
-import { CustomQuery } from '../../components/function-runner/function-runner';
+import { discoverFunctions } from '../../utils/api/functionDiscovery';
+import type { ModuleFunction } from '../../utils/api/functionDiscovery';
+import type { CustomQuery } from '../../types/functions';
 import { Sheet } from '../../components/shared/sheet';
 import { TooltipAction } from '../../components/shared/tooltip-action';
 import { copyToClipboard } from '../../utils/toast';
@@ -32,8 +33,6 @@ export interface LogsViewProps {
   adminClient?: any;
   useMockData?: boolean;
   onError?: (error: string) => void;
-  teamSlug?: string;
-  projectSlug?: string;
 }
 
 const formatTimestamp = (timestamp: number): string => {
@@ -84,14 +83,6 @@ const formatBytes = (bytes?: number): string => {
   return `${value.toFixed(1)} ${units[unitIndex]}`;
 };
 
-const getLogTypeIcon = (log: LogEntry): string => {
-  if (log.function?.type === 'query') return 'Q';
-  if (log.function?.type === 'mutation') return 'M';
-  if (log.function?.type === 'action') return 'A';
-  if (log.topic === 'http') return 'H';
-  return 'L';
-};
-
 export const LogsView: React.FC<LogsViewProps> = ({
   convexUrl,
   accessToken,
@@ -99,8 +90,6 @@ export const LogsView: React.FC<LogsViewProps> = ({
   adminClient,
   useMockData = false,
   onError,
-  teamSlug,
-  projectSlug,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFunctions, setSelectedFunctions] = useState<(ModuleFunction | CustomQuery)[]>([]);
@@ -116,7 +105,6 @@ export const LogsView: React.FC<LogsViewProps> = ({
 
   const {
     componentNames,
-    selectedComponentId,
     selectedComponent,
     setSelectedComponent,
     componentNameToId,
@@ -157,7 +145,6 @@ export const LogsView: React.FC<LogsViewProps> = ({
     isPaused,
     setIsPaused,
     clearLogs,
-    refreshLogs,
   } = useLogs({
     convexUrl: convexUrl || baseUrl,
     accessToken,
@@ -171,6 +158,7 @@ export const LogsView: React.FC<LogsViewProps> = ({
     if (!adminClient || useMockData) return;
 
     setIsLoadingFunctions(true);
+    console.log("loading functions", isLoadingFunctions);
     discoverFunctions(adminClient, useMockData)
       .then((funcs) => {
         setFunctions(funcs);

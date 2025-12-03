@@ -8,14 +8,13 @@ import {
   ArrowDownUp, 
   Plus,
   X,
-  ListFilter,
   Eye,
   EyeOff,
   Search,
   Clock,
   FileText
 } from 'lucide-react';
-import { FilterExpression, FilterClause, SortConfig, TableDefinition } from '../../../types';
+import type { FilterExpression, FilterClause, SortConfig, TableDefinition } from '../../../types';
 import { operatorOptions, typeOptions } from '../../../utils/constants';
 import { Dropdown } from '../../../components/shared';
 
@@ -64,10 +63,6 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
   const [visibleFields, setVisibleFields] = useState<string[]>(
     propVisibleFields || []
   );
-
-  // Check if draft differs from applied filters
-  const isDirty = JSON.stringify(draftFilters) !== JSON.stringify(filters.clauses) ||
-    JSON.stringify(draftSortConfig) !== JSON.stringify(sortConfig);
 
   // Sync draft with props when they change externally
   useEffect(() => {
@@ -260,16 +255,6 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
     }
   }, [canGoForward, historyIndex, filterHistory, setFilters, setSortConfig]);
 
-  const handleAddFilter = () => {
-    const newFilter: FilterClause = {
-      field: allFields[0] || '_id',
-      op: 'eq',
-      value: '',
-      enabled: true,
-    };
-    setDraftFilters([...draftFilters, newFilter]);
-  };
-
   const handleRemoveFilter = (index: number) => {
     setDraftFilters(draftFilters.filter((_, i) => i !== index));
   };
@@ -296,11 +281,6 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
         direction: draftSortConfig.direction === 'asc' ? 'desc' : 'asc'
       });
     }
-  };
-
-  const getSortFieldLabel = (field: string): string => {
-    if (field === '_creationTime') return 'By creation time';
-    return `By ${field}`;
   };
 
   // Handle form submission - apply filters

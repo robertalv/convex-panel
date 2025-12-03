@@ -44,8 +44,8 @@ export const ProBadge: React.FC<{ tooltip?: string }> = ({ tooltip }) => {
         left: Math.max(margin, Math.min(initialLeft, window.innerWidth - estimatedWidth - margin)),
       });
 
-      const raf1 = requestAnimationFrame(() => {
-        const raf2 = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
           updatePosition();
           setTimeout(updatePosition, 10);
           setTimeout(updatePosition, 50);

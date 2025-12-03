@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Value } from 'convex/values';
-import { executeFunction, FunctionResult } from '../utils/functionExecution';
-import { ModuleFunction } from '../utils/functionDiscovery';
-import { useRunHistory, RunHistoryItem } from './useRunHistory';
+import type { Value } from 'convex/values';
+import { executeFunction } from '../utils/api/functionExecution';
+import type { FunctionResult } from '../utils/api/functionExecution';
+import type { ModuleFunction } from '../utils/api/functionDiscovery';
+import { useRunHistory } from './useRunHistory';
+import type { RunHistoryItem } from './useRunHistory';
 
 interface UseFunctionResultProps {
   adminClient: any;

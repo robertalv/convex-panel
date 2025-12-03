@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, AlertTriangle } from 'lucide-react';
-import { Insight } from '../../../utils/api';
+import type { Insight } from '../../../utils/api/types';
 import { Tooltip } from '../../../components/shared/tooltip';
 import { ProblemForInsight } from './problem-for-insight';
 import { SparklineForInsight } from './sparkline-for-insight';
@@ -55,8 +55,8 @@ export const InsightsSummaryListItem: React.FC<{ insight: Insight }> = ({ insigh
       <span style={{ width: '80px', minWidth: '80px' }}>
         {severity === 'error' ? (
           <Tooltip
-            text="This insight is a critical problem and should be addressed soon."
-            side="left"
+            content={<span>This insight is a critical problem and should be addressed soon.</span>}
+            position="left"
           >
             <div
               style={{
@@ -78,8 +78,8 @@ export const InsightsSummaryListItem: React.FC<{ insight: Insight }> = ({ insigh
           </Tooltip>
         ) : (
           <Tooltip
-            text="This insight indicates a potential issue and should be investigated."
-            side="left"
+            content={<span>This insight indicates a potential issue and should be investigated.</span>}
+            position="left"
           >
             <div
               style={{
@@ -108,7 +108,7 @@ export const InsightsSummaryListItem: React.FC<{ insight: Insight }> = ({ insigh
         <ProblemForInsight insight={insight} />
       </div>
       <div style={{ height: '100%', width: '240px', minWidth: '240px', display: 'flex', alignItems: 'center' }}>
-        <SparklineForInsight insight={insight} />
+        <SparklineForInsight />
       </div>
     </button>
   );

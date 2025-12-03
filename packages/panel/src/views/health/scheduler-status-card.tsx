@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { LineChart, Undo2, Info } from 'lucide-react';
+import { LineChart, Undo2 } from 'lucide-react';
 import { HealthCard } from './components/health-card';
 import { FunctionRateChart } from './components/function-rate-chart';
-import { BigMetric, MetricHealth } from './components/big-metric';
+import { BigMetric } from './components/big-metric';
+import type { MetricHealth } from './components/big-metric';
 import { TooltipAction } from '../../components/shared/tooltip-action';
-import { fetchSchedulerLag } from '../../utils/api';
+import { fetchSchedulerLag } from '../../utils/api/metrics';
 import { transformToChartData, getTimeRange } from './utils';
-import { APIResponse } from './types';
+import type { APIResponse } from './types';
 import { formatDistance } from 'date-fns';
 
 interface SchedulerStatusCardProps {
@@ -26,13 +27,18 @@ export const SchedulerStatusCard: React.FC<SchedulerStatusCardProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!deploymentUrl || !authToken) {
+      setLoading(false);
+      return;
+    }
+
     let mounted = true;
 
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
-        const result = await fetchSchedulerLag(deploymentUrl || '', authToken, useMockData);
+        const result = await fetchSchedulerLag(deploymentUrl, authToken, useMockData);
         
         // Transform the response to match the expected format
         // The API returns TimeseriesResponse: [SerializedDate, number | null][]

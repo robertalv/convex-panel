@@ -1,5 +1,5 @@
 {
-    "name": "convex-panel/desktop",
+    "name": "@convex-panel/desktop",
     "version": "0.0.0",
     "private": true,
     "scripts": {
@@ -12,8 +12,9 @@
         "convex-panel": "workspace:*",
         "convex-panel/shared": "workspace:*",
         "@tauri-apps/api": "^1.5.3",
-        "react": "^18.2.0",
-        "react-dom": "^18.2.0"
+        "convex": "^1.21.0",
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0"
     },
     "devDependencies": {
         "@tauri-apps/cli": "^1.5.9",

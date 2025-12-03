@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ExternalLink, Copy, Check, Github, Package, BookOpen, FileCode, Bug } from 'lucide-react';
-import { ComponentInfo } from '../../../types/components';
+import { ExternalLink, Copy, Check, Github, Package, BookOpen, Bug } from 'lucide-react';
+import type { ComponentInfo } from '../../../types/components';
 
 export interface ComponentDetailSheetProps {
   component: ComponentInfo;

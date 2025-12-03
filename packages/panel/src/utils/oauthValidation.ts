@@ -1,6 +1,4 @@
-/**
- * OAuth configuration validation utilities
- */
+import { CONVEX_PANEL_API_DOMAIN, CONVEX_PANEL_DOMAIN, ROUTES } from "./constants";
 
 export interface OAuthValidationResult {
   isValid: boolean;
@@ -8,7 +6,6 @@ export interface OAuthValidationResult {
   warnings: string[];
 }
 
-// Re-export OAuthConfig type for convenience, but we'll accept a simpler shape for validation
 export interface OAuthConfig {
   clientId?: string;
   redirectUri?: string;
@@ -17,7 +14,9 @@ export interface OAuthConfig {
 }
 
 /**
- * Validate OAuth configuration before attempting connection
+ * Validate OAuth configuration
+ * @param config - The OAuth configuration to validate
+ * @returns The validation result
  */
 export function validateOAuthConfig(config: OAuthConfig | null | undefined): OAuthValidationResult {
   const errors: string[] = [];
@@ -28,7 +27,6 @@ export function validateOAuthConfig(config: OAuthConfig | null | undefined): OAu
     return { isValid: false, errors, warnings };
   }
 
-  // Required fields
   if (!config.clientId || config.clientId.trim() === '') {
     errors.push('OAuth Client ID is required. Please set OAUTH_CLIENT_ID environment variable or provide it in oauthConfig.');
   }
@@ -37,9 +35,8 @@ export function validateOAuthConfig(config: OAuthConfig | null | undefined): OAu
     errors.push('Redirect URI is required. It should match your OAuth app settings.');
   }
 
-  // Warnings for missing but recommended fields
   if (!config.tokenExchangeUrl || config.tokenExchangeUrl.trim() === '') {
-    warnings.push('Token exchange URL is not configured. The default production server (https://api.convexpanel.dev/v1/convex/oauth) will be used.');
+    warnings.push(`Token exchange URL is not configured. The default production server (https://${CONVEX_PANEL_API_DOMAIN}${ROUTES.CONVEX_OAUTH}) will be used.`);
   }
 
   return {
@@ -57,9 +54,7 @@ export async function checkTokenExchangeEndpoint(url: string): Promise<{
   error?: string;
 }> {
   try {
-    // First check if it's a health endpoint available
-    // Try to find health endpoint by replacing common patterns
-    const healthUrl = url.replace('/v1/convex/oauth', '/health').replace('/api/convex/exchange', '/health');
+    const healthUrl = url.replace(ROUTES.CONVEX_OAUTH, ROUTES.HEALTH_ENDPOINT).replace(ROUTES.OAUTH_DEV_ENDPOINT, ROUTES.HEALTH_ENDPOINT);
     
     try {
       const healthResponse = await fetch(healthUrl, {
@@ -67,7 +62,6 @@ export async function checkTokenExchangeEndpoint(url: string): Promise<{
         headers: {
           'Accept': 'application/json',
         },
-        // Short timeout for health checks
         signal: AbortSignal.timeout(5000),
       });
 
@@ -78,12 +72,11 @@ export async function checkTokenExchangeEndpoint(url: string): Promise<{
       // Health endpoint might not exist, that's okay
     }
 
-    // Try a simple OPTIONS request to check CORS
     const optionsResponse = await fetch(url, {
       method: 'OPTIONS',
       headers: {
         'Accept': 'application/json',
-        'Origin': typeof window !== 'undefined' ? window.location.origin : 'https://convexpanel.dev',
+        'Origin': typeof window !== 'undefined' ? window.location.origin : `https://${CONVEX_PANEL_DOMAIN}`,
       },
       signal: AbortSignal.timeout(5000),
     });
@@ -92,7 +85,6 @@ export async function checkTokenExchangeEndpoint(url: string): Promise<{
       return { isReachable: true };
     }
 
-    // If OPTIONS fails, try a simple GET to check if endpoint exists
     const getResponse = await fetch(url, {
       method: 'GET',
       headers: {
@@ -101,7 +93,6 @@ export async function checkTokenExchangeEndpoint(url: string): Promise<{
       signal: AbortSignal.timeout(5000),
     });
 
-    // Even if GET returns an error, if we get a response, the endpoint exists
     if (getResponse.status !== 0) {
       return { isReachable: true };
     }
@@ -115,7 +106,7 @@ export async function checkTokenExchangeEndpoint(url: string): Promise<{
       if (error.name === 'TimeoutError' || error.message.includes('timeout')) {
         return {
           isReachable: false,
-          error: 'Connection timeout. The API server may be down or unreachable. Please check https://api.convexpanel.dev/health',
+          error: `Connection timeout. The API server may be down or unreachable. Please check https://${CONVEX_PANEL_API_DOMAIN}${ROUTES.HEALTH_ENDPOINT}`,
         };
       }
       
@@ -159,20 +150,31 @@ export async function validateOAuthSetup(
     return configValidation;
   }
 
-  // Optionally check endpoint availability (default: true)
-  const shouldCheckEndpoint = options?.checkEndpoint !== false;
+  const isDev = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' || 
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === '[::1]'
+  );
+  const shouldCheckEndpoint = options?.checkEndpoint ?? !isDev;
   
   if (shouldCheckEndpoint && config && config.tokenExchangeUrl) {
     try {
       const endpointCheck = await checkTokenExchangeEndpoint(config.tokenExchangeUrl);
       
       if (!endpointCheck.isReachable) {
-        configValidation.errors.push(endpointCheck.error || 'Token exchange endpoint is not reachable.');
-        configValidation.isValid = false;
+        const errorMsg = endpointCheck.error || 'Token exchange endpoint is not reachable.';
+        if (errorMsg.includes('CORS')) {
+          configValidation.warnings.push(
+            `${errorMsg} This may not prevent OAuth from working. You can still try to connect.`
+          );
+        } else {
+          configValidation.warnings.push(
+            `${errorMsg} You can still try to connect, but it may fail.`
+          );
+        }
+        // Don't set isValid to false - allow user to try anyway
       }
     } catch (error) {
-      // If endpoint check fails, add as warning rather than error
-      // This allows connection to proceed (might be temporary network issue)
       configValidation.warnings.push(
         `Could not verify endpoint availability: ${error instanceof Error ? error.message : 'Unknown error'}. You can still try to connect.`
       );

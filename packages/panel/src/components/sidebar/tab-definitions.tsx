@@ -9,7 +9,7 @@ import {
   Puzzle,
   Settings,
 } from 'lucide-react';
-import { TabId } from '../../types/tabs';
+import type { TabId } from '../../types/tabs';
 
 export interface TabDefinition {
   id: TabId;

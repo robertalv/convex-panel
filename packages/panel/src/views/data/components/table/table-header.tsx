@@ -1,7 +1,7 @@
 import React from 'react';
 import { Checkbox } from '../../../../components/shared/checkbox';
 import { TableColumnHeader } from './table-column-header';
-import { ColumnMeta } from './data-table-utils';
+import type { ColumnMeta } from './data-table-utils';
 
 export interface TableHeaderProps {
   columns: string[];

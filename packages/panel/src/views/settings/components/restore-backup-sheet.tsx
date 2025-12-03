@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Loader2, ArrowRight, AlertCircle } from 'lucide-react';
-import { CloudBackupResponse } from '../../../utils/api';
+import type { CloudBackupResponse } from '../../../utils/api/types';
 
 export interface RestoreBackupSheetProps {
   backup: CloudBackupResponse;

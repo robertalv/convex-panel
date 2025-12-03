@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
-import { X } from 'lucide-react';
 import { DataFilterPanel } from './data-filter-panel';
-import { FilterExpression, SortConfig, TableDefinition } from '../../../types';
+import type { FilterExpression, SortConfig, TableDefinition } from '../../../types';
 
 export interface FilterSheetProps {
   isOpen: boolean;

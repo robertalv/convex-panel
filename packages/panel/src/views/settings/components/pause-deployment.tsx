@@ -4,7 +4,7 @@ import {
   getConvexDeploymentState,
   pauseConvexDeployment,
   resumeConvexDeployment,
-} from '../../../utils/api';
+} from '../../../utils/api/deployments';
 import { getAdminClientInfo, validateAdminClientInfo } from '../../../utils/adminClient';
 import { setStorageItem } from '../../../utils/storage';
 import { STORAGE_KEYS } from '../../../utils/constants';

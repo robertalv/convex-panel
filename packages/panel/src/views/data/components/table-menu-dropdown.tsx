@@ -32,7 +32,6 @@ export const TableMenuDropdown: React.FC<TableMenuDropdownProps> = ({
   useEffect(() => {
     const menuWidth = 180;
     const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
     
     let x = position.x;
     let y = position.y;

@@ -1,12 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Filter, Plus, MoreVertical, EyeOff, Trash2, Edit2, X, ArrowUpDown } from 'lucide-react';
-import { FilterExpression, SortConfig } from '../../../types';
+import type { FilterExpression, SortConfig } from '../../../types';
 import { operatorOptions } from '../../../utils/constants';
 import { TooltipAction } from '../../../components/shared/tooltip-action';
 import { TableMenuDropdown } from './table-menu-dropdown';
 
 export interface TableToolbarProps {
-  selectedTable: string;
   documentCount: number;
   onFilterToggle: () => void;
   isFilterOpen: boolean;
@@ -30,7 +29,6 @@ export interface TableToolbarProps {
 }
 
 export const TableToolbar: React.FC<TableToolbarProps> = ({
-  selectedTable,
   documentCount,
   onFilterToggle,
   isFilterOpen,
@@ -172,7 +170,7 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
 
               {/* Filter Badges */}
               {activeFilters.map((filter, index) => {
-                const filterIndex = filters?.clauses?.findIndex((f, i) => 
+                const filterIndex = filters?.clauses?.findIndex((f) => 
                   f.field === filter.field && f.op === filter.op && 
                   JSON.stringify(f.value) === JSON.stringify(filter.value)
                 ) ?? index;

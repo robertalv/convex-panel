@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Fingerprint, Search, ArrowUpRight, HelpCircle } from 'lucide-react';
-import { TableDefinition } from '../../../types';
+import { Fingerprint, Search, ArrowUpRight } from 'lucide-react';
 import { Card } from '../../../components/shared/card';
 
 export interface Index {
@@ -29,7 +28,6 @@ export interface Index {
 
 export interface IndexesViewProps {
   tableName: string;
-  tableSchema?: TableDefinition[string];
   adminClient?: any;
   componentId?: string | null;
 }
@@ -49,7 +47,6 @@ function getIndexType(index: Index): 'database' | 'search' | 'vector' | 'unknown
 
 export const IndexesView: React.FC<IndexesViewProps> = ({ 
   tableName, 
-  tableSchema,
   adminClient,
   componentId,
 }) => {

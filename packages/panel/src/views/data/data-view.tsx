@@ -7,7 +7,7 @@ import { AddDocumentSheet } from './components/add-document-sheet';
 import { SchemaView } from './components/schema-view';
 import { IndexesView } from './components/indexes-view';
 import { MetricsView } from './components/metrics-view';
-import { CustomQuery } from '../../components/function-runner/function-runner';
+import type { CustomQuery } from '../../types/functions';
 import { useTableData } from '../../hooks/useTableData';
 import { useComponents } from '../../hooks/useComponents';
 import { saveTableFilters } from '../../utils/storage';
@@ -28,7 +28,6 @@ export interface DataViewProps {
 export const DataView: React.FC<DataViewProps> = ({
   convexUrl,
   accessToken,
-  baseUrl,
   adminClient,
   useMockData = false,
   onError,
@@ -56,7 +55,6 @@ export const DataView: React.FC<DataViewProps> = ({
   const tableData = useTableData({
     convexUrl: convexUrl || '',
     accessToken,
-    baseUrl: baseUrl || convexUrl || '',
     adminClient,
     useMockData,
     onError,
@@ -145,7 +143,6 @@ export const DataView: React.FC<DataViewProps> = ({
 
         <div className="cp-data-main">
           <TableToolbar
-            selectedTable={tableData.selectedTable}
             documentCount={tableData.documentCount}
             onFilterToggle={() => setIsFilterOpen(!isFilterOpen)}
             isFilterOpen={isFilterOpen}
@@ -185,7 +182,7 @@ export const DataView: React.FC<DataViewProps> = ({
                 table: tableData.selectedTable,
                 componentId: selectedComponentId,
               };
-              showGlobalRunner(customQuery, 'click');
+              showGlobalRunner(customQuery);
             }}
             onSchema={() => {
               openSheet({
@@ -205,7 +202,6 @@ export const DataView: React.FC<DataViewProps> = ({
                 content: (
                   <IndexesView
                     tableName={tableData.selectedTable}
-                    tableSchema={tableSchema}
                     adminClient={adminClient}
                     componentId={selectedComponentId}
                   />

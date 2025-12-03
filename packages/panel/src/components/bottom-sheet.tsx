@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   ChevronDown,
   ChevronUp,
@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { ConvexLogo } from './icons';
 import { AskAI } from './ask-ai';
-import { extractDeploymentName, extractProjectName, fetchDeploymentMetadata, fetchProjectInfo, getConvexDeploymentState } from '../utils/api';
 import { getAdminClientInfo, validateAdminClientInfo } from '../utils/adminClient';
 import { setStorageItem, getStorageItem } from '../utils/storage';
 import { STORAGE_KEYS } from '../utils/constants';
@@ -23,11 +22,15 @@ import { Sidebar } from './sidebar';
 import { useActiveTab } from '../hooks/useActiveTab';
 import { useIsGlobalRunnerShown, useShowGlobalRunner } from '../lib/functionRunner';
 import { useFunctionRunnerShortcuts } from '../hooks/useFunctionRunnerShortcuts';
-import { TabId } from '../types/tabs';
-import { Team, Project, EnvType } from '../types';
+import type { TabId } from '../types/tabs';
+import type { Team, Project, EnvType } from '../types';
 import { useThemeSafe } from '../hooks/useTheme';
 import { useHasSubscription } from '../hooks/useTeamOrbSubscription';
 import { SupportPopup } from './support-popup';
+import { fetchDeploymentMetadata } from '../utils/api/deployments';
+import { extractDeploymentName, extractProjectName } from '../utils/api/utils';
+import { fetchProjectInfo } from '../utils/api/teams';
+import { getConvexDeploymentState } from '../utils/api/deployments';
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -122,6 +125,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   } | null>(null);
 
   const [deploymentState, setDeploymentState] = useState<'running' | 'paused' | null>(null);
+  const deploymentStateFetchRef = useRef<{ lastFetch: number; isFetching: boolean }>({ lastFetch: 0, isFetching: false });
+  const prevDepsRef = useRef<{ deploymentUrl?: string; accessToken?: string }>({});
 
   useEffect(() => {
     if (!isAuthenticated || !deploymentUrl) {
@@ -175,12 +180,42 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       return;
     }
 
+    // Check if dependencies actually changed
+    const currentDeps = { deploymentUrl, accessToken: accessToken?.substring(0, 20) };
+    const prevDeps = prevDepsRef.current;
+    const depsChanged = prevDeps.deploymentUrl !== currentDeps.deploymentUrl || 
+                        prevDeps.accessToken !== currentDeps.accessToken;
+    
+    // Update ref with current deps
+    prevDepsRef.current = currentDeps;
+
+    let isMounted = true;
+    let intervalId: NodeJS.Timeout | null = null;
+
     const fetchDeploymentState = async () => {
+      if (!isMounted || deploymentStateFetchRef.current.isFetching) return;
+      
+      // Throttle: don't fetch if we fetched less than 1 second ago (unless forced)
+      const now = Date.now();
+      const timeSinceLastFetch = now - deploymentStateFetchRef.current.lastFetch;
+      if (timeSinceLastFetch < 1000) {
+        return;
+      }
+
+      deploymentStateFetchRef.current.isFetching = true;
+      deploymentStateFetchRef.current.lastFetch = now;
+
       try {
         const clientInfo = getAdminClientInfo(adminClient, deploymentUrl);
         const validationError = validateAdminClientInfo(clientInfo);
 
+        if (!isMounted) {
+          deploymentStateFetchRef.current.isFetching = false;
+          return;
+        }
+
         if (validationError) {
+          deploymentStateFetchRef.current.isFetching = false;
           return;
         }
 
@@ -188,46 +223,72 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         const finalAdminKey = accessToken || adminKey;
 
         if (!finalDeploymentUrl || !finalAdminKey) {
+          deploymentStateFetchRef.current.isFetching = false;
           return;
         }
 
         const state = await getConvexDeploymentState(finalDeploymentUrl, finalAdminKey);
+        
+        if (!isMounted) {
+          deploymentStateFetchRef.current.isFetching = false;
+          return;
+        }
+        
         setDeploymentState(state.state);
+        deploymentStateFetchRef.current.isFetching = false;
       } catch (error) {
+        if (!isMounted) {
+          deploymentStateFetchRef.current.isFetching = false;
+          return;
+        }
         setDeploymentState(null);
+        deploymentStateFetchRef.current.isFetching = false;
       }
     };
 
-    fetchDeploymentState();
-    
     // Check for immediate state changes (triggered by pause-deployment component)
     const checkForStateChange = () => {
+      if (!isMounted) return;
       const lastChange = getStorageItem<number>(STORAGE_KEYS.DEPLOYMENT_STATE_CHANGED, 0);
       const now = Date.now();
       // If state was changed within the last 10 seconds, refresh immediately
       if (lastChange > 0 && (now - lastChange) < 10000) {
+        deploymentStateFetchRef.current.lastFetch = 0; // Force fetch
         fetchDeploymentState();
       }
     };
 
     // Listen for custom deployment state change events for immediate updates
     const handleDeploymentStateChange = () => {
+      if (!isMounted) return;
+      deploymentStateFetchRef.current.lastFetch = 0; // Force fetch
       fetchDeploymentState();
     };
 
-    window.addEventListener('deploymentStateChanged', handleDeploymentStateChange);
-    
-    // Also poll every 2 seconds to keep state updated (as fallback)
-    const interval = setInterval(() => {
-      checkForStateChange();
+    // Only fetch on initial mount or when deps actually change
+    if (depsChanged || deploymentStateFetchRef.current.lastFetch === 0) {
       fetchDeploymentState();
-    }, 2000);
+    }
     
-    // Also check immediately on mount and when dependencies change
+    // Check for immediate state changes
     checkForStateChange();
     
+    // Listen for custom events
+    window.addEventListener('deploymentStateChanged', handleDeploymentStateChange);
+    
+    // Poll every 5 seconds (reduced from 2 seconds to reduce load)
+    intervalId = setInterval(() => {
+      if (!isMounted) return;
+      checkForStateChange();
+      fetchDeploymentState();
+    }, 5000);
+    
     return () => {
-      clearInterval(interval);
+      isMounted = false;
+      deploymentStateFetchRef.current.isFetching = false;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
       window.removeEventListener('deploymentStateChanged', handleDeploymentStateChange);
     };
   }, [isAuthenticated, deploymentUrl, adminClient, accessToken]);
@@ -243,12 +304,43 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     setStorageItem(STORAGE_KEYS.SETTINGS_SECTION, 'pause-deployment');
   };
 
-  // Project name for future use
-  const _projectName = deploymentMetadata?.projectName || providedProjectName || extractProjectName(deploymentUrl) || 'convex-panel';
-  void _projectName; // Silence unused warning
-  const deploymentName = deploymentMetadata?.deploymentName || extractDeploymentName(deploymentUrl) || 'convex-panel';
+  // Calculate project name with fallbacks
+  const projectName = useMemo(() => {
+    return deploymentMetadata?.projectName || providedProjectName || extractProjectName(deploymentUrl) || 'convex-panel';
+  }, [deploymentMetadata?.projectName, providedProjectName, deploymentUrl]);
+  
+  const deploymentName = useMemo(() => {
+    return deploymentMetadata?.deploymentName || extractDeploymentName(deploymentUrl) || 'convex-panel';
+  }, [deploymentMetadata?.deploymentName, deploymentUrl]);
+  
   const deploymentType = deploymentMetadata?.deploymentType || providedEnvironment || 'development';
   const environment = deploymentType === 'prod' ? 'production' : deploymentType === 'preview' ? 'preview' : 'development';
+  
+  // Ensure project always has a name for ProjectSelector - reactive to projectInfo changes
+  const projectWithName = useMemo(() => {
+    // Prioritize project from projectInfo (fetched from API) over prop
+    const baseProject = projectInfo?.project || project;
+    if (baseProject) {
+      // Use the project's name if it exists and is not empty, otherwise fall back to calculated projectName
+      // Check if baseProject.name is a valid non-empty string
+      const hasValidName = baseProject.name && typeof baseProject.name === 'string' && baseProject.name.trim().length > 0;
+      const finalName = hasValidName ? baseProject.name : projectName;
+      return {
+        ...baseProject,
+        name: finalName,
+      };
+    }
+    // If no project exists, create one with the project name
+    if (projectName && projectName !== 'convex-panel') {
+      return {
+        id: deploymentName || '',
+        name: projectName,
+        slug: projectName,
+        teamId: projectInfo?.team?.id || team?.id || '',
+      };
+    }
+    return undefined;
+  }, [projectInfo, project, projectName, deploymentName, team]);
   
   const handleTabChange = (tab: TabId) => {
     setInternalActiveTab(tab);
@@ -310,7 +402,10 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     <>
       <div className="cp-flex cp-items-center cp-gap-2">
         <ConvexLogo width={20} height={20} />
-        <ProjectSelector team={projectInfo?.team || team} project={projectInfo?.project || project} />
+        <ProjectSelector 
+          team={projectInfo?.team || team} 
+          project={projectWithName}
+        />
       </div>
       <DeploymentDisplay
         environment={environment}
@@ -491,7 +586,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
             <div className="cp-floating-btn-wrapper">
               <button
                 type="button"
-                onClick={() => showGlobalRunner(null, 'click')}
+                onClick={() => showGlobalRunner(null)}
                 className="cp-floating-btn"
                 title="Run functions (Ctrl+`)"
               >

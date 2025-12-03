@@ -4,7 +4,8 @@ import dodoLogo from '../../../../../shared/assets/logos/dodo.webp';
 import autumnLogo from '../../../../../shared/assets/logos/autumn.webp';
 import erquhartLogo from '../../../../../shared/assets/logos/erquhart.webp';
 
-export const DEVELOPER_LOGOS: Record<string, string> = {
+// Store whatever the bundler gives us (string in Vite, StaticImageData in Next, etc.)
+export const DEVELOPER_LOGOS: Record<string, unknown> = {
   'get-convex': convexLogo,
   'devwithbobby': devwithbobbyLogo,
   'dodopayments': dodoLogo,
@@ -13,5 +14,17 @@ export const DEVELOPER_LOGOS: Record<string, string> = {
 };
 
 export function getDeveloperLogoUrl(developer: string): string | undefined {
-  return DEVELOPER_LOGOS[developer];
+  const img = DEVELOPER_LOGOS[developer];
+  if (!img) return undefined;
+
+  if (typeof img === 'string') {
+    return img;
+  }
+
+  // Handle Next.js StaticImageData (which has a .src string field)
+  if (typeof img === 'object' && 'src' in (img as any) && typeof (img as any).src === 'string') {
+    return (img as any).src;
+  }
+
+  return undefined;
 }

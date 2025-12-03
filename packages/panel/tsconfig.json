@@ -7,7 +7,8 @@
       "convex-panel/shared": [
         "../shared/src"
       ]
-    }
+    },
+    "types": ["vite/client", "node", "svelte", "vue"]
   },
   "include": [
     "src/**/*"

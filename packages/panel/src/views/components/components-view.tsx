@@ -5,7 +5,7 @@ import { ComponentDetailSheet } from './components/component-detail-sheet';
 import { useSheetSafe } from '../../contexts/sheet-context';
 import { ALL_COMPONENTS } from './data';
 import { CATEGORIES } from './constants';
-import { ComponentCategory, ComponentInfo } from '../../types/components';
+import type { ComponentCategory, ComponentInfo } from '../../types/components';
 import { useNpmDownloads } from './hooks/useNpmDownloads';
 
 export const ComponentsView: React.FC = () => {

@@ -1,0 +1,330 @@
+/**
+ * Log fetching and processing functions
+ * Handles all log-related API operations including streaming and processing
+ */
+
+import { ROUTES } from '../../utils/constants';
+import type {
+  LogEntry,
+  FunctionExecutionJson,
+  FunctionExecutionLog,
+  ModuleFunction,
+  FetchLogsOptions,
+  FetchLogsResponse,
+} from '../../types';
+import { mockFetchLogsFromApi } from '../mockData';
+import { normalizeToken } from './helpers';
+
+/**
+ * Fetch logs from the Convex API
+ * @param FetchLogsOptions
+ * @returns FetchLogsResponse
+ */
+export async function fetchLogsFromApi({
+  cursor,
+  convexUrl,
+  accessToken,
+  signal,
+  functionId,
+  limit,
+  useMockData = false
+}: FetchLogsOptions & { 
+  useMockData?: boolean;
+  functionId?: string;
+  limit?: number;
+}): Promise<FetchLogsResponse> {
+  if (useMockData) {
+    return mockFetchLogsFromApi(cursor);
+  }
+
+  const urlObj = new URL(convexUrl);
+  const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
+  
+  const url = new URL(`${baseUrl}${ROUTES.STREAM_FUNCTION_LOGS_API}`);
+  const cursorValue = (cursor === 'now' || cursor === '' || !cursor) ? '0' : String(cursor);
+  url.searchParams.set('cursor', cursorValue);
+  if (functionId) {
+    url.searchParams.set('function', functionId);
+  }
+  if (limit) {
+    url.searchParams.set('limit', String(limit));
+  }
+  
+  const normalizedToken = normalizeToken(accessToken);
+  
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      'Authorization': normalizedToken,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-0.0.0',
+    },
+    signal,
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to fetch logs: HTTP ${response.status} - ${errorText}`);
+  }
+  
+  const data = await response.json();
+  
+  const formattedLogs: LogEntry[] = (data.entries || []).map((entry: any) => {
+    const timestamp = entry.timestamp 
+      ? (entry.timestamp > 1e12 ? entry.timestamp : entry.timestamp * 1000)
+      : Date.now();
+    
+    const udfType = entry.udfType || entry.udf_type || entry.type;
+    const identifier = entry.identifier || entry.udf_path || entry.function;
+    const requestId = entry.requestId || entry.request_id || entry.execution_id;
+    
+    const executionTime = entry.executionTime 
+      ? (entry.executionTime < 1000 ? entry.executionTime * 1000 : entry.executionTime)
+      : (entry.execution_time_ms || entry.executionTimeMs);
+    
+    const success = entry.success;
+    let status: string | undefined;
+    
+    if (entry.status) {
+      status = entry.status;
+    } else if (success === null || success === undefined) {
+      status = undefined;
+    } else if (typeof success === 'object' && success !== null) {
+      status = 'success';
+    } else if (success === true) {
+      status = 'success';
+    } else {
+      status = 'error';
+    }
+    
+    return {
+      timestamp,
+      topic: entry.topic || 'console',
+      function: identifier ? {
+        type: udfType,
+        path: identifier,
+        cached: entry.cachedResult || entry.cached || false,
+        request_id: requestId
+      } : undefined,
+      log_level: entry.level || entry.log_level || 'INFO',
+      message: entry.message || entry.logLines?.join('\n') || JSON.stringify(entry),
+      execution_time_ms: executionTime,
+      status,
+      error_message: entry.error || entry.error_message,
+      raw: entry
+    };
+  });
+
+  return {
+    logs: formattedLogs,
+    newCursor: data.newCursor || data.new_cursor,
+    hostname: urlObj.hostname
+  };
+}
+
+/**
+ * Stream UDF execution logs from the Convex API
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param authToken - The authentication token
+ * @param cursor - The cursor to start streaming from
+ * @returns The streamed UDF execution logs
+ */
+export async function streamUdfExecution(
+  deploymentUrl: string,
+  authToken: string,
+  cursor: number | string = 0,
+): Promise<{ entries: FunctionExecutionJson[]; newCursor: number | string }> {
+  const url = `${deploymentUrl}${ROUTES.STREAM_UDF_EXECUTION}?cursor=${cursor}`;
+
+  const normalizedToken = normalizeToken(authToken);
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: normalizedToken,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-1.0.0',
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Failed to stream UDF executions: HTTP ${response.status} - ${text}`);
+  }
+
+  const data = await response.json();
+
+  return {
+    entries: (data.entries || []) as FunctionExecutionJson[],
+    newCursor: data.new_cursor ?? cursor,
+  };
+}
+
+/**
+ * Stream function logs from the Convex API
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param authToken - The authentication token
+ * @param cursor - The cursor to start streaming from
+ * @param sessionId - The session ID to stream from
+ * @param clientRequestCounter - The client request counter to stream from
+ * @returns The streamed function logs
+ */
+export async function streamFunctionLogs(
+  deploymentUrl: string,
+  authToken: string,
+  cursor: number | string = 0,
+  sessionId?: string,
+  clientRequestCounter?: number,
+): Promise<{ entries: FunctionExecutionJson[]; newCursor: number | string }> {
+  const params = new URLSearchParams({
+    cursor: String(cursor),
+  });
+
+  if (sessionId && clientRequestCounter !== undefined) {
+    params.set('session_id', sessionId);
+    params.set('client_request_counter', String(clientRequestCounter));
+  }
+
+  const url = `${deploymentUrl}${ROUTES.STREAM_FUNCTION_LOGS}?${params.toString()}`;
+
+  const normalizedToken = normalizeToken(authToken);
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: normalizedToken,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-1.0.0',
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Failed to stream function logs: HTTP ${response.status} - ${text}`);
+  }
+
+  const data = await response.json();
+
+  return {
+    entries: (data.entries || []) as FunctionExecutionJson[],
+    newCursor: data.new_cursor ?? cursor,
+  };
+}
+
+/**
+ * Process function logs
+ * @param entries - The function execution logs to process
+ * @param selectedFunction - The function to select
+ * @returns The processed function logs
+ */
+export function processFunctionLogs(
+  entries: FunctionExecutionJson[],
+  selectedFunction: ModuleFunction | null,
+): FunctionExecutionLog[] {
+  if (!entries || entries.length === 0) return [];
+
+  const targetIdentifier = selectedFunction?.identifier;
+
+  const normalizeIdentifier = (id: string | undefined | null) =>
+    (id || '').replace(/\.js:/g, ':').replace(/\.js$/g, '');
+
+  const matchesSelected = (entry: FunctionExecutionJson) => {
+    if (!selectedFunction) return true;
+
+    const raw: any = entry as any;
+    const entryPath: string | undefined =
+      raw.udf_path || raw.identifier;
+
+    const normalizedEntryId = normalizeIdentifier(entryPath);
+    const normalizedTargetId = normalizeIdentifier(targetIdentifier);
+
+    return (
+      normalizedEntryId.length > 0 &&
+      normalizedTargetId.length > 0 &&
+      normalizedEntryId === normalizedTargetId
+    );
+  };
+
+  const matchingEntries = entries.filter(matchesSelected);
+  const effectiveEntries =
+    selectedFunction ? matchingEntries : entries;
+
+  return effectiveEntries
+    .map((entry) => {
+      const raw: any = entry as any;
+
+      const udfTypeRaw = (raw.udf_type || raw.udfType || 'query') as string;
+      const componentPath = raw.component_path || raw.componentPath;
+
+      const identifierRaw =
+        raw.identifier ||
+        raw.udf_path ||
+        (componentPath ? `${componentPath}:${raw.identifier}` : '');
+
+      const timestampSec = raw.timestamp ?? raw.execution_timestamp ?? 0;
+      const startedAtMs =
+        timestampSec > 1e12 ? timestampSec : timestampSec * 1000;
+
+      const executionTimeSeconds =
+        raw.execution_time ??
+        (raw.execution_time_ms != null
+          ? raw.execution_time_ms / 1000
+          : raw.executionTimeMs != null
+          ? raw.executionTimeMs / 1000
+          : 0);
+      const durationMs = executionTimeSeconds * 1000;
+      const completedAtMs = startedAtMs + durationMs;
+
+      const logLines = (raw.log_lines || raw.logLines || []).map((line: any) =>
+        typeof line === 'string' ? line : JSON.stringify(line),
+      );
+
+      const success =
+        raw.error == null &&
+        (raw.success === undefined ||
+          raw.success === null ||
+          raw.success === true ||
+          (typeof raw.success === 'object' && raw.success !== null));
+
+      const functionName =
+        typeof identifierRaw === 'string' && identifierRaw.includes(':')
+          ? identifierRaw.split(':').slice(-1)[0]
+          : identifierRaw;
+
+      const functionIdentifier =
+        componentPath && identifierRaw
+          ? `${componentPath}:${identifierRaw}`
+          : identifierRaw;
+
+      return {
+        id: raw.execution_id || raw.executionId || `${identifierRaw}-${startedAtMs}`,
+        functionIdentifier,
+        functionName,
+        udfType: (udfTypeRaw.toLowerCase() || 'query') as any,
+        componentPath,
+        timestamp: startedAtMs,
+        startedAt: startedAtMs,
+        completedAt: completedAtMs,
+        durationMs,
+        success,
+        error: raw.error || raw.error_message,
+        logLines,
+        usageStats: raw.usage_stats || raw.usageStats || {
+          database_read_bytes: 0,
+          database_write_bytes: 0,
+          database_read_documents: 0,
+          storage_read_bytes: 0,
+          storage_write_bytes: 0,
+          vector_index_read_bytes: 0,
+          vector_index_write_bytes: 0,
+          memory_used_mb: 0,
+        },
+        requestId: raw.request_id || raw.requestId || '',
+        executionId: raw.execution_id || raw.executionId || '',
+        caller: raw.caller,
+        environment: raw.environment,
+        identityType: raw.identity_type || raw.identityType || '',
+        returnBytes: raw.return_bytes || raw.returnBytes,
+        raw: raw,
+      } as FunctionExecutionLog;
+    });
+  }
+

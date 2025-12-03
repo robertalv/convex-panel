@@ -7,8 +7,8 @@
         "withGlobalTauri": false
     },
     "package": {
-        "productName": "convex-panel",
-        "version": "0.0.0"
+        "productName": "Convex Panel",
+        "version": "0.1.0"
     },
     "tauri": {
         "allowlist": {
@@ -16,12 +16,23 @@
             "shell": {
                 "all": false,
                 "open": true
+            },
+            "window": {
+                "all": false,
+                "close": true,
+                "hide": true,
+                "show": true,
+                "maximize": true,
+                "minimize": true,
+                "unmaximize": true,
+                "unminimize": true,
+                "startDragging": true
             }
         },
         "bundle": {
             "active": true,
             "targets": "all",
-            "identifier": "dev.robertalvarez.convex-panel",
+            "identifier": "dev.convexpanel.desktop",
             "icon": [
                 "icons/32x32.png",
                 "icons/128x128.png",
@@ -31,15 +42,17 @@
             ]
         },
         "security": {
-            "csp": null
+            "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.visitors.now; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.convex.cloud https://*.convex.site https://api.convexpanel.dev wss://*.convex.cloud"
         },
         "windows": [
             {
                 "fullscreen": false,
                 "resizable": true,
                 "title": "Convex Panel",
-                "width": 800,
-                "height": 600
+                "width": 1200,
+                "height": 800,
+                "minWidth": 800,
+                "minHeight": 600
             }
         ]
     }

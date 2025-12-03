@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Key, Eye, EyeOff, Copy, Check, AlertCircle, Edit2, Trash2, Plus, ClipboardList, X } from 'lucide-react';
 import {
   getAllEnvironmentVariables,
-  getEnvironmentVariable,
   setEnvironmentVariable,
   deleteEnvironmentVariable,
-  batchUpdateEnvironmentVariables,
-  EnvironmentVariable,
-} from '../../../utils/api';
+  batchUpdateEnvironmentVariables
+} from '../../../utils/api/environment';
+import type { EnvironmentVariable } from '../../../utils/api/types';
 import { getAdminClientInfo, validateAdminClientInfo } from '../../../utils/adminClient';
 
 export interface EnvironmentVariablesProps {
