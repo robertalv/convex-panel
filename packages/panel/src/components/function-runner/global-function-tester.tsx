@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FunctionRunner, CustomQuery } from './function-runner';
-import { ModuleFunction, discoverFunctions } from '../../utils/functionDiscovery';
-import { fetchComponents } from '../../utils/api';
+import { FunctionRunner } from './function-runner';
+import { discoverFunctions } from '../../utils/api/functionDiscovery';
+import type { ModuleFunction } from '../../utils/api/functionDiscovery';
+import { fetchComponents } from '../../utils/api/functions';
 import { useIsGlobalRunnerShown, useHideGlobalRunner, useGlobalRunnerSelectedItem, useGlobalRunnerAutoRun } from '../../lib/functionRunner';
+import type { CustomQuery } from '../../types/functions';
 
 interface GlobalFunctionTesterProps {
   adminClient: any;
@@ -18,10 +20,10 @@ export const GlobalFunctionTester: React.FC<GlobalFunctionTesterProps> = ({
   adminClient,
   componentId,
   deploymentUrl,
-  isVertical = false,
-  setIsVertical,
-  isExpanded = false,
-  setIsExpanded,
+  isVertical: _isVertical = false,
+  setIsVertical: _setIsVertical,
+  isExpanded: _isExpanded = false,
+  setIsExpanded: _setIsExpanded,
 }) => {
   const isShowing = useIsGlobalRunnerShown();
   const hideGlobalRunner = useHideGlobalRunner();
@@ -144,7 +146,7 @@ export const GlobalFunctionTester: React.FC<GlobalFunctionTesterProps> = ({
           <FunctionRunner
             onClose={() => {
               setAutoRun(false);
-              hideGlobalRunner('click');
+              hideGlobalRunner();
             }}
             adminClient={adminClient}
             deploymentUrl={deploymentUrl}

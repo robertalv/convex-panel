@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { convexPanel } from './src/vite-plugin';
+import { convexPanel } from './src/vite';
 
-export { convexPanel } from './src/vite-plugin';
-export type { ConvexPanelVitePluginConfig } from './src/vite-plugin';
+export { convexPanel } from './src/vite';
+export type { ConvexPanelVitePluginConfig } from './src/vite';
 
 // Default config for the panel package itself
 export default defineConfig({

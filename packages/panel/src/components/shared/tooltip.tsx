@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, ReactNode } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 interface TooltipProps {
@@ -85,8 +86,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
         left: Math.max(margin, Math.min(initialLeft, window.innerWidth - estimatedWidth - margin)),
       });
 
-      const raf1 = requestAnimationFrame(() => {
-        const raf2 = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
           updatePosition();
           setTimeout(updatePosition, 10);
           setTimeout(updatePosition, 50);

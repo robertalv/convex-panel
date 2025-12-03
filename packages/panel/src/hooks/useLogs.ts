@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchLogsFromApi } from '../utils/api';
-import { LogEntry, FetchLogsResponse } from '../types';
+import { fetchLogsFromApi } from '../utils/api/logs';
+import type { LogEntry, FetchLogsResponse } from '../types';
 
 export interface UseLogsOptions {
   convexUrl?: string;
@@ -21,8 +21,7 @@ export interface UseLogsReturn {
   refreshLogs: () => void;
 }
 
-const POLLING_INTERVAL = 2000; // 2 seconds
-const RETRY_DELAY = 5000; // 5 seconds
+const POLLING_INTERVAL = 2000;
 
 export function useLogs({
   convexUrl,

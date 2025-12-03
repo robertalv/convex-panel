@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { TableDefinition } from '../../../types';
+import type { TableDefinition } from '../../../types';
 import { Card } from '../../../components/shared/card';
 
 export interface SchemaViewProps {

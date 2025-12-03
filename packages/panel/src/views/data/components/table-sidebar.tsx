@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Plus } from 'lucide-react';
-import { TableDefinition } from '../../../types';
-import { ComponentSelector } from '../../../components/function-runner/components/component-selector';
+import type { TableDefinition } from '../../../types';
+import { ComponentSelector } from '../../../components/component-selector';
 
 export interface TableSidebarProps {
   tables: TableDefinition;

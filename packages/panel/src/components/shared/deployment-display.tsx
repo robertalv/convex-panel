@@ -1,6 +1,6 @@
 import React from 'react';
 import { ExternalLink } from 'lucide-react';
-import { EnvType, DeploymentKind } from '../../types';
+import type { EnvType, DeploymentKind } from '../../types';
 
 export interface DeploymentDisplayProps {
   environment?: EnvType;

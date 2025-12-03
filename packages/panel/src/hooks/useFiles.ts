@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchFiles, FileMetadata } from '../utils/api';
+import { fetchFiles } from '../utils/api/files';
+import type { FileMetadata } from '../utils/api/types';
 
 export interface UseFilesProps {
   adminClient: any;

@@ -7,7 +7,7 @@ import { FilesView } from '../views/files';
 import { LogsView } from '../views/logs';
 import { ComponentsView } from '../views/components';
 import { SettingsView } from '../views/settings';
-import { TabId } from '../types/tabs';
+import type { TabId } from '../types/tabs';
 
 interface MainViewsProps {
   activeTab: TabId;
@@ -27,11 +27,11 @@ interface MainViewsProps {
   };
 }
 
-const comingSoonStyle: React.CSSProperties = { padding: '24px', color: '#fff' };
-
-const createComingSoonRenderer =
-  (label: string) => (): React.ReactElement =>
-    <div style={comingSoonStyle}>{`${label} View - Coming Soon`}</div>;
+// Reserved for potential future use:
+// const comingSoonStyle: React.CSSProperties = { padding: '24px', color: '#fff' };
+// const createComingSoonRenderer =
+//   (label: string) => (): React.ReactElement =>
+//     <div style={comingSoonStyle}>{`${label} View - Coming Soon`}</div>;
 
 type ContainerProps = MainViewsProps['containerProps'];
 type TabRenderer = (props: ContainerProps) => React.ReactElement;
@@ -44,7 +44,6 @@ const tabRenderers: Record<TabId, TabRenderer> = {
     <DataView
       convexUrl={deployUrl || baseUrl}
       accessToken={accessToken}
-      baseUrl={baseUrl}
       adminClient={adminClient}
       useMockData={useMockData}
       onError={onError}
@@ -62,26 +61,22 @@ const tabRenderers: Record<TabId, TabRenderer> = {
       onError={onError}
     />
   ),
-  files: ({ deployUrl, baseUrl, accessToken, adminClient, useMockData, onError, teamSlug, projectSlug }) => (
+  files: ({ deployUrl, baseUrl, accessToken, adminClient, useMockData, onError }) => (
     <FilesView
       convexUrl={deployUrl || baseUrl}
       accessToken={accessToken}
-      baseUrl={baseUrl}
       adminClient={adminClient}
       useMockData={useMockData}
       onError={onError}
-      teamSlug={teamSlug}
-      projectSlug={projectSlug}
     />
   ),
-  schedules: ({ adminClient, accessToken, useMockData }) => (
+  schedules: ({ adminClient, useMockData }) => (
     <SchedulesView
       adminClient={adminClient}
-      accessToken={accessToken}
       useMockData={useMockData}
     />
   ),
-  logs: ({ deployUrl, baseUrl, accessToken, adminClient, useMockData, onError, teamSlug, projectSlug }) => (
+  logs: ({ deployUrl, baseUrl, accessToken, adminClient, useMockData, onError }) => (
     <LogsView
       convexUrl={deployUrl || baseUrl}
       accessToken={accessToken}
@@ -89,8 +84,6 @@ const tabRenderers: Record<TabId, TabRenderer> = {
       adminClient={adminClient}
       useMockData={useMockData}
       onError={onError}
-      teamSlug={teamSlug}
-      projectSlug={projectSlug}
     />
   ),
   components: () => <ComponentsView />,

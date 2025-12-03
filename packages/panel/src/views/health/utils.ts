@@ -1,4 +1,4 @@
-import { APIResponse, ChartData, TimeRange } from './types';
+import type { APIResponse, ChartData, TimeRange } from './types';
 
 /**
  * Transform API data to chart format (like Convex dashboard)

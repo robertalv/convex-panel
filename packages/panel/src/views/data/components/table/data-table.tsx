@@ -5,13 +5,13 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {
+import type {
   TableDocument,
   TableDefinition,
   FilterExpression,
 } from '../../../../types';
 import { ContextMenu } from '../../../../components/shared/context-menu';
-import { patchDocumentFields, deleteDocuments } from '../../../../utils/functions';
+import { patchDocumentFields, deleteDocuments } from '../../../../utils/api/documents';
 import { useConfirmSafe } from '../../../../contexts/confirm-dialog-context';
 import { toast } from '../../../../utils/toast';
 import { EmptyTableState } from './empty-table-state';
@@ -25,7 +25,6 @@ import {
   isConvexId,
   DEFAULT_COLUMN_WIDTH,
   MIN_COLUMN_WIDTH,
-  ColumnMeta,
 } from './data-table-utils';
 
 export interface DataTableProps {
@@ -853,7 +852,6 @@ export const DataTable: React.FC<DataTableProps> = ({
                     onCancelEditing={cancelEditing}
                     onCellMenuClick={handleCellMenuClick}
                     isEditableColumn={isEditableColumn}
-                    clampPosition={clampPosition}
                     onNavigateToTable={onNavigateToTable}
                     accessToken={accessToken}
                     teamSlug={teamSlug}

@@ -3,6 +3,9 @@
  * Based on: https://docs.convex.dev/platform-apis/oauth-applications
  */
 
+import { CONVEX_API_DOMAIN, ROUTES } from "./constants";
+import { STORAGE_KEYS, STATE_PAYLOAD_VERSION } from "./constants";
+
 export type TokenScope = 'team' | 'project';
 
 export interface OAuthConfig {
@@ -19,10 +22,10 @@ export interface OAuthToken {
   expires_at?: number; // Optional expiration timestamp
 }
 
-const STORAGE_KEY = 'convex-panel-oauth-token';
-const STATE_STORAGE_KEY = 'convex-panel-oauth-state';
-const USED_CODE_STORAGE_KEY = 'convex-panel-oauth-used-codes';
-const STATE_PAYLOAD_VERSION = 1;
+// const STORAGE_KEY = 'convex-panel-oauth-token';
+// const STATE_STORAGE_KEY = 'convex-panel-oauth-state';
+// const USED_CODE_STORAGE_KEY = 'convex-panel-oauth-used-codes';
+// const STATE_PAYLOAD_VERSION = 1;
 
 const inFlightExchanges = new Map<string, Promise<OAuthToken | null>>();
 
@@ -136,7 +139,7 @@ export async function buildAuthorizationUrl(
       codeChallenge: pkce.codeChallenge.substring(0, 20) + '...',
     });
     pkceCodeVerifier = pkce.codeVerifier;
-    sessionStorage.setItem(`${STATE_STORAGE_KEY}-pkce`, pkce.codeVerifier);
+    sessionStorage.setItem(`${STORAGE_KEYS.OAUTH_STATE}-pkce`, pkce.codeVerifier);
     params.append('code_challenge', pkce.codeChallenge);
     params.append('code_challenge_method', 'S256');
     console.debug('PKCE added to params');
@@ -157,7 +160,7 @@ export async function buildAuthorizationUrl(
   params.set('state', finalState);
 
   try {
-    sessionStorage.setItem(STATE_STORAGE_KEY, finalState);
+    sessionStorage.setItem(STORAGE_KEYS.OAUTH_STATE, finalState);
   } catch (err) {
     console.warn('Failed to store state in sessionStorage:', err);
   }
@@ -268,7 +271,7 @@ export async function exchangeCodeForToken(
   }
 
   try {
-    const response = await fetch('https://api.convex.dev/oauth/token', {
+    const response = await fetch(`https://${CONVEX_API_DOMAIN}${ROUTES.OAUTH_PROD_ENDPOINT}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -304,7 +307,7 @@ export async function exchangeCodeForToken(
  */
 export function storeToken(token: OAuthToken): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(token));
+    localStorage.setItem(STORAGE_KEYS.OAUTH_TOKEN, JSON.stringify(token));
   } catch (e) {
     console.error('Failed to store OAuth token:', e);
   }
@@ -315,7 +318,7 @@ export function storeToken(token: OAuthToken): void {
  */
 export function getStoredToken(): OAuthToken | null {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(STORAGE_KEYS.OAUTH_TOKEN);
     if (!stored) return null;
     
     const token: OAuthToken = JSON.parse(stored);
@@ -338,9 +341,9 @@ export function getStoredToken(): OAuthToken | null {
  */
 export function clearToken(): void {
   try {
-    localStorage.removeItem(STORAGE_KEY);
-    sessionStorage.removeItem(`${STATE_STORAGE_KEY}-pkce`);
-    sessionStorage.removeItem(STATE_STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEYS.OAUTH_TOKEN);
+    sessionStorage.removeItem(`${STORAGE_KEYS.OAUTH_STATE}-pkce`);
+    sessionStorage.removeItem(STORAGE_KEYS.OAUTH_STATE);
   } catch (e) {
     console.error('Failed to clear OAuth token:', e);
   }
@@ -351,7 +354,7 @@ export function clearToken(): void {
  */
 export function getStoredCodeVerifier(): string | null {
   try {
-    return sessionStorage.getItem(`${STATE_STORAGE_KEY}-pkce`);
+    return sessionStorage.getItem(`${STORAGE_KEYS.OAUTH_STATE}-pkce`);
   } catch (e) {
     return null;
   }
@@ -365,7 +368,7 @@ export function getStoredCodeVerifier(): string | null {
  */
 function isCodeUsed(code: string): boolean {
   try {
-    const usedCodes = sessionStorage.getItem(USED_CODE_STORAGE_KEY);
+    const usedCodes = sessionStorage.getItem(STORAGE_KEYS.OAUTH_USED_CODES);
     if (!usedCodes) return false;
     const codes = JSON.parse(usedCodes) as string[];
     return codes.includes(code);
@@ -379,7 +382,7 @@ function isCodeUsed(code: string): boolean {
  */
 function markCodeAsUsed(code: string): void {
   try {
-    const usedCodes = sessionStorage.getItem(USED_CODE_STORAGE_KEY);
+    const usedCodes = sessionStorage.getItem(STORAGE_KEYS.OAUTH_USED_CODES);
     const codes = usedCodes ? (JSON.parse(usedCodes) as string[]) : [];
     if (!codes.includes(code)) {
       codes.push(code);
@@ -387,7 +390,7 @@ function markCodeAsUsed(code: string): void {
       if (codes.length > 10) {
         codes.shift();
       }
-      sessionStorage.setItem(USED_CODE_STORAGE_KEY, JSON.stringify(codes));
+      sessionStorage.setItem(STORAGE_KEYS.OAUTH_USED_CODES, JSON.stringify(codes));
     }
   } catch (e) {
     console.warn('Failed to mark code as used:', e);
@@ -427,7 +430,7 @@ export async function handleOAuthCallback(
   const exchangePromise = (async () => {
     try {
       // Verify state if stored
-      const storedState = sessionStorage.getItem(STATE_STORAGE_KEY);
+      const storedState = sessionStorage.getItem(STORAGE_KEYS.OAUTH_STATE);
       if (storedState && state !== storedState) {
         throw new Error('OAuth state mismatch');
       }
@@ -447,8 +450,8 @@ export async function handleOAuthCallback(
       markCodeAsUsed(code);
       
       // Clean up
-      sessionStorage.removeItem(`${STATE_STORAGE_KEY}-pkce`);
-      sessionStorage.removeItem(STATE_STORAGE_KEY);
+      sessionStorage.removeItem(`${STORAGE_KEYS.OAUTH_STATE}-pkce`);
+      sessionStorage.removeItem(STORAGE_KEYS.OAUTH_STATE);
       
       // Clean URL immediately to prevent React from reading it again
       window.history.replaceState({}, document.title, window.location.pathname);

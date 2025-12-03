@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AlertCircle, Package, Trash2 } from 'lucide-react';
+import { AlertCircle, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import {
   getComponents,
   deleteComponent,
-  Component,
-} from '../../../utils/api';
+} from '../../../utils/api/components';
 import { getAdminClientInfo, validateAdminClientInfo } from '../../../utils/adminClient';
+import type { Component } from '../../../utils/api/types';
 
 const DeleteButtonWithTooltip: React.FC<{
   isActive: boolean;
@@ -52,15 +52,6 @@ const DeleteButtonWithTooltip: React.FC<{
           left: Math.max(margin, Math.min(left, window.innerWidth - tooltipWidth - margin)),
         });
       };
-
-      // Update position after tooltip renders
-      const raf1 = requestAnimationFrame(() => {
-        const raf2 = requestAnimationFrame(() => {
-          updatePosition();
-          setTimeout(updatePosition, 10);
-          setTimeout(updatePosition, 50);
-        });
-      });
 
       window.addEventListener('scroll', updatePosition, true);
       window.addEventListener('resize', updatePosition);

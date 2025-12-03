@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { ChartData, TimeRange } from '../types';
+import type { ChartData, TimeRange } from '../types';
 import { generateColor, formatFunctionName } from '../../../utils';
 import { transformFunctionToSVGPath, getCurrentTimeX } from '../utils';
 

@@ -29,10 +29,6 @@ export const TooltipAction: React.FC<{
         const spaceBelow = window.innerHeight - rect.bottom - margin;
         const spaceAbove = rect.top - margin;
         
-        // Check if there's enough space on the right
-        const spaceRight = window.innerWidth - rect.right;
-        const spaceLeft = rect.left;
-        
         // Determine vertical placement
         let placement: 'top' | 'bottom' = 'bottom';
         let top: number;
@@ -82,8 +78,8 @@ export const TooltipAction: React.FC<{
       };
 
       // Use requestAnimationFrame to ensure DOM is ready
-      const raf1 = requestAnimationFrame(() => {
-        const raf2 = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
           updatePosition();
           // Update again after tooltip renders to get accurate dimensions
           setTimeout(updatePosition, 10);

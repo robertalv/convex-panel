@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import Editor, { BeforeMount, OnMount } from '@monaco-editor/react';
-import { executeCustomQuery, FunctionResult } from '../utils/functionExecution';
+import Editor, { type BeforeMount, type OnMount } from '../components/editor/lazy-monaco-editor';
+import { executeCustomQuery } from '../utils/api/functionExecution';
+import type { FunctionResult } from '../utils/api/functionExecution';
 import { useThemeSafe } from './useTheme';
 
 interface UseFunctionEditorProps {
@@ -283,52 +284,37 @@ export function useFunctionEditor({
 
   const queryEditor = (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '8px 12px',
-          borderBottom: '1px solid var(--color-panel-border)',
+      <Editor
+        height="100%"
+        defaultLanguage="typescript"
+        theme={monacoTheme}
+        value={code}
+        beforeMount={handleEditorWillMount}
+        onMount={handleEditorDidMount}
+        onChange={(value: string | undefined) => {
+          if (value !== null && value !== undefined) {
+            setCode(value);
+          }
         }}
-      >
-        <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-panel-text-secondary)' }}>
-          Custom Query
-        </span>
-      </div>
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <Editor
-          height="100%"
-          defaultLanguage="typescript"
-          theme={monacoTheme}
-          value={code}
-          beforeMount={handleEditorWillMount}
-          onMount={handleEditorDidMount}
-          onChange={(value) => {
-            if (value !== null && value !== undefined) {
-              setCode(value);
-            }
-          }}
-          options={{
-            automaticLayout: true,
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            fontSize: 13,
-            fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
-            lineNumbers: 'on',
-            lineNumbersMinChars: 3,
-            scrollbar: {
-              horizontalScrollbarSize: 8,
-              verticalScrollbarSize: 8,
-            },
-            wordWrap: 'on',
-            tabSize: 2,
-            readOnly: false,
-            domReadOnly: false,
-            contextmenu: true,
-          }}
-        />
-      </div>
+        options={{
+          automaticLayout: true,
+          minimap: { enabled: false },
+          scrollBeyondLastLine: false,
+          fontSize: 13,
+          fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
+          lineNumbers: 'on',
+          lineNumbersMinChars: 3,
+          scrollbar: {
+            horizontalScrollbarSize: 8,
+            verticalScrollbarSize: 8,
+          },
+          wordWrap: 'on',
+          tabSize: 2,
+          readOnly: false,
+          domReadOnly: false,
+          contextmenu: true,
+        }}
+      />
     </div>
   );
 

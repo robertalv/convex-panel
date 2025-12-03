@@ -1,5 +1,5 @@
 import React from 'react';
-import { Team, Project } from '../../types';
+import type { Team, Project } from '../../types';
 import { Avatar } from './avatar';
 
 export interface ProjectSelectorProps {

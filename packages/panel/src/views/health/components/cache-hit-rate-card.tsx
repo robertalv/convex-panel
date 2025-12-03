@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { HealthCard } from './health-card';
 import { FunctionRateChart } from './function-rate-chart';
-import { APIResponse } from '../types';
+import type { APIResponse } from '../types';
 import { transformToChartData, getTimeRange } from '../utils';
-import { fetchCacheHitRate } from '../../../utils/api';
+import { fetchCacheHitRate } from '../../../utils/api/metrics';
 
 interface CacheHitRateCardProps {
   deploymentUrl?: string;
@@ -21,13 +21,18 @@ export const CacheHitRateCard: React.FC<CacheHitRateCardProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!deploymentUrl || !authToken) {
+      setLoading(false);
+      return;
+    }
+
     let mounted = true;
 
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
-        const result = await fetchCacheHitRate(deploymentUrl || '', authToken, useMockData);
+        const result = await fetchCacheHitRate(deploymentUrl, authToken, useMockData);
         if (mounted) {
           setData(result);
         }

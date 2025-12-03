@@ -1,10 +1,10 @@
 import React from 'react';
-import { ContextMenuEntry } from '../../../../components/shared/context-menu';
+import type { ContextMenuEntry } from '../../../../components/shared/context-menu';
 import { copyToClipboard } from '../../../../utils/toast';
 import { formatValue } from './data-table-utils';
 import { DocumentViewer } from '../document-viewer';
 import { CellViewer } from '../cell-viewer';
-import { FilterExpression, FilterClause } from '../../../../types';
+import type { FilterExpression, FilterClause } from '../../../../types';
 
 export const buildCellMenuItems = (
   column: string,

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { discoverFunctions, groupFunctionsByPath, ModuleFunction, FunctionGroup } from '../utils/functionDiscovery';
+import { discoverFunctions, groupFunctionsByPath } from '../utils/api/functionDiscovery';
+import type { ModuleFunction, FunctionGroup } from '../utils/api/functionDiscovery';
 
 export interface UseFunctionsProps {
   adminClient: any;

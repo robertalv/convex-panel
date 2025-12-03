@@ -29,7 +29,6 @@ import { ModuleFunction } from '../../utils/functionDiscovery';
 
 export interface SchedulesViewProps {
   adminClient?: any;
-  accessToken?: string;
   useMockData?: boolean;
 }
 
@@ -50,7 +49,6 @@ const formatTimestamp = (timestamp: number | bigint): string => {
 
 export const SchedulesView: React.FC<SchedulesViewProps> = ({
   adminClient,
-  accessToken,
   useMockData = false,
 }) => {
   const [selectedTab, setSelectedTab] = useState<'scheduled' | 'cron'>('scheduled');

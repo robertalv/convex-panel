@@ -1,21 +1,24 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ConvexReactClient, useConvex } from 'convex/react';
 import { ConvexClient } from 'convex/browser';
 import { ToastProvider } from './components/toast';
-import { useOAuth, UseOAuthReturn } from './hooks/useOAuth';
+import { useOAuth } from './hooks/useOAuth';
+import type { UseOAuthReturn } from './hooks/useOAuth';
 import { MainViews } from './components/main-view';
 import { BottomSheet } from './components/bottom-sheet';
 import { AuthPanel } from './components/auth-panel';
 import { OAuthErrorPopup } from './components/oauth-error-popup';
 import { getConvexUrl, getOAuthConfigFromEnv, isDevelopment } from './utils/env';
-import { extractProjectName, getTeamTokenFromEnv } from './utils/api';
-import { Team, Project } from './types';
+import { getTeamTokenFromEnv } from './utils/api/utils';
+import type { Team, Project } from './types';
 import { useActiveTab } from './hooks/useActiveTab';
-import { ThemeProvider, Theme } from './hooks/useTheme';
+import { ThemeProvider } from './hooks/useTheme';
+import type { Theme } from './hooks/useTheme';
 import { SheetProvider } from './contexts/sheet-context';
 import { ConfirmDialogProvider } from './contexts/confirm-dialog-context';
 import { getStorageItem, setStorageItem } from './utils/storage';
 import { STORAGE_KEYS } from './utils/constants';
+import { setupGlobalErrorHandling } from './utils/error-handling';
 
 export interface ConvexPanelProps {
   convex?: ConvexReactClient | any;
@@ -66,6 +69,11 @@ const ConvexPanel = ({
   settings,
   ...restProps
 }: ConvexPanelProps) => {
+  // Set up global error handling on mount
+  useEffect(() => {
+    setupGlobalErrorHandling();
+  }, []);
+
   const [isMounted, setIsMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -76,14 +84,63 @@ const ConvexPanel = ({
   const [activeTab, setActiveTab] = useActiveTab();
 
   let convexFromContext: any;
+  let convexError: Error | null = null;
   try {
     convexFromContext = useConvex();
   } catch (e) {
+    convexError = e instanceof Error ? e : new Error(String(e));
     convexFromContext = undefined;
+    if (typeof window !== 'undefined' && isDevelopment()) {
+      console.warn('[ConvexPanel] useConvex() failed:', convexError.message);
+    }
   }
 
   const convex = providedConvex || convexFromContext;
-  const deployUrl = providedDeployUrl || getConvexUrl();
+  
+  const deployUrlFromClient = useMemo(() => {
+    if (convex) {
+      const url = 
+        (convex as any).address || 
+        (convex as any)._baseUrl || 
+        (convex as any).baseUrl ||
+        (convex as any).url ||
+        (convex as any)?._client?.address ||
+        (convex as any)?._client?._baseUrl ||
+        (convex as any)?._client?.baseUrl ||
+        (convex as any)?._client?.url ||
+        (convex as any)?._httpClient?.baseURL ||
+        (convex as any)?._client?._httpClient?.baseURL;
+      
+      return url || null;
+    }
+    return null;
+  }, [convex]);
+  
+  const deployUrlFromEnv = useMemo(() => {
+    const envUrl = getConvexUrl();
+    if (envUrl) return envUrl;
+    
+    if (typeof window !== 'undefined') {
+      try {
+        // Check Next.js __NEXT_DATA__
+        const nextData = (window as any).__NEXT_DATA__;
+        if (nextData?.env) {
+          const nextUrl = nextData.env.NEXT_PUBLIC_CONVEX_URL || nextData.env.VITE_CONVEX_URL;
+          if (nextUrl) {
+            if (isDevelopment()) {
+              console.log('[ConvexPanel] Found deployUrl in window.__NEXT_DATA__.env:', nextUrl);
+            }
+            return nextUrl;
+          }
+        }
+              } catch (e) {
+        // Ignore
+      }
+    }
+    return undefined;
+  }, []);
+  
+  const deployUrl = providedDeployUrl || deployUrlFromClient || deployUrlFromEnv;
 
   // Memoize OAuth config to prevent infinite loops (new object on every render)
   // Environment variables don't change during runtime, so we can safely memoize
@@ -101,17 +158,19 @@ const ConvexPanel = ({
     return getTeamTokenFromEnv() || undefined;
   }, [providedTeamAccessToken]);
 
-  // Track if we should allow automatic OAuth callback handling
-  const [allowAutoCallback, setAllowAutoCallback] = useState(false);
-  
   // OAuth authentication (skip if mockup mode or auth provided)
   const internalAuth = useOAuth(mockup || providedAuth ? null : (oauthConfig || null));
   const oauth = providedAuth || internalAuth;
 
-  // Determine which token to use (OAuth or manual)
+  // Determine which token to use (OAuth, provided, or from environment)
   // In mockup mode, skip authentication
-  const effectiveAccessToken = mockup ? undefined : (oauth.token?.access_token || providedAccessToken || undefined);
-  const isAuthenticated = mockup ? true : (oauth.isAuthenticated || !!providedAccessToken);
+  // Priority: OAuth token > provided accessToken > envTeamAccessToken
+  const effectiveAccessToken = mockup 
+    ? undefined 
+    : (oauth.token?.access_token || providedAccessToken || envTeamAccessToken || undefined);
+  const isAuthenticated = mockup 
+    ? true 
+    : (oauth.isAuthenticated || !!providedAccessToken || !!envTeamAccessToken);
 
   // Set mounted state and inject analytics script
   // Note: CSS injection is handled by Shadow DOM wrapper if using ConvexPanelShadow
@@ -140,26 +199,26 @@ const ConvexPanel = ({
     }
   }, [isOpen]);
 
-  // Create admin client - use OAuth token or deployKey
+  // Create admin client - use OAuth token, deployKey, or envTeamAccessToken
   const adminClient = useMemo(() => {
     if (!isMounted) return null;
-    // Create adminClient if we have a URL and either deployKey or OAuth token
-    if (deployUrl && (providedDeployKey || effectiveAccessToken)) {
+    // Create adminClient if we have a URL and either deployKey, OAuth token, or env token
+    if (deployUrl && (providedDeployKey || effectiveAccessToken || envTeamAccessToken)) {
       return new ConvexClient(deployUrl);
     }
     return null;
-  }, [deployUrl, providedDeployKey, effectiveAccessToken, isMounted]);
+  }, [deployUrl, providedDeployKey, effectiveAccessToken, envTeamAccessToken, isMounted]);
 
-  // Set admin auth - prefer deployKey, fall back to OAuth token
+  // Set admin auth - prefer deployKey, fall back to OAuth token, then envTeamAccessToken
   useEffect(() => {
     if (!isMounted || !adminClient) return;
 
-    // Use deployKey if available, otherwise use OAuth token
-    const authToken = providedDeployKey || effectiveAccessToken;
+    // Use deployKey if available, otherwise use OAuth token, then envTeamAccessToken
+    const authToken = providedDeployKey || effectiveAccessToken || envTeamAccessToken;
     if (authToken) {
       (adminClient as any).setAdminAuth(authToken);
     }
-  }, [adminClient, providedDeployKey, effectiveAccessToken, isMounted]);
+  }, [adminClient, providedDeployKey, effectiveAccessToken, envTeamAccessToken, isMounted]);
 
   // Don't render during SSR
   if (typeof window === 'undefined') {
@@ -199,10 +258,15 @@ const ConvexPanel = ({
     }
 
     // Validate configuration and endpoint before connecting
+    // Skip endpoint check in development to avoid CORS issues
     try {
       const { validateOAuthSetup } = await import('./utils/oauthValidation');
-      const validation = await validateOAuthSetup(oauthConfig);
+      const isDev = isDevelopment();
+      const validation = await validateOAuthSetup(oauthConfig, { 
+        checkEndpoint: !isDev // Only check endpoint in production
+      });
       
+      // Only block on actual configuration errors, not endpoint reachability issues
       if (!validation.isValid || validation.errors.length > 0) {
         setValidationError({
           errors: validation.errors,
@@ -210,6 +274,11 @@ const ConvexPanel = ({
         });
         setShowErrorPopup(true);
         return;
+      }
+      
+      // Show warnings but don't block
+      if (validation.warnings.length > 0) {
+        console.warn('[ConvexPanel] OAuth setup warnings:', validation.warnings);
       }
 
       // If there are only warnings, show them but allow continuation
@@ -256,7 +325,7 @@ const ConvexPanel = ({
           <BottomSheet
           isOpen={isAuthenticated ? isOpen : false}
           onClose={toggleOpen}
-          projectName={deployUrl ? extractProjectName(deployUrl) : undefined}
+          projectName={deployUrl ? undefined : ''}
           deploymentUrl={deployUrl}
           environment="development"
           isAuthenticated={isAuthenticated}

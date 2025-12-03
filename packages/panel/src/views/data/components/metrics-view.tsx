@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { fetchTableRate, TimeseriesBucket } from '../../../utils/api';
+import { fetchTableRate } from '../../../utils/api/metrics';
+import type { TimeseriesBucket } from '../../../utils/api/types';
 import { Card } from '../../../components/shared/card';
 
 export interface MetricsViewProps {
@@ -7,7 +8,6 @@ export interface MetricsViewProps {
   deploymentUrl?: string;
   accessToken?: string;
   componentId?: string | null;
-  onClose?: () => void;
 }
 
 export const MetricsView: React.FC<MetricsViewProps> = ({
@@ -15,7 +15,6 @@ export const MetricsView: React.FC<MetricsViewProps> = ({
   deploymentUrl,
   accessToken,
   componentId,
-  onClose,
 }) => {
   const [readsData, setReadsData] = useState<TimeseriesBucket[]>([]);
   const [writesData, setWritesData] = useState<TimeseriesBucket[]>([]);
@@ -73,69 +72,69 @@ export const MetricsView: React.FC<MetricsViewProps> = ({
   };
 
   // Calculate max value for Y-axis scaling
-  const maxValue = useMemo(() => {
-    const allValues = [
-      ...readsData.map(d => d.metric || 0),
-      ...writesData.map(d => d.metric || 0),
-    ];
-    if (allValues.length === 0) return 4;
-    const max = Math.max(...allValues);
-    // Round up to nearest nice number
-    if (max === 0) return 4;
-    const magnitude = Math.pow(10, Math.floor(Math.log10(max)));
-    return Math.ceil(max / magnitude) * magnitude;
-  }, [readsData, writesData]);
+  // const maxValue = useMemo(() => {
+  //   const allValues = [
+  //     ...readsData.map(d => d.metric || 0),
+  //     ...writesData.map(d => d.metric || 0),
+  //   ];
+  //   if (allValues.length === 0) return 4;
+  //   const max = Math.max(...allValues);
+  //   // Round up to nearest nice number
+  //   if (max === 0) return 4;
+  //   const magnitude = Math.pow(10, Math.floor(Math.log10(max)));
+  //   return Math.ceil(max / magnitude) * magnitude;
+  // }, [readsData, writesData]);
 
-  const graphHeight = 200;
-  const graphWidth = 600;
+  // const graphHeight = 200;
+  // const graphWidth = 600;
 
   // Generate time labels from data
-  const timeLabels = useMemo(() => {
-    const times = readsData.length > 0 
-      ? readsData.map(d => d.time)
-      : writesData.length > 0
-        ? writesData.map(d => d.time)
-        : [];
+  // const timeLabels = useMemo(() => {
+  //   const times = readsData.length > 0 
+  //     ? readsData.map(d => d.time)
+  //     : writesData.length > 0
+  //       ? writesData.map(d => d.time)
+  //       : [];
     
-    // Sample every nth label to avoid crowding
-    const sampleRate = Math.max(1, Math.floor(times.length / 7));
-    return times
-      .filter((_, i) => i % sampleRate === 0 || i === times.length - 1)
-      .map(formatTime);
-  }, [readsData, writesData]);
+  //   // Sample every nth label to avoid crowding
+  //   const sampleRate = Math.max(1, Math.floor(times.length / 7));
+  //   return times
+  //     .filter((_, i) => i % sampleRate === 0 || i === times.length - 1)
+  //     .map(formatTime);
+  // }, [readsData, writesData]);
 
   // Render data line for a graph
-  const renderDataLine = (data: TimeseriesBucket[], color: string) => {
-    if (data.length === 0 || maxValue === 0) return null;
+  // const renderDataLine = (data: TimeseriesBucket[], color: string) => {
+  //   if (data.length === 0 || maxValue === 0) return null;
 
-    const points = data
-      .map((bucket, index) => {
-        const x = (index / (data.length - 1)) * graphWidth;
-        const y = graphHeight - ((bucket.metric || 0) / maxValue) * graphHeight;
-        return `${x},${y}`;
-      })
-      .join(' ');
+  //   const points = data
+  //     .map((bucket, index) => {
+  //       const x = (index / (data.length - 1)) * graphWidth;
+  //       const y = graphHeight - ((bucket.metric || 0) / maxValue) * graphHeight;
+  //       return `${x},${y}`;
+  //     })
+  //     .join(' ');
 
-    const areaPoints = `${points} ${graphWidth},${graphHeight} 0,${graphHeight}`;
+  //   const areaPoints = `${points} ${graphWidth},${graphHeight} 0,${graphHeight}`;
 
-    return (
-      <>
-        <polygon
-          points={areaPoints}
-          fill={`color-mix(in srgb, ${color} 18%, transparent)`}
-          stroke="none"
-        />
-        <polyline
-          points={points}
-          fill="none"
-          stroke={color}
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </>
-    );
-  };
+  //   return (
+  //     <>
+  //       <polygon
+  //         points={areaPoints}
+  //         fill={`color-mix(in srgb, ${color} 18%, transparent)`}
+  //         stroke="none"
+  //       />
+  //       <polyline
+  //         points={points}
+  //         fill="none"
+  //         stroke={color}
+  //         strokeWidth={2}
+  //         strokeLinecap="round"
+  //         strokeLinejoin="round"
+  //       />
+  //     </>
+  //   );
+  // };
 
   const formatNumber = (value: number) => {
     if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;

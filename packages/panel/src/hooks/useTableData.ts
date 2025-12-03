@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { 
+import type { 
   TableDefinition, 
   TableDocument, 
   PaginationOptions, 
@@ -10,8 +10,8 @@ import {
   SortConfig
 } from '../types';
 import { saveActiveTable, getTableFilters } from '../utils/storage';
-import { fetchTablesFromApi } from '../utils/api';
-import { patchDocumentFields } from '../utils/functions';
+import { fetchTablesFromApi } from '../utils/api/tables';
+import { patchDocumentFields } from '../utils/api/documents';
 import { mockFetchTablesFromApi } from '../utils/mockData';
 
 export const useTableData = ({
@@ -29,13 +29,6 @@ export const useTableData = ({
    * @required
    */
   accessToken,
-
-  /**
-   * The base URL for the API.
-   * Used to configure the connection to the backend.
-   * @required
-   */
-  baseUrl,
 
   /**
    * Convex admin client instance.
@@ -443,33 +436,6 @@ export const useTableData = ({
     // If the table doesn't exist in our tables object, create a fallback table definition
     if (!tables[tableName]) {
       console.warn(`Table ${tableName} not found in tables. Using fallback definition.`);
-      
-      // Create a basic fallback table definition with _id and _creationTime
-      const fallbackTable = {
-        type: 'object',
-        fields: [
-          {
-            fieldName: '_id',
-            optional: false,
-            shape: { type: 'string' }
-          },
-          {
-            fieldName: '_creationTime',
-            optional: false,
-            shape: { type: 'number' }
-          },
-          {
-            fieldName: 'name',
-            optional: false,
-            shape: { type: 'string' }
-          },
-          {
-            fieldName: 'description',
-            optional: false,
-            shape: { type: 'string' }
-          }
-        ]
-      };
       
       // Generate basic documents with the fallback definition
       const mockDocs: TableDocument[] = [];

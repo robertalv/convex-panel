@@ -9,17 +9,13 @@ import datadogLogo from '../../../../../shared/assets/integrations/dd_icon_rgb.w
 import fivetranLogo from '../../../../../shared/assets/integrations/fivetran-blue.svg';
 import airbyteLogo from '../../../../../shared/assets/integrations/airbyte.svg';
 
-export interface IntegrationsProps {
-  adminClient?: any;
-  accessToken?: string;
-  deploymentUrl?: string;
-}
-
 interface Integration {
   id: string;
   name: string;
   type: 'Exception Reporting' | 'Log Stream' | 'Streaming Export';
-  logo: string;
+  // `logo` can be a string (Vite/webpack) or `StaticImageData` (Next.js),
+  // so keep it broad here and let consumers narrow as needed.
+  logo: any;
   tooltip: React.ReactNode;
 }
 
@@ -188,11 +184,7 @@ const INTEGRATIONS: Integration[] = [
   },
 ];
 
-export const Integrations: React.FC<IntegrationsProps> = ({
-  adminClient,
-  accessToken,
-  deploymentUrl,
-}) => {
+export const Integrations: React.FC = () => {
   return (
     <div
       style={{

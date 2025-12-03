@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { ColumnMeta } from './data-table-utils';
+import type { ColumnMeta } from './data-table-utils';
 
 export interface SchemaHoverLabelProps {
   column: string;

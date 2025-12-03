@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Bot,
   Mail,
@@ -23,10 +22,9 @@ import {
   Wallet,
   Gauge,
   Zap,
-  HardDrive,
   Type,
 } from 'lucide-react';
-import { ComponentInfo, ComponentCategory } from '../../../types/components';
+import type { ComponentInfo, ComponentCategory } from '../../../types/components';
 import { getComponentImageUrl } from '../utils/images';
 
 const getGradient = (index: number, category: string): { gradientFrom: string; gradientTo: string } => {

@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle } from 'lucide-react';
-import {
-  getAuthProviders,
+import type {
   AuthProvider,
   OIDCProvider,
-  CustomJWTProvider,
-} from '../../../utils/api';
+  CustomJWTProvider
+} from '../../../utils/api/types';
+import { getAuthProviders } from '../../../utils/api/auth';
 
 export interface AuthenticationProps {
   adminClient?: any;
-  accessToken?: string;
-  deploymentUrl?: string;
 }
 
 const isOIDCProvider = (provider: AuthProvider): provider is OIDCProvider => {
@@ -22,9 +20,7 @@ const isCustomJWTProvider = (provider: AuthProvider): provider is CustomJWTProvi
 };
 
 export const Authentication: React.FC<AuthenticationProps> = ({
-  adminClient,
-  accessToken,
-  deploymentUrl: providedDeploymentUrl,
+  adminClient
 }) => {
   const [authProviders, setAuthProviders] = useState<AuthProvider[]>([]);
   const [isLoading, setIsLoading] = useState(true);
