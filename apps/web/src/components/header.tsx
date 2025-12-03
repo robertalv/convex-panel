@@ -5,9 +5,9 @@ import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
 
 const navLinks = [
-  { label: "Home", href: "/" },
-  { label: "Docs", href: "/docs" },
-  { label: "Changelog", href: "/changelog" },
+  { label: "Visit Convex", href: "https://convex.link/cpanel" },
+  // { label: "Docs", href: "/docs" },
+  // { label: "Changelog", href: "/changelog" },
 ];
 
 export function Header() {
