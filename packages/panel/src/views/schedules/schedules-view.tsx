@@ -15,9 +15,9 @@ import {
 } from 'lucide-react';
 import React, { Activity, useEffect, useState } from 'react';
 import { FixedSizeList } from 'react-window';
-import { ComponentSelector } from '../../components/function-runner/components/component-selector';
-import { FunctionSelector } from '../../components/function-runner/components/function-selector';
-import { CustomQuery } from '../../components/function-runner/function-runner';
+import { ComponentSelector } from '../../../src/components/component-selector';
+import { FunctionSelector } from '../../../src/components/function-runner/function-selector';
+
 import { useComponents } from '../../hooks/useComponents';
 import { useCronJobs } from '../../hooks/useCronJobs';
 import { useFunctions } from '../../hooks/useFunctions';
@@ -25,7 +25,8 @@ import { usePaginatedScheduledJobs } from '../../hooks/usePaginatedScheduledJobs
 // import { logsViewStyles } from '../../styles/panelStyles';
 import { getDeploymentUrl } from '../../utils/adminClient';
 import { formatCronSchedule, formatRelativeTime } from '../../utils/cronFormatters';
-import { ModuleFunction } from '../../utils/functionDiscovery';
+import type { ModuleFunction } from '../../../src/utils/api/functionDiscovery';
+import type { CustomQuery } from '../../../src/types/functions';
 
 export interface SchedulesViewProps {
   adminClient?: any;

@@ -1,10 +1,13 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Sparkles } from 'lucide-react';
+import { usePortalEnvironment } from '../contexts/portal-context';
 
 export function AskAI() {
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const shadowRootRef = useRef<ShadowRoot | Document | null>(null);
+  const { ownerDocument } = usePortalEnvironment();
+  const resolvedDocument = ownerDocument ?? (typeof document !== 'undefined' ? document : null);
 
   // Helper function to get the shadow root or document
   const getRoot = useCallback(() => {
@@ -29,8 +32,12 @@ export function AskAI() {
   useEffect(() => {
     // Always load script in main document (not Shadow DOM) so widget can create overlays
     // Check if script is already loaded
+    if (!resolvedDocument) {
+      return undefined;
+    }
+
     const scriptSelector = 'script[src="https://widget.kapa.ai/kapa-widget.bundle.js"]';
-    const existingScript = document.querySelector(scriptSelector);
+    const existingScript = resolvedDocument.querySelector(scriptSelector);
 
     if (existingScript) {
       setIsScriptLoaded(true);
@@ -64,7 +71,7 @@ export function AskAI() {
       };
 
       // Always append to main document body (not Shadow DOM)
-      document.body.appendChild(script);
+      resolvedDocument.body.appendChild(script);
     }
 
     // Set up event listener in main document to handle Shadow DOM clicks
@@ -83,15 +90,37 @@ export function AskAI() {
     };
 
     // Listen for custom event that can cross Shadow DOM boundary
-    document.addEventListener('kapa-ai-open', handleKapaOpen);
+    resolvedDocument.addEventListener('kapa-ai-open', handleKapaOpen);
 
     return () => {
       // Cleanup event listener
-      document.removeEventListener('kapa-ai-open', handleKapaOpen);
+      resolvedDocument.removeEventListener('kapa-ai-open', handleKapaOpen);
     };
+  }, [resolvedDocument]);
+
+  const waitForKapa = useCallback(async () => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    const kapaWindow = window as any;
+    if (kapaWindow.kapa && typeof kapaWindow.kapa.open === 'function') {
+      return kapaWindow.kapa;
+    }
+
+    // Poll for up to 2 seconds
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (kapaWindow.kapa && typeof kapaWindow.kapa.open === 'function') {
+        return kapaWindow.kapa;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    return null;
   }, []);
 
-  const handleClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleClick = useCallback(async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -99,14 +128,14 @@ export function AskAI() {
     const isShadowDOM = root instanceof ShadowRoot;
 
     // Wait a moment for the widget to be ready if script just loaded
-    const tryOpen = () => {
+    const tryOpen = async () => {
       // Method 1: Try to access the global Kapa object (most reliable)
       // Since script is loaded in main document, window.kapa should be available
       if (typeof window !== 'undefined') {
-        const kapaWindow = window as any;
-        if (kapaWindow.kapa && typeof kapaWindow.kapa.open === 'function') {
+        const kapaInstance = await waitForKapa();
+        if (kapaInstance && typeof kapaInstance.open === 'function') {
           try {
-            kapaWindow.kapa.open();
+            kapaInstance.open();
             return;
           } catch (err) {
             console.error('Error opening Kapa widget:', err);
@@ -116,31 +145,36 @@ export function AskAI() {
 
       // Method 2: Dispatch a custom event that bubbles to main document
       // This allows Shadow DOM clicks to be detected by scripts in main document
-      if (isShadowDOM && buttonRef.current) {
+      if (resolvedDocument) {
         const customEvent = new CustomEvent('kapa-ai-open', {
           bubbles: true,
           cancelable: true,
           composed: true, // This allows the event to cross Shadow DOM boundary
         });
-        buttonRef.current.dispatchEvent(customEvent);
+        if (buttonRef.current) {
+          buttonRef.current.dispatchEvent(customEvent);
+        }
+        resolvedDocument.dispatchEvent(customEvent);
       }
 
       // Method 3: Try to trigger via class selector in main document
       // The widget should listen for clicks on elements with js-launch-kapa-ai class
-      const elements = document.querySelectorAll('.js-launch-kapa-ai');
-      elements.forEach((el) => {
-        // Create and dispatch a click event
-        const clickEvent = new MouseEvent('click', {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-          composed: true, // Allow event to cross Shadow DOM boundary
+      if (resolvedDocument) {
+        const elements = resolvedDocument.querySelectorAll('.js-launch-kapa-ai');
+        elements.forEach((el) => {
+          // Create and dispatch a click event
+          const clickEvent = new MouseEvent('click', {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            composed: true, // Allow event to cross Shadow DOM boundary
+          });
+          el.dispatchEvent(clickEvent);
         });
-        el.dispatchEvent(clickEvent);
-      });
+      }
 
       // Method 4: Try to find and click the Kapa trigger button in main document
-      const kapaButton = document.querySelector('[data-kapa-button]') as HTMLElement;
+      const kapaButton = resolvedDocument?.querySelector('[data-kapa-button]') as HTMLElement | null;
       if (kapaButton) {
         kapaButton.click();
       }
@@ -152,7 +186,7 @@ export function AskAI() {
       // If script isn't loaded yet, wait a bit and try again
       setTimeout(tryOpen, 500);
     }
-  }, [isScriptLoaded, getRoot]);
+  }, [getRoot, isScriptLoaded, resolvedDocument, waitForKapa]);
 
   return (
     <button

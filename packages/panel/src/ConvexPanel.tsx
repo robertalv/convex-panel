@@ -16,6 +16,7 @@ import { ThemeProvider } from './hooks/useTheme';
 import type { Theme } from './hooks/useTheme';
 import { SheetProvider } from './contexts/sheet-context';
 import { ConfirmDialogProvider } from './contexts/confirm-dialog-context';
+import { PortalProvider } from './contexts/portal-context';
 import { getStorageItem, setStorageItem } from './utils/storage';
 import { STORAGE_KEYS } from './utils/constants';
 import { setupGlobalErrorHandling } from './utils/error-handling';
@@ -44,6 +45,8 @@ export interface ConvexPanelProps {
   project?: Project;
   /** Initial theme for the panel. Defaults to 'dark'. User's preference is persisted in localStorage. */
   defaultTheme?: Theme;
+  /** Optional portal container for overlays rendered from within the panel */
+  portalContainer?: Element | DocumentFragment | null;
   [key: string]: any;
 }
 
@@ -67,6 +70,7 @@ const ConvexPanel = ({
   theme,
   mergedTheme,
   settings,
+  portalContainer,
   ...restProps
 }: ConvexPanelProps) => {
   // Set up global error handling on mount
@@ -172,8 +176,6 @@ const ConvexPanel = ({
     ? true 
     : (oauth.isAuthenticated || !!providedAccessToken || !!envTeamAccessToken);
 
-  // Set mounted state and inject analytics script
-  // Note: CSS injection is handled by Shadow DOM wrapper if using ConvexPanelShadow
   useEffect(() => {
     setIsMounted(true);
 
@@ -318,6 +320,7 @@ const ConvexPanel = ({
 
   // Root container with scoped styles - no CSS imports
   return (
+    <PortalProvider value={portalContainer ?? null}>
     <ThemeProvider defaultTheme={defaultTheme}>
       <SheetProvider>
         <ConfirmDialogProvider>
@@ -392,6 +395,7 @@ const ConvexPanel = ({
         </ConfirmDialogProvider>
       </SheetProvider>
     </ThemeProvider>
+    </PortalProvider>
   );
 };
 

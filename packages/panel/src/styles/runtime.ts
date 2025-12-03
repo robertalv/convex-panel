@@ -130,72 +130,76 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   transition-duration: var(--tw-duration, 0s);
 }
 .cp-theme-dark {
-  --color-panel-bg: #0F1115;
-  --color-panel-bg-secondary: #16181D;
-  --color-panel-bg-tertiary: #1C1F26;
-  --color-panel-border: #2D313A;
-  --color-panel-text: #ffffff;
-  --color-panel-text-secondary: #9ca3af;
-  --color-panel-text-muted: #6b7280;
-  --color-panel-accent: #34D399;
-  --color-panel-accent-hover: #26a878;
-  --color-panel-success: #10b981;
-  --color-panel-warning: #f59e0b;
-  --color-panel-error: #ef4444;
-  --color-panel-info: #3b82f6;
-  --color-panel-httpaction: #8b5cf6;
-  --color-panel-hover: rgba(255, 255, 255, 0.05);
-  --color-panel-active: rgba(255, 255, 255, 0.1);
+  --color-panel-bg: rgb(30, 28, 26);
+  --color-panel-bg-secondary: rgb(42, 40, 37);
+  --color-panel-bg-tertiary: rgb(60, 58, 55);
+  --color-panel-border: rgba(163, 156, 148, 0.3);
+  --color-panel-text: rgb(255, 255, 255);
+  --color-panel-text-secondary: rgb(185, 177, 170);
+  --color-panel-text-muted: rgb(143, 135, 128);
+  --color-panel-highlight-bg: rgb(109, 82, 23);
+  --color-panel-highlight-border: var(--color-panel-success);
+  --color-panel-accent: rgb(99, 168, 248);
+  --color-panel-accent-hover: rgb(143, 190, 255);
+  --color-panel-success: var(--green-200);
+  --color-panel-warning: var(--yellow-200);
+  --color-panel-error: var(--red-200);
+  --color-panel-info: var(--info);
+  --color-panel-httpaction: var(--purple-500);
+  --color-panel-hover: rgba(255, 255, 255, 0.06);
+  --color-panel-active: rgba(255, 255, 255, 0.12);
   --color-panel-shadow: rgba(0, 0, 0, 0.5);
-  --color-panel-code-bg: #1a1d24;
-  --color-panel-scrollbar: #3f4451;
-  --color-panel-scrollbar-hover: #5c6370;
+  --color-panel-code-bg: rgb(42, 40, 37);
+  --color-panel-scrollbar: rgb(107, 107, 107);
+  --color-panel-scrollbar-hover: rgb(147, 147, 147);
   --cp-data-header-bg: var(--color-panel-bg-secondary);
-  --cp-data-header-text: var(--color-panel-text-secondary);
+  --cp-data-header-text: var(--color-panel-text-muted);
   --cp-data-header-border: var(--color-panel-border);
   --cp-data-row-border: var(--color-panel-border);
   --cp-data-row-hover-bg: rgba(255, 255, 255, 0.04);
   --cp-data-row-selected-bg: rgba(255, 255, 255, 0.08);
   --cp-data-cell-hover-bg: rgba(255, 255, 255, 0.06);
-  --cp-data-highlight-bg: rgba(52, 211, 153, 0.16);
-  --cp-data-highlight-border: rgba(52, 211, 153, 0.45);
+  --cp-data-highlight-bg: var(--color-panel-highlight-bg);
+  --cp-data-highlight-border: var(--color-panel-highlight-border);
   --cp-data-menu-bg: var(--color-panel-bg-tertiary);
   --cp-data-menu-border: var(--color-panel-border);
-  --cp-data-resize-indicator: var(--color-panel-success);
+  --cp-data-resize-indicator: var(--color-panel-accent);
 }
 .cp-theme-light {
-  --color-panel-bg: #ffffff;
-  --color-panel-bg-secondary: #f9fafb;
-  --color-panel-bg-tertiary: #f3f4f6;
-  --color-panel-border: #e5e7eb;
-  --color-panel-text: #111827;
-  --color-panel-text-secondary: #6b7280;
-  --color-panel-text-muted: #9ca3af;
-  --color-panel-accent: #34D399;
-  --color-panel-accent-hover: #26a878;
-  --color-panel-success: #059669;
-  --color-panel-warning: #d97706;
-  --color-panel-error: #dc2626;
-  --color-panel-info: #2563eb;
-  --color-panel-httpaction: #7c3aed;
-  --color-panel-hover: rgba(0, 0, 0, 0.05);
-  --color-panel-active: rgba(0, 0, 0, 0.1);
-  --color-panel-shadow: rgba(0, 0, 0, 0.12);
-  --color-panel-code-bg: #f9fafb;
-  --color-panel-scrollbar: #d1d5db;
-  --color-panel-scrollbar-hover: #9ca3af;
-  --cp-data-header-bg: var(--color-panel-bg);
+  --color-panel-bg: rgb(243, 240, 237);
+  --color-panel-bg-secondary: rgb(253, 252, 250);
+  --color-panel-bg-tertiary: rgb(240, 238, 235);
+  --color-panel-border: rgba(33, 34, 30, 0.14);
+  --color-panel-text: rgb(42, 40, 37);
+  --color-panel-text-secondary: rgb(120, 118, 113);
+  --color-panel-text-muted: rgb(120, 118, 113);
+  --color-panel-highlight-bg: rgb(254, 252, 232);
+  --color-panel-highlight-border: var(--color-panel-success);
+  --color-panel-accent: rgb(48, 106, 207);
+  --color-panel-accent-hover: rgb(33, 34, 181);
+  --color-panel-success: rgb(34, 137, 9);
+  --color-panel-warning: rgb(109, 82, 23);
+  --color-panel-error: rgb(168, 21, 21);
+  --color-panel-info: rgb(7, 191, 232);
+  --color-panel-httpaction: rgb(141, 38, 118);
+  --color-panel-hover: rgba(30, 28, 25, 0.06);
+  --color-panel-active: rgba(30, 28, 25, 0.1);
+  --color-panel-shadow: rgba(30, 28, 25, 0.18);
+  --color-panel-code-bg: rgb(249, 247, 238);
+  --color-panel-scrollbar: rgb(193, 193, 193);
+  --color-panel-scrollbar-hover: rgb(125, 125, 125);
+  --cp-data-header-bg: var(--color-panel-bg-secondary);
   --cp-data-header-text: var(--color-panel-text-secondary);
   --cp-data-header-border: var(--color-panel-border);
   --cp-data-row-border: var(--color-panel-border);
-  --cp-data-row-hover-bg: rgba(15, 23, 42, 0.05);
-  --cp-data-row-selected-bg: rgba(15, 23, 42, 0.09);
-  --cp-data-cell-hover-bg: rgba(15, 23, 42, 0.08);
-  --cp-data-highlight-bg: rgba(34, 197, 94, 0.2);
-  --cp-data-highlight-border: rgba(34, 197, 94, 0.45);
+  --cp-data-row-hover-bg: rgba(30, 28, 25, 0.05);
+  --cp-data-row-selected-bg: rgba(30, 28, 25, 0.08);
+  --cp-data-cell-hover-bg: rgba(30, 28, 25, 0.06);
+  --cp-data-highlight-bg: var(--color-panel-highlight-bg);
+  --cp-data-highlight-border: var(--color-panel-highlight-border);
   --cp-data-menu-bg: var(--color-panel-bg-tertiary);
   --cp-data-menu-border: var(--color-panel-border);
-  --cp-data-resize-indicator: var(--color-panel-success);
+  --cp-data-resize-indicator: var(--color-panel-accent);
 }
 @layer components {
   .cp-panel-container {
@@ -345,24 +349,24 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   }
   @keyframes highlight {
     0% {
-      background-color: transparent;
+      background-color: var(--color-panel-bg-secondary);
     }
     50% {
-      background-color: var(--cp-data-highlight-bg);
+      background-color: var(--color-panel-highlight-bg);
     }
     100% {
-      background-color: transparent;
+      background-color: var(--color-panel-bg-secondary);
     }
   }
   @keyframes highlightBorder {
     0% {
-      box-shadow: 0 0 0 0 transparent;
+      box-shadow: 0 0 0 0 var(--color-panel-highlight-border);
     }
     50% {
-      box-shadow: 0 0 0 1px var(--cp-data-highlight-border);
+      box-shadow: 0 0 0 1px var(--color-panel-highlight-border);
     }
     100% {
-      box-shadow: 0 0 0 0 transparent;
+      box-shadow: 0 0 0 0 var(--color-panel-highlight-border);
     }
   }
   @keyframes fadeIn {
@@ -840,7 +844,7 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     background-color: var(--color-panel-accent-hover);
   }
   .cp-resize-handle {
-    height: 8px;
+    height: 2px;
     cursor: ns-resize;
     background-color: transparent;
     position: absolute;
@@ -848,6 +852,19 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     left: 0;
     right: 0;
     z-index: 10;
+    transition: background 0.15s ease;
+  }
+  .cp-resize-handle:hover {
+    background: radial-gradient(ellipse at center, var(--color-panel-accent) 0%, transparent 70%);
+    @supports (color: color-mix(in lab, red, red)) {
+      background: radial-gradient(ellipse at center, color-mix(in srgb, var(--color-panel-accent) 50%, transparent) 0%, transparent 70%);
+    }
+    @supports (color: color-mix(in lab, red, red)) {
+      background: radial-gradient(ellipse at center, var(--color-panel-accent) 0%, transparent 70%);
+      @supports (color: color-mix(in lab, red, red)) {
+        background: radial-gradient(ellipse at center, color-mix(in srgb, var(--color-panel-accent) 50%, transparent) 0%, transparent 70%);
+      }
+    }
   }
   .cp-sidebar {
     width: 48px;
@@ -856,7 +873,7 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 16px 0;
+    padding: 8px 0;
     gap: 8px;
     flex-shrink: 0;
   }
@@ -910,7 +927,7 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     width: 3px;
     height: 24px;
     border-radius: 999px;
-    background: #34D399;
+    background: var(--color-panel-accent);
   }
   .cp-tooltip {
     position: absolute;
@@ -1746,7 +1763,6 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   padding-left: 12px;
   padding-right: 12px;
   border-bottom: 1px solid var(--color-panel-border);
-  padding-bottom: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;

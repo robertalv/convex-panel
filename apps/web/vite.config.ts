@@ -39,11 +39,23 @@ export default defineConfig(({ mode }) => {
     ],
     resolve: {
       alias: {
-        'convex-panel/styles.css': path.resolve(__dirname, '../../packages/panel/src/styles/tailwind.css'),
-        'convex-panel/nextjs': path.resolve(__dirname, '../../packages/panel/src/nextjs/index.tsx'),
-        'convex-panel/react': path.resolve(__dirname, '../../packages/panel/src/react/index.tsx'),
+        'convex-panel/styles.css': path.resolve(
+          __dirname,
+          '../../packages/panel/src/styles/tailwind.css',
+        ),
+        'convex-panel/nextjs': path.resolve(
+          __dirname,
+          '../../packages/panel/src/nextjs/index.tsx',
+        ),
+        'convex-panel/react': path.resolve(
+          __dirname,
+          '../../packages/panel/src/react/index.tsx',
+        ),
         'convex-panel': path.resolve(__dirname, '../../packages/panel/src/index.ts'),
       },
+      // Ensure all packages (including convex-panel and framer-motion)
+      // share a single React instance to avoid "invalid hook call" errors.
+      dedupe: ['react', 'react-dom'],
     },
     define: {
       __CONVEX_ACCESS_TOKEN__: JSON.stringify(convexAccessToken),

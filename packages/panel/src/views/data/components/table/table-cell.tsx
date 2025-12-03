@@ -76,20 +76,28 @@ export const TableCell: React.FC<TableCellProps> = ({
     <td
       style={{
         padding: 0,
-        borderRight: '1px solid var(--color-panel-border)',
+        borderRight: '1px solid var(--cp-data-row-border)',
         width,
         minWidth: width,
         maxWidth: width,
-        transition: 'background-color 0.35s ease',
+        transition: 'background-color 0.35s ease, box-shadow 0.35s ease',
         backgroundColor: isEditing
           ? 'var(--color-panel-bg-secondary)'
           : isHighlighted
-            ? 'rgba(52, 211, 153, 0.18)'
+            ? 'var(--cp-data-highlight-bg)'
             : isMenuOpen
               ? 'var(--color-panel-active)'
               : isHovered
                 ? 'var(--color-panel-hover)'
                 : 'transparent',
+        boxShadow: isHighlighted
+          ? '0 0 0 1px var(--cp-data-highlight-border)'
+          : isMenuOpen
+            ? '0 0 0 1px var(--color-panel-active)'
+            : 'none',
+        animation: isHighlighted
+          ? 'var(--animate-highlight), var(--animate-highlightBorder)'
+          : undefined,
         position: 'relative',
       }}
       onMouseEnter={onMouseEnter}

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle } from 'lucide-react';
+import { usePortalEnvironment } from '../../contexts/portal-context';
 
 export interface ConfirmDialogProps {
   isOpen: boolean;
@@ -23,17 +24,20 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   cancelLabel = 'Cancel',
   variant = 'danger',
 }) => {
+  const { container, ownerDocument } = usePortalEnvironment();
+  const portalTarget = container ?? ownerDocument?.body ?? null;
   // Prevent body scroll when dialog is open
   useEffect(() => {
+    if (!portalTarget || !ownerDocument?.body) return;
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      ownerDocument.body.style.overflow = 'hidden';
     } else {
-      document.body.style.overflow = '';
+      ownerDocument.body.style.overflow = '';
     }
     return () => {
-      document.body.style.overflow = '';
+      ownerDocument.body.style.overflow = '';
     };
-  }, [isOpen]);
+  }, [isOpen, ownerDocument, portalTarget]);
 
   // Handle escape key
   useEffect(() => {
@@ -46,7 +50,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     return () => window.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !portalTarget) return null;
 
   const variantColors = {
     danger: {
@@ -230,7 +234,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         }
       `}</style>
     </>,
-    document.body,
+    portalTarget,
   );
 };
 

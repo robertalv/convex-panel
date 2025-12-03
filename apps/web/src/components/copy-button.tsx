@@ -1,3 +1,5 @@
+'use client'
+
 import { Button } from './ui/button'
 import { Terminal } from 'lucide-react'
 import { useState } from 'react'
@@ -17,7 +19,7 @@ export function CopyButton() {
     <Button
       asChild
       size="lg"
-      className="rounded-xl px-5 text-base font-mono flex items-center cursor-pointer"
+      className="rounded-xl px-5 text-base font-mono flex items-center cursor-pointer bg-background-secondary/40 backdrop-blur-sm hover:bg-background-secondary/70"
       onClick={handleCopy}>
       <div className="flex items-center gap-2">
         <Terminal className="size-4 animate-bounce" />

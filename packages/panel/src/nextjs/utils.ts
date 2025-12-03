@@ -58,3 +58,5 @@ export const getConvexUrlFromNext = (): string | undefined => {
   return getNextEnvVar('CONVEX_URL');
 };
 
+
+

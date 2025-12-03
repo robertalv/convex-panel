@@ -76,20 +76,28 @@ export const TableRow: React.FC<TableRowProps> = ({
   projectSlug,
 }) => {
   const isSelected = selectedDocumentIds.includes(document._id);
+  const baseRowBackground = 'var(--color-panel-bg-secondary)';
+
+  const rowBackgroundColor = isSelected
+    ? 'var(--cp-data-row-selected-bg)'
+    : baseRowBackground;
+
+  const rowBoxShadow = isNewRow
+    ? '0 0 0 0 var(--color-panel-highlight-border)'
+    : 'none';
+
+  const rowAnimation = isNewRow
+    ? 'var(--animate-highlight), var(--animate-highlightBorder)'
+    : undefined;
 
   return (
     <tr
       style={{
-        borderBottom: '1px solid var(--color-panel-border)',
+        borderBottom: '1px solid var(--cp-data-row-border)',
         transition: 'background-color 0.35s ease, box-shadow 0.35s ease',
-        backgroundColor: isSelected
-          ? 'var(--color-panel-active)'
-          : isNewRow
-            ? 'rgba(52, 211, 153, 0.12)'
-            : 'transparent',
-        boxShadow: isNewRow
-          ? '0 0 0 1px rgba(52, 211, 153, 0.25)'
-          : 'none',
+        backgroundColor: rowBackgroundColor,
+        boxShadow: rowBoxShadow,
+        animation: rowAnimation,
       }}
     >
       <td
@@ -101,7 +109,7 @@ export const TableRow: React.FC<TableRowProps> = ({
           maxWidth: 40,
           position: 'sticky',
           left: 0,
-          backgroundColor: 'var(--color-panel-bg)',
+          backgroundColor: rowBackgroundColor,
           zIndex: 11,
         }}
       >
@@ -112,7 +120,7 @@ export const TableRow: React.FC<TableRowProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            borderRight: '1px solid var(--color-panel-border)',
+            borderRight: '1px solid var(--cp-data-row-border)',
           }}
         >
           <Checkbox

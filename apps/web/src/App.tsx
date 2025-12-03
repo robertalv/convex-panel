@@ -15,11 +15,6 @@ const convex = new ConvexReactClient(convexUrl);
 export default function App() {
   useEffect(() => {
     document.documentElement.lang = "en";
-    document.documentElement.classList.add("dark");
-
-    return () => {
-      document.documentElement.classList.remove("dark");
-    };
   }, []);
 
   return (

@@ -17,4 +17,11 @@ export {
   type SheetContent,
 } from './sheet-context';
 
+export {
+  PortalProvider,
+  usePortalContainer,
+  usePortalEnvironment,
+  usePortalTarget,
+} from './portal-context';
+
 

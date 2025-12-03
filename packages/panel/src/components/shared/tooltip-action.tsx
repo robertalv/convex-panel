@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { usePortalTarget } from '../../contexts/portal-context';
 
 export const TooltipAction: React.FC<{ 
   icon: React.ReactNode; 
@@ -14,6 +15,7 @@ export const TooltipAction: React.FC<{
   } | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const portalTarget = usePortalTarget();
 
   useEffect(() => {
     if (showTooltip && triggerRef.current) {
@@ -113,7 +115,7 @@ export const TooltipAction: React.FC<{
           {icon}
         </button>
       </div>
-      {showTooltip && tooltipPosition && typeof document !== 'undefined' && (
+      {showTooltip && tooltipPosition && portalTarget && (
         createPortal(
           <div 
             ref={tooltipRef}
@@ -134,7 +136,7 @@ export const TooltipAction: React.FC<{
               }}
             />
           </div>,
-          document.body
+          portalTarget
         )
       )}
     </>

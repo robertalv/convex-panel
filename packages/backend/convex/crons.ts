@@ -4,20 +4,13 @@ import { internal } from "./_generated/api";
 
 const crons = cronJobs();
 
-// Archive todos older than 1 hour - runs every hour
+// Keep GitHub / npm OSS stats in sync. This is a fallback if you don't
+// configure the GitHub webhook; with the webhook configured this just
+// makes sure things stay fresh.
 crons.interval(
-  "archive old todos",
-  { hours: 1 }, 
-  internal.todos.archiveOldTodos
+  "sync convex-panel stars",
+  { minutes: 15 },
+  internal.stats.syncStars,
 );
-
-// Delete completed todos - runs every hour
-crons.interval(
-  "delete completed todos",
-  { hours: 1 }, 
-  internal.todos.deleteCompletedTodos
-);
-
-
 
 export default crons;

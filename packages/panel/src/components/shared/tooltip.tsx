@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { usePortalTarget } from '../../contexts/portal-context';
 
 interface TooltipProps {
   content: ReactNode;
@@ -23,6 +24,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const portalTarget = usePortalTarget();
 
   useEffect(() => {
     if (showTooltip && triggerRef.current) {
@@ -209,7 +211,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
       >
         {children}
       </div>
-      {showTooltip && tooltipPosition && typeof document !== 'undefined' && (
+      {showTooltip && tooltipPosition && portalTarget && (
         createPortal(
           <div
             ref={tooltipRef}
@@ -240,7 +242,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
             {content}
             <div style={getArrowStyle()} />
           </div>,
-          document.body
+          portalTarget
         )
       )}
     </>

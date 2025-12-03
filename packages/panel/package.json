@@ -51,10 +51,9 @@
     },
     "./vue": {
       "types": "./dist/vue/index.d.ts",
+      "vue": "./dist/vue/ConvexPanelVue.vue",
       "import": "./dist/vue/index.esm.js",
-      "require": "./dist/vue/index.js",
-      "default": "./dist/vue/index.js",
-      "vue": "./dist/vue/ConvexPanelVue.vue"
+      "require": "./dist/vue/index.js"
     }
   },
   "files": [

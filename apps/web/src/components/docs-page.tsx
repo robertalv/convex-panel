@@ -1,291 +1,289 @@
-import { HeroHeader } from "./hero5-header";
-import { CopyButton } from "./copy-button";
-import { TextEffect } from "./motion-primitives/text-effect";
-import { AnimatedGroup } from "./motion-primitives/animated-group";
+import React, { useMemo, useState } from "react";
+import {
+  Activity,
+  Database,
+  FileCode,
+  Layout,
+  Play,
+  Server,
+  Settings,
+  Terminal,
+} from "lucide-react";
+import { motion } from "framer-motion";
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+import type { DocsNavSection, DocsPath, Framework } from "./docs/constants";
+import { CommandPalette } from "./docs/command-palette";
+import { FrameworkSelector } from "./docs/framework-selector";
+import {
+  ConfigurationContent,
+  EnvironmentContent,
+  GenericViewContent,
+  InstallationContent,
+  IntroContent,
+  QuickStartContent,
+} from "./docs/sections";
+import { OnThisPage, PageHeader } from "./docs/layout";
 
-const sections = [
-  { id: "overview", label: "Overview" },
-  { id: "installation", label: "Installation" },
-  { id: "connecting-to-convex", label: "Connecting to Convex" },
-  { id: "using-the-panel", label: "Using the Panel" },
-  { id: "data-view", label: "Data view" },
-  { id: "logs-and-health", label: "Logs & health" },
-  { id: "embedding", label: "Embedding the panel" },
+function cn(...inputs: (string | undefined | null | false)[]) {
+  return twMerge(clsx(inputs));
+}
+
+const docsNav: DocsNavSection[] = [
+  {
+    title: "Overview",
+    items: [
+      {
+        label: "Introduction",
+        href: "/docs",
+        icon: Layout,
+        description: "What is Convex Panel?",
+      },
+      {
+        label: "Installation",
+        href: "/docs/installation",
+        icon: Terminal,
+        description: "Add the package to your project",
+      },
+      {
+        label: "Environment Setup",
+        href: "/docs/environment",
+        icon: Settings,
+        description: "Configure variables & connections",
+      },
+    ],
+  },
+  {
+    title: "Integration",
+    items: [
+      {
+        label: "Quick Start",
+        href: "/docs/quick-start",
+        icon: Play,
+        description: "Get up and running in seconds",
+      },
+      {
+        label: "Configuration",
+        href: "/docs/configuration",
+        icon: Server,
+        description: "Customizing behavior and themes",
+      },
+    ],
+  },
+  {
+    title: "Features",
+    items: [
+      {
+        label: "Data View",
+        href: "/docs/data-view",
+        icon: Database,
+        description: "Browse and edit your data",
+      },
+      {
+        label: "Logs View",
+        href: "/docs/logs-view",
+        icon: Activity,
+        description: "Real-time function logs",
+      },
+      {
+        label: "Functions Runner",
+        href: "/docs/functions",
+        icon: FileCode,
+        description: "Test queries & mutations",
+      },
+    ],
+  },
 ];
 
-export default function DocsPage() {
+export const DocsPage: React.FC = () => {
+  const [framework, setFramework] = useState<Framework>("react");
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [currentPath, setCurrentPath] = useState<DocsPath>("/docs");
+
+  const showFrameworkSelector = useMemo(
+    () =>
+      ["/docs/installation", "/docs/environment", "/docs/quick-start"].includes(
+        currentPath,
+      ),
+    [currentPath],
+  );
+
+  const currentContent = useMemo(() => {
+    switch (currentPath) {
+      case "/docs":
+        return <IntroContent />;
+      case "/docs/installation":
+        return <InstallationContent framework={framework} />;
+      case "/docs/environment":
+        return <EnvironmentContent framework={framework} />;
+      case "/docs/quick-start":
+        return <QuickStartContent framework={framework} />;
+      case "/docs/configuration":
+        return <ConfigurationContent />;
+      case "/docs/data-view":
+        return (
+          <GenericViewContent
+            title="Data View"
+            description="Browse, filter, sort, and edit your Convex tables with an intuitive interface designed for speed and reliability."
+            features={[
+              "Table Browser: View all tables with paginated data display",
+              "Advanced Filtering: Query-based filtering with date ranges and full-text search",
+              "In-place Editing: Double-click any cell to edit (auto-converts types)",
+              "Context Menu: Right-click for quick actions (copy, delete, view details)",
+            ]}
+          />
+        );
+      case "/docs/logs-view":
+        return (
+          <GenericViewContent
+            title="Logs View"
+            description="Real-time function logs with powerful filtering and search capabilities."
+            features={[
+              "Type Filtering: SUCCESS, FAILURE, DEBUG, WARNING, ERROR, HTTP",
+              "Full-text Search: Search across all log messages instantly",
+              "Time Range: Filter logs by specific time periods to debug historical issues",
+              "Export: Download logs in JSON format for external analysis",
+            ]}
+          />
+        );
+      case "/docs/functions":
+        return (
+          <GenericViewContent
+            title="Functions Runner"
+            description="Test and debug your Convex functions directly from the panel without writing a script."
+            features={[
+              "Function Runner: Execute queries, mutations, and actions",
+              "Code Inspection: View source code with syntax highlighting",
+              "Input Editor: Monaco-powered editor with JSON validation",
+              "Performance Metrics: View execution time and gas consumption",
+            ]}
+          />
+        );
+      default:
+        return (
+          <IntroContent />
+        );
+    }
+  }, [currentPath, framework]);
+
   return (
-    <>
-      <HeroHeader />
-      <main className="min-h-screen bg-background/95 text-foreground">
-        <div className="relative pt-24 md:pt-28 pb-24">
-          {/* Soft gradient backdrop */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+    <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+      <CommandPalette
+        open={cmdOpen}
+        setOpen={setCmdOpen}
+        docsNav={docsNav}
+        onNavigate={(href) => setCurrentPath(href)}
+      />
+
+      <div className="flex flex-col lg:flex-row gap-10 lg:gap-16">
+        {/* Sidebar Desktop */}
+        <aside className="hidden lg:flex w-64 flex-col gap-6 sticky top-[90px] h-[calc(100vh-8rem)]">
+          <button
+            type="button"
+            onClick={() => setCmdOpen(true)}
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-background-secondary/50 border border-border/60 text-sm text-content-secondary hover:text-content-primary hover:border-border hover:bg-background-secondary transition-all group shadow-sm text-left"
           >
-            <div className="absolute inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_top,_rgba(52,211,153,0.18),_transparent_60%)]" />
-            <div className="absolute -right-40 top-40 h-64 w-64 rounded-full bg-[radial-gradient(circle,_rgba(243,176,28,0.16),_transparent_70%)] blur-3xl" />
-          </div>
+            <Terminal className="w-4 h-4 opacity-50 group-hover:opacity-100" />
+            <span className="flex-1">Search docs...</span>
+            <kbd className="hidden xl:inline-flex items-center gap-0.5 px-1.5 h-5 text-[10px] font-medium text-content-tertiary bg-background-tertiary rounded border border-border">
+              <span className="text-xs">⌘</span>
+              K
+            </kbd>
+          </button>
 
-          <div className="mx-auto flex max-w-6xl gap-10 px-6 lg:px-8">
-            {/* Sidebar */}
-            <aside className="sticky top-28 hidden h-fit w-56 shrink-0 md:block">
-              <div className="rounded-2xl border border-border/60 bg-muted/30 p-3 text-xs">
-                <p className="mb-2 px-2 text-[11px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
-                  Docs
-                </p>
-                <nav className="space-y-1.5">
-                  {sections.map((section) => (
-                    <a
-                      key={section.id}
-                      href={`#${section.id}`}
-                      className="block rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-background/60 hover:text-[#34D399]"
-                    >
-                      {section.label}
-                    </a>
-                  ))}
-                </nav>
-              </div>
-            </aside>
+          <nav className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-10 space-y-8">
+            {docsNav.map((section) => (
+              <div key={section.title}>
+                <h3 className="text-[11px] font-bold text-content-tertiary uppercase tracking-widest mb-3 pl-3">
+                  {section.title}
+                </h3>
+                <ul className="space-y-0.5">
+                  {section.items.map((item) => {
+                    const isActive = currentPath === item.href;
+                    return (
+                      <li key={item.href}>
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPath(item.href)}
+                          className={cn(
+                            "relative flex w-full items-center py-2 px-3 rounded-md text-sm transition-all duration-200 group text-left",
+                            isActive
+                              ? "text-content-primary font-medium bg-background-secondary"
+                              : "text-content-secondary hover:text-content-primary hover:bg-background-secondary/50",
+                          )}
+                        >
+                          {isActive && (
+                            <motion.div
+                              layoutId="sidebar-active-pill"
+                              className="absolute left-[-4px] top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-full shadow-[0_0_8px_rgba(var(--primary),0.6)]"
+                              transition={{
+                                type: "spring",
+                                stiffness: 400,
+                                damping: 30,
+                              }}
+                            />
+                          )}
 
-            {/* Main content */}
-            <div className="flex-1 space-y-16">
-              {/* Header */}
-              <section id="overview" className="space-y-6">
-                <TextEffect
-                  as="p"
-                  preset="fade-in-blur"
-                  speedSegment={0.25}
-                  className="inline-flex items-center rounded-full border border-[#34D399]/20 bg-[#34D399]/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.22em] text-[#D1FAE5]"
-                >
-                  Convex Panel · Documentation
-                </TextEffect>
-
-                <div className="space-y-4">
-                  <TextEffect
-                    as="h1"
-                    preset="fade-in-blur"
-                    speedSegment={0.3}
-                    className="text-balance text-3xl font-semibold tracking-tight md:text-4xl"
-                  >
-                    Build, debug, and operate your Convex app in real time.
-                  </TextEffect>
-                  <p className="max-w-2xl text-sm text-muted-foreground md:text-base">
-                    Convex Panel is a developer-focused control panel for your Convex
-                    backend. Inspect data, stream logs, run functions, and keep your
-                    deployment healthy – all in a single, beautiful interface that feels
-                    like part of your app, not an afterthought.
-                  </p>
-                </div>
-
-                <AnimatedGroup
-                  className="mt-6 flex flex-wrap items-center gap-3"
-                  variants={{
-                    container: {
-                      visible: {
-                        transition: { staggerChildren: 0.05 },
-                      },
-                    },
-                    item: {
-                      hidden: { opacity: 0, y: 8 },
-                      visible: {
-                        opacity: 1,
-                        y: 0,
-                        transition: { type: "spring", bounce: 0.25, duration: 0.9 },
-                      },
-                    },
-                  }}
-                >
-                  <div className="rounded-xl border border-[#34D399]/30 bg-background/80 px-3 py-2 text-[11px] text-muted-foreground shadow-sm shadow-[#34D399]/10">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#A7F3D0]">
-                      Quick install
-                    </span>
-                    <div className="mt-1.5 flex items-center gap-2">
-                      <span className="rounded bg-black/60 px-1.5 py-0.5 font-mono text-[11px] text-[#A7F3D0]">
-                        npm install convex-panel
-                      </span>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
-                    Works with any Convex app · Dev & prod safe · OAuth ready
-                  </div>
-                </AnimatedGroup>
-              </section>
-
-              {/* Installation */}
-              <section id="installation" className="space-y-5">
-                <h2 className="text-lg font-semibold tracking-tight">
-                  1. Installation
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Install the panel into your frontend codebase. You can use npm, pnpm,
-                  or yarn – it&apos;s a regular React component with zero runtime
-                  coupling to your app&apos;s routing.
-                </p>
-
-                <div className="overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-b from-background/80 to-background/40">
-                  <div className="flex items-center justify-between border-b border-border/70 bg-muted/50 px-4 py-2.5">
-                    <p className="text-xs font-mono text-muted-foreground">
-                      Install with your favorite package manager
-                    </p>
-                    <CopyButton />
-                  </div>
-                  <pre className="overflow-x-auto bg-[radial-gradient(circle_at_top,_rgba(52,211,153,0.16),_transparent_55%)] px-4 py-3 text-[12px] leading-relaxed text-[#E5E7EB]">
-                    <code className="font-mono">
-                      npm install convex-panel{"\n"}
-                      {"# or"}{"\n"}
-                      pnpm add convex-panel{"\n"}
-                      yarn add convex-panel
-                    </code>
-                  </pre>
-                </div>
-              </section>
-
-              {/* Connecting */}
-              <section id="connecting-to-convex" className="space-y-5">
-                <h2 className="text-lg font-semibold tracking-tight">
-                  2. Connect to your Convex deployment
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Convex Panel needs a Convex URL and an access token with admin
-                  privileges. In this marketing site we pass them through{" "}
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
-                    import.meta.env
-                  </code>{" "}
-                  and the panel picks them up automatically.
-                </p>
-
-                <div className="space-y-3 rounded-2xl border border-border/70 bg-background/60 p-4 text-xs">
-                  <ol className="space-y-2 text-muted-foreground">
-                    <li>
-                      <span className="font-medium text-foreground">
-                        1. Get your Convex deployment URL
-                      </span>{" "}
-                      from the Convex dashboard.
-                    </li>
-                    <li>
-                      <span className="font-medium text-foreground">
-                        2. Create an access token
-                      </span>{" "}
-                      with admin privileges.
-                    </li>
-                    <li>
-                      <span className="font-medium text-foreground">
-                        3. Expose them as environment variables
-                      </span>{" "}
-                      (see this repo&apos;s{" "}
-                      <code className="rounded bg-muted px-1.5 py-0.5">
-                        VITE_CONVEX_URL
-                      </code>{" "}
-                      and{" "}
-                      <code className="rounded bg-muted px-1.5 py-0.5">
-                        VITE_CONVEX_ACCESS_TOKEN
-                      </code>{" "}
-                      usage).
-                    </li>
-                  </ol>
-                </div>
-              </section>
-
-              {/* Using the panel */}
-              <section id="using-the-panel" className="space-y-5">
-                <h2 className="text-lg font-semibold tracking-tight">
-                  3. Drop the panel into your app
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Convex Panel renders as a floating debugger that you can summon on
-                  top of your app. In this site we mount it once at the root of the
-                  React tree:
-                </p>
-
-                <div className="overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-b from-background/90 to-background/40">
-                  <div className="flex items-center justify-between border-b border-border/70 bg-muted/50 px-4 py-2.5">
-                    <p className="text-xs font-mono text-muted-foreground">
-                      Minimal usage
-                    </p>
-                  </div>
-                  <pre className="overflow-x-auto px-4 py-3 text-[12px] leading-relaxed text-[#E5E7EB]">
-                    <code className="font-mono">
-                      {`import ConvexPanel from "convex-panel";\n\nfunction App() {\n  return (\n    <ConvexProvider client={convex}>\n      {/* your app */}\n      <ConvexPanel />\n    </ConvexProvider>\n  );\n}`}
-                    </code>
-                  </pre>
-                </div>
-              </section>
-
-              {/* Data view */}
-              <section id="data-view" className="space-y-5">
-                <h2 className="text-lg font-semibold tracking-tight">
-                  Data view: real-time tables
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  The{" "}
-                  <span className="font-medium text-foreground">
-                    Data view
-                  </span>{" "}
-                  lets you browse any table in your Convex deployment with instant
-                  updates, powerful filtering, and inline editing. The screenshot on
-                  the homepage is driven by the same components you&apos;ll see in your
-                  own app.
-                </p>
-                <ul className="grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
-                  <li className="rounded-2xl border border-border/70 bg-background/80 p-3">
-                    <p className="text-xs font-semibold text-foreground">
-                      Live updates
-                    </p>
-                    <p className="mt-1 text-xs">
-                      New documents created by your app appear in the table in real
-                      time, with a soft highlight for new rows and updated cells.
-                    </p>
-                  </li>
-                  <li className="rounded-2xl border border-border/70 bg-background/80 p-3">
-                    <p className="text-xs font-semibold text-foreground">
-                      Powerful filters
-                    </p>
-                    <p className="mt-1 text-xs">
-                      Build complex filter expressions, save them per-table, and jump
-                      directly to a single document by ID.
-                    </p>
-                  </li>
+                          <span className="relative z-10 flex items-center gap-3">
+                            <item.icon
+                              className={cn(
+                                "w-4 h-4 transition-colors",
+                                isActive
+                                  ? "text-primary"
+                                  : "opacity-60 group-hover:opacity-100",
+                              )}
+                            />
+                            {item.label}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
-              </section>
+              </div>
+            ))}
+          </nav>
+        </aside>
 
-              {/* Logs & health */}
-              <section id="logs-and-health" className="space-y-5">
-                <h2 className="text-lg font-semibold tracking-tight">
-                  Logs & health
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Convex Panel surfaces function logs, errors, and deployment health
-                  signals alongside your data so you can debug without jumping
-                  between tabs.
-                </p>
-              </section>
+        {/* Mobile Nav */}
+        <div className="lg:hidden mb-6">
+          <button
+            type="button"
+            onClick={() => setCmdOpen(true)}
+            className="w-full flex items-center gap-2 px-4 py-3 rounded-xl bg-background-secondary border border-border text-sm text-content-secondary hover:text-content-primary shadow-sm"
+          >
+            <Terminal className="w-4 h-4" />
+            <span>Search documentation...</span>
+          </button>
+        </div>
 
-              {/* Embedding */}
-              <section id="embedding" className="space-y-5">
-                <h2 className="text-lg font-semibold tracking-tight">
-                  Embedding in other apps
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  You can embed Convex Panel in any React app (Next.js, Vite, SPA
-                  dashboards, internal tools) or ship it as a standalone desktop app
-                  using the provided example in this repo.
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  See the examples in{" "}
-                  <code className="rounded bg-muted px-1.5 py-0.5">
-                    packages/panel/examples
-                  </code>{" "}
-                  for Next.js and Svelte integrations.
-                </p>
-              </section>
+        {/* Main Content Area */}
+        <div className="flex-1 min-w-0 pb-20">
+          {showFrameworkSelector && (
+            <div className="mb-10">
+              <FrameworkSelector current={framework} onChange={setFramework} />
+            </div>
+          )}
+
+          {currentContent}
+
+          <div className="mt-20 pt-8 border-t border-border/40 flex justify-between gap-4">
+            <div className="text-sm text-content-tertiary">
+              Was this page helpful?
+              <button
+                type="button"
+                className="text-primary hover:underline ml-1"
+              >
+                Give feedback
+              </button>
+            </div>
+            <div className="text-sm text-content-tertiary">
+              Last updated on Dec 3, 2023
             </div>
           </div>
         </div>
-      </main>
-    </>
+      </div>
+    </main>
   );
-}
-
+};
 

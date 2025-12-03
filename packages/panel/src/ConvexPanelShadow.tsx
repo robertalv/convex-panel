@@ -16,8 +16,8 @@ export const ConvexPanelShadow = (props: ConvexPanelProps) => {
   const shadowRootRef = useRef<ShadowRoot | null>(null);
   const reactRootRef = useRef<Root | null>(null);
   const propsRef = useRef<ConvexPanelProps>(props);
-  // Track mount instance to prevent stale cleanup from unmounting current root
   const mountIdRef = useRef(0);
+  const portalContainerRef = useRef<HTMLElement | null>(null);
 
   propsRef.current = props;
 
@@ -52,6 +52,20 @@ export const ConvexPanelShadow = (props: ConvexPanelProps) => {
       container.id = 'convex-panel-shadow-container';
       shadowRoot.appendChild(container);
 
+      // Create portal container for overlays
+      const existingPortalContainer = shadowRoot.getElementById('convex-panel-portal-root');
+      const portalContainer = existingPortalContainer || document.createElement('div');
+      portalContainer.id = 'convex-panel-portal-root';
+      portalContainer.style.position = 'fixed';
+      portalContainer.style.inset = '0px';
+      portalContainer.style.pointerEvents = 'none';
+      portalContainer.style.zIndex = '100000';
+      portalContainer.style.display = 'contents';
+      if (!existingPortalContainer) {
+        shadowRoot.appendChild(portalContainer);
+      }
+      portalContainerRef.current = portalContainer as HTMLElement;
+
       // Create React root
       reactRootRef.current = createRoot(container);
     } else if (!reactRootRef.current) {
@@ -64,8 +78,30 @@ export const ConvexPanelShadow = (props: ConvexPanelProps) => {
     }
 
     // Render/update ConvexPanel with current props
+    if (shadowRoot) {
+      const existingPortalContainer = shadowRoot.getElementById('convex-panel-portal-root');
+      if (existingPortalContainer) {
+        portalContainerRef.current = existingPortalContainer as HTMLElement;
+      } else if (!portalContainerRef.current) {
+        const portalContainer = document.createElement('div');
+        portalContainer.id = 'convex-panel-portal-root';
+        portalContainer.style.position = 'fixed';
+        portalContainer.style.inset = '0px';
+        portalContainer.style.pointerEvents = 'none';
+        portalContainer.style.zIndex = '100000';
+        portalContainer.style.display = 'contents';
+        shadowRoot.appendChild(portalContainer);
+        portalContainerRef.current = portalContainer;
+      }
+    }
+
     if (reactRootRef.current) {
-      reactRootRef.current.render(<ConvexPanel {...propsRef.current} />);
+      reactRootRef.current.render(
+        <ConvexPanel
+          {...propsRef.current}
+          portalContainer={propsRef.current.portalContainer ?? portalContainerRef.current}
+        />
+      );
     }
 
     // Cleanup on unmount
@@ -90,8 +126,14 @@ export const ConvexPanelShadow = (props: ConvexPanelProps) => {
 
   // Update React root when props change (using a separate effect to avoid recreating shadow root)
   useEffect(() => {
+    propsRef.current = props;
     if (reactRootRef.current) {
-      reactRootRef.current.render(<ConvexPanel {...props} />);
+      reactRootRef.current.render(
+        <ConvexPanel
+          {...props}
+          portalContainer={props.portalContainer ?? portalContainerRef.current}
+        />
+      );
     }
   }); // Run on every render to update props
 

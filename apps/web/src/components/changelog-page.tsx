@@ -1,337 +1,239 @@
-import { HeroHeader } from "./hero5-header";
-import { AnimatedGroup } from "./motion-primitives/animated-group";
-import { CopyLinkButton } from "./copy-link-button";
+import React from "react";
+import { Bug, CheckCircle2, Sparkles, Wrench, Zap } from "lucide-react";
 
-export default function ChangelogPage() {
+type ChangeType = "feature" | "fix" | "improvement" | "chore";
+
+interface ChangeItem {
+  type: ChangeType;
+  text: string;
+}
+
+interface Release {
+  version: string;
+  date: string;
+  title: string;
+  description: string;
+  changes: ChangeItem[];
+}
+
+const releases: Release[] = [
+  {
+    version: "v0.3.0",
+    date: "December 3, 2023",
+    title: "Improved Filtering & Mobile Support",
+    description:
+      "This release focuses on making the panel usable on smaller screens and introduces powerful regex filtering for logs. We've also refined the color palette for better contrast in light mode.",
+    changes: [
+      {
+        type: "feature",
+        text: "Added regex support for log filtering (e.g. /user_*/)",
+      },
+      {
+        type: "feature",
+        text: "New mobile-responsive layout for the dashboard with collapsible sidebar",
+      },
+      {
+        type: "fix",
+        text: "Fixed issue with dark mode persistence across sessions",
+      },
+      {
+        type: "improvement",
+        text: "Performance improvements for large log volumes (virtualized lists)",
+      },
+      {
+        type: "feature",
+        text: "Added 'Copy as cURL' to function runner",
+      },
+    ],
+  },
+  {
+    version: "v0.2.1",
+    date: "November 20, 2023",
+    title: "Quick Fixes & Polish",
+    description:
+      "A hotfix release to address connection timeouts and improve the initial onboarding experience for new users.",
+    changes: [
+      {
+        type: "fix",
+        text: "Increased socket timeout duration to prevent ghost disconnects",
+      },
+      {
+        type: "improvement",
+        text: "Better error messages for auth failures",
+      },
+      {
+        type: "improvement",
+        text: "Polished empty states for Data View",
+      },
+      {
+        type: "chore",
+        text: "Added tooltip helpers for complex configuration options",
+      },
+    ],
+  },
+  {
+    version: "v0.2.0",
+    date: "November 15, 2023",
+    title: "The Big Refactor",
+    description:
+      "We completely rewrote the internal state management to handle thousands of concurrent updates without freezing the UI. This lays the groundwork for the upcoming real-time graph visualizations.",
+    changes: [
+      {
+        type: "improvement",
+        text: "Switch to virtualized lists for log viewing (smooth scrolling at 10k+ logs)",
+      },
+      {
+        type: "feature",
+        text: "Added 'Clear Logs' button for better session management",
+      },
+      {
+        type: "feature",
+        text: "Initial support for Action inspection (inputs/outputs)",
+      },
+      {
+        type: "chore",
+        text: "Refactored theme provider to support system preference detection",
+      },
+    ],
+  },
+  {
+    version: "v0.1.0",
+    date: "October 1, 2023",
+    title: "Initial Public Release",
+    description:
+      "First public beta of Convex Panel. Includes core features like Data View, Function Runner, and basic logging.",
+    changes: [
+      { type: "feature", text: "Browse and edit Convex tables" },
+      { type: "feature", text: "Run Queries and Mutations" },
+      { type: "feature", text: "Basic log streaming" },
+      { type: "feature", text: "OAuth integration" },
+    ],
+  },
+];
+
+const TypeIcon = ({ type }: { type: ChangeType }) => {
+  switch (type) {
+    case "feature":
+      return <Sparkles className="w-4 h-4 text-purple-500" />;
+    case "fix":
+      return <Bug className="w-4 h-4 text-red-500" />;
+    case "improvement":
+      return <Zap className="w-4 h-4 text-yellow-500" />;
+    case "chore":
+      return <Wrench className="w-4 h-4 text-blue-500" />;
+    default:
+      return null;
+  }
+};
+
+const TypeBadge = ({ type }: { type: ChangeType }) => {
+  const styles: Record<ChangeType, string> = {
+    feature:
+      "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+    fix: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+    improvement:
+      "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20",
+    chore:
+      "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+  };
+
   return (
-    <>
-      <HeroHeader />
-      <main className="h-full">
-        <div
-          aria-hidden
-          className="absolute inset-0 isolate hidden opacity-65 contain-strict lg:block"
-        >
-          <div className="w-140 h-320 -translate-y-87.5 absolute left-0 top-0 -rotate-45 rounded-full bg-[radial-gradient(68.54%_68.72%_at_55.02%_31.46%,hsla(0,0%,85%,.08)_0,hsla(0,0%,55%,.02)_50%,hsla(0,0%,45%,0)_80%)]" />
-          <div className="h-320 absolute left-0 top-0 w-60 -rotate-45 rounded-full bg-[radial-gradient(50%_50%_at_50%_50%,hsla(0,0%,85%,.06)_0,hsla(0,0%,45%,.02)_80%,transparent_100%)] [translate:5%_-50%]" />
-          <div className="h-320 -translate-y-87.5 absolute left-0 top-0 w-60 -rotate-45 bg-[radial-gradient(50%_50%_at_50%_50%,hsla(0,0%,85%,.04)_0,hsla(0,0%,45%,.02)_80%,transparent_100%)]" />
-        </div>
-        <section className="min-h-screen">
-          <div className="relative pt-24 md:pt-36">
-            <AnimatedGroup
-              variants={{
-                container: {
-                  visible: {
-                    transition: {
-                      delayChildren: 0.5,
-                    },
-                  },
-                },
-              }}
-              className="mx-auto max-w-7xl px-6 lg:px-8"
-            >
-              <div className="mx-auto max-w-3xl text-center">
-                <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
-                  Changelog
-                </h1>
-                <p className="mt-6 text-lg leading-8 text-muted-foreground">
-                  Stay up to date with the latest improvements and updates to Convex Panel.
-                </p>
+    <span
+      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${styles[type]}`}
+    >
+      {type}
+    </span>
+  );
+};
+
+export function ChangelogPage() {
+  return (
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+      <div className="mb-20 text-center md:text-left">
+        <h1 className="text-4xl md:text-5xl font-bold text-content-primary mb-6 font-display tracking-tight">
+          Changelog
+        </h1>
+        <p className="text-lg md:text-xl text-content-secondary max-w-2xl leading-relaxed">
+          Stay up to date with the latest improvements, fixes, and features for
+          Convex Panel.
+        </p>
+      </div>
+
+      <div className="space-y-16">
+        {releases.map((release, index) => (
+          <div
+            key={release.version}
+            className="relative grid md:grid-cols-[200px_1fr] gap-8 md:gap-16 group"
+          >
+            {/* Sticky Date/Version Column */}
+            <div className="md:sticky md:top-32 self-start flex md:flex-col flex-row items-center md:items-end gap-3 md:gap-2">
+              <span className="text-sm font-bold text-content-tertiary uppercase tracking-wider">
+                {release.date}
+              </span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-background-secondary border border-border shadow-sm">
+                <span
+                  className="w-2 h-2 rounded-full bg-primary animate-pulse"
+                  style={{ opacity: index === 0 ? 1 : 0 }}
+                />
+                <span className="text-sm font-mono font-semibold text-content-primary">
+                  {release.version}
+                </span>
               </div>
 
-              <div className="mt-16 space-y-20">
-                {/* Version 0.2.18 */}
-                <div id="version-0.2.18" className="relative">
-                  <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                    <div className="w-full border-t border-muted"></div>
-                  </div>
-                  <div className="relative flex justify-start group gap-2">
-                    <span className="bg-background pr-3 text-sm font-semibold leading-6">
-                      Version 0.2.18 - December 1, 2025
-                    </span>
-                    <CopyLinkButton version="version-0.2.18" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-3">
-                  <div>
-                    <h2 className="text-2xl font-bold tracking-tight">
-                      Website, Routing & OSS Stats
-                    </h2>
-                    <p className="mt-4 leading-7 text-muted-foreground">
-                      A fresh marketing experience for Convex Panel with proper routing, docs,
-                      changelog, and live open‑source stats powered by Convex components.
-                    </p>
-                  </div>
-                  <div className="lg:col-span-2">
-                    <ul className="space-y-8">
-                      <li>
-                        <h3 className="font-semibold leading-6">New Docs & Changelog pages</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Added dedicated <code>/docs</code> and <code>/changelog</code> pages with
-                          animated headers, deep links, and copy‑link buttons for each release.
-                        </p>
-                      </li>
-                      <li>
-                        <h3 className="font-semibold leading-6">TanStack Router integration</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Replaced manual pathname checks with TanStack Router for smoother,
-                          scalable client‑side routing across the marketing site.
-                        </p>
-                      </li>
-                      <li>
-                        <h3 className="font-semibold leading-6">OSS Stats component</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Wired in <code>@erquhart/convex-oss-stats</code> to sync GitHub stars and
-                          npm downloads for <code>convex-panel</code>, and surface them in the Stats
-                          section via Convex queries.
-                        </p>
-                      </li>
-                      <li>
-                        <h3 className="font-semibold leading-6">Panel polish & quieter logs</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Refined the Convex Panel header actions, improved highlight animations in
-                          the data view, and removed noisy console diagnostics from the embedded
-                          panel components.
-                        </p>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
+              {/* Desktop Timeline Dot */}
+              <div className="hidden md:block absolute right-[-40px] top-3 w-4 h-4 rounded-full bg-background-primary border-[3px] border-border z-10 group-hover:border-primary group-hover:bg-background-primary transition-colors duration-300" />
+            </div>
 
-                {/* Version 0.1.47 */}
-                <div id="version-0.1.47" className="relative">
-                  <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                    <div className="w-full border-t border-muted"></div>
-                  </div>
-                  <div className="relative flex justify-start group gap-2">
-                    <span className="bg-background pr-3 text-sm font-semibold leading-6">
-                      Version 0.1.47 - March 17, 2025
-                    </span>
-                    <CopyLinkButton version="version-0.1.47" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-3">
-                  <div>
-                    <h2 className="text-2xl font-bold tracking-tight">
-                      Feature Enhancements & DevTools
-                    </h2>
-                    <p className="mt-4 leading-7 text-muted-foreground">
-                      Introducing recently viewed tables, advanced row selection, and comprehensive
-                      editing capabilities.
-                    </p>
-                  </div>
-                  <div className="lg:col-span-2">
-                    <ul className="space-y-8">
-                      <li>
-                        <h3 className="font-semibold leading-6">Recently Viewed Tables</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Implemented a feature to track and display recently viewed tables for quick access.
-                        </p>
-                      </li>
-                      <li>
-                        <h3 className="font-semibold leading-6">Row Selection & Detailed Panel</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Added the ability to select rows, opening a detailed panel for in-depth data insights.
-                        </p>
-                      </li>
-                      <li>
-                        <h3 className="font-semibold leading-6">Field and JSON Editing</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Enhanced editing capabilities allowing field-specific edits and full record
-                          editing in JSON format.
-                        </p>
-                      </li>
-                      <li>
-                        <h3 className="font-semibold leading-6">DevTools Integration</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Introduced DevTools to display frontend browser console logs and a network tab
-                          for comprehensive debugging.
-                        </p>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
+            {/* Content Column */}
+            <div className="relative border-l border-border md:border-l-0 pl-8 md:pl-0 pb-12">
+              {/* Mobile Timeline */}
+              <div className="md:hidden absolute left-0 top-3 bottom-0 w-px bg-border" />
+              <div className="md:hidden absolute left-[-3.5px] top-4 w-2 h-2 rounded-full bg-content-secondary" />
 
-                {/* Version 0.1.32 */}
-                <div id="version-0.1.32" className="relative">
-                  <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                    <div className="w-full border-t border-muted"></div>
-                  </div>
-                  <div className="relative flex justify-start group gap-2">
-                    <span className="bg-background pr-3 text-sm font-semibold leading-6">
-                      Version 0.1.32 - March 14, 2024
-                    </span>
-                    <CopyLinkButton version="version-0.1.32" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-3">
-                  <div>
-                    <h2 className="text-2xl font-bold tracking-tight">Feature Update</h2>
-                    <p className="mt-4 leading-7 text-muted-foreground">
-                      Enhanced UI controls and stability improvements.
-                    </p>
-                  </div>
-                  <div className="lg:col-span-2">
-                    <ul className="space-y-8">
-                      <li>
-                        <h3 className="font-semibold leading-6">Button Positioning</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Added support for customizable button positioning in the interface.
-                        </p>
-                      </li>
-                      <li>
-                        <h3 className="font-semibold leading-6">Error Handling</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Improved error handling to ensure ConvexPanel button remains visible during errors.
-                        </p>
-                      </li>
-                      <li>
-                        <h3 className="font-semibold leading-6">Log Management</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Enhanced log filtering and auto-pause functionality with improved error log styling.
-                        </p>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
+              {/* Desktop Continuous Line */}
+              <div className="hidden md:block absolute left-[-33px] top-0 bottom-[-64px] w-px bg-border group-last:bottom-0" />
 
-                {/* Version 0.1.25 */}
-                <div id="version-0.1.25" className="relative">
-                  <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                    <div className="w-full border-t border-muted"></div>
-                  </div>
-                  <div className="relative flex justify-start group gap-2">
-                    <span className="bg-background pr-3 text-sm font-semibold leading-6">
-                      Version 0.1.25 - March 13, 2024
-                    </span>
-                    <CopyLinkButton version="version-0.1.25" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-3">
-                  <div>
-                    <h2 className="text-2xl font-bold tracking-tight">
-                      Documentation & Performance
-                    </h2>
-                    <p className="mt-4 leading-7 text-muted-foreground">
-                      Major documentation updates and performance improvements.
-                    </p>
-                  </div>
-                  <div className="lg:col-span-2">
-                    <ul className="space-y-8">
-                      <li>
-                        <h3 className="font-semibold leading-6">Infinite Scroll</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Improved infinite scroll functionality for better performance.
-                        </p>
-                      </li>
-                      <li>
-                        <h3 className="font-semibold leading-6">Documentation</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Enhanced documentation with improved installation and usage guidelines.
-                        </p>
-                      </li>
-                      <li>
-                        <h3 className="font-semibold leading-6">Automatic Login</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Added automatic login prompt during installation for better user experience.
-                        </p>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
+              <h2 className="text-2xl md:text-3xl font-bold text-content-primary mb-4 font-display tracking-tight">
+                {release.title}
+              </h2>
 
-                {/* Version 0.1.20 */}
-                <div id="version-0.1.20" className="relative">
-                  <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                    <div className="w-full border-t border-muted"></div>
-                  </div>
-                  <div className="relative flex justify-start group gap-2">
-                    <span className="bg-background pr-3 text-sm font-semibold leading-6">
-                      Version 0.1.20 - March 12, 2024
-                    </span>
-                    <CopyLinkButton version="version-0.1.20" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-3">
-                  <div>
-                    <h2 className="text-2xl font-bold tracking-tight">
-                      Health Monitoring Update
-                    </h2>
-                    <p className="mt-4 leading-7 text-muted-foreground">
-                      Added comprehensive health monitoring features and UI improvements.
-                    </p>
-                  </div>
-                  <div className="lg:col-span-2">
-                    <ul className="space-y-8">
-                      <li>
-                        <h3 className="font-semibold leading-6">Health Monitoring</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Implemented health monitoring feature with detailed metrics and visualization.
-                        </p>
-                      </li>
-                      <li>
-                        <h3 className="font-semibold leading-6">Cell Editing</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Added cell editing restrictions and improved data validation.
-                        </p>
-                      </li>
-                      <li>
-                        <h3 className="font-semibold leading-6">Version Checking</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Implemented version checking system and UI improvements.
-                        </p>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
+              <p className="text-base md:text-lg text-content-secondary mb-8 leading-relaxed max-w-3xl">
+                {release.description}
+              </p>
 
-                {/* Version 0.1.0 */}
-                <div id="version-0.1.0" className="relative">
-                  <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                    <div className="w-full border-t border-muted"></div>
+              <div className="space-y-3">
+                {release.changes.map((change, i) => (
+                  // eslint-disable-next-line react/no-array-index-key
+                  <div
+                    key={i}
+                    className="flex items-start gap-3 p-3 rounded-lg hover:bg-background-secondary/40 transition-colors -ml-3"
+                  >
+                    <div className="mt-1 shrink-0">
+                      <TypeIcon type={change.type} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-content-primary text-sm md:text-base leading-relaxed">
+                        {change.text}
+                      </p>
+                    </div>
+                    <div className="shrink-0 hidden sm:block">
+                      <TypeBadge type={change.type} />
+                    </div>
                   </div>
-                  <div className="relative flex justify-start group gap-2">
-                    <span className="bg-background pr-3 text-sm font-semibold leading-6">
-                      Version 0.1.0 - March 14, 2024
-                    </span>
-                    <CopyLinkButton version="version-0.1.0" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-3">
-                  <div>
-                    <h2 className="text-2xl font-bold tracking-tight">Initial Release</h2>
-                    <p className="mt-4 leading-7 text-muted-foreground">
-                      The first stable release of Convex Panel with all core features.
-                    </p>
-                  </div>
-                  <div className="lg:col-span-2">
-                    <ul className="space-y-8">
-                      <li>
-                        <h3 className="font-semibold leading-6">Real-time Data View</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          View and interact with your Convex data in real-time with automatic updates.
-                        </p>
-                      </li>
-                      <li>
-                        <h3 className="font-semibold leading-6">Live Logs</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Monitor your application logs in real-time with advanced filtering options.
-                        </p>
-                      </li>
-                      <li>
-                        <h3 className="font-semibold leading-6">Health Monitoring</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Track the health and performance of your Convex deployment.
-                        </p>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
+                ))}
               </div>
-            </AnimatedGroup>
+            </div>
           </div>
-        </section>
-      </main>
-    </>
+        ))}
+      </div>
+
+      <div className="flex justify-center mt-12">
+        <div className="text-content-tertiary text-sm flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4" />
+          <span>All systems operational</span>
+        </div>
+      </div>
+    </div>
   );
 }
 

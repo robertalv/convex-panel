@@ -6,52 +6,31 @@ import {
   RouterProvider,
   Outlet,
 } from "@tanstack/react-router";
-import HeroSection from "./components/hero-section";
-import ContentSection from "./components/content-2";
-import DemoSection from "./components/demo-section";
-import StatsSection from "./components/stats";
-import CallToAction from "./components/call-to-action";
-import FooterSection from "./components/footer";
-import DocsPage from "./components/docs-page";
-import ChangelogPage from "./components/changelog-page";
-import { Button } from "./components/ui/button";
-// Root layout shared by all routes
-const RootLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  return (
-    <div className="min-h-screen bg-background text-foreground antialiased">
-      {children}
-    </div>
-  );
-};
+
+import { StartPage } from "./components/startpage";
+import { Header } from "./components/header";
+import { DocsPage } from "./components/docs-page";
+import { ChangelogPage } from "./components/changelog-page";
+
+const RootLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="min-h-screen bg-background-primary text-content-primary antialiased overflow-hidden">
+    <Header />
+    {children}
+  </div>
+);
 
 // Home page (marketing + embedded ConvexPanel)
 const HomePage: React.FC = () => {
   return (
-    <>
-      <HeroSection />
-      <ContentSection />
-      <DemoSection />
-      <StatsSection />
-      <CallToAction />
-      <FooterSection />
-
-      <div className="try-me-container">
-        <Button
-          asChild
-          size="lg"
-          className="rounded-xl px-5 text-base font-mono flex items-center cursor-default"
-          disabled
-        >
-          <div className="flex items-center gap-2">
-            <span className="relative">
-              <span className="transition-all duration-200">try me!</span>
-            </span>
-          </div>
-        </Button>
-      </div>
-    </>
+    <main className="px-6 md:px-12 lg:px-36 overflow-hidden md:overflow-visible">
+      <StartPage />
+    </main>
   );
 };
+
+const DocsRouteComponent: React.FC = () => <DocsPage />;
+
+const ChangelogRouteComponent: React.FC = () => <ChangelogPage />;
 
 // Build the TanStack router route tree
 const rootRoute = new RootRoute({
@@ -73,13 +52,13 @@ const indexRoute = new Route({
 const docsRoute = new Route({
   getParentRoute: () => rootRoute,
   path: "/docs",
-  component: DocsPage,
+  component: DocsRouteComponent,
 });
 
 const changelogRoute = new Route({
   getParentRoute: () => rootRoute,
   path: "/changelog",
-  component: ChangelogPage,
+  component: ChangelogRouteComponent,
 });
 
 const routeTree = rootRoute.addChildren([indexRoute, docsRoute, changelogRoute]);
