@@ -2,12 +2,11 @@ import { Button } from "./ui/button";
 import { HeroImage } from "./hero-image";
 import { Metrics } from "./metrics";
 import { WordAnimation } from "./word-animation";
-import { HugeiconsIcon } from '@hugeicons/react'
-import { ArrowRight01FreeIcons } from '@hugeicons/core-free-icons'
-import { Link, useRouterState } from "@tanstack/react-router";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowRight01FreeIcons } from "@hugeicons/core-free-icons";
+import { Link } from "@tanstack/react-router";
 import { CopyButton } from "./copy-button";
 import { AnimatedGroup } from "./motion-primitives/animated-group";
-import { EmailSignup } from "./email-signup";
 import type { Variants } from "motion/react";
 
 const transitionVariants: { item: Variants } = {
@@ -31,9 +30,6 @@ const transitionVariants: { item: Variants } = {
 };
 
 export function Hero() {
-  const { location } = useRouterState();
-  const currentPath = location.pathname || "/";
-
   return (
     <section className="mt-[60px] lg:mt-[140px] min-h-[530px] relative lg:h-[calc(100vh-260px)]">
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-12">

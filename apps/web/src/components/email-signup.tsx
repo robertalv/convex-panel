@@ -1,10 +1,11 @@
-import { FormEvent, useState } from "react";
-import { useMutation } from "convex/react";
+import type { FormEvent } from "react";
+import { useState } from "react";
+import { useAction } from "convex/react";
 import { api } from "../../../../packages/backend/convex/_generated/api";
 import { Button } from "./ui/button";
 
 export function EmailSignup() {
-  const marketingSignup = useMutation(api.loops.marketingSignup);
+  const marketingSignup = useAction(api.loops.marketingSignup);
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">(
     "idle",

@@ -1,4 +1,3 @@
-import React from "react";
 import { Bug, CheckCircle2, Sparkles, Wrench, Zap } from "lucide-react";
 
 type ChangeType = "feature" | "fix" | "improvement" | "chore";

@@ -1,6 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { ConvexReactClient } from "convex/react";
-import { Module, CronJobWithRuns, CronJobLog, CronSpec } from "../lib/common-types";
+import type {
+  Module,
+  CronJobWithRuns,
+  CronJobLog,
+  CronSpec,
+} from "../lib/common-types";
 
 export function useCronJobs(adminClient: ConvexReactClient, udfPath: string |null) {
   const [cronJobs, setCronJobs] = useState<CronJobWithRuns[] | undefined>(undefined);

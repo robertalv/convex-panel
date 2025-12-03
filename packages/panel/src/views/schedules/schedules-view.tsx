@@ -23,7 +23,6 @@ import { useCronJobs } from '../../hooks/useCronJobs';
 import { useFunctions } from '../../hooks/useFunctions';
 import { usePaginatedScheduledJobs } from '../../hooks/usePaginatedScheduledJobs';
 // import { logsViewStyles } from '../../styles/panelStyles';
-import { getDeploymentUrl } from '../../utils/adminClient';
 import { formatCronSchedule, formatRelativeTime } from '../../utils/cronFormatters';
 import type { ModuleFunction } from '../../../src/utils/api/functionDiscovery';
 import type { CustomQuery } from '../../../src/types/functions';
@@ -69,9 +68,6 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
 
   const {
     functions: allFunctions,
-    groupedFunctions,
-    isLoading,
-    error: functionsError,
   } = useFunctions({
     adminClient,
     useMockData,
@@ -79,7 +75,6 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
   });
 
   const [selectedFunction, setSelectedFunction] = useState<ModuleFunction | CustomQuery | null>(allFunctions?.[0]);
-  const deploymentUrl = getDeploymentUrl(adminClient);
 
   useEffect(() => {
     setSelectedFunction(allFunctions[0]);
@@ -173,7 +168,6 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
         selectedFunction={selectedFunction}
         selectedTab={selectedTab}
         listHeight={listHeight}
-        deploymentUrl={deploymentUrl}
         allFunctions={allFunctions}
         setSelectedFunction={setSelectedFunction}
         hoveredRowIndex={hoveredRowIndex}
@@ -196,7 +190,6 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
 interface Props {
   selectedFunction: ModuleFunction | CustomQuery | null;
   adminClient: ConvexReactClient;
-  deploymentUrl: string | null;
   selectedTab: 'scheduled' | 'cron';
   setSelectedFunction: React.Dispatch<React.SetStateAction<ModuleFunction | CustomQuery | null>>;
   allFunctions: ModuleFunction[];
@@ -211,7 +204,6 @@ const ScheduledFunctionView = ({
   selectedFunction,
   setSelectedFunction,
   adminClient,
-  deploymentUrl,
   selectedTab,
   allFunctions,
   selectedComponentId,
@@ -219,10 +211,9 @@ const ScheduledFunctionView = ({
   hoveredRowIndex,
   setHoveredRowIndex
 }: Props) => {
-  const { jobs, status } = usePaginatedScheduledJobs(
+  const { jobs } = usePaginatedScheduledJobs(
     (selectedFunction && 'identifier' in selectedFunction) ? selectedFunction.identifier : undefined,
     adminClient,
-    deploymentUrl ?? "",
   );
 
   const ScheduleRow = React.memo(({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
@@ -374,7 +365,7 @@ interface CronsViewProps {
 }
 
 const CronsJobsFunctionView = ({ adminClient, selectedComponentId, selectedTab, hoveredRowIndex, setHoveredRowIndex }: CronsViewProps) => {
-  const { loading: loadingCrons, cronJobs, cronJobRuns } = useCronJobs(adminClient, selectedComponentId ?? null);
+  const { loading: loadingCrons, cronJobs } = useCronJobs(adminClient, selectedComponentId ?? null);
   return (<Activity mode={selectedTab === "cron" ? "visible" : "hidden"}>
     {loadingCrons ? (
       <div style={{ padding: '16px', color: '#9ca3af' }}>Loading cron jobs...</div>

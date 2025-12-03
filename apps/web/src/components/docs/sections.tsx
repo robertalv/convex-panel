@@ -1,8 +1,7 @@
-import React from "react";
 import { Activity, Database, Play, Settings, Terminal } from "lucide-react";
 import type { Framework } from "./constants";
 import { CodeBlock } from "./code-block";
-import { GenericViewContent, OnThisPage, PageHeader } from "./layout";
+import { OnThisPage, PageHeader } from "./layout";
 
 export function IntroContent() {
   return (
@@ -60,7 +59,7 @@ export function IntroContent() {
   );
 }
 
-export function InstallationContent({ framework }: { framework: Framework }) {
+export function InstallationContent() {
   return (
     <div className="flex gap-10 animate-fade-in">
       <div className="flex-1 min-w-0">

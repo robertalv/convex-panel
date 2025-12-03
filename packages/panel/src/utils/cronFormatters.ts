@@ -1,4 +1,4 @@
-import { CronSchedule } from "../lib/common-types";
+import { type CronSchedule } from "../lib/common-types";
 
 export function formatCronSchedule(schedule: CronSchedule): string {
   if (!schedule) return "Unknown schedule";

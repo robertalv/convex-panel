@@ -124,9 +124,6 @@ export function AskAI() {
     e.preventDefault();
     e.stopPropagation();
 
-    const root = getRoot();
-    const isShadowDOM = root instanceof ShadowRoot;
-
     // Wait a moment for the widget to be ready if script just loaded
     const tryOpen = async () => {
       // Method 1: Try to access the global Kapa object (most reliable)

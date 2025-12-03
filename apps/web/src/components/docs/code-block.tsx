@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, Copy, FileCode } from "lucide-react";
 
 type CodeBlockProps = {

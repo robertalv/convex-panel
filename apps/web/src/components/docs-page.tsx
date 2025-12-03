@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Activity,
   Database,
@@ -23,7 +23,6 @@ import {
   IntroContent,
   QuickStartContent,
 } from "./docs/sections";
-import { OnThisPage, PageHeader } from "./docs/layout";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -113,7 +112,7 @@ export const DocsPage: React.FC = () => {
       case "/docs":
         return <IntroContent />;
       case "/docs/installation":
-        return <InstallationContent framework={framework} />;
+        return <InstallationContent />;
       case "/docs/environment":
         return <EnvironmentContent framework={framework} />;
       case "/docs/quick-start":

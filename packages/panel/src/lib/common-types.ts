@@ -1,7 +1,7 @@
 // WARNING: THIS FILE SHOULD NOT BE USED IN ANYWAY SHAPE OR FORM IN THE CONVEX PANEL
 // DO NOT IMPORT ANYTHING OUT OF THIS FILE
 
-import { Infer, v } from "convex/values";
+import { type Infer, v } from "convex/values";
 
 export type CronSchedule =
   | {

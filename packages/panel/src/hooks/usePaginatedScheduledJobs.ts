@@ -1,56 +1,44 @@
-import { ConvexReactClient, usePaginatedQuery } from "convex/react";
+import { ConvexReactClient } from "convex/react";
 import { useEffect, useState } from "react";
-import { extractDeploymentName, extractProjectName, fetchDeploymentMetadata } from "../utils/api";
+// import { extractDeploymentName, extractProjectName, fetchDeploymentMetadata } from "../utils/api";
 
 export const SCHEDULED_JOBS_PAGE_SIZE = 50;
 
-interface ScheduledJobsFn {
-  udfPath: string | undefined;
-  currentDeployment: string;
-
-}
-
 // Current Deployment info 
-type CurrentDeployment = {
-  deploymentName?: string;
-  projectName?: string;
-  deploymentType?: "prod" | "dev" | "preview";
-  kind?: "local" | "cloud";
-} | undefined;
+// type CurrentDeployment = {
+//   deploymentName?: string;
+//   projectName?: string;
+//   deploymentType?: "prod" | "dev" | "preview";
+//   kind?: "local" | "cloud";
+// } | undefined;
 
 // TODO: Save this in local storage
-const fetchMetadata = async (adminClient: ConvexReactClient, deploymentUrl: string,) => {
-  let metadata: CurrentDeployment = undefined
-  try {
-    const _metadata = await fetchDeploymentMetadata(adminClient, deploymentUrl, undefined);
-    metadata = _metadata
-  } catch (error) {
-    console.debug('Failed to fetch deployment metadata:', error);
-    metadata = {
-      deploymentName: extractDeploymentName(deploymentUrl),
-      projectName: extractProjectName(deploymentUrl),
-      deploymentType: 'dev',
-      kind: 'cloud',
-    }
+// const fetchMetadata = async (adminClient: ConvexReactClient, deploymentUrl: string,) => {
+//   let metadata: CurrentDeployment = undefined
+//   try {
+//     const _metadata = await fetchDeploymentMetadata(adminClient, deploymentUrl, undefined);
+//     metadata = _metadata
+//   } catch (error) {
+//     console.debug('Failed to fetch deployment metadata:', error);
+//     metadata = {
+//       deploymentName: extractDeploymentName(deploymentUrl),
+//       projectName: extractProjectName(deploymentUrl),
+//       deploymentType: 'dev',
+//       kind: 'cloud',
+//     }
 
-  }
+//   }
 
-  return metadata;
-};
+//   return metadata;
+// };
 
-export function usePaginatedScheduledJobs(udfPath: string | undefined, adminClient: ConvexReactClient, deploymentUrl: string,) {
-  const { deployment, error: errorDeployment, loading: loadingDeployment } = useCurrentDeployment(adminClient, deploymentUrl)
+export function usePaginatedScheduledJobs(udfPath: string | undefined, adminClient: ConvexReactClient) {
+  // const { deployment, error: errorDeployment, loading: loadingDeployment } = useCurrentDeployment(adminClient, deploymentUrl)
   const isPaused = useIsDeploymentPaused(adminClient)
   const [results, setResults] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [status, setStatus] = useState<"LoadingFirstPage" | "LoadingMore" | "Exhausted" | "CanLoadMore">("LoadingFirstPage")
-
-  usePaginatedQuery
-  const args = {
-    udfPath,
-    componentId: null,
-  };
+  const [, setLoading] = useState(true);
+  const [, setError] = useState<Error | null>(null);
+  const [status, ] = useState<"LoadingFirstPage" | "LoadingMore" | "Exhausted" | "CanLoadMore">("LoadingFirstPage")
 
   // I do not like this method by one bit, I'm thinking of creating a useAsync hook, or focusing on doing this with pure javascript
   // maybe this https://react.dev/reference/react/useEffectEvent
@@ -130,34 +118,33 @@ export function usePaginatedScheduledJobs(udfPath: string | undefined, adminClie
   }
 }
 
+// const useCurrentDeployment = (adminClient: ConvexReactClient, deploymentUrl: string,) => {
+//   const [deployment, setDeployment] = useState<CurrentDeployment | null>(null);
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState<Error | null>(null);
 
-const useCurrentDeployment = (adminClient: ConvexReactClient, deploymentUrl: string,) => {
-  const [deployment, setDeployment] = useState<CurrentDeployment | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+//   useEffect(() => {
+//     const loadData = async () => {
+//       try {
+//         setLoading(true);
+//         const data = await fetchMetadata(adminClient, deploymentUrl,);
+//         setDeployment(data);
+//       } catch (err: unknown) {
+//         setError(err as Error);
+//       } finally {
+//         setLoading(false);
+//       }
+//     };
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        const data = await fetchMetadata(adminClient, deploymentUrl,);
-        setDeployment(data);
-      } catch (err: unknown) {
-        setError(err as Error);
-      } finally {
-        setLoading(false);
-      }
-    };
+//     loadData();
+//   }, [adminClient, deploymentUrl,]);
 
-    loadData();
-  }, [adminClient, deploymentUrl,]);
-
-  return {
-    deployment,
-    error,
-    loading
-  }
-}
+//   return {
+//     deployment,
+//     error,
+//     loading
+//   }
+// }
 
 // Type of backendState table
 type BackendStateTableDoc = {
