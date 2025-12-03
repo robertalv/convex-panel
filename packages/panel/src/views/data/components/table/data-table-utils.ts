@@ -1,5 +1,5 @@
-import { TableField, TableSchema } from '../../../../types';
-import { parseAccessToken } from '../../../../utils/api';
+import type { TableField, TableSchema } from '../../../../types';
+import { parseAccessToken } from '../../../../utils/api/utils';
 
 export const DEFAULT_COLUMN_WIDTH = 160;
 export const MIN_COLUMN_WIDTH = 96;

@@ -1,5 +1,4 @@
-import { LogEntry, FetchLogsResponse, FetchTablesResponse, TableDefinition } from '../types';
-import { LogType } from './constants';
+import type { LogEntry, FetchLogsResponse, FetchTablesResponse, TableDefinition } from '../types';
 
 /**
  * Store a mock log database to simulate persistence between calls

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { editor } from 'monaco-editor';
-import Editor, { BeforeMount, OnMount } from '@monaco-editor/react';
+import Editor from './lazy-monaco-editor';
+import type { BeforeMount, OnMount } from './lazy-monaco-editor';
 import { useThemeSafe } from '../../hooks/useTheme';
 import { setupMonacoThemes, getMonacoTheme } from './monaco-theme';
 import { editorOptions } from './editor-options';

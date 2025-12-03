@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { FunctionExecutionLog, ModuleFunction } from '../types';
+import type { FunctionExecutionLog, ModuleFunction } from '../types';
 import { INTERVALS } from '../utils/constants';
-import { processFunctionLogs, streamFunctionLogs, streamUdfExecution } from '../utils/api';
+import { processFunctionLogs, streamFunctionLogs, streamUdfExecution } from '../utils/api/logs';
 
 interface UseFunctionLogStreamOptions {
   deploymentUrl?: string;

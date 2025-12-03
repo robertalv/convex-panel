@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { Code as CodeIcon } from 'lucide-react';
 import {
   SearchableDropdown,
+} from './shared/searchable-dropdown';
+import type {
   SearchableDropdownOption,
 } from './shared/searchable-dropdown';
 import { isComponentId } from '../utils/components';

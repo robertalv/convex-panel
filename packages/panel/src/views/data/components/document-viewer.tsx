@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Copy, Loader2, ExternalLink } from 'lucide-react';
 import { copyToClipboard } from '../../../utils/toast';
-import { createDocumentLink, isConvexId } from './table/data-table-utils';
+import { createDocumentLink } from './table/data-table-utils';
 import { useSheetSafe } from '../../../contexts/sheet-context';
 
 export interface DocumentViewerProps {

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Plus, AlertCircle, CheckCircle2, Loader2, Info } from 'lucide-react';
-import Editor, { BeforeMount, OnMount } from '@monaco-editor/react';
+import Editor from '../../../components/editor/lazy-monaco-editor';
+import type { BeforeMount, OnMount } from '../../../components/editor/lazy-monaco-editor';
 import { useThemeSafe } from '../../../hooks/useTheme';
-import { insertDocuments } from '../../../utils/functions';
+import { insertDocuments } from '../../../utils/api/documents';
 import { toast } from 'sonner';
-import { TableSchema } from '../../../types';
+import type { TableSchema } from '../../../types';
 
 export interface AddDocumentPanelProps {
   selectedTable: string;
@@ -19,7 +20,7 @@ export interface AddDocumentPanelProps {
   onGetEditorContent?: React.MutableRefObject<(() => string) | null>;
 }
 
-const defaultDocumentTemplate = (tableName: string, tableSchema?: TableSchema) => {
+const defaultDocumentTemplate = (tableSchema?: TableSchema) => {
   if (tableSchema && tableSchema.fields && tableSchema.fields.length > 0) {
     // Use actual field names from schema
     const fieldEntries = tableSchema.fields
@@ -83,7 +84,7 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
   // Initialize code with template
   useEffect(() => {
     if (selectedTable) {
-      setCode(defaultDocumentTemplate(selectedTable, tableSchema));
+      setCode(defaultDocumentTemplate(tableSchema));
       setError(null);
       setSuccess(false);
     }
@@ -211,7 +212,6 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
     
     // Determine what to insert based on context
     let textToInsert = '';
-    let needsComma = false;
     
     // Check if we're inside an object (between { and })
     const textBefore = model.getValueInRange({
@@ -379,7 +379,7 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
       
       // Reset form after a short delay
       setTimeout(() => {
-        setCode(defaultDocumentTemplate(selectedTable, tableSchema));
+        setCode(defaultDocumentTemplate(tableSchema));
         setSuccess(false);
         if (onDocumentAdded) {
           onDocumentAdded();
@@ -533,7 +533,7 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
             height="100%"
             language="json"
             value={code}
-            onChange={(value) => {
+            onChange={(value: string | undefined) => {
               setCode(value || '');
               setError(null);
               setSuccess(false);

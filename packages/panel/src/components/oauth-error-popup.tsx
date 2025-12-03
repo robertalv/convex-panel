@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, AlertTriangle, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { CONVEX_PANEL_API_DOMAIN, ROUTES } from '../utils/constants';
 
 export interface OAuthErrorPopupProps {
   isOpen: boolean;
@@ -205,7 +206,7 @@ export const OAuthErrorPopup: React.FC<OAuthErrorPopupProps> = ({
               Documentation
             </a>
             <a
-              href="https://api.convexpanel.dev/health"
+              href={`${CONVEX_PANEL_API_DOMAIN}${ROUTES.HEALTH_ENDPOINT}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{

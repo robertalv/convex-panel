@@ -2,8 +2,7 @@ import React from 'react';
 import classNames from 'classnames';
 import { GripVertical } from 'lucide-react';
 import { SchemaHoverLabel } from './schema-hover-label';
-import { ColumnMeta } from './data-table-utils';
-import { MIN_COLUMN_WIDTH } from './data-table-utils';
+import type { ColumnMeta } from './data-table-utils';
 
 export interface TableColumnHeaderProps {
   column: string;

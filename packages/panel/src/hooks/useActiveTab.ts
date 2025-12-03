@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { TabId } from '../types/tabs';
+import type { TabId } from '../types/tabs';
 import { getStorageItem, setStorageItem } from '../utils/storage';
 import { STORAGE_KEYS } from '../utils/constants';
 

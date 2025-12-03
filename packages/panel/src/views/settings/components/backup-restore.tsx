@@ -1,27 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AlertCircle, HardDrive, ExternalLink, Loader2, MoreVertical, CheckCircle2, XCircle } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import {
-  createBackup,
-  listBackups,
-  getBackup,
-  configurePeriodicBackup,
-  getPeriodicBackupConfig,
-  disablePeriodicBackup,
-  deleteBackup,
-  restoreBackup,
-  downloadBackup,
-  CloudBackupResponse,
-  PeriodicBackupConfig,
-  fetchTeams,
-  getTokenDetails,
-  getDeploymentIdFromUrl,
-  extractDeploymentName,
-  fetchProjectInfo,
-  getTeamTokenFromEnv,
-  getLatestRestore,
-  confirmSnapshotImport,
-} from '../../../utils/api';
 import { ProBadge } from '../../../components/shared/pro-badge';
 import { Checkbox } from '../../../components/shared/checkbox';
 import { BackupActionsDropdown } from './backup-actions-dropdown';
@@ -29,6 +8,12 @@ import { RestoreBackupSheet } from './restore-backup-sheet';
 import { DeleteBackupSheet } from './delete-backup-sheet';
 import { RestoreDetailsSheet } from './restore-details-sheet';
 import { useSheetSafe } from '../../../contexts/sheet-context';
+import type { CloudBackupResponse, PeriodicBackupConfig } from '../../../utils/api/types';
+import { createBackup, listBackups, getPeriodicBackupConfig, getLatestRestore, confirmSnapshotImport, getBackup, configurePeriodicBackup, disablePeriodicBackup, downloadBackup, restoreBackup, deleteBackup } from '../../../utils/api/backups';
+import { getDeploymentIdFromUrl } from '../../../utils/api/deployments';
+import { extractDeploymentName, getTeamTokenFromEnv } from '../../../utils/api/utils';
+import { fetchProjectInfo, fetchTeams, getTokenDetails } from '../../../utils/api/teams';
+
 
 const BackupButtonWithTooltip: React.FC<{
   isDisabled: boolean;
@@ -75,15 +60,6 @@ const BackupButtonWithTooltip: React.FC<{
           left: Math.max(margin, Math.min(left, window.innerWidth - tooltipWidth - margin)),
         });
       };
-
-      // Update position after tooltip renders
-      const raf1 = requestAnimationFrame(() => {
-        const raf2 = requestAnimationFrame(() => {
-          updatePosition();
-          setTimeout(updatePosition, 10);
-          setTimeout(updatePosition, 50);
-        });
-      });
 
       window.addEventListener('scroll', updatePosition, true);
       window.addEventListener('resize', updatePosition);
@@ -223,7 +199,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
   const [automaticBackup, setAutomaticBackup] = useState(false);
   const [deploymentId, setDeploymentId] = useState<number | null>(providedDeploymentId || null);
   const [resolvedTeamId, setResolvedTeamId] = useState<number | null>(teamId || null);
-  const [resolvedProjectId, setResolvedProjectId] = useState<number | null>(null);
+  const [resolvedProjectId, ] = useState<number | null>(null);
   
   // Restore status tracking
   const [restoreStatus, setRestoreStatus] = useState<{
@@ -365,7 +341,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
     }
 
     try {
-      const latestRestore = await getLatestRestore(adminClient, providedDeploymentUrl, accessToken);
+      const latestRestore = await getLatestRestore(adminClient);
       
       if (!latestRestore) {
         // Don't clear status if we already have one - the restore might just not appear yet
@@ -618,7 +594,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
       let isProjectToken = false;
       let detectedTeamId: number | null = null;
       try {
-        const tokenDetails = await getTokenDetails(token, true);
+        const tokenDetails = await getTokenDetails(token);
         isProjectToken = tokenDetails?.type === 'projectToken';
         
         if (isProjectToken) {
@@ -626,7 +602,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
           const envTeamToken = getTeamTokenFromEnv();
           if (envTeamToken && envTeamToken !== token) {
             try {
-              const envTokenDetails = await getTokenDetails(envTeamToken, true);
+              const envTokenDetails = await getTokenDetails(envTeamToken);
               if (envTokenDetails?.type !== 'projectToken' && envTokenDetails?.teamId) {
                 token = envTeamToken;
                 isProjectToken = false;
@@ -642,15 +618,17 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
           // If still a project token, show error immediately with helpful instructions
           if (isProjectToken) {
             setIsLoading(false);
-            const envTokenAvailable = !!getTeamTokenFromEnv();
+            const envToken = getTeamTokenFromEnv();
+            const envTokenAvailable = !!envToken;
+            const isNext = typeof window !== 'undefined' && (window as any).__NEXT_DATA__;
             const errorMsg = envTokenAvailable
               ? 'Backup operations require a team access token. A project token was detected. ' +
-                'The team token from CONVEX_ACCESS_TOKEN is available but may not be accessible in the browser. ' +
-                'Please configure VITE_CONVEX_ACCESS_TOKEN in your .env file, or pass it via the `teamAccessToken` prop to ConvexPanel. ' +
+                'The team token from CONVEX_ACCESS_TOKEN was found in the environment, but it may be a project token instead of a team token. ' +
+                `Please ensure CONVEX_ACCESS_TOKEN in your .env file is a team access token (not a project token), or pass a team token via the \`teamAccessToken\` prop to ConvexPanel. ` +
                 'Create a team access token at: https://dashboard.convex.dev/t/idylcode/settings'
               : 'Backup operations require a team access token, but a project token is being used. ' +
-                'Please provide a team access token by either: (1) Setting VITE_CONVEX_ACCESS_TOKEN in your .env file (for Vite apps), or (2) Passing it via the `teamAccessToken` prop to ConvexPanel. ' +
-                'Create a team access token at: https://dashboard.convex.dev/t/idylcode/settings';
+                `Please provide a team access token by either: (1) Setting CONVEX_ACCESS_TOKEN in your .env file (for ${isNext ? 'Next.js' : 'Vite'} apps), or (2) Passing it via the \`teamAccessToken\` prop to ConvexPanel. ` +
+                'Note: CONVEX_ACCESS_TOKEN must be a team access token (not a project token). Create a team access token at: https://dashboard.convex.dev/t/idylcode/settings';
             setError(errorMsg);
             return;
           }
@@ -677,7 +655,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
       // Note: The token_details endpoint works from browser when using Bearer token format
       if (!currentTeamId && token) {
         try {
-          const tokenDetails = await getTokenDetails(token, true); // Use Bearer format
+          const tokenDetails = await getTokenDetails(token); // Use Bearer format
           
           if (tokenDetails?.teamId) {
             const teamIdNum = typeof tokenDetails.teamId === 'string' 
@@ -814,8 +792,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
       // Step 3: Load backups if we have teamId - this is the primary operation we need
       if (currentTeamId) {
         try {
-          // Always use Bearer token format (matching CLI script pattern)
-          const backupList = await listBackups(currentTeamId, token, true);
+          const backupList = await listBackups(currentTeamId, token);
           setAllBackups(backupList || []);
           
           // Extract deploymentId from backups (this is more reliable than fetching projects/deployments)
@@ -871,7 +848,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
         let tokenType: string | undefined;
         try {
           if (token) {
-            const tokenDetails = await getTokenDetails(token, true);
+            const tokenDetails = await getTokenDetails(token);
             tokenType = tokenDetails?.type;
           }
         } catch {
@@ -890,6 +867,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
         try {
           const config = await getPeriodicBackupConfig(currentDeploymentId, token);
           setPeriodicConfig(config);
+          console.log('periodic config', periodicConfig);
           setAutomaticBackup(config !== null);
         } catch (err: any) {
           // If config doesn't exist or fails, that's okay
@@ -947,7 +925,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
     setError(null);
 
     try {
-      const newBackup = await createBackup(currentDeploymentId, token, false, useBearer);
+      const newBackup = await createBackup(currentDeploymentId, token, false);
       
       // Add the new backup to the list immediately
       setAllBackups(prevBackups => [newBackup, ...prevBackups]);
@@ -965,7 +943,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
       pollingIntervalRef.current = setInterval(async () => {
         try {
           pollAttemptsRef.current++;
-          const updatedBackup = await getBackup(newBackup.id, token, useBearer);
+          const updatedBackup = await getBackup(newBackup.id, token);
           
           // Update the backup in the list
           setAllBackups(prevBackups =>
@@ -1058,6 +1036,10 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
           useBearer
         );
       } else {
+        if (!currentDeploymentId) {
+          setError('Deployment ID is required to disable periodic backup');
+          return;
+        }
         await disablePeriodicBackup(currentDeploymentId, token, useBearer);
       }
       await loadData();
@@ -1107,7 +1089,6 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
     try {
       const downloadUrl = downloadBackup(
         dropdownState.backup,
-        providedDeploymentUrl,
         token
       );
       
@@ -1186,7 +1167,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
             // Use IIFE to handle async without returning a promise that could cause issues
             (async () => {
               try {
-                const { importId } = await restoreBackup(targetDeploymentId, backupId, restoreToken, true);
+                const { importId } = await restoreBackup(targetDeploymentId, backupId, restoreToken);
                 
                 // Update status with the importId we got back
                 setRestoreStatus(prev => prev ? {
@@ -1273,7 +1254,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
             if (!currentTeamId || typeof currentTeamId !== 'number') {
               throw new Error('Team ID is required to delete backup');
             }
-            await deleteBackup(currentTeamId, backupId, deleteToken);
+            await deleteBackup(backupId, deleteToken);
             // Remove the deleted backup from the list instead of reloading everything
             setAllBackups(prevBackups => prevBackups.filter(backup => backup.id !== backupId));
             closeSheet();

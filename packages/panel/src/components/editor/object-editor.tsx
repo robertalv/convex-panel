@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { BeforeMount, OnMount } from '@monaco-editor/react';
-import Editor from '@monaco-editor/react';
-import { Value } from 'convex/values';
+import  { useState, useCallback, useEffect, useRef } from 'react';
+import Editor from './lazy-monaco-editor';
+import type { BeforeMount, OnMount } from './lazy-monaco-editor';
+import type { Value } from 'convex/values';
 import { useThemeSafe } from '../../hooks/useTheme';
 import { setupMonacoThemes, getMonacoTheme } from './monaco-theme';
 import { editorOptions } from './editor-options';
@@ -57,7 +57,6 @@ export function ObjectEditor(props: ObjectEditorProps) {
     indentTopLevel = false,
   } = props;
 
-  const [monaco, setMonaco] = useState<Parameters<BeforeMount>[0]>();
   const { theme } = useThemeSafe();
   const saveActionRef = useRef(saveAction);
 
@@ -109,7 +108,6 @@ export function ObjectEditor(props: ObjectEditorProps) {
 
   const handleBeforeMount: BeforeMount = (monacoInstance) => {
     setupMonacoThemes(monacoInstance);
-    setMonaco(monacoInstance);
 
     monacoInstance.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
       noSemanticValidation: true,

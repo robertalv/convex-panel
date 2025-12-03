@@ -1,8 +1,8 @@
 import React from 'react';
 import { Checkbox } from '../../../../components/shared/checkbox';
-import { TableDocument } from '../../../../types';
+import type { TableDocument } from '../../../../types';
 import { TableCell } from './table-cell';
-import { ColumnMeta } from './data-table-utils';
+import type { ColumnMeta } from './data-table-utils';
 
 export interface TableRowProps {
   document: TableDocument;
@@ -34,7 +34,6 @@ export interface TableRowProps {
   onCancelEditing: () => void;
   onCellMenuClick: (event: React.MouseEvent, rowId: string, column: string, value: any) => void;
   isEditableColumn: (column: string) => boolean;
-  clampPosition: (x: number, y: number) => { x: number; y: number };
   onNavigateToTable?: (tableName: string, documentId: string) => void;
   accessToken?: string;
   teamSlug?: string;
@@ -71,7 +70,6 @@ export const TableRow: React.FC<TableRowProps> = ({
   onCancelEditing,
   onCellMenuClick,
   isEditableColumn,
-  clampPosition,
   onNavigateToTable,
   accessToken,
   teamSlug,
@@ -148,7 +146,6 @@ export const TableRow: React.FC<TableRowProps> = ({
             column={column}
             value={value}
             width={width}
-            rowId={document._id}
             columnMeta={columnMeta[column]}
             isHighlighted={isHighlighted}
             isHovered={isHovered}

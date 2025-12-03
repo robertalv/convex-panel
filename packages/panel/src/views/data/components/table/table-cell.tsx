@@ -3,13 +3,13 @@ import { MoreVertical, Link2 } from 'lucide-react';
 import { Tooltip } from '../../../../components/shared/tooltip';
 import { DocumentPreview } from '../document-preview';
 import { InlineCellEditor } from './inline-cell-editor';
-import { formatValue, getValueColor, isConvexId, createDocumentLink, ColumnMeta } from './data-table-utils';
+import { formatValue, getValueColor, isConvexId, createDocumentLink } from './data-table-utils';
+import type { ColumnMeta } from './data-table-utils';
 
 export interface TableCellProps {
   column: string;
   value: any;
   width: number;
-  rowId: string;
   columnMeta?: ColumnMeta;
   isHighlighted: boolean;
   isHovered: boolean;
@@ -42,7 +42,6 @@ export const TableCell: React.FC<TableCellProps> = ({
   column,
   value,
   width,
-  rowId,
   columnMeta,
   isHighlighted,
   isHovered,
@@ -154,9 +153,8 @@ export const TableCell: React.FC<TableCellProps> = ({
                     projectSlug={projectSlug}
                   />
                 }
-                placement="right"
-                maxWidth="500px"
-                delay={300}
+                position="right"
+                maxWidth={500}
               >
                 <div
                   style={{

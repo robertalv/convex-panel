@@ -1,4 +1,5 @@
-import React, { ReactNode, forwardRef } from 'react';
+import React, { forwardRef } from 'react';
+import type { ReactNode } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
 export interface DropdownTriggerProps {

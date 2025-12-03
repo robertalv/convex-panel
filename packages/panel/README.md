@@ -107,6 +107,29 @@ In your Convex deployment settings you should also configure:
 
 ### Next.js (App Router)
 
+**Recommended: Use the Next.js-specific import** (includes SSR handling):
+
+```tsx
+// app/providers.tsx
+"use client";
+
+import { ConvexReactClient, ConvexProvider } from "convex/react";
+import ConvexPanel from "convex-panel/nextjs";
+
+const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+
+export function ConvexClientProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <ConvexProvider client={convex}>
+      {children}
+      <ConvexPanel />
+    </ConvexProvider>
+  );
+}
+```
+
+**Alternative: Using the default import** (requires manual SSR handling):
+
 ```tsx
 // app/providers.tsx
 "use client";
@@ -130,6 +153,27 @@ export function ConvexClientProvider({ children }: { children: React.ReactNode }
 
 ### Vite / React
 
+**Recommended: Use the React-specific import**:
+
+```tsx
+// src/App.tsx
+import { ConvexReactClient, ConvexProvider } from "convex/react";
+import ConvexPanel from "convex-panel/react";
+
+const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
+
+function App() {
+  return (
+    <ConvexProvider client={convex}>
+      {/* Your app */}
+      <ConvexPanel />
+    </ConvexProvider>
+  );
+}
+```
+
+**Alternative: Using the default import**:
+
 ```tsx
 // src/App.tsx
 import { ConvexReactClient, ConvexProvider } from "convex/react";
@@ -148,6 +192,22 @@ function App() {
 ```
 
 That's it! The panel will appear at the bottom of your screen. Click to expand and authenticate with your Convex account via OAuth.
+
+## Framework-Specific Imports
+
+Convex Panel provides framework-specific entry points for optimal integration:
+
+- **`convex-panel/nextjs`** - Next.js-optimized wrapper with built-in SSR handling
+- **`convex-panel/react`** - React/Vite-optimized wrapper without SSR overhead
+- **`convex-panel`** - Default export (backward compatible, works everywhere)
+
+### Why use framework-specific imports?
+
+- **Next.js**: The `/nextjs` import handles client-side rendering automatically, preventing hydration issues
+- **React/Vite**: The `/react` import is simpler and has no SSR overhead for client-only apps
+- **Default**: Use the default import if you prefer manual SSR handling or need maximum compatibility
+
+All imports provide the same functionality - choose based on your framework for the best experience.
 
 ## Configuration
 

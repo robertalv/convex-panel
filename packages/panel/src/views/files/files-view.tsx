@@ -1,34 +1,31 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Search, Upload, Calendar, FileCode, ExternalLink, Pause, Trash2, Loader2, Check, AlertCircle, X } from 'lucide-react';
+import { Search, Upload, Calendar, ExternalLink, Trash2, FileCode, X } from 'lucide-react';
 import { ComponentSelector } from '../../components/component-selector';
 import { useComponents } from '../../hooks/useComponents';
 import { useFiles } from '../../hooks/useFiles';
-import { FileMetadata, deleteFile, uploadFileWithFallbacks } from '../../utils/api';
+import type { FileMetadata } from '../../utils/api';
+import { deleteFile, uploadFileWithFallbacks } from '../../utils/api';
 import { useSheetSafe } from '../../contexts/sheet-context';
 import { FilePreview } from './components/file-preview';
-import { DateFilterDropdown, DateFilter } from './components/date-filter-dropdown';
+import { DateFilterDropdown } from './components/date-filter-dropdown';
+import type { DateFilter } from './components/date-filter-dropdown';
 import { Checkbox } from '../../components/shared/checkbox';
+import { ROUTES } from '../../utils/constants';
 
 export interface FilesViewProps {
   convexUrl?: string;
   accessToken: string;
-  baseUrl?: string;
   adminClient?: any;
   useMockData?: boolean;
   onError?: (error: string) => void;
-  teamSlug?: string;
-  projectSlug?: string;
 }
 
 export const FilesView: React.FC<FilesViewProps> = ({
   convexUrl,
   accessToken,
-  baseUrl,
   adminClient,
   useMockData = false,
   onError,
-  teamSlug,
-  projectSlug,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
@@ -62,8 +59,6 @@ export const FilesView: React.FC<FilesViewProps> = ({
     isLoading,
     error: filesError,
     refetch,
-    hasMore,
-    loadMore,
   } = useFiles({
     adminClient,
     useMockData,
@@ -301,7 +296,6 @@ export const FilesView: React.FC<FilesViewProps> = ({
           file={file}
           deploymentUrl={convexUrl}
           accessToken={accessToken}
-          componentId={selectedComponentId}
         />
       ),
       width: '600px',
@@ -318,7 +312,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
 
     try {
       // Construct file URL
-      const fileUrl = file.url || `${convexUrl}/api/storage/${file.storageId || file._id}`;
+      const fileUrl = file.url || `${convexUrl}${ROUTES.STORAGE}/${file.storageId || file._id}`;
       
       // If file has a direct URL (signed URL), use it directly
       if (file.url && file.url.startsWith('http')) {

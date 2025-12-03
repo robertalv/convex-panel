@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 export interface DateFilter {
@@ -414,11 +414,6 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
       </div>
     );
   };
-
-  const selectedPreset = PRESET_OPTIONS.find(opt => opt.type === value.type);
-  const dateRange = value.type !== 'any' && value.startDate && value.endDate
-    ? formatDateRange(value.startDate, value.endDate)
-    : null;
 
   return (
     <>

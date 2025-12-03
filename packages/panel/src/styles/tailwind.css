@@ -5,10 +5,15 @@
  * All styles are scoped to prevent affecting the parent app.
  * Import this in your app: import 'convex-panel/dist/styles.css'
  *
- * IMPORTANT: We don't import Tailwind directly here to prevent CSS leakage.
+ * Tailwind CSS is configured with 'cp-' prefix and proper isolation.
  * All classes are prefixed with 'cp-' for scoping.
  * Uses CSS custom properties for theming.
  */
+
+/* Tailwind CSS directives - base styles disabled to prevent leakage */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* ================================
    Theme Variables
@@ -96,10 +101,11 @@
 
 /*
  * Custom component styles for Convex Panel
- * Note: In Tailwind v4, we use standard Tailwind classes with the cp- prefix
+ * Organized using Tailwind's @layer directive for proper ordering
  */
 
-/* Base panel container */
+@layer components {
+  /* Base panel container */
 .cp-panel-container {
   background-color: var(--color-panel-bg);
   color: var(--color-panel-text);
@@ -599,14 +605,22 @@
 
 /* Root panel container - fully isolated to prevent affecting parent app */
 .cp-bottom-sheet {
-  /* CSS Containment: Isolate styles, layout, and paint within this container */
-  contain: style layout paint;
+  /* CSS Containment: Isolate styles, layout, paint, and size within this container */
+  contain: style layout paint size;
   /* Prevent style leakage to parent */
   isolation: isolate;
+  /* Reset inherited styles to prevent parent app interference */
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   color: var(--color-panel-text);
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  /* Prevent text selection inheritance */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Layout */
   position: fixed;
   bottom: 0;
   left: 0;
@@ -618,9 +632,15 @@
   z-index: 99998;
   box-shadow: 0 -4px 6px -1px var(--color-panel-shadow);
   pointer-events: auto;
-  margin: 0;
-  padding: 0;
   outline: none;
+  /* Explicitly reset properties that might inherit from parent */
+  text-align: left;
+  text-decoration: none;
+  text-transform: none;
+  letter-spacing: normal;
+  word-spacing: normal;
+  white-space: normal;
+  direction: ltr;
 }
 
 /* Header styles */
@@ -824,6 +844,24 @@
   flex-shrink: 0;
 }
 
+/* Sidebar main section (all tabs except settings) */
+.cp-sidebar-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+/* Sidebar footer (settings button) */
+.cp-sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
 /* Sidebar item wrapper */
 .cp-sidebar-item-wrapper {
   position: relative;
@@ -861,7 +899,7 @@
 /* Active indicator */
 .cp-sidebar-active-indicator {
   position: absolute;
-  left: 4px;
+  left: -6px;
   top: 50%;
   transform: translateY(-50%);
   width: 3px;
@@ -969,11 +1007,14 @@
   pointer-events: none !important;
 }
 
-/* ================================
-   Utility Classes
-   ================================ */
+}
 
-/* Flex utilities */
+@layer utilities {
+  /* ================================
+     Utility Classes
+     ================================ */
+
+  /* Flex utilities */
 .cp-flex { display: flex; }
 .cp-flex-1 { flex: 1; }
 .cp-flex-col { flex-direction: column; }
@@ -1043,9 +1084,10 @@
 /* Cursor */
 .cp-cursor-pointer { cursor: pointer; }
 
-/* Transitions */
-.cp-transition { transition: all 0.15s ease; }
-.cp-transition-colors { transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+  /* Transitions */
+  .cp-transition { transition: all 0.15s ease; }
+  .cp-transition-colors { transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+}
 
 /* ================================
    Shared Search Input Styles

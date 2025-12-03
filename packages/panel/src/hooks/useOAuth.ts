@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  OAuthConfig,
-  OAuthToken,
   buildAuthorizationUrl,
   handleOAuthCallback,
   getStoredToken,
   clearToken,
+} from '../utils/oauth';
+import type {
+  OAuthConfig,
+  OAuthToken,
 } from '../utils/oauth';
 
 export interface UseOAuthReturn {

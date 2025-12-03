@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { X } from 'lucide-react';
 import { AddDocumentPanel } from './add-document-panel';
-import { TableSchema } from '../../../types';
+import type { TableSchema } from '../../../types';
 
 export interface AddDocumentSheetProps {
   isOpen: boolean;

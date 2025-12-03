@@ -1,15 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Play, ChevronDown, Search, Pause, Code, CodeXml } from 'lucide-react';
-import Editor, { BeforeMount, OnMount } from '@monaco-editor/react';
-import { ModuleFunction as TypedModuleFunction, FunctionExecutionLog } from '../../types';
-import { ModuleFunction } from '../../utils/functionDiscovery';
+import { Play, Search, Pause, CodeXml } from 'lucide-react';
+import Editor from '../../components/editor/lazy-monaco-editor';
+import type { BeforeMount } from '../../components/editor/lazy-monaco-editor';
+import type { ModuleFunction as TypedModuleFunction, FunctionExecutionLog } from '../../types';
+import type { ModuleFunction } from '../../utils/api/functionDiscovery';
 import { useShowGlobalRunner } from '../../lib/functionRunner';
 import { useFunctions } from '../../hooks/useFunctions';
-import { 
-  fetchUdfExecutionStats,
-  aggregateFunctionStats,
-  fetchSourceCode,
-} from '../../utils/api';
 import { getAdminKey } from '../../utils/adminClient';
 import { ComponentSelector } from '../../components/component-selector';
 import { useComponents } from '../../hooks/useComponents';
@@ -19,6 +15,8 @@ import { HealthCard } from '../health/components/health-card';
 import { useThemeSafe } from '../../hooks/useTheme';
 import { EmptyFunctionsState } from './components/empty-functions-state';
 import { FunctionExecutionDetailSheet } from './components/function-execution-detail-sheet';
+import { fetchUdfExecutionStats, aggregateFunctionStats } from '../../utils/api/metrics';
+import { fetchSourceCode } from '../../utils/api/functions';
 
 export interface FunctionsViewProps {
   adminClient: any;
@@ -94,7 +92,7 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
   const [logs, setLogs] = useState<FunctionExecutionLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [logCursor, setLogCursor] = useState<number | string>('now');
+  const [, setLogCursor] = useState<number | string>('now');
   const [selectedExecution, setSelectedExecution] = useState<FunctionExecutionLog | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
@@ -273,7 +271,7 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
       .then((code) => {
         setSourceCode(code);
       })
-      .catch((error) => {
+      .catch(() => {
         setSourceCode(null);
       })
       .finally(() => {
@@ -316,7 +314,7 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
   };
 
   const handleRunFunction = (func: ModuleFunction | TypedModuleFunction) => {
-    showGlobalRunner(func as any, 'click', true);
+    showGlobalRunner(func as any);
   };
 
   const togglePath = (path: string) => {

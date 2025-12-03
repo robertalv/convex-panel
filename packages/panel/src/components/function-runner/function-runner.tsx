@@ -1,18 +1,19 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { X, Play, Settings, Code as CodeIcon, ChevronDown, Copy, Maximize2, ArrowLeft, ArrowRight, ChevronUp } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Play, Settings, Code as CodeIcon, Copy, ArrowLeft, ArrowRight } from 'lucide-react';
 import { copyToClipboard } from '../../utils/toast';
-import { ModuleFunction } from '../../utils/functionDiscovery';
+import type { ModuleFunction } from '../../utils/api/functionDiscovery';
 import { useFunctionResult } from '../../hooks/useFunctionResult';
 import { useFunctionEditor } from '../../hooks/useFunctionEditor';
 import { Result } from './result';
 import { QueryResult } from './query-result';
-import { useRunHistory, RunHistoryItem } from '../../hooks/useRunHistory';
+import { useRunHistory } from '../../hooks/useRunHistory';
+import type { RunHistoryItem } from '../../hooks/useRunHistory';
 import { ComponentSelector } from '../component-selector';
 import { FunctionSelector } from './function-selector';
 import { useThemeSafe } from '../../hooks/useTheme';
-import { Value } from 'convex/values';
-import { CustomQuery } from '../../types/functions';
-import { ExecutableUdfType } from 'src/types/convex';
+import type { Value } from 'convex/values';
+import type { CustomQuery } from '../../types/functions';
+import type { ExecutableUdfType } from '../../types/convex';
 import { ObjectEditor } from '../editor';
 
 export interface FunctionRunnerProps {
@@ -50,7 +51,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
   const [runHistoryItem, setRunHistoryItem] = useState<RunHistoryItem | undefined>();
   const [historyIndex, setHistoryIndex] = useState(0);
   const [argsError, setArgsError] = useState<string[]>([]);
-  const { theme } = useThemeSafe();
+  const { theme: _theme } = useThemeSafe();
 
   useEffect(() => {
     if (propComponentId !== undefined) {
@@ -98,8 +99,8 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
         const hasComponentId = fn.componentId !== null && fn.componentId !== undefined;
         if (hasComponentId) return false;
         
+        // If the function has an identifier but no componentId, include it
         if (fn.identifier && fn.identifier.includes(':')) {
-          const firstPart = fn.identifier.split(':')[0];
           return true;
         }
         return true;
@@ -695,19 +696,16 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
               <Result
                 result={customQueryResult}
                 loading={customQueryLoading}
-                lastRequestTiming={customQueryTiming}
               />
             ) : moduleFunction && moduleFunction.udfType === 'query' ? (
               <QueryResult
                 result={currentResult}
                 loading={isRunning}
-                lastRequestTiming={currentTiming}
               />
             ) : currentResult ? (
               <Result
                 result={currentResult}
                 loading={isRunning}
-                lastRequestTiming={currentTiming}
               />
             ) : (
               <div

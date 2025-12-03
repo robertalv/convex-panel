@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Download, RotateCcw, Trash2, MoreVertical } from 'lucide-react';
+import { Download, RotateCcw, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 export interface BackupActionsDropdownProps {
@@ -26,7 +26,6 @@ export const BackupActionsDropdown: React.FC<BackupActionsDropdownProps> = ({
   useEffect(() => {
     const menuWidth = 150;
     const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
     
     let x = position.x;
     let y = position.y;

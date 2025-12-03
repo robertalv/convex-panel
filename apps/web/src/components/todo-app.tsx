@@ -28,6 +28,7 @@ export function TodoApp() {
   const removeTodo = useMutation(api.todos.remove);
   const seedData = useMutation(api.todos.seedDemoData);
 
+
   const [newTodoText, setNewTodoText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<Category>("Work");
   const [isAdding, setIsAdding] = useState(false);
@@ -40,17 +41,41 @@ export function TodoApp() {
     try {
       await createTodo({ text: newTodoText.trim(), category: selectedCategory });
       setNewTodoText("");
+    } catch (error: any) {
+      // Handle paused deployment error gracefully
+      if (error?.message?.includes('paused') || error?.message?.includes('Cannot run functions while')) {
+        console.warn('Deployment is paused, cannot create todo');
+        // Error will be shown by error boundary
+        return;
+      }
+      throw error; // Re-throw other errors
     } finally {
       setIsAdding(false);
     }
   };
 
   const handleToggle = async (id: Id<"todos">) => {
-    await toggleTodo({ id });
+    try {
+      await toggleTodo({ id });
+    } catch (error: any) {
+      if (error?.message?.includes('paused') || error?.message?.includes('Cannot run functions while')) {
+        console.warn('Deployment is paused, cannot toggle todo');
+        return;
+      }
+      throw error;
+    }
   };
 
   const handleRemove = async (id: Id<"todos">) => {
-    await removeTodo({ id });
+    try {
+      await removeTodo({ id });
+    } catch (error: any) {
+      if (error?.message?.includes('paused') || error?.message?.includes('Cannot run functions while')) {
+        console.warn('Deployment is paused, cannot remove todo');
+        return;
+      }
+      throw error;
+    }
   };
 
   const lastCategorizedTime = todos && todos.length > 0 
@@ -62,6 +87,27 @@ export function TodoApp() {
         hour12: true 
       })
     : "No data";
+
+  // Handle paused deployment error
+  if (todos === null) {
+    return (
+      <div className="w-full max-w-md mx-auto">
+        <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-6 text-center">
+          <div className="text-yellow-500 mb-4">
+            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-semibold text-foreground mb-2">
+            Deployment Paused
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            This deployment is currently paused. Resume the deployment in the dashboard settings to allow functions to run.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-md mx-auto">

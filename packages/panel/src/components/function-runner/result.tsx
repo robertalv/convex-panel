@@ -1,27 +1,17 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
-import Editor, { BeforeMount, OnMount } from '@monaco-editor/react';
-import { FunctionResult as FunctionResultType } from '../../utils/functionExecution';
-import { copyToClipboard } from '../../utils/toast';
+import Editor, { type BeforeMount } from '../editor/lazy-monaco-editor';
+import type { FunctionResult as FunctionResultType } from '../../utils/api/functionExecution';
 import { useThemeSafe } from '../../hooks/useTheme';
 
 interface ResultProps {
   result?: FunctionResultType;
   loading?: boolean;
-  lastRequestTiming?: {
-    startedAt: number;
-    endedAt: number;
-  };
-  requestFilter?: any;
-  startCursor?: number;
 }
 
 export const Result: React.FC<ResultProps> = ({
   result,
   loading = false,
-  lastRequestTiming,
-  requestFilter,
-  startCursor,
 }) => {
   const { theme } = useThemeSafe();
   const [monaco, setMonaco] = useState<Parameters<BeforeMount>[0]>();
@@ -33,16 +23,6 @@ export const Result: React.FC<ResultProps> = ({
     }
     return result.errorMessage || 'Unknown error';
   }, [result]);
-
-  const handleCopy = async () => {
-    if (resultString) {
-      await copyToClipboard(resultString);
-    }
-  };
-
-  const duration = lastRequestTiming
-    ? lastRequestTiming.endedAt - lastRequestTiming.startedAt
-    : null;
 
   const handleEditorWillMount: BeforeMount = (monacoInstance) => {
     setMonaco(monacoInstance);

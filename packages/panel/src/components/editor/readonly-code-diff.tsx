@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import type { editor } from 'monaco-editor';
-import { DiffEditor, BeforeMount, DiffOnMount } from '@monaco-editor/react';
+import { DiffEditor } from './lazy-monaco-editor';
+import type { BeforeMount, DiffOnMount } from './lazy-monaco-editor';
 import { useThemeSafe } from '../../hooks/useTheme';
 import { setupMonacoThemes, getMonacoTheme } from './monaco-theme';
 import { editorOptions } from './editor-options';
@@ -40,7 +41,7 @@ export function ReadonlyCodeDiff({
   originalCode,
   modifiedCode,
   language = 'json',
-  path,
+  path: _path,
   height = { type: 'parent' },
 }: ReadonlyCodeDiffProps) {
   const { theme } = useThemeSafe();

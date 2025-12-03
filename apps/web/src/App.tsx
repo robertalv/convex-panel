@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Analytics } from "@vercel/analytics/react";
 import { AppRouterProvider } from "./router";
+import ConvexPanel, { AppContentWrapper } from "convex-panel/react";
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL;
 
@@ -23,8 +24,14 @@ export default function App() {
 
   return (
     <ConvexProvider client={convex}>
-      <AppRouterProvider />
-      <Analytics />
+      {/* App content with error boundary - if this crashes, panel still shows */}
+      <AppContentWrapper>
+        <AppRouterProvider />
+        <Analytics />
+      </AppContentWrapper>
+      
+      {/* Convex Panel - always visible, even if app crashes */}
+      <ConvexPanel />
     </ConvexProvider>
   );
 }

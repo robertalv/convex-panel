@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FunctionExecutionLog } from '../../../types';
+import type { FunctionExecutionLog } from '../../../types';
 import { Card } from '../../../components/shared/card';
 
 interface FunctionExecutionDetailSheetProps {

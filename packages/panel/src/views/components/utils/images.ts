@@ -24,7 +24,12 @@ import rateLimiterImage from '../../../../../shared/assets/components/rate-limit
 import actionCacheImage from '../../../../../shared/assets/components/action-cache.webp';
 import persistentTextStreamingImage from '../../../../../shared/assets/components/persistent-text-streaming.webp';
 
-export const COMPONENT_IMAGES: Record<string, string> = {
+// Note: values are typed as `any` so this stays framework-agnostic:
+// - In Vite/webpack builds these imports are usually strings
+// - In Next.js they are `StaticImageData`
+// Using `any` keeps the library portable while allowing consumers to
+// narrow the type as needed (e.g. for <img> vs <Image>).
+export const COMPONENT_IMAGES: Record<string, any> = {
   'ai-agent': agentImage,
   'workpool': workpoolImage,
   'workflow': workflowImage,
@@ -52,6 +57,6 @@ export const COMPONENT_IMAGES: Record<string, string> = {
   'persistent-text-streaming': persistentTextStreamingImage,
 };
 
-export function getComponentImageUrl(componentId: string): string | undefined {
+export function getComponentImageUrl(componentId: string): any {
   return COMPONENT_IMAGES[componentId];
 }

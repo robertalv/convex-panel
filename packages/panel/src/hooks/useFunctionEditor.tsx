@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import Editor, { BeforeMount, OnMount } from '@monaco-editor/react';
-import { executeCustomQuery, FunctionResult } from '../utils/functionExecution';
+import Editor, { type BeforeMount, type OnMount } from '../components/editor/lazy-monaco-editor';
+import { executeCustomQuery } from '../utils/api/functionExecution';
+import type { FunctionResult } from '../utils/api/functionExecution';
 import { useThemeSafe } from './useTheme';
 
 interface UseFunctionEditorProps {
@@ -290,7 +291,7 @@ export function useFunctionEditor({
         value={code}
         beforeMount={handleEditorWillMount}
         onMount={handleEditorDidMount}
-        onChange={(value) => {
+        onChange={(value: string | undefined) => {
           if (value !== null && value !== undefined) {
             setCode(value);
           }

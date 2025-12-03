@@ -23,6 +23,12 @@
             "convex-panel/shared": [
                 "./packages/shared/src"
             ],
+            "convex-panel/react": [
+                "./packages/panel/src/react/index.tsx"
+            ],
+            "convex-panel/nextjs": [
+                "./packages/panel/src/nextjs/index.tsx"
+            ],
             "convex-panel": [
                 "./packages/panel/src"
             ],

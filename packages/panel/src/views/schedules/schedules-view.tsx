@@ -7,19 +7,18 @@ import {
 } from 'lucide-react';
 import { ComponentSelector } from '../../components/component-selector';
 import { FunctionSelector } from '../../components/function-runner/function-selector';
-import { discoverFunctions, ModuleFunction } from '../../utils/functionDiscovery';
-import { CustomQuery } from '../../components/function-runner/function-runner';
-import { fetchComponents } from '../../utils/api';
+import { discoverFunctions } from '../../utils/api/functionDiscovery';
+import type { ModuleFunction } from '../../utils/api/functionDiscovery';
+import { fetchComponents } from '../../utils/api/functions';
+import type { CustomQuery } from '../../types';
 
 export interface SchedulesViewProps {
   adminClient?: any;
-  accessToken?: string;
   useMockData?: boolean;
 }
 
 export const SchedulesView: React.FC<SchedulesViewProps> = ({
   adminClient,
-  accessToken,
   useMockData = false,
 }) => {
   const [selectedTab, setSelectedTab] = useState<'scheduled' | 'cron'>('scheduled');
@@ -32,6 +31,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
     if (!adminClient) return;
 
     setIsLoadingFunctions(true);
+    console.log("loading functions", isLoadingFunctions);
     Promise.all([
       discoverFunctions(adminClient, useMockData),
       fetchComponents(adminClient, useMockData).catch(() => []),

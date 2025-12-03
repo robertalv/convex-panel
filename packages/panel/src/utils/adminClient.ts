@@ -86,18 +86,44 @@ export function getAdminKey(adminClient?: any): string | null {
     // Ignore env access errors
   }
 
-  // Fallback: try Vite-style env (if available in host app)
-  try {
-    const maybeImportMeta: any =
-      typeof import.meta !== 'undefined' ? (import.meta as any) : null;
-    if (maybeImportMeta?.env?.CONVEX_ACCESS_TOKEN) {
-      return maybeImportMeta.env.CONVEX_ACCESS_TOKEN as string;
+  // Skip import.meta for Next.js to avoid webpack warnings
+  // Check if we're in Next.js first
+  const isNext = (() => {
+    if (typeof window !== 'undefined') {
+      try {
+        // @ts-ignore
+        if ((window as any).__NEXT_DATA__) return true;
+      } catch {}
     }
-    if (maybeImportMeta?.env?.VITE_CONVEX_ACCESS_TOKEN) {
-      return maybeImportMeta.env.VITE_CONVEX_ACCESS_TOKEN as string;
+    try {
+      if (typeof process !== 'undefined' && process.env?.NEXT_RUNTIME) return true;
+    } catch {}
+    return false;
+  })();
+
+  // Try process.env for VITE_ prefixed vars (works in both)
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      const viteToken = process.env.VITE_CONVEX_ACCESS_TOKEN;
+      if (viteToken) return viteToken;
     }
   } catch {
-    // Ignore if import.meta is not available
+    // Ignore
+  }
+
+  // Only try import.meta if NOT in Next.js (to avoid webpack warnings)
+  if (!isNext) {
+    try {
+      // Direct access for Vite - webpack won't analyze this if isNext is true at build time
+      // @ts-ignore - import.meta.env is available in Vite
+      if (typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined') {
+        // @ts-ignore
+        const token = import.meta.env.VITE_CONVEX_ACCESS_TOKEN || import.meta.env.CONVEX_ACCESS_TOKEN;
+        if (token) return token;
+      }
+    } catch {
+      // Ignore
+    }
   }
 
   return null;

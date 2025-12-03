@@ -15,8 +15,6 @@ import FooterSection from "./components/footer";
 import DocsPage from "./components/docs-page";
 import ChangelogPage from "./components/changelog-page";
 import { Button } from "./components/ui/button";
-import ConvexPanel from "convex-panel";
-
 // Root layout shared by all routes
 const RootLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
@@ -61,7 +59,6 @@ const rootRoute = new RootRoute({
     <RootLayout>
       <Suspense fallback={null}>
         <Outlet />
-        <ConvexPanel forceDisplay={true} />
       </Suspense>
     </RootLayout>
   ),

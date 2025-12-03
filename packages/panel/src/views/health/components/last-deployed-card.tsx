@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowUp } from 'lucide-react';
 import { HealthCard } from './health-card';
 import { TimestampDistance } from './timestamp-distance';
-import { fetchLastPushEvent, fetchServerVersion } from '../../../utils/api';
+import { fetchLastPushEvent, fetchServerVersion } from '../../../utils/api/health';
 
 interface LastDeployedCardProps {
   deploymentUrl?: string;

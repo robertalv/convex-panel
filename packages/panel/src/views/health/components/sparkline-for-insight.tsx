@@ -1,7 +1,6 @@
 import React from 'react';
-import { Insight } from '../../../utils/api';
 
-export const SparklineForInsight: React.FC<{ insight: Insight }> = ({ insight }) => {
+export const SparklineForInsight: React.FC = () => {
   // For now, render a simple placeholder sparkline
   // In the future, this could fetch and display actual sparkline data
   const width = 60;

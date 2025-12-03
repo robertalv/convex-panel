@@ -2,6 +2,8 @@
  * NPM API utilities for fetching package download statistics
  */
 
+import { NPM_API_DOMAIN, NPM_ROUTES } from "../../../utils/constants";
+
 export interface NpmPackageDownloads {
   downloads: number;
   start: string;
@@ -25,8 +27,7 @@ export async function fetchNpmWeeklyDownloads(
   packageName: string
 ): Promise<NpmPackageInfo> {
   try {
-    // Fetch last week's downloads from npm API
-    const url = `https://api.npmjs.org/downloads/point/last-week/${encodeURIComponent(packageName)}`;
+    const url = `https://${NPM_API_DOMAIN}${NPM_ROUTES.DOWNLOADS.replace('{packageName}', encodeURIComponent(packageName))}`;
     
     const response = await fetch(url, {
       method: 'GET',

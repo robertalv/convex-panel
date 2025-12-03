@@ -1,9 +1,12 @@
 import React, { useCallback, useMemo } from 'react';
 import { Code as CodeIcon } from 'lucide-react';
-import { isCustomQueryValue, ModuleFunction } from '../../utils/functionDiscovery';
-import { CustomQuery } from '../../types/functions';
+import { isCustomQueryValue } from '../../utils/api/functionDiscovery';
+import type { ModuleFunction } from '../../utils/api/functionDiscovery';
+import type { CustomQuery } from '../../types/functions';
 import {
   SearchableDropdown,
+} from '../shared/searchable-dropdown';
+import type {
   SearchableDropdownOption,
 } from '../shared/searchable-dropdown';
 

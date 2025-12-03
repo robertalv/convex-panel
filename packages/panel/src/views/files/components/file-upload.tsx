@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Upload, X, Check, Loader2, AlertCircle, Info } from 'lucide-react';
-import { uploadFileWithFallbacks, diagnoseFileStorageAvailability } from '../../../utils/api';
+import { uploadFileWithFallbacks, diagnoseFileStorageAvailability } from '../../../utils/api/files';
 
 export interface FileUploadProps {
   adminClient?: any;

@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { createGlobalState } from "react-use";
-import { ModuleFunction } from "../utils/functionDiscovery";
-import { CustomQuery } from "../types/functions";
+import type { ModuleFunction } from "../utils/api/functionDiscovery";
+import type { CustomQuery } from "../types/functions";
 
 const useGlobalRunnerShown = createGlobalState(false);
 export const useGlobalRunnerSelectedItem = createGlobalState<{
@@ -21,7 +21,7 @@ export function useShowGlobalRunner() {
   const [, setAutoRun] = useGlobalRunnerAutoRun();
 
   return useCallback(
-    (selected: ModuleFunction | CustomQuery | null, how: "click" | "keyboard" | "tutorial" | "redirect" = "click", autoRun: boolean = false) => {
+    (selected: ModuleFunction | CustomQuery | null, autoRun: boolean = false) => {
       if (selected || !selectedItem) {
         const fn = selected ?? {
           type: "customQuery" as const,
@@ -43,7 +43,7 @@ export function useShowGlobalRunner() {
 export function useHideGlobalRunner() {
   const [, setGlobalRunnerShown] = useGlobalRunnerShown();
   return useCallback(
-    (how: "click" | "redirect" | "keyboard") => {
+    () => {
       setGlobalRunnerShown(false);
     },
     [setGlobalRunnerShown],

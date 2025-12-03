@@ -12,7 +12,7 @@ import {
   useFilteredOptions,
   useSelectionState,
 } from '../../hooks/dropdowns';
-import { LOG_TYPES, LogType } from '../../types/logs';
+import { LOG_TYPES } from '../../utils/constants';
 
 interface MultiSelectLogTypeSelectorProps {
   selectedLogTypes: string[];
@@ -34,7 +34,7 @@ export const MultiSelectLogTypeSelector: React.FC<MultiSelectLogTypeSelectorProp
     [selectedLogTypes]
   );
 
-  const selectionState = useSelectionState<LogType>({
+  const selectionState = useSelectionState<typeof LOG_TYPES[0]>({
     items: LOG_TYPES,
     selected: selectedLogTypeObjects,
     getKey: (item) => item.value,
@@ -150,7 +150,7 @@ export const MultiSelectLogTypeSelector: React.FC<MultiSelectLogTypeSelectorProp
         {/* Log Type List */}
         <DropdownList
           items={filteredOptions}
-          renderItem={(logType, index) => {
+          renderItem={(logType) => {
             const isSelected = selectedLogTypes.includes(logType.value);
             return (
               <div

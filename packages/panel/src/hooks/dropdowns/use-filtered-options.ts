@@ -1,12 +1,12 @@
 import { useMemo, useState, useCallback } from 'react';
 
-export interface FilterableOption<T> {
+export interface FilterableOption<> {
   searchValue?: string;
   label?: string;
   [key: string]: any;
 }
 
-export function useFilteredOptions<T extends FilterableOption<any>>(
+export function useFilteredOptions<T extends FilterableOption>(
   options: T[],
   getSearchText?: (option: T) => string
 ) {

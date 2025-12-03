@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useRef } from 'react';
 import { Code as CodeIcon } from 'lucide-react';
-import { isCustomQueryValue, ModuleFunction } from '../../utils/functionDiscovery';
-import { CustomQuery } from '../../types/functions';
+import { isCustomQueryValue } from '../../utils/api/functionDiscovery';
+import type { ModuleFunction } from '../../utils/api/functionDiscovery';
+import type { CustomQuery } from '../../types/functions';
 import { Checkbox } from '../shared/checkbox';
 import {
   DropdownShell,
@@ -259,7 +260,7 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
         {/* Function List with Virtualization */}
         <DropdownList
           items={filteredOptions}
-          renderItem={(option, index) => {
+          renderItem={(option) => {
             const isSelected = isFunctionSelected(option);
             return (
               <div

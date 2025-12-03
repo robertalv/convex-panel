@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Loader2, ExternalLink, Download, Image, FileText, File } from 'lucide-react';
+import { Copy, Loader2, ExternalLink, Download, FileText, File } from 'lucide-react';
 import { copyToClipboard } from '../../../utils/toast';
-import { useSheetSafe } from '../../../contexts/sheet-context';
-import { FileMetadata } from '../../../utils/api';
+import type { FileMetadata } from '../../../utils/api/types';
 
 const ImagePreview: React.FC<{
   url: string;
@@ -15,7 +14,6 @@ const ImagePreview: React.FC<{
 
   useEffect(() => {
     if (!accessToken || !deploymentUrl || !url.includes(deploymentUrl)) {
-      // Public URL or signed URL - use directly
       setImageUrl(url);
       setIsLoading(false);
       return;
@@ -104,16 +102,13 @@ export interface FilePreviewProps {
   file: FileMetadata;
   deploymentUrl?: string;
   accessToken?: string;
-  componentId?: string | null;
 }
 
 export const FilePreview: React.FC<FilePreviewProps> = ({
   file,
   deploymentUrl,
   accessToken,
-  componentId,
 }) => {
-  const { closeSheet } = useSheetSafe();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);

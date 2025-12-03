@@ -165,7 +165,7 @@ export const MultiSelectComponentSelector: React.FC<MultiSelectComponentSelector
         {/* Component List */}
         <DropdownList
           items={filteredOptions}
-          renderItem={(option, index) => {
+          renderItem={(option) => {
             const component = option.value;
             const isSelected = selectedComponents.includes(component);
             return (

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, ExternalLink } from 'lucide-react';
 import { Card } from '../../../components/shared/card';
-import { Insight, fetchInsights } from '../../../utils/api';
+import { fetchInsights } from '../../../utils/api/health';
+import type { Insight } from '../../../utils/api/types';
 import { InsightsSummaryListItem } from './insights-summary-list-item';
 
 export const InsightsSummary: React.FC<{

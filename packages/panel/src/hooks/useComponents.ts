@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { fetchComponents } from '../utils/api';
+import { fetchComponents } from '../utils/api/functions';
 
 export interface UseComponentsProps {
   adminClient: any;

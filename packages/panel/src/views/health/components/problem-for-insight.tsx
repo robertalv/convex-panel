@@ -1,5 +1,5 @@
 import React from 'react';
-import { Insight } from '../../../utils/api';
+import type { Insight } from '../../../utils/api/types';
 
 export const ProblemForInsight: React.FC<{ insight: Insight }> = ({ insight }) => {
   const getProblemText = (): string => {

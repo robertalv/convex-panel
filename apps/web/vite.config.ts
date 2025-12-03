@@ -1,7 +1,7 @@
 import { defineConfig, loadEnv, type PluginOption } from 'vite'
 import react from '@vitejs/plugin-react-swc'
 import tailwindcss from '@tailwindcss/vite'
-import { convexPanel } from '../../packages/panel/src/vite-plugin'
+import { convexPanel } from '../../packages/panel/src/vite'
 
 import path from 'path';
 
@@ -40,6 +40,8 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         'convex-panel/styles.css': path.resolve(__dirname, '../../packages/panel/src/styles/tailwind.css'),
+        'convex-panel/nextjs': path.resolve(__dirname, '../../packages/panel/src/nextjs/index.tsx'),
+        'convex-panel/react': path.resolve(__dirname, '../../packages/panel/src/react/index.tsx'),
         'convex-panel': path.resolve(__dirname, '../../packages/panel/src/index.ts'),
       },
     },

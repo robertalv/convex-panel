@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SettingsSidebar, SettingsSection } from './components/settings-sidebar';
+import { SettingsSidebar, type SettingsSection } from './components/settings-sidebar';
 import { EnvironmentVariables } from './components/environment-variables';
 import { UrlDeployKey } from './components/url-deploy-key';
 import { Authentication } from './components/authentication';
@@ -58,11 +58,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         );
       case 'authentication':
         return (
-          <Authentication
-            adminClient={adminClient}
-            accessToken={accessToken}
-            deploymentUrl={deploymentUrl}
-          />
+          <Authentication adminClient={adminClient} />
         );
       case 'components':
         return (
@@ -84,11 +80,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         );
       case 'integrations':
         return (
-          <Integrations
-            adminClient={adminClient}
-            accessToken={accessToken}
-            deploymentUrl={deploymentUrl}
-          />
+          <Integrations />
         );
       case 'pause-deployment':
         return (

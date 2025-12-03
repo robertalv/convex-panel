@@ -1,5 +1,7 @@
-import React, { ReactNode } from 'react';
-import { FixedSizeList, ListChildComponentProps } from 'react-window';
+import React from 'react';
+import type { ReactNode } from 'react';
+import { FixedSizeList } from 'react-window';
+import type { ListChildComponentProps } from 'react-window';
 
 export interface DropdownListProps<T> {
   items: T[];
