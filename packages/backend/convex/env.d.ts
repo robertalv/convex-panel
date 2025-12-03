@@ -1,4 +1,4 @@
-declare const process: {
+export declare const process: {
   env: Record<string, string | undefined>;
 };
 

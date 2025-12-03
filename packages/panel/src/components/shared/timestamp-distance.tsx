@@ -41,7 +41,7 @@ export const TimestampDistance: React.FC<TimestampDistanceProps> = ({
   const fullDate = date.toLocaleString();
 
   return (
-    <Tooltip text={fullDate}>
+    <Tooltip content={fullDate}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
         <span
           style={{

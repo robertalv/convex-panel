@@ -16,9 +16,12 @@
         "lint": "turbo run lint",
         "test": "turbo run test",
         "clean": "turbo run clean",
-        "format": "prettier --write \"**/*.{ts,tsx,md}\""
+        "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+        "knip": "knip"
     },
     "devDependencies": {
+        "@types/node": "^24.10.1",
+        "knip": "^5.71.0",
         "prettier": "^3.5.2",
         "turbo": "^2.4.2",
         "typescript": "^5.9.3"

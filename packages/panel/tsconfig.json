@@ -11,6 +11,6 @@
     "types": ["vite/client", "node", "svelte", "vue"]
   },
   "include": [
-    "src/**/*"
+    "./src/**/*"
   ]
 }
