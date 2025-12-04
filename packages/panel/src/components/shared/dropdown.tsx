@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import { useThemeSafe } from '../../hooks/useTheme';
+import { usePortalTarget } from '../../contexts/portal-context';
 
 export interface DropdownOption<T> {
   value: T;
@@ -46,12 +47,13 @@ export function Dropdown<T = string | number>({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const { theme } = useThemeSafe();
+  const portalTarget = usePortalTarget();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       if (
-        dropdownRef.current && 
+        dropdownRef.current &&
         !dropdownRef.current.contains(target) &&
         triggerRef.current &&
         !triggerRef.current.contains(target)
@@ -65,7 +67,7 @@ export function Dropdown<T = string | number>({
       const timeoutId = setTimeout(() => {
         document.addEventListener('mousedown', handleClickOutside);
       }, 10);
-      
+
       // Handle escape key
       const handleEscape = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
@@ -96,7 +98,7 @@ export function Dropdown<T = string | number>({
       const updatePosition = () => {
         if (triggerRef.current) {
           const rect = triggerRef.current.getBoundingClientRect();
-          
+
           setDropdownPosition({
             top: rect.bottom + 4,
             left: align === 'right' ? rect.right : rect.left,
@@ -104,16 +106,16 @@ export function Dropdown<T = string | number>({
           });
         }
       };
-      
+
       // Use requestAnimationFrame to ensure DOM is ready
       requestAnimationFrame(() => {
         updatePosition();
       });
-      
+
       // Update position on scroll/resize
       window.addEventListener('scroll', updatePosition, true);
       window.addEventListener('resize', updatePosition);
-      
+
       return () => {
         window.removeEventListener('scroll', updatePosition, true);
         window.removeEventListener('resize', updatePosition);
@@ -163,7 +165,7 @@ export function Dropdown<T = string | number>({
           }
         }}
       >
-        <span style={{ 
+        <span style={{
           textAlign: 'center',
           flex: 1,
           overflow: 'hidden',
@@ -172,19 +174,19 @@ export function Dropdown<T = string | number>({
         }}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <ChevronDown 
-          size={12} 
-          style={{ 
+        <ChevronDown
+          size={12}
+          style={{
             color: 'var(--color-panel-text-muted)',
             marginLeft: '4px',
             flexShrink: 0,
             transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
             transition: 'transform 0.2s',
-          }} 
+          }}
         />
       </button>
 
-      {isOpen && dropdownPosition && createPortal(
+      {isOpen && dropdownPosition && portalTarget && createPortal(
         <div
           ref={dropdownRef}
           className={`${dropdownClassName || ''} cp-theme-${theme}`.trim()}
@@ -248,14 +250,14 @@ export function Dropdown<T = string | number>({
                     {option.icon}
                   </span>
                 )}
-                <span style={{ 
+                <span style={{
                   textAlign: 'center',
                   flex: 1,
                 }}>
                   {option.label}
                 </span>
                 {isSelected && (
-                  <span style={{ 
+                  <span style={{
                     color: 'var(--color-panel-accent)',
                     fontSize: '12px',
                     flexShrink: 0,
@@ -267,7 +269,7 @@ export function Dropdown<T = string | number>({
             );
           })}
         </div>,
-        document.body
+        portalTarget
       )}
     </div>
   );

@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { usePortalTarget } from '../../contexts/portal-context';
+import { useThemeSafe } from '../../hooks/useTheme';
 
 export interface SearchableDropdownOption<T> {
   key: string;
@@ -38,21 +41,67 @@ export function SearchableDropdown<T>({
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const portalTarget = usePortalTarget();
+  const { theme } = useThemeSafe();
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(target) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(target)
+      ) {
         setIsOpen(false);
       }
     };
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+      // Use a small delay to avoid immediate closing when opening
+      const timeoutId = setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside);
+      }, 10);
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+      return () => {
+        clearTimeout(timeoutId);
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [isOpen]);
+
+  // Calculate dropdown position for portal
+  useEffect(() => {
+    if (isOpen && triggerRef.current) {
+      const updatePosition = () => {
+        if (triggerRef.current) {
+          const rect = triggerRef.current.getBoundingClientRect();
+          setDropdownPosition({
+            top: rect.bottom + 4,
+            left: rect.left,
+            width: rect.width,
+          });
+        }
+      };
+
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        updatePosition();
+      });
+
+      // Update position on scroll/resize
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+
+      return () => {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    } else {
+      setDropdownPosition(null);
+    }
   }, [isOpen]);
 
   useEffect(() => {
@@ -87,8 +136,9 @@ export function SearchableDropdown<T>({
   const displayLabel = selectedOption?.label || placeholder;
 
   return (
-    <div style={{ position: 'relative' }} ref={dropdownRef}>
+    <div style={{ position: 'relative' }}>
       <div
+        ref={triggerRef}
         onClick={() => setIsOpen(!isOpen)}
         style={{
           display: 'flex',
@@ -129,25 +179,28 @@ export function SearchableDropdown<T>({
         )}
       </div>
 
-      {isOpen && (
+      {isOpen && dropdownPosition && portalTarget && createPortal(
         <div
+          ref={dropdownRef}
+          className={`cp-theme-${theme}`}
           style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            marginTop: '4px',
+            position: 'fixed',
+            top: `${dropdownPosition.top}px`,
+            left: `${dropdownPosition.left}px`,
+            width: `${dropdownPosition.width}px`,
             backgroundColor: 'var(--color-panel-bg)',
             border: '1px solid var(--color-panel-border)',
             borderRadius: '6px',
             boxShadow: '0 4px 16px var(--color-panel-shadow)',
-            zIndex: 1000,
+            zIndex: 100000,
             maxHeight: `${listMaxHeight}px`,
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
+            pointerEvents: 'auto',
           }}
           onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           <div style={{ padding: '8px', borderBottom: '1px solid var(--color-panel-border)' }}>
             <div style={{ position: 'relative' }}>
@@ -254,7 +307,8 @@ export function SearchableDropdown<T>({
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        portalTarget
       )}
     </div>
   );

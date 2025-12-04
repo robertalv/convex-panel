@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { usePortalTarget } from '../../contexts/portal-context';
 
 export const ProBadge: React.FC<{ tooltip?: string }> = ({ tooltip }) => {
   const [showTooltip, setShowTooltip] = useState(false);
@@ -9,6 +10,7 @@ export const ProBadge: React.FC<{ tooltip?: string }> = ({ tooltip }) => {
   } | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const portalTarget = usePortalTarget();
 
   useEffect(() => {
     if (showTooltip && triggerRef.current && tooltip) {
@@ -92,7 +94,7 @@ export const ProBadge: React.FC<{ tooltip?: string }> = ({ tooltip }) => {
           PRO
         </span>
       </div>
-      {showTooltip && tooltip && tooltipPosition && typeof document !== 'undefined' && (
+      {showTooltip && tooltip && tooltipPosition && portalTarget && (
         createPortal(
           <div
             ref={tooltipRef}
@@ -136,7 +138,7 @@ export const ProBadge: React.FC<{ tooltip?: string }> = ({ tooltip }) => {
               }}
             />
           </div>,
-          document.body
+          portalTarget
         )
       )}
     </>

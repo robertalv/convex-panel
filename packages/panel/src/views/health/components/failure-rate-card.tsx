@@ -49,8 +49,8 @@ export const FailureRateCard: React.FC<FailureRateCardProps> = ({
 
     fetchData();
 
-    // Refresh every 60 seconds
-    const interval = setInterval(fetchData, 60000);
+    // Refresh every 30 seconds for real-time tracking
+    const interval = setInterval(fetchData, 30000);
 
     return () => {
       mounted = false;

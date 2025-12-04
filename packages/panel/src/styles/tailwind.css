@@ -252,11 +252,12 @@
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease;
+  color: var(--color-panel-text);
 }
 
 .cp-btn-primary {
   background-color: var(--color-panel-accent);
-  color: white;
+  color: var(--color-panel-text);
   border: none;
 }
 

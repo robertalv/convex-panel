@@ -411,11 +411,11 @@ export const mockFetchCacheHitRate = async () => {
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 500));
   
-  // Generate mock data for the last hour (60 minutes)
-  const timestamps = Array.from({ length: 60 }, (_, i) => {
+  // Generate mock data for the last 26 minutes
+  const timestamps = Array.from({ length: 26 }, (_, i) => {
     const now = Math.floor(Date.now() / 1000);
     return {
-      secs_since_epoch: now - (60 - i) * 60,
+      secs_since_epoch: now - (26 - i) * 60,
       nanos_since_epoch: 0
     };
   });
@@ -496,11 +496,11 @@ export const mockFetchFailureRate = async () => {
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 500));
   
-  // Generate mock data for the last hour (60 minutes)
-  const timestamps = Array.from({ length: 60 }, (_, i) => {
+  // Generate mock data for the last 26 minutes
+  const timestamps = Array.from({ length: 26 }, (_, i) => {
     const now = Math.floor(Date.now() / 1000);
     return {
-      secs_since_epoch: now - (60 - i) * 60,
+      secs_since_epoch: now - (26 - i) * 60,
       nanos_since_epoch: 0
     };
   });
@@ -588,11 +588,11 @@ export const mockFetchSchedulerLag = async () => {
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 500));
   
-  // Generate mock data for the last hour (60 minutes)
-  const timestamps = Array.from({ length: 60 }, (_, i) => {
+  // Generate mock data for the last 26 minutes
+  const timestamps = Array.from({ length: 26 }, (_, i) => {
     const now = Math.floor(Date.now() / 1000);
     return {
-      secs_since_epoch: now - (60 - i) * 60,
+      secs_since_epoch: now - (26 - i) * 60,
       nanos_since_epoch: 0
     };
   });
@@ -608,12 +608,12 @@ export const mockFetchSchedulerLag = async () => {
     // Add some random noise for variation
     value += (Math.random() - 0.5) * 0.8;
     
-    // Major spikes at specific points
-    if (i === 15) {
+    // Major spikes at specific points (within 26 minute range)
+    if (i === 10) {
       value += 4 + Math.random() * 3; // Add 4-7 minute spike
-    } else if (i === 30) {
+    } else if (i === 20) {
       value += 6 + Math.random() * 4; // Add 6-10 minute spike
-    } else if (i === 45) {
+    } else if (i === 15) {
       value += 3 + Math.random() * 2; // Add 3-5 minute spike
     } 
     // Medium spikes every 10 minutes

@@ -214,7 +214,7 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
         <span>{displayText}</span>
       </DropdownTrigger>
 
-      <DropdownPanel isOpen={isOpen} width={dropdownWidth} maxHeight={350}>
+      <DropdownPanel isOpen={isOpen} width={dropdownWidth} maxHeight={350} triggerRef={triggerRef}>
         <DropdownSearch
           value={searchQuery}
           onChange={setSearchQuery}

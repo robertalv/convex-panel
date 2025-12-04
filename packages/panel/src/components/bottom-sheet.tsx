@@ -458,7 +458,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         <button
           type="button"
           onClick={handleUpgradeClick}
-          className="cp-upgrade-btn"
+          className="cp-btn cp-btn-primary"
         >
           <Sparkles size={14} />
           <span>Upgrade to Pro</span>

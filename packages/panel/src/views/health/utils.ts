@@ -12,11 +12,19 @@ export const transformToChartData = (
     return { timestamps: [], functionData: new Map() };
   }
 
-  // Collect all unique timestamps
+  // Filter to only show the last 26 minutes
+  const now = Math.floor(Date.now() / 1000);
+  const twentySixMinutesAgo = now - (26 * 60); // 26 minutes = 1560 seconds
+
+  // Collect all unique timestamps within the last 26 minutes
   const allTimestamps = new Set<number>();
   data.forEach(([_, timeSeries]) => {
     timeSeries.forEach(([timestamp]) => {
-      allTimestamps.add(timestamp.secs_since_epoch);
+      const ts = timestamp.secs_since_epoch;
+      // Only include timestamps within the last 26 minutes
+      if (ts >= twentySixMinutesAgo && ts <= now) {
+        allTimestamps.add(ts);
+      }
     });
   });
 
@@ -27,9 +35,13 @@ export const transformToChartData = (
   data.forEach(([functionName, timeSeries]) => {
     const valueMap = new Map<number, number | null>();
 
-    // First pass: store all values (including nulls)
+    // First pass: store all values (including nulls) within the last 26 minutes
     timeSeries.forEach(([timestamp, value]) => {
-      valueMap.set(timestamp.secs_since_epoch, typeof value === 'number' ? value : null);
+      const ts = timestamp.secs_since_epoch;
+      // Only include timestamps within the last 26 minutes
+      if (ts >= twentySixMinutesAgo && ts <= now) {
+        valueMap.set(ts, typeof value === 'number' ? value : null);
+      }
     });
 
     // Second pass: fill nulls with defaults if there was previous data (like Convex does)
@@ -53,29 +65,39 @@ export const transformToChartData = (
 };
 
 /**
- * Get time range from API response
+ * Get time range from API response (last 26 minutes)
  */
 export const getTimeRange = (data: APIResponse | null): TimeRange => {
   if (!data || data.length === 0) {
     const now = new Date();
+    const twentySixMinutesAgo = new Date(now.getTime() - 26 * 60 * 1000);
     return {
-      start: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      start: twentySixMinutesAgo.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       end: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
   }
 
+  // Filter to only show the last 26 minutes
+  const now = Math.floor(Date.now() / 1000);
+  const twentySixMinutesAgo = now - (26 * 60); // 26 minutes = 1560 seconds
+
   const allTimestamps: number[] = [];
   data.forEach(([_, timeSeries]) => {
     timeSeries.forEach(([timestamp]) => {
-      allTimestamps.push(timestamp.secs_since_epoch);
+      const ts = timestamp.secs_since_epoch;
+      // Only include timestamps within the last 26 minutes
+      if (ts >= twentySixMinutesAgo && ts <= now) {
+        allTimestamps.push(ts);
+      }
     });
   });
 
   if (allTimestamps.length === 0) {
-    const now = new Date();
+    const nowDate = new Date();
+    const twentySixMinutesAgoDate = new Date(nowDate.getTime() - 26 * 60 * 1000);
     return {
-      start: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      end: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      start: twentySixMinutesAgoDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      end: nowDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
   }
 
@@ -90,6 +112,7 @@ export const getTimeRange = (data: APIResponse | null): TimeRange => {
 
 /**
  * Calculate current time position (right edge of chart)
+ * @deprecated Use real-time current time state instead for live updates
  */
 export const getCurrentTimeX = (timestamps: number[], width: number = 300): number => {
   if (timestamps.length === 0) return width;

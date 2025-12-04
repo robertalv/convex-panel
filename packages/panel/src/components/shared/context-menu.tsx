@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useThemeSafe } from '../../hooks/useTheme';
 import { useSheetSafe } from '../../contexts/sheet-context';
+import { usePortalTarget } from '../../contexts/portal-context';
 
 export interface ViewingAction {
   title?: string;
@@ -51,30 +52,30 @@ function matchesShortcut(
 ): boolean {
   const isMac = navigator.platform.includes('Mac');
   const key = event.key.toLowerCase();
-  
+
   // Map special keys
   const keyMap: Record<string, string> = {
     'enter': 'return',
     ' ': 'space',
     'escape': 'esc',
   };
-  
+
   const normalizedKey = keyMap[key] || key;
   const normalizedShortcutKey = keyMap[shortcut.key] || shortcut.key;
-  
+
   if (normalizedKey !== normalizedShortcutKey) return false;
-  
+
   // Check modifiers
   const metaMatch = shortcut.meta ? (isMac ? event.metaKey : event.ctrlKey) : !event.metaKey && !event.ctrlKey;
   const ctrlMatch = shortcut.ctrl ? event.ctrlKey : !event.ctrlKey;
   const shiftMatch = shortcut.shift === event.shiftKey;
   const altMatch = shortcut.alt === event.altKey;
-  
+
   // For Mac, meta takes precedence over ctrl
   if (isMac && shortcut.meta) {
     return metaMatch && shiftMatch && altMatch && !event.ctrlKey;
   }
-  
+
   return metaMatch && ctrlMatch && shiftMatch && altMatch;
 }
 
@@ -88,21 +89,22 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   const itemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const { theme } = useThemeSafe();
   const { openSheet } = useSheetSafe();
+  const portalTarget = usePortalTarget();
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [hoveredItemIndex, setHoveredItemIndex] = useState<number | null>(null);
   const [submenuPosition, setSubmenuPosition] = useState<{ top: number; left: number } | null>(null);
   const closeSubmenuTimeoutRef = useRef<number | null>(null);
-  
+
   // Get only actionable items (no dividers)
   const actionableItems = items.filter(
     (item): item is ContextMenuItemDescriptor => !('type' in item && (item as { type: string }).type === 'divider')
   );
-  
+
   // Execute selected item
   const executeSelected = useCallback(() => {
     if (selectedIndex >= 0 && selectedIndex < actionableItems.length) {
       const item = actionableItems[selectedIndex];
-      
+
       // If this is a viewing action, open the sheet
       if (item.viewing) {
         openSheet({
@@ -113,7 +115,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         onClose();
         return;
       }
-      
+
       // Otherwise, execute the onClick handler
       item.onClick();
       onClose();
@@ -124,16 +126,16 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     const handleMouseDown = (event: MouseEvent) => {
       if (!menuRef.current) return;
       const target = event.target as Node;
-      if (!menuRef.current.contains(target) && 
-          !(submenuRef.current && submenuRef.current.contains(target))) {
+      if (!menuRef.current.contains(target) &&
+        !(submenuRef.current && submenuRef.current.contains(target))) {
         onClose();
       }
     };
     const handleContextMenu = (event: MouseEvent) => {
       if (!menuRef.current) return;
       const target = event.target as Node;
-      if (!menuRef.current.contains(target) && 
-          !(submenuRef.current && submenuRef.current.contains(target))) {
+      if (!menuRef.current.contains(target) &&
+        !(submenuRef.current && submenuRef.current.contains(target))) {
         onClose();
       }
     };
@@ -170,7 +172,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         if (index < actionableItems.length) {
           event.preventDefault();
           const item = actionableItems[index];
-          
+
           // If this is a viewing action, open the sheet
           if (item.viewing) {
             openSheet({
@@ -181,7 +183,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             onClose();
             return;
           }
-          
+
           item.onClick();
           onClose();
         }
@@ -194,7 +196,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           const shortcut = parseShortcut(item.shortcut);
           if (matchesShortcut(event, shortcut)) {
             event.preventDefault();
-            
+
             // If this is a viewing action, open the sheet
             if (item.viewing) {
               openSheet({
@@ -205,7 +207,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               onClose();
               return;
             }
-            
+
             item.onClick();
             onClose();
             return;
@@ -213,7 +215,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         }
       }
     };
-    
+
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('keydown', handleKeyDown);
@@ -227,6 +229,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       }
     };
   }, [onClose, actionableItems, executeSelected, openSheet, submenuPosition]);
+
+  if (!portalTarget) return null;
 
   return createPortal(
     <div
@@ -243,6 +247,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         boxShadow: '0 20px 35px var(--color-panel-shadow)',
         padding: '6px 0',
         zIndex: 100000,
+        pointerEvents: 'auto',
       }}
     >
       {items.map((item, index) => {
@@ -260,10 +265,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         const action = item as ContextMenuItemDescriptor;
         const actionableIndex = actionableItems.findIndex(a => a === action);
         const isSelected = actionableIndex === selectedIndex;
-        
+
         const hasSubmenu = Boolean(action.submenu && action.submenu.length > 0);
         const showSubmenu = hoveredItemIndex === actionableIndex && hasSubmenu;
-        
+
         return (
           <div
             key={action.label}
@@ -311,12 +316,12 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
-                
+
                 // Don't close if there's a submenu
                 if (hasSubmenu) {
                   return;
                 }
-                
+
                 // If this is a viewing action, open the sheet
                 if (action.viewing) {
                   openSheet({
@@ -327,7 +332,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                   onClose();
                   return;
                 }
-                
+
                 action.onClick();
                 onClose();
               }}
@@ -335,9 +340,9 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 width: '100%',
                 padding: '6px 14px',
                 backgroundColor: isSelected
-                  ? (action.destructive 
-                      ? 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)' 
-                      : 'var(--color-panel-hover)')
+                  ? (action.destructive
+                    ? 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)'
+                    : 'var(--color-panel-hover)')
                   : 'transparent',
                 border: 'none',
                 display: 'flex',
@@ -363,7 +368,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 )}
               </div>
             </button>
-            
+
             {showSubmenu && action.submenu && submenuPosition && (
               <div
                 ref={submenuRef}
@@ -382,6 +387,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                   overflowY: 'auto',
                   // Overlap with parent menu to bridge gap
                   marginLeft: '0px',
+                  pointerEvents: 'auto',
                 }}
                 onClick={(e) => e.stopPropagation()}
                 onMouseEnter={() => {
@@ -458,7 +464,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         );
       })}
     </div>,
-    document.body,
+    portalTarget
   );
 };
 

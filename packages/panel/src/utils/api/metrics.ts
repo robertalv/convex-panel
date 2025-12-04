@@ -38,18 +38,18 @@ export const fetchFailureRate = async (
   }
 
   const now = Math.floor(Date.now() / 1000);
-  const oneHourAgo = now - 3600;
+  const twentySixMinutesAgo = now - (26 * 60); // 26 minutes = 1560 seconds
 
   const window = {
     start: {
-      secs_since_epoch: oneHourAgo,
+      secs_since_epoch: twentySixMinutesAgo,
       nanos_since_epoch: 0
     },
     end: {
       secs_since_epoch: now,
       nanos_since_epoch: 0
     },
-    num_buckets: 60
+    num_buckets: 26
   };
 
   const params = new URLSearchParams({
@@ -103,18 +103,18 @@ export const fetchCacheHitRate = async (
   }
 
   const now = Math.floor(Date.now() / 1000);
-  const oneHourAgo = now - 3600;
+  const twentySixMinutesAgo = now - (26 * 60); // 26 minutes = 1560 seconds
 
   const window = {
     start: {
-      secs_since_epoch: oneHourAgo,
+      secs_since_epoch: twentySixMinutesAgo,
       nanos_since_epoch: 0
     },
     end: {
       secs_since_epoch: now,
       nanos_since_epoch: 0
     },
-    num_buckets: 60
+    num_buckets: 26
   };
 
   const params = new URLSearchParams({
@@ -170,7 +170,7 @@ export async function fetchSchedulerLag(
   }
 
   const end = new Date();
-  const start = new Date(end.getTime() - 60 * 60 * 1000);
+  const start = new Date(end.getTime() - 26 * 60 * 1000); // 26 minutes
   
   const window = {
     start: {
@@ -181,7 +181,7 @@ export async function fetchSchedulerLag(
       secs_since_epoch: Math.floor(end.getTime() / 1000),
       nanos_since_epoch: (end.getTime() % 1000) * 1000000
     },
-    num_buckets: 60
+    num_buckets: 26
   };
 
   try {

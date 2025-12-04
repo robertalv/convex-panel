@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { ChartData, TimeRange } from '../types';
 import { generateColor, formatFunctionName } from '../../../utils';
-import { transformFunctionToSVGPath, getCurrentTimeX } from '../utils';
+import { transformFunctionToSVGPath } from '../utils';
 
 interface FunctionRateChartProps {
   chartData: ChartData;
@@ -18,6 +18,7 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
   const [hoverValues, setHoverValues] = useState<Map<string, number>>(new Map());
   const [hoverTime, setHoverTime] = useState<string | null>(null);
   const [visibleFunctions, setVisibleFunctions] = useState<Set<string>>(new Set());
+  const [currentTime, setCurrentTime] = useState<number>(Math.floor(Date.now() / 1000));
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -27,6 +28,15 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
       setVisibleFunctions(new Set(chartData.functionData.keys()));
     }
   }, [chartData.functionData, visibleFunctions.size]);
+
+  // Update current time every second for real-time current time line movement
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Math.floor(Date.now() / 1000));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Generate paths and colors for all functions
   const functionPaths = useMemo(() => {
@@ -140,7 +150,18 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
     [chartData.functionData]
   );
 
-  const currentTimeX = getCurrentTimeX(chartData.timestamps);
+  // Calculate current time X position using the real-time current time
+  const currentTimeX = useMemo(() => {
+    if (chartData.timestamps.length === 0) return 300;
+    const minTs = Math.min(...chartData.timestamps);
+    const maxTs = Math.max(...chartData.timestamps);
+    // If current time is beyond the data range, show at right edge
+    if (currentTime >= maxTs) return 300;
+    // Calculate position based on current time
+    const progress = (currentTime - minTs) / (maxTs - minTs);
+    return progress * 300;
+  }, [chartData.timestamps, currentTime]);
+  
   const functionNames = Array.from(chartData.functionData.keys());
 
   return (
