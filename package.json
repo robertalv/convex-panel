@@ -19,6 +19,9 @@
         "format": "prettier --write \"**/*.{ts,tsx,md}\"",
         "knip": "knip"
     },
+    "engines": {
+        "node": ">=22.0.0"
+    },
     "devDependencies": {
         "@types/node": "^24.10.1",
         "knip": "^5.71.0",
@@ -26,8 +29,5 @@
         "turbo": "^2.4.2",
         "typescript": "^5.9.3"
     },
-    "packageManager": "pnpm@10.24.0",
-    "engines": {
-        "node": ">=20.0.0"
-    }
+    "packageManager": "pnpm@9.14.4"
 }
