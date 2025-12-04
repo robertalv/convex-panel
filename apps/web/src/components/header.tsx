@@ -1,8 +1,12 @@
 import { useQuery } from "convex/react";
 import { Link, useRouterState } from "@tanstack/react-router";
+import { Star, Menu, X } from "lucide-react";
 import { api } from "../../../../packages/backend/convex/_generated/api";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
+import { formatCompactNumber } from "../lib/utils";
+import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
 const navLinks = [
   { label: "Visit Convex", href: "https://convex.link/cpanel" },
@@ -14,58 +18,100 @@ export function Header() {
   const stars = useQuery(api.stats.getConvexPanelStars) ?? 0;
   const { location } = useRouterState();
   const currentPath = location.pathname || "/";
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <header className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4">
-      <nav className="flex h-12 items-center justify-between gap-4 w-full max-w-2xl rounded-full border border-border bg-background/70 dark:bg-background-secondary/70 backdrop-blur-xl shadow-2xl shadow-black/40 px-2 pl-2 transition-all duration-300">
-          <Link to="/" className="ml-1 flex items-center gap-2 group">
+      <nav className="relative flex h-12 items-center justify-between gap-4 w-full max-w-2xl rounded-full border border-border/40 bg-background-primary/60 dark:bg-background-secondary/60 backdrop-blur-xl shadow-sm px-2 pl-4 transition-all duration-300">
+        <Link to="/" className="flex items-center gap-2 group z-50">
           <Logo width={24} height={24} />
           <span className="hidden sm:inline text-md font-medium tracking-tight text-content-primary">
             Convex Panel
           </span>
-          </Link>
+        </Link>
 
+        {/* Desktop Nav */}
         <ul className="hidden md:flex items-center gap-1 text-[11px] md:text-xs font-medium mx-2">
           {navLinks.map((link) => (
             <li key={link.href}>
-              <Link
-                to={link.href}
-                className={`px-3 py-1.5 rounded-full border transition-colors ${
-                  link.href === currentPath
-                    ? "bg-white/5 text-content-primary border-white/10"
-                    : "border-transparent text-[#9ca3af] hover:text-content-primary hover:bg-white/5"
-                }`}
+              <a
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`px-3 py-1.5 rounded-full border transition-all duration-200 ${link.href === currentPath
+                  ? "bg-background-tertiary text-content-primary border-border"
+                  : "border-transparent text-content-secondary hover:text-content-primary hover:bg-background-secondary/50"
+                  }`}
               >
                 {link.label}
-              </Link>
+              </a>
             </li>
           ))}
         </ul>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 z-50">
           <a
             href="https://github.com/robertalv/convex-panel"
             target="_blank"
             rel="noreferrer"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background-secondary/90 border border-border text-[11px] font-medium text-content-primary hover:bg-background-secondary transition-colors"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background-secondary/50 border border-border/50 text-[11px] font-medium text-content-primary hover:bg-background-tertiary transition-colors group"
           >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 16 16"
-              className="h-3 w-3 fill-current"
-            >
-              <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.62 7.62 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
-            </svg>
+            <Star className="w-3 h-3 fill-current text-content-tertiary group-hover:text-yellow-500 transition-colors" />
             <span className="hidden sm:inline">Star</span>
-            <span className="ml-0.5 border-l border-border pl-1.5 text-[10px] font-mono tabular-nums text-[#6b7280]">
-              {stars.toLocaleString()}
+            <span className="ml-0.5 border-l border-border/50 pl-1.5 text-[10px] font-mono tabular-nums text-content-secondary">
+              {formatCompactNumber(stars)}
             </span>
           </a>
           <ThemeToggle />
+
+          {/* Mobile Menu Button */}
+          <button
+            className="md:hidden p-2 text-content-secondary hover:text-content-primary transition-colors"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
         </div>
+
+        {/* Mobile Menu */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="absolute top-14 left-0 right-0 p-2 bg-background-primary/90 backdrop-blur-xl border border-border/50 rounded-2xl shadow-xl flex flex-col gap-2 md:hidden overflow-hidden"
+            >
+              {navLinks.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-3 rounded-xl text-sm font-medium text-content-secondary hover:text-content-primary hover:bg-background-secondary transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  {link.label}
+                </a>
+              ))}
+              <div className="h-px bg-border/50 mx-2 my-1" />
+              <a
+                href="https://github.com/robertalv/convex-panel"
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-3 rounded-xl text-sm font-medium text-content-secondary hover:text-content-primary hover:bg-background-secondary transition-colors flex items-center gap-2"
+              >
+                <Star className="w-4 h-4" />
+                Star on GitHub
+                <span className="ml-auto text-xs text-content-tertiary font-mono">
+                  {formatCompactNumber(stars)}
+                </span>
+              </a>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
     </header>
   );
 }
-
-

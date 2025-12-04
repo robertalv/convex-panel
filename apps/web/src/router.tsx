@@ -13,16 +13,18 @@ import { DocsPage } from "./components/docs-page";
 import { ChangelogPage } from "./components/changelog-page";
 
 const RootLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="min-h-screen bg-background-primary text-content-primary antialiased overflow-hidden">
+  <div className="min-h-screen bg-background-primary text-content-primary antialiased flex flex-col">
     <Header />
-    {children}
+    <div className="flex-1 w-full">
+      {children}
+    </div>
   </div>
 );
 
 // Home page (marketing + embedded ConvexPanel)
 const HomePage: React.FC = () => {
   return (
-    <main className="px-6 md:px-12 lg:px-36 overflow-hidden md:overflow-visible">
+    <main className="w-full px-4 md:px-12 lg:px-36 overflow-hidden">
       <StartPage />
     </main>
   );

@@ -9,6 +9,7 @@ export interface DeploymentDisplayProps {
   teamSlug?: string;
   projectSlug?: string;
   onClick?: () => void;
+  loading?: boolean;
 }
 
 export const DeploymentDisplay: React.FC<DeploymentDisplayProps> = ({
@@ -18,7 +19,57 @@ export const DeploymentDisplay: React.FC<DeploymentDisplayProps> = ({
   teamSlug,
   projectSlug,
   onClick,
+  loading = false,
 }) => {
+  if (loading) {
+    return (
+      <div className="cp-deployment-badge">
+        {/* Icon skeleton */}
+        <div
+          style={{
+            width: '12px',
+            height: '12px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(34, 197, 94, 0.3)',
+            flexShrink: 0,
+            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          }}
+        />
+        {/* Environment label skeleton */}
+        <div
+          style={{
+            width: 100,
+            height: 10,
+            borderRadius: 4,
+            backgroundColor: 'rgba(34, 197, 94, 0.3)',
+            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          }}
+        />
+        {/* Dot skeleton */}
+        <div
+          style={{
+            width: 4,
+            height: 4,
+            borderRadius: '50%',
+            backgroundColor: 'rgba(34, 197, 94, 0.3)',
+            flexShrink: 0,
+            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          }}
+        />
+        {/* Deployment name skeleton */}
+        <div
+          style={{
+            width: 80,
+            height: 10,
+            borderRadius: 4,
+            backgroundColor: 'rgba(34, 197, 94, 0.3)',
+            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          }}
+        />
+      </div>
+    );
+  }
+
   const environmentLabel = 
     environment === 'development' ? 'Development' : 
     environment === 'production' ? 'Production' : 

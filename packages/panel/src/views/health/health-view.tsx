@@ -3,6 +3,7 @@ import {
   Settings as SettingsIcon
 } from 'lucide-react';
 import { Card } from '../../components/shared/card';
+import { SkeletonCard } from '../../components/shared/skeleton-card';
 import { FailureRateCard } from './components/failure-rate-card';
 import { CacheHitRateCard } from './components/cache-hit-rate-card';
 import { SchedulerStatusCard } from './scheduler-status-card';
@@ -18,6 +19,37 @@ export const HealthView: React.FC<{
   authToken,
   useMockData = false,
 }) => {
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    // Simulate initial loading state
+    if (deploymentUrl && authToken) {
+      setIsLoading(true);
+      const timer = setTimeout(() => {
+        setIsLoading(false);
+      }, 1000); // Give components time to load their data
+      return () => clearTimeout(timer);
+    } else {
+      setIsLoading(false);
+    }
+  }, [deploymentUrl, authToken]);
+
+  if (isLoading) {
+    return (
+      <div className="cp-health-container cp-scrollbar">
+        <div className="cp-health-grid">
+          <SkeletonCard title="Failure Rate" height="140px" showTooltip variant="chart" />
+          <SkeletonCard title="Cache Hit Rate" height="140px" showTooltip variant="chart" />
+          <SkeletonCard title="Scheduler Status" height="140px" showTooltip variant="chart" />
+        </div>
+        <div className="cp-health-grid">
+          <SkeletonCard title="Last Deployed" height="100px" showTooltip variant="simple" />
+          <SkeletonCard title="Exception Reporting" height="100px" showAction showTooltip variant="simple" />
+        </div>
+        <SkeletonCard title="Insights" height="200px" showTooltip={false} variant="insights" />
+      </div>
+    );
+  }
 
   return (
     <div className="cp-health-container cp-scrollbar">

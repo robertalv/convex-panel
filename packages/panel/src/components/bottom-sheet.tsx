@@ -109,6 +109,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     deploymentType?: 'dev' | 'prod' | 'preview';
     kind?: 'cloud' | 'local';
   } | null>(null);
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
 
   const [projectInfo, setProjectInfo] = useState<{
     team?: {
@@ -123,6 +124,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       teamId: string;
     };
   } | null>(null);
+  const [isLoadingProjectInfo, setIsLoadingProjectInfo] = useState(false);
 
   const [deploymentState, setDeploymentState] = useState<'running' | 'paused' | null>(null);
   const deploymentStateFetchRef = useRef<{ lastFetch: number; isFetching: boolean }>({ lastFetch: 0, isFetching: false });
@@ -131,10 +133,12 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   useEffect(() => {
     if (!isAuthenticated || !deploymentUrl) {
       setDeploymentMetadata(null);
+      setIsLoadingMetadata(false);
       return;
     }
 
     const fetchMetadata = async () => {
+      setIsLoadingMetadata(true);
       try {
         const metadata = await fetchDeploymentMetadata(adminClient, deploymentUrl, accessToken);
         setDeploymentMetadata(metadata);
@@ -145,6 +149,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
           deploymentType: 'dev',
           kind: 'cloud',
         });
+      } finally {
+        setIsLoadingMetadata(false);
       }
     };
 
@@ -154,10 +160,12 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   useEffect(() => {
     if (!isAuthenticated || !deploymentUrl) {
       setProjectInfo(null);
+      setIsLoadingProjectInfo(false);
       return;
     }
 
     const fetchInfo = async () => {
+      setIsLoadingProjectInfo(true);
       try {
         const info = await fetchProjectInfo(adminClient, deploymentUrl, accessToken, teamSlug, projectSlug);
         setProjectInfo(info);
@@ -167,13 +175,14 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         } else {
           setProjectInfo(null);
         }
+      } finally {
+        setIsLoadingProjectInfo(false);
       }
     };
 
     fetchInfo();
   }, [isAuthenticated, deploymentUrl, adminClient, accessToken, teamSlug, projectSlug, team, project]);
 
-  // Fetch deployment state
   useEffect(() => {
     if (!isAuthenticated || !deploymentUrl || !adminClient) {
       setDeploymentState(null);
@@ -294,17 +303,14 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   }, [isAuthenticated, deploymentUrl, adminClient, accessToken]);
 
   const handleSettingsClick = () => {
-    // Navigate to settings tab
     if (onTabChange) {
       onTabChange('settings');
     } else {
       setInternalActiveTab('settings');
     }
-    // Set the settings section to pause-deployment
     setStorageItem(STORAGE_KEYS.SETTINGS_SECTION, 'pause-deployment');
   };
 
-  // Calculate project name with fallbacks
   const projectName = useMemo(() => {
     return deploymentMetadata?.projectName || providedProjectName || extractProjectName(deploymentUrl) || 'convex-panel';
   }, [deploymentMetadata?.projectName, providedProjectName, deploymentUrl]);
@@ -315,14 +321,10 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   
   const deploymentType = deploymentMetadata?.deploymentType || providedEnvironment || 'development';
   const environment = deploymentType === 'prod' ? 'production' : deploymentType === 'preview' ? 'preview' : 'development';
-  
-  // Ensure project always has a name for ProjectSelector - reactive to projectInfo changes
+
   const projectWithName = useMemo(() => {
-    // Prioritize project from projectInfo (fetched from API) over prop
     const baseProject = projectInfo?.project || project;
     if (baseProject) {
-      // Use the project's name if it exists and is not empty, otherwise fall back to calculated projectName
-      // Check if baseProject.name is a valid non-empty string
       const hasValidName = baseProject.name && typeof baseProject.name === 'string' && baseProject.name.trim().length > 0;
       const finalName = hasValidName ? baseProject.name : projectName;
       return {
@@ -330,7 +332,6 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         name: finalName,
       };
     }
-    // If no project exists, create one with the project name
     if (projectName && projectName !== 'convex-panel') {
       return {
         id: deploymentName || '',
@@ -386,7 +387,6 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   useFunctionRunnerShortcuts();
 
   const getHeight = () => {
-    // Always show at least the collapsed height (40px) so header is always visible
     const minHeight = PANEL_COLLAPSED_HEIGHT;
     if (!isAuthenticated) return minHeight;
     if (!isOpen) return minHeight;
@@ -395,16 +395,18 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   };
 
   const height = getHeight();
-  // Ensure height is never less than collapsed height
   const finalHeight = height === '0px' || !height ? PANEL_COLLAPSED_HEIGHT : height;
+
+  const isProjectSelectorLoading = isAuthenticated && (isLoadingMetadata || isLoadingProjectInfo);
 
   const headerLeftContent = isAuthenticated ? (
     <>
       <div className="cp-flex cp-items-center cp-gap-2">
-        <ConvexLogo width={20} height={20} />
+        <ConvexLogo width={30} height={30} />
         <ProjectSelector 
           team={projectInfo?.team || team} 
           project={projectWithName}
+          loading={isProjectSelectorLoading}
         />
       </div>
       <DeploymentDisplay
@@ -413,11 +415,12 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         kind={deploymentMetadata?.kind || 'cloud'}
         teamSlug={teamSlug}
         projectSlug={projectSlug}
+        loading={isLoadingMetadata}
       />
     </>
   ) : (
     <>
-      <ConvexLogo width={20} height={20} />
+      <ConvexLogo width={30} height={30} />
       {onConnect && (
         <button
           type="button"
@@ -515,8 +518,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         <div onMouseDown={handleResizeStart} className="cp-resize-handle" />
       )}
       <div className="cp-header" style={{ borderBottom: isOpen ? undefined : 'none' }}>
-        <div className="cp-header-section">{headerLeftContent}</div>
-        <div className="cp-header-section">{headerRightContent}</div>
+        <div className="cp-header-section cp-header-section--left">{headerLeftContent}</div>
+        <div className="cp-header-section cp-header-section--right">{headerRightContent}</div>
       </div>
 
       {isPanelExpanded && (

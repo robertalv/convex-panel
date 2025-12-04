@@ -14,6 +14,135 @@
 @tailwind utilities;
 
 /* ================================
+   Skeleton Loading States
+   ================================ */
+
+.cp-skeleton {
+  background-color: var(--color-panel-border);
+  border-radius: 4px;
+  animation: cp-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.cp-skeleton--shimmer {
+  background: linear-gradient(90deg, 
+    var(--color-panel-bg-secondary) 25%, 
+    var(--color-panel-bg-tertiary) 50%, 
+    var(--color-panel-bg-secondary) 75%
+  );
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: cp-skeleton-loading 1.5s infinite ease-in-out;
+}
+
+@keyframes cp-skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes cp-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.cp-skeleton-title {
+  margin-bottom: 8px;
+}
+
+.cp-skeleton-action {
+  border-radius: 50%;
+}
+
+.cp-skeleton-tooltip {
+  border-radius: 50%;
+}
+
+.cp-skeleton-text {
+  border-radius: 3px;
+}
+
+.cp-skeleton-content {
+  border-radius: 6px;
+}
+
+.cp-skeleton-card {
+  opacity: 0.7;
+}
+
+.cp-skeleton-header {
+  align-items: center;
+}
+
+.cp-skeleton-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cp-skeleton-metric-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.cp-skeleton-value {
+  width: 120px;
+  height: 28px;
+}
+
+.cp-skeleton-subtext {
+  width: 80px;
+  height: 16px;
+}
+
+.cp-skeleton-filter-row {
+  display: flex;
+  gap: 10px;
+}
+
+.cp-skeleton-chip {
+  height: 26px;
+  border-radius: 18px;
+}
+
+.cp-skeleton-chart {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.cp-skeleton-bar {
+  flex: 1;
+  border-radius: 6px 6px 2px 2px;
+}
+
+.cp-skeleton-time-desktop {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .cp-skeleton-time-desktop {
+    display: flex;
+  }
+}
+
+/* ================================
    Theme Variables
    ================================ */
 
@@ -660,8 +789,111 @@
 
 .cp-header-section {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 16px;
+}
+
+.cp-header-section--left {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-start;
+}
+
+.cp-header-section--right {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 12px;
+}
+
+.cp-header-section--right > * {
+  flex-shrink: 0;
+}
+
+.cp-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.cp-header-controls .cp-separator {
+  height: 20px;
+}
+
+@media (max-width: 1280px) {
+  .cp-header-section--right {
+    flex-wrap: wrap;
+    column-gap: 10px;
+    row-gap: 8px;
+  }
+}
+
+/* Tablet and smaller screens - stack header sections vertically */
+@media (max-width: 1024px) {
+  .cp-header {
+    flex-direction: column;
+    height: auto;
+    min-height: auto;
+    padding: 12px 14px;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .cp-header-section {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .cp-header-section--left {
+    justify-content: flex-start;
+    gap: 10px;
+  }
+
+  .cp-header-section--right {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+
+  .cp-header-section--right > *:not(.cp-header-controls) {
+    flex: 1 1 calc(50% - 8px);
+    min-width: 140px;
+  }
+
+  .cp-header-section .cp-flex {
+    flex-direction: row;
+  }
+
+  .cp-header-section--right .cp-separator {
+    display: none;
+  }
+
+  .cp-header-controls {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 640px) {
+  .cp-header-section--right {
+    flex-direction: column;
+  }
+
+  .cp-header-section--right > *:not(.cp-header-controls) {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .cp-header-controls {
+    justify-content: space-between;
+  }
 }
 
 /* Icon button */

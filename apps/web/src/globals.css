@@ -94,8 +94,11 @@
   --color-chart-line-7: var(--chart-line-7);
   --color-chart-line-8: var(--chart-line-8);
 
+  --color-border: var(--border);
   --color-border-transparent: var(--border-transparent);
   --color-border-selected: var(--border-selected);
+  --color-accent: var(--content-accent);
+  --color-link: var(--content-link);
 
   --color-macosScrollbar-thumb: var(--macosScrollbar-thumb);
   --color-macosScrollbar-thumb-hover: var(--macosScrollbar-thumb-hover);
@@ -137,6 +140,7 @@
     0% {
       transform: rotate(0deg);
     }
+
     100% {
       transform: rotate(360deg);
     }
@@ -146,9 +150,11 @@
     0% {
       stroke-dasharray: 1 99;
     }
+
     50% {
       stroke-dasharray: 35 65;
     }
+
     100% {
       stroke-dasharray: 1 99;
     }
@@ -159,10 +165,12 @@
       fill-opacity: 1;
       opacity: 1;
     }
+
     50% {
       fill-opacity: 0.75;
       opacity: 0.75;
     }
+
     100% {
       fill-opacity: 1;
       opacity: 1;
@@ -179,9 +187,11 @@
     0% {
       opacity: 1;
     }
+
     50% {
       opacity: 0.5;
     }
+
     100% {
       opacity: 1;
     }
@@ -193,6 +203,7 @@
       transform: skew(-90deg);
       margin-left: -2rem;
     }
+
     100% {
       height: 100%;
       transform: skew(0deg);
@@ -204,15 +215,19 @@
     0% {
       transform: translateY(0);
     }
+
     25% {
       transform: translateY(-0.5rem);
     }
+
     50% {
       transform: translateY(0px);
     }
+
     75% {
       transform: translateY(-0.25rem);
     }
+
     100% {
       transform: translateY(0px);
     }
@@ -222,9 +237,11 @@
     0% {
       box-shadow: inset 0 4px 0 0 transparent;
     }
+
     50% {
       box-shadow: inset 0 4px 0 0 var(--content-warning);
     }
+
     100% {
       box-shadow: inset 0 4px 0 0 transparent;
     }
@@ -234,9 +251,11 @@
     0% {
       box-shadow: inset 0 -4px 0 0 transparent;
     }
+
     50% {
       box-shadow: inset 0 -4px 0 0 var(--content-warning);
     }
+
     100% {
       box-shadow: inset 0 -4px 0 0 transparent;
     }
@@ -246,9 +265,11 @@
     0% {
       background-color: var(--background-secondary);
     }
+
     50% {
       background-color: var(--background-highlight);
     }
+
     100% {
       background-color: var(--background-secondary);
     }
@@ -258,9 +279,11 @@
     0% {
       background-color: var(--border-transparent);
     }
+
     50% {
       background-color: var(--content-success);
     }
+
     100% {
       background-color: var(--border-transparent);
     }
@@ -270,6 +293,7 @@
     0% {
       opacity: 0;
     }
+
     100% {
       opacity: 1;
     }
@@ -279,6 +303,7 @@
     0% {
       transform: none;
     }
+
     100% {
       transform: translateX(-1rem);
     }
@@ -346,6 +371,9 @@
   --chart-line-6: rgb(140, 86, 75);
   --chart-line-7: rgb(227, 119, 194);
   --chart-line-8: rgb(188, 189, 34);
+
+  /* Default border color (light mode) - will be overridden by html.light/html.dark */
+  --color-border: rgba(0, 0, 0, 0.08);
 }
 
 html.light {
@@ -408,15 +436,19 @@ html.dark {
   h1 {
     @apply text-2xl;
   }
+
   h2 {
     @apply text-xl;
   }
+
   h3 {
     @apply text-lg font-semibold;
   }
+
   h4 {
     @apply text-base font-semibold;
   }
+
   h5 {
     @apply text-sm font-semibold;
   }
@@ -459,29 +491,17 @@ html [data-sonner-toaster][dir="ltr"] {
 /* Use the colors from our custom palette for toasts */
 html [data-sonner-toast],
 html [data-sonner-toast] [data-close-button] {
-  @apply bg-background-secondary
-      border-background-tertiary
-      text-content-primary;
+  @apply bg-background-secondary border-background-tertiary text-content-primary;
 }
 
 html [data-sonner-toast][data-type="success"],
 html [data-sonner-toast][data-type="success"] [data-close-button] {
-  @apply bg-green-50
-      border-green-100
-      text-green-700
-      dark:bg-green-950
-      dark:border-green-900
-      dark:text-green-200;
+  @apply bg-green-50 border-green-100 text-green-700 dark:bg-green-950 dark:border-green-900 dark:text-green-200;
 }
 
 html [data-sonner-toast][data-type="error"],
 html [data-sonner-toast][data-type="error"] [data-close-button] {
-  @apply bg-red-50
-      border-red-100
-      text-red-700
-      dark:bg-red-950
-      dark:border-red-900
-      dark:text-red-200;
+  @apply bg-red-50 border-red-100 text-red-700 dark:bg-red-950 dark:border-red-900 dark:text-red-200;
 }
 
 /* Used for elements that need to fade in to a specific opacity
@@ -492,6 +512,7 @@ html [data-sonner-toast][data-type="error"] [data-close-button] {
   from {
     opacity: 0;
   }
+
   to {
     opacity: var(--final-opacity, 1);
   }
@@ -507,8 +528,7 @@ html [data-sonner-toast][data-type="error"] [data-close-button] {
   }
 
   .scrollbar {
-    @apply scrollbar-thin scrollbar-thumb-neutral-1 scrollbar-corner-background-secondary
-    scrollbar-thumb-rounded dark:scrollbar-thumb-neutral-8;
+    @apply scrollbar-thin scrollbar-thumb-neutral-1 scrollbar-corner-background-secondary scrollbar-thumb-rounded dark:scrollbar-thumb-neutral-8;
   }
 
   .custom-scrollbar {

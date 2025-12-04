@@ -9,7 +9,7 @@ import {
   Settings,
   Terminal,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { DocsNavSection, DocsPath, Framework } from "./docs/constants";
@@ -98,6 +98,7 @@ export const DocsPage: React.FC = () => {
   const [framework, setFramework] = useState<Framework>("react");
   const [cmdOpen, setCmdOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState<DocsPath>("/docs");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const showFrameworkSelector = useMemo(
     () =>
@@ -165,6 +166,64 @@ export const DocsPage: React.FC = () => {
     }
   }, [currentPath, framework]);
 
+  const NavContent = () => (
+    <nav className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-10 space-y-8">
+      {docsNav.map((section) => (
+        <div key={section.title}>
+          <h3 className="text-[11px] font-bold text-content-tertiary uppercase tracking-widest mb-3 pl-3">
+            {section.title}
+          </h3>
+          <ul className="space-y-0.5">
+            {section.items.map((item) => {
+              const isActive = currentPath === item.href;
+              return (
+                <li key={item.href}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentPath(item.href);
+                      setMobileNavOpen(false);
+                    }}
+                    className={cn(
+                      "relative flex w-full items-center py-2 px-3 rounded-md text-sm transition-all duration-200 group text-left",
+                      isActive
+                        ? "text-content-primary font-medium bg-background-secondary"
+                        : "text-content-secondary hover:text-content-primary hover:bg-background-secondary/50",
+                    )}
+                  >
+                    {isActive && (
+                      <motion.div
+                        layoutId="sidebar-active-pill"
+                        className="absolute left-[-4px] top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-full shadow-[0_0_8px_rgba(var(--primary),0.6)]"
+                        transition={{
+                          type: "spring",
+                          stiffness: 400,
+                          damping: 30,
+                        }}
+                      />
+                    )}
+
+                    <span className="relative z-10 flex items-center gap-3">
+                      <item.icon
+                        className={cn(
+                          "w-4 h-4 transition-colors",
+                          isActive
+                            ? "text-primary"
+                            : "opacity-60 group-hover:opacity-100",
+                        )}
+                      />
+                      {item.label}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </nav>
+  );
+
   return (
     <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
       <CommandPalette
@@ -190,71 +249,61 @@ export const DocsPage: React.FC = () => {
             </kbd>
           </button>
 
-          <nav className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-10 space-y-8">
-            {docsNav.map((section) => (
-              <div key={section.title}>
-                <h3 className="text-[11px] font-bold text-content-tertiary uppercase tracking-widest mb-3 pl-3">
-                  {section.title}
-                </h3>
-                <ul className="space-y-0.5">
-                  {section.items.map((item) => {
-                    const isActive = currentPath === item.href;
-                    return (
-                      <li key={item.href}>
-                        <button
-                          type="button"
-                          onClick={() => setCurrentPath(item.href)}
-                          className={cn(
-                            "relative flex w-full items-center py-2 px-3 rounded-md text-sm transition-all duration-200 group text-left",
-                            isActive
-                              ? "text-content-primary font-medium bg-background-secondary"
-                              : "text-content-secondary hover:text-content-primary hover:bg-background-secondary/50",
-                          )}
-                        >
-                          {isActive && (
-                            <motion.div
-                              layoutId="sidebar-active-pill"
-                              className="absolute left-[-4px] top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-full shadow-[0_0_8px_rgba(var(--primary),0.6)]"
-                              transition={{
-                                type: "spring",
-                                stiffness: 400,
-                                damping: 30,
-                              }}
-                            />
-                          )}
-
-                          <span className="relative z-10 flex items-center gap-3">
-                            <item.icon
-                              className={cn(
-                                "w-4 h-4 transition-colors",
-                                isActive
-                                  ? "text-primary"
-                                  : "opacity-60 group-hover:opacity-100",
-                              )}
-                            />
-                            {item.label}
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </nav>
+          <NavContent />
         </aside>
 
         {/* Mobile Nav */}
-        <div className="lg:hidden mb-6">
+        <div className="lg:hidden mb-6 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setMobileNavOpen(true)}
+            className="flex items-center gap-2 px-4 py-3 rounded-xl bg-background-secondary border border-border text-sm text-content-secondary hover:text-content-primary shadow-sm"
+          >
+            <Layout className="w-4 h-4" />
+            <span>Menu</span>
+          </button>
           <button
             type="button"
             onClick={() => setCmdOpen(true)}
-            className="w-full flex items-center gap-2 px-4 py-3 rounded-xl bg-background-secondary border border-border text-sm text-content-secondary hover:text-content-primary shadow-sm"
+            className="flex-1 flex items-center gap-2 px-4 py-3 rounded-xl bg-background-secondary border border-border text-sm text-content-secondary hover:text-content-primary shadow-sm"
           >
             <Terminal className="w-4 h-4" />
             <span>Search documentation...</span>
           </button>
         </div>
+
+        {/* Mobile Drawer */}
+        <AnimatePresence>
+          {mobileNavOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 lg:hidden"
+                onClick={() => setMobileNavOpen(false)}
+              />
+              <motion.div
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ type: "spring", damping: 20, stiffness: 300 }}
+                className="fixed top-0 left-0 bottom-0 w-3/4 max-w-sm bg-background-primary border-r border-border z-50 lg:hidden p-6 overflow-y-auto"
+              >
+                <div className="flex items-center justify-between mb-8">
+                  <span className="font-semibold text-lg">Documentation</span>
+                  <button
+                    onClick={() => setMobileNavOpen(false)}
+                    className="p-2 hover:bg-background-secondary rounded-full transition-colors"
+                  >
+                    <Layout className="w-5 h-5" />
+                  </button>
+                </div>
+                <NavContent />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
         {/* Main Content Area */}
         <div className="flex-1 min-w-0 pb-20">
