@@ -1,6 +1,7 @@
 import { useQuery } from "convex/react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Star, Menu, X } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { StarIcon, Menu01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { api } from "../../../../packages/backend/convex/_generated/api";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
@@ -56,7 +57,7 @@ export function Header() {
             rel="noreferrer"
             className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background-secondary/50 border border-border/50 text-[11px] font-medium text-content-primary hover:bg-background-tertiary transition-colors group"
           >
-            <Star className="w-3 h-3 fill-current text-content-tertiary group-hover:text-yellow-500 transition-colors" />
+            <HugeiconsIcon icon={StarIcon} className="w-3 h-3 fill-current text-content-tertiary group-hover:text-yellow-500 transition-colors" />
             <span className="hidden sm:inline">Star</span>
             <span className="ml-0.5 border-l border-border/50 pl-1.5 text-[10px] font-mono tabular-nums text-content-secondary">
               {formatCompactNumber(stars)}
@@ -69,7 +70,7 @@ export function Header() {
             className="md:hidden p-2 text-content-secondary hover:text-content-primary transition-colors"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
-            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            {mobileMenuOpen ? <HugeiconsIcon icon={Cancel01Icon} className="w-6 h-6" /> : <HugeiconsIcon icon={Menu01Icon} className="w-6 h-6" />}
           </button>
         </div>
 
@@ -102,7 +103,7 @@ export function Header() {
                 rel="noreferrer"
                 className="px-4 py-3 rounded-xl text-sm font-medium text-content-secondary hover:text-content-primary hover:bg-background-secondary transition-colors flex items-center gap-2"
               >
-                <Star className="w-4 h-4" />
+                <HugeiconsIcon icon={StarIcon} className="w-4 h-4" />
                 Star on GitHub
                 <span className="ml-auto text-xs text-content-tertiary font-mono">
                   {formatCompactNumber(stars)}

@@ -81,6 +81,9 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
 .resize {
   resize: both;
 }
+.flex-wrap {
+  flex-wrap: wrap;
+}
 .items-center {
   align-items: center;
 }
@@ -318,10 +321,11 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     font-weight: 500;
     cursor: pointer;
     transition: background-color 0.15s ease, border-color 0.15s ease;
+    color: var(--color-panel-text);
   }
   .cp-btn-primary {
     background-color: var(--color-panel-accent);
-    color: white;
+    color: var(--color-panel-text);
     border: none;
   }
   .cp-btn-primary:hover {

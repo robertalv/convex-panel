@@ -38,7 +38,7 @@ export function WordAnimation() {
 
   return (
     <AnimatePresence mode="wait">
-      <motion.div key={word} className="text-primary inline-block">
+      <motion.div key={word} className="text-accent inline-block">
         {word?.split("").map((char, index) => (
           <motion.span
             // eslint-disable-next-line react/no-array-index-key
