@@ -3,7 +3,7 @@ import { SparklesIcon } from './icons';
 import { usePortalEnvironment } from '../contexts/portal-context';
 
 export function AskAI() {
-  const [isScriptLoaded, setIsScriptLoaded] = useState(false);
+  const [, setIsScriptLoaded] = useState(false);
   const hiddenButtonRef = useRef<HTMLButtonElement | null>(null);
   const { ownerDocument } = usePortalEnvironment();
   const resolvedDocument = ownerDocument ?? (typeof document !== 'undefined' ? document : null);

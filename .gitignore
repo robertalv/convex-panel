@@ -45,3 +45,5 @@ pnpm-debug.log*
 .npmrc
 package-lock.json
 bun.lockb
+# pnpm-lock.yaml should be committed
+!pnpm-lock.yaml

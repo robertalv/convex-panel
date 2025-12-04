@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { createPortal } from 'react';
+import { createPortal } from 'react-dom';
 import type { ReactNode } from 'react';
 import { usePortalTarget } from '../../contexts/portal-context';
 
