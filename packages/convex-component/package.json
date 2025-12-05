@@ -1,22 +1,99 @@
 {
-    "name": "convex-panel/convex-component",
-    "version": "0.0.0",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
-    "scripts": {
-        "build": "tsup",
-        "dev": "tsup --watch",
-        "lint": "eslint src/**/*.ts*"
+  "name": "convex-panel/component",
+  "description": "A convex panel component component for Convex.",
+  "repository": "github:devwithbobby/convex-panel",
+  "homepage": "https://github.com/devwithbobby/convex-panel#readme",
+  "bugs": {
+    "url": "https://github.com/devwithbobby/convex-panel/issues"
+  },
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "keywords": [
+    "convex",
+    "component"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "run-p -r 'dev:*'",
+    "dev:backend": "convex dev --typecheck-components",
+    "dev:frontend": "cd example && vite --clearScreen false",
+    "dev:build": "chokidar 'tsconfig*.json' 'src/**/*.ts' -i '**/*.test.ts' -c 'npx convex codegen --component-dir ./src/component && npm run build' --initial",
+    "predev": "path-exists .env.local || (npm run build && convex dev --until-success)",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "build": "tsc --project ./tsconfig.build.json",
+    "typecheck": "tsc --noEmit && tsc -p example && tsc -p example/convex",
+    "lint": "eslint .",
+    "all": "run-p -r 'dev:*' 'test:watch'",
+    "test": "vitest run --typecheck",
+    "test:watch": "vitest --typecheck --clearScreen false",
+    "test:debug": "vitest --inspect-brk --no-file-parallelism",
+    "test:coverage": "vitest run --coverage --coverage.reporter=text",
+    "prepublishOnly": "npm run clean && npm run build",
+    "preversion": "npm run clean && npm ci && npm run build && run-p test lint typecheck",
+    "alpha": "npm version prerelease --preid alpha && npm publish --tag alpha && git push --follow-tags",
+    "release": "npm version patch && npm publish && git push --follow-tags",
+    "version": "vim -c 'normal o' -c 'normal o## '$npm_package_version CHANGELOG.md && prettier -w CHANGELOG.md && git add CHANGELOG.md"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
     },
-    "dependencies": {
-        "convex-panel/shared": "workspace:*"
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "default": "./dist/react/index.js"
     },
-    "devDependencies": {
-        "convex": "^1.10.0",
-        "tsup": "^8.0.2",
-        "typescript": "^5.9.3"
+    "./test": "./src/test.ts",
+    "./_generated/component.js": {
+      "types": "./dist/component/_generated/component.d.ts"
     },
-    "peerDependencies": {
-        "convex": ">=1.10.0"
+    "./convex.config.js": {
+      "types": "./dist/component/convex.config.d.ts",
+      "default": "./dist/component/convex.config.js"
+    },
+    "./convex.config": {
+      "types": "./dist/component/convex.config.d.ts",
+      "default": "./dist/component/convex.config.js"
     }
+  },
+  "peerDependencies": {
+    "convex": "^1.29.3",
+    "react": "^18.3.1 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@convex-dev/eslint-plugin": "^1.0.0",
+    "@edge-runtime/vm": "^5.0.0",
+    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/js": "9.39.1",
+    "@types/node": "^20.19.25",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "chokidar-cli": "3.0.0",
+    "convex": "1.29.3",
+    "convex-test": "0.0.40",
+    "cpy-cli": "^6.0.0",
+    "eslint": "9.39.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "npm-run-all2": "8.0.4",
+    "path-exists-cli": "2.0.0",
+    "pkg-pr-new": "^0.0.60",
+    "prettier": "3.6.2",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.47.0",
+    "vite": "7.2.6",
+    "vitest": "3.2.4"
+  },
+  "types": "./dist/client/index.d.ts",
+  "module": "./dist/client/index.js"
 }

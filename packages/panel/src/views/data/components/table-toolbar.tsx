@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Filter, Plus, MoreVertical, EyeOff, Trash2, Edit2, X, ArrowUpDown } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Filter, Plus, MoreVertical, EyeOff, Trash2, Edit2, X, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { FilterExpression, SortConfig } from '../../../types';
 import { operatorOptions } from '../../../utils/constants';
 import { TooltipAction } from '../../../components/shared/tooltip-action';
@@ -53,22 +53,135 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   const hasSelection = selectedCount > 0;
   const deleteLabel = selectedCount > 1 ? `Delete ${selectedCount} rows` : 'Delete';
   const activeFilters = filters?.clauses?.filter(f => f.enabled) || [];
   const hasActiveFilters = activeFilters.length > 0 || sortConfig !== null;
+  // Calculate total badge count: sort badge + filter badges + clear all button
+  const totalBadges = (sortConfig ? 1 : 0) + activeFilters.length + (hasActiveFilters && onClearFilters ? 1 : 0);
+  const shouldScroll = totalBadges > 3;
+
+  // Check scroll position to show/hide arrows
+  const checkScrollPosition = useCallback(() => {
+    if (!scrollContainerRef.current || !shouldScroll) {
+      setCanScrollLeft(false);
+      setCanScrollRight(false);
+      return;
+    }
+    const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+    setCanScrollLeft(scrollLeft > 0);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
+  }, [shouldScroll]);
+
+  useEffect(() => {
+    if (!shouldScroll) {
+      setCanScrollLeft(false);
+      setCanScrollRight(false);
+      return;
+    }
+    
+    checkScrollPosition();
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', checkScrollPosition);
+      // Also check on resize
+      window.addEventListener('resize', checkScrollPosition);
+      // Check initially and after a short delay to account for rendering
+      const timeoutId = setTimeout(checkScrollPosition, 100);
+      
+      return () => {
+        container.removeEventListener('scroll', checkScrollPosition);
+        window.removeEventListener('resize', checkScrollPosition);
+        clearTimeout(timeoutId);
+      };
+    }
+  }, [shouldScroll, checkScrollPosition, totalBadges]);
+
+  // Inject style to hide webkit scrollbar
+  useEffect(() => {
+    if (!shouldScroll) return;
+    
+    const styleId = 'table-toolbar-scrollbar-hide';
+    if (document.getElementById(styleId)) return;
+    
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      [data-scroll-container]::-webkit-scrollbar {
+        display: none;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      const existingStyle = document.getElementById(styleId);
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+    };
+  }, [shouldScroll]);
+
+  const scrollLeft = () => {
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      const scrollAmount = 200;
+      const start = container.scrollLeft;
+      const target = Math.max(0, start - scrollAmount);
+      const duration = 300;
+      const startTime = performance.now();
+
+      const animate = (currentTime: number) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const ease = 1 - Math.pow(1 - progress, 3); // Ease out cubic
+        container.scrollLeft = start + (target - start) * ease;
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        }
+      };
+      requestAnimationFrame(animate);
+    }
+  };
+
+  const scrollRight = () => {
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      const scrollAmount = 200;
+      const start = container.scrollLeft;
+      const maxScroll = container.scrollWidth - container.clientWidth;
+      const target = Math.min(maxScroll, start + scrollAmount);
+      const duration = 300;
+      const startTime = performance.now();
+
+      const animate = (currentTime: number) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const ease = 1 - Math.pow(1 - progress, 3); // Ease out cubic
+        container.scrollLeft = start + (target - start) * ease;
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        }
+      };
+      requestAnimationFrame(animate);
+    }
+  };
 
   return (
     <div style={{
-      height: '40px',
-      borderBottom: '1px solid var(--color-panel-border)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '0 12px',
-      backgroundColor: 'var(--color-panel-bg)',
-    }}>
+        height: '40px',
+        borderBottom: '1px solid var(--color-panel-border)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 8px',
+        backgroundColor: 'var(--color-panel-bg)',
+      }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <div
           onClick={onFilterToggle}
@@ -99,7 +212,7 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
           <span style={{ fontSize: '12px', fontWeight: 500 }}>Filter & Sort</span>
         </div>
         
-        <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--color-panel-border)', margin: '0 4px' }}></div>
+        <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--color-panel-border)' }}></div>
         
         <div style={{ color: 'var(--color-panel-text-muted)', fontSize: '12px', padding: '0 8px' }}>
           {documentCount} {documentCount === 1 ? 'document' : 'documents'}
@@ -109,7 +222,72 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
         {hasActiveFilters && (
           <>
             <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--color-panel-border)', margin: '0 4px' }}></div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', maxWidth: '400px', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0', position: 'relative' }}>
+              {/* Left Arrow with Fade */}
+              {shouldScroll && canScrollLeft && (
+                <>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: '24px',
+                      top: 0,
+                      bottom: 0,
+                      width: '24px',
+                      background: 'linear-gradient(to right, var(--color-panel-bg), transparent)',
+                      pointerEvents: 'none',
+                      zIndex: 1,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={scrollLeft}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '24px',
+                      height: '24px',
+                      padding: 0,
+                      backgroundColor: 'var(--color-panel-bg)',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      color: 'var(--color-panel-text-muted)',
+                      flexShrink: 0,
+                      transition: 'all 0.2s',
+                      zIndex: 2,
+                      position: 'relative',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = 'var(--color-panel-text)';
+                      e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                      e.currentTarget.style.backgroundColor = 'var(--color-panel-bg)';
+                    }}
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                </>
+              )}
+              <div 
+                ref={scrollContainerRef}
+                data-scroll-container
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  flexWrap: shouldScroll ? 'nowrap' : 'wrap', 
+                  maxWidth: shouldScroll ? (canScrollLeft && canScrollRight ? '352px' : canScrollLeft || canScrollRight ? '376px' : '400px') : '400px',
+                  overflowX: shouldScroll ? 'auto' : 'hidden',
+                  overflowY: 'hidden',
+                  WebkitOverflowScrolling: 'touch',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
+                  scrollBehavior: 'smooth',
+                }}
+              >
               {/* Sort Badge */}
               {sortConfig && (
                 <div
@@ -124,6 +302,7 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
                     fontSize: '11px',
                     color: 'var(--color-panel-text)',
                     fontFamily: 'monospace',
+                    flexShrink: 0,
                   }}
                 >
                   <ArrowUpDown size={10} style={{ color: 'var(--color-panel-text-muted)' }} />
@@ -196,6 +375,7 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
                       borderRadius: '12px',
                       fontSize: '11px',
                       color: 'var(--color-panel-text)',
+                      flexShrink: 0,
                     }}
                   >
                     <span style={{ fontFamily: 'monospace', color: 'var(--color-panel-text-secondary)' }}>
@@ -260,6 +440,7 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
                     color: 'var(--color-panel-text-muted)',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
+                    flexShrink: 0,
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.color = 'var(--color-panel-text)';
@@ -275,6 +456,55 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
                   <X size={10} />
                   Clear all
                 </button>
+              )}
+              </div>
+              {/* Right Arrow with Fade */}
+              {shouldScroll && canScrollRight && (
+                <>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      right: '24px',
+                      top: 0,
+                      bottom: 0,
+                      width: '24px',
+                      background: 'linear-gradient(to left, var(--color-panel-bg), transparent)',
+                      pointerEvents: 'none',
+                      zIndex: 1,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={scrollRight}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '24px',
+                      height: '24px',
+                      padding: 0,
+                      backgroundColor: 'var(--color-panel-bg)',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      color: 'var(--color-panel-text-muted)',
+                      flexShrink: 0,
+                      transition: 'all 0.2s',
+                      zIndex: 2,
+                      position: 'relative',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = 'var(--color-panel-text)';
+                      e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                      e.currentTarget.style.backgroundColor = 'var(--color-panel-bg)';
+                    }}
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </>
               )}
             </div>
           </>

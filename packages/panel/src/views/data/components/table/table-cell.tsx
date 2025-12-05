@@ -99,6 +99,8 @@ export const TableCell: React.FC<TableCellProps> = ({
           ? 'var(--animate-highlight), var(--animate-highlightBorder)'
           : undefined,
         position: 'relative',
+        overflow: 'hidden',
+        boxSizing: 'border-box',
       }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -132,9 +134,11 @@ export const TableCell: React.FC<TableCellProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '8px 12px',
+            padding: '6px 12px',
             gap: '8px',
             cursor: isEditable ? 'pointer' : 'default',
+            height: '100%',
+            boxSizing: 'border-box',
           }}
         >
           <div
@@ -226,8 +230,8 @@ export const TableCell: React.FC<TableCellProps> = ({
               data-menu-trigger
               onClick={onMenuClick}
               style={{
-                width: 22,
-                height: 22,
+                width: 20,
+                height: 20,
                 borderRadius: 6,
                 border: '1px solid var(--color-panel-border)',
                 backgroundColor: 'var(--color-panel-bg-tertiary)',

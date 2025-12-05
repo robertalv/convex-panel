@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ArrowLeft, 
   ArrowRight, 
-  ChevronDown, 
   Info, 
   Fingerprint, 
   ArrowDownUp, 
@@ -17,6 +16,8 @@ import {
 import type { FilterExpression, FilterClause, SortConfig, TableDefinition } from '../../../types';
 import { operatorOptions, typeOptions } from '../../../utils/constants';
 import { Dropdown } from '../../../components/shared';
+import { SearchableDropdown } from '../../../components/shared/searchable-dropdown';
+import type { SearchableDropdownOption } from '../../../components/shared/searchable-dropdown';
 
 export interface DataFilterPanelProps {
   filters: FilterExpression;
@@ -118,6 +119,39 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
 
   const availableIndexes = getAvailableIndexes();
 
+  // Prepare sort options for SearchableDropdown
+  const sortOptions = React.useMemo<SearchableDropdownOption<string>[]>(() => {
+    return availableIndexes.map(index => {
+      let icon: React.ReactNode;
+      if (index.name === '_creationTime') {
+        icon = <Clock size={14} style={{ color: 'var(--color-panel-text-secondary)' }} />;
+      } else if (index.name === '_id') {
+        icon = <FileText size={14} style={{ color: 'var(--color-panel-text-secondary)' }} />;
+      } else {
+        icon = <Fingerprint size={14} style={{ color: 'var(--color-panel-text-secondary)' }} />;
+      }
+
+      return {
+        key: index.name,
+        label: (
+          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontWeight: 500 }}>{index.label}</span>
+            <span style={{ 
+              fontSize: '10px', 
+              color: 'var(--color-panel-text-muted)',
+              fontFamily: 'monospace',
+            }}>
+              ({index.fields.join(', ')})
+            </span>
+          </div>
+        ),
+        value: index.fields[0],
+        icon,
+        searchValue: `${index.label} ${index.name} ${index.fields.join(' ')}`.toLowerCase(),
+      };
+    });
+  }, [availableIndexes]);
+
   // Initialize visible fields when table changes - show all fields by default
   useEffect(() => {
     if (allFields.length > 0 && selectedTable) {
@@ -150,10 +184,6 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
   // Field visibility state
   const [isFieldVisibilityOpen, setIsFieldVisibilityOpen] = useState(openColumnVisibility);
   const [fieldSearchQuery, setFieldSearchQuery] = useState('');
-  
-  // Sort dropdown state
-  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
-  const [sortSearchQuery, setSortSearchQuery] = useState('');
 
   // Open column visibility when prop changes
   useEffect(() => {
@@ -303,22 +333,6 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isFieldVisibilityOpen]);
-
-  // Close sort dropdown on outside click
-  useEffect(() => {
-    if (!isSortDropdownOpen) return;
-    
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('[data-sort-dropdown]')) {
-        setIsSortDropdownOpen(false);
-        setSortSearchQuery('');
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isSortDropdownOpen]);
 
   // Calculate hidden fields count
   const hiddenFieldsCount = allFields.length - visibleFields.length;
@@ -491,7 +505,11 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
           <div style={{ position: 'relative' }} data-field-visibility>
             <button
               type="button"
-              onClick={() => setIsFieldVisibilityOpen(!isFieldVisibilityOpen)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsFieldVisibilityOpen(!isFieldVisibilityOpen);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -543,6 +561,7 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
                   overflow: 'hidden',
                 }}
                 onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
               >
               {/* Search */}
               <div style={{ padding: '12px', borderBottom: '1px solid var(--color-panel-border)' }}>
@@ -607,7 +626,11 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = 'transparent';
                     }}
-                    onClick={() => toggleFieldVisibility(field)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFieldVisibility(field);
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
                   >
                     <span>{field}</span>
                     <div
@@ -647,7 +670,11 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
               }}>
                 <button
                   type="button"
-                  onClick={hideAllFields}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    hideAllFields();
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
                   style={{
                     flex: 1,
                     padding: '6px 12px',
@@ -676,7 +703,11 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={showAllFields}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    showAllFields();
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
                   style={{
                     flex: 1,
                     padding: '6px 12px',
@@ -724,200 +755,55 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
           </span>
           {draftSortConfig ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ position: 'relative' }} data-sort-dropdown>
-                <div
-                  onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ flex: 1 }}>
+                  <SearchableDropdown
+                    selectedValue={draftSortConfig.field}
+                    options={sortOptions}
+                    onSelect={(field) => handleSetSort(field, draftSortConfig.direction)}
+                    placeholder="Select field to sort..."
+                    searchPlaceholder="Search fields..."
+                    emptyStateText="No fields found"
+                    listMaxHeight={300}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveSort();
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 12px',
-                    backgroundColor: 'var(--color-panel-bg-tertiary)',
+                    padding: '6px',
+                    color: 'var(--color-panel-text-muted)',
+                    backgroundColor: 'transparent',
                     border: '1px solid var(--color-panel-border)',
                     borderRadius: '6px',
-                    fontSize: '12px',
-                    color: 'var(--color-panel-text)',
                     cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     transition: 'all 0.2s',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--color-panel-text-muted)';
-                    e.currentTarget.style.backgroundColor = 'var(--color-panel-active)';
+                    e.currentTarget.style.color = 'var(--color-panel-error)';
+                    e.currentTarget.style.borderColor = 'var(--color-panel-error)';
                   }}
                   onMouseLeave={(e) => {
+                    e.currentTarget.style.color = 'var(--color-panel-text-muted)';
                     e.currentTarget.style.borderColor = 'var(--color-panel-border)';
-                    e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Fingerprint size={14} style={{ color: 'var(--color-panel-text-secondary)' }} />
-                    <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>
-                      {draftSortConfig.field}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ChevronDown 
-                      size={12} 
-                      style={{ 
-                        color: 'var(--color-panel-text-muted)',
-                        transform: isSortDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                        transition: 'transform 0.2s',
-                      }} 
-                    />
-                    <X
-                      size={12}
-                      style={{
-                        color: 'var(--color-panel-text-muted)',
-                        opacity: 0,
-                        transition: 'opacity 0.2s',
-                        cursor: 'pointer',
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveSort();
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.opacity = '1';
-                        e.currentTarget.style.color = 'var(--color-panel-error)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.opacity = '0';
-                        e.currentTarget.style.color = 'var(--color-panel-text-muted)';
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {isSortDropdownOpen && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      marginTop: '4px',
-                      backgroundColor: 'var(--color-panel-bg-tertiary)',
-                      border: '1px solid var(--color-panel-border)',
-                      borderRadius: '6px',
-                      boxShadow: '0 4px 16px var(--color-panel-shadow)',
-                      zIndex: 1000,
-                      maxHeight: '300px',
-                      overflow: 'auto',
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {/* Search */}
-                    <div style={{ padding: '8px', borderBottom: '1px solid var(--color-panel-border)' }}>
-                      <div style={{ position: 'relative' }}>
-                        <Search
-                          size={12}
-                          style={{
-                            position: 'absolute',
-                            left: '8px',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            color: 'var(--color-panel-text-muted)',
-                            pointerEvents: 'none',
-                          }}
-                        />
-                        <input
-                          type="text"
-                          placeholder="Search..."
-                          value={sortSearchQuery}
-                          onChange={(e) => setSortSearchQuery(e.target.value)}
-                          style={{
-                            width: '100%',
-                            backgroundColor: 'var(--color-panel-bg-secondary)',
-                            border: '1px solid var(--color-panel-border)',
-                            borderRadius: '4px',
-                            height: '28px',
-                            paddingLeft: '28px',
-                            paddingRight: '8px',
-                            fontSize: '12px',
-                            color: 'var(--color-panel-text)',
-                            outline: 'none',
-                          }}
-                          onFocus={(e) => {
-                            e.currentTarget.style.borderColor = 'var(--color-panel-accent)';
-                          }}
-                          onBlur={(e) => {
-                            e.currentTarget.style.borderColor = 'var(--color-panel-border)';
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Index Options */}
-                    <div style={{ padding: '4px' }}>
-                      {availableIndexes
-                        .filter(idx => 
-                          idx.label.toLowerCase().includes(sortSearchQuery.toLowerCase()) ||
-                          idx.name.toLowerCase().includes(sortSearchQuery.toLowerCase())
-                        )
-                        .map((index) => (
-                          <div
-                            key={index.name}
-                            onClick={() => {
-                              handleSetSort(index.fields[0], draftSortConfig.direction);
-                              setIsSortDropdownOpen(false);
-                              setSortSearchQuery('');
-                            }}
-                            style={{
-                              padding: '8px 12px',
-                              fontSize: '12px',
-                              color: 'var(--color-panel-text)',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              transition: 'background-color 0.2s',
-                              backgroundColor: draftSortConfig.field === index.fields[0] 
-                                ? 'color-mix(in srgb, var(--color-panel-accent) 20%, transparent)' 
-                                : 'transparent',
-                            }}
-                            onMouseEnter={(e) => {
-                              if (draftSortConfig.field !== index.fields[0]) {
-                                e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (draftSortConfig.field !== index.fields[0]) {
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                              }
-                            }}
-                          >
-                            {index.name === '_creationTime' ? (
-                              <Clock size={14} style={{ color: 'var(--color-panel-text-secondary)' }} />
-                            ) : index.name === '_id' ? (
-                              <FileText size={14} style={{ color: 'var(--color-panel-text-secondary)' }} />
-                            ) : (
-                              <Fingerprint size={14} style={{ color: 'var(--color-panel-text-secondary)' }} />
-                            )}
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontWeight: 500 }}>{index.label}</div>
-                              <div style={{ 
-                                fontSize: '10px', 
-                                color: 'var(--color-panel-text-muted)',
-                                fontFamily: 'monospace',
-                                marginTop: '2px',
-                              }}>
-                                ({index.fields.join(', ')})
-                              </div>
-                            </div>
-                            {draftSortConfig.field === index.fields[0] && (
-                              <span style={{ 
-                                color: 'var(--color-panel-accent)',
-                                fontSize: '12px',
-                              }}>✓</span>
-                            )}
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
+                  <X size={14} />
+                </button>
               </div>
               <div
-                onClick={handleToggleSortDirection}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleSortDirection();
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -960,7 +846,7 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.opacity = '1';
-                    e.currentTarget.style.color = 'var(--color-panel-text)';
+                    e.currentTarget.style.color = 'var(--color-panel-error)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.opacity = '0';
@@ -970,154 +856,15 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
               </div>
             </div>
           ) : (
-            <div style={{ position: 'relative' }} data-sort-dropdown>
-              <button
-                type="button"
-                onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  backgroundColor: 'var(--color-panel-bg-tertiary)',
-                  border: '1px solid var(--color-panel-border)',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  color: 'var(--color-panel-text)',
-                  cursor: 'pointer',
-                  fontFamily: 'monospace',
-                  outline: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-panel-text-muted)';
-                  e.currentTarget.style.backgroundColor = 'var(--color-panel-active)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-panel-border)';
-                  e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
-                }}
-              >
-                <span>Select field to sort...</span>
-                <ChevronDown size={12} style={{ color: 'var(--color-panel-text-muted)' }} />
-              </button>
-
-              {isSortDropdownOpen && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    marginTop: '4px',
-                    backgroundColor: 'var(--color-panel-bg-tertiary)',
-                    border: '1px solid var(--color-panel-border)',
-                    borderRadius: '6px',
-                    boxShadow: '0 4px 16px var(--color-panel-shadow)',
-                    zIndex: 1000,
-                    maxHeight: '300px',
-                    overflow: 'auto',
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {/* Search */}
-                  <div style={{ padding: '8px', borderBottom: '1px solid var(--color-panel-border)' }}>
-                    <div style={{ position: 'relative' }}>
-                      <Search
-                        size={12}
-                        style={{
-                          position: 'absolute',
-                          left: '8px',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          color: 'var(--color-panel-text-muted)',
-                          pointerEvents: 'none',
-                        }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Search..."
-                        value={sortSearchQuery}
-                        onChange={(e) => setSortSearchQuery(e.target.value)}
-                        style={{
-                          width: '100%',
-                          backgroundColor: 'var(--color-panel-bg-secondary)',
-                          border: '1px solid var(--color-panel-border)',
-                          borderRadius: '4px',
-                          height: '28px',
-                          paddingLeft: '28px',
-                          paddingRight: '8px',
-                          fontSize: '12px',
-                          color: 'var(--color-panel-text)',
-                          outline: 'none',
-                        }}
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor = 'var(--color-panel-accent)';
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = 'var(--color-panel-border)';
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Index Options */}
-                  <div style={{ padding: '4px' }}>
-                    {availableIndexes
-                      .filter(idx => 
-                        idx.label.toLowerCase().includes(sortSearchQuery.toLowerCase()) ||
-                        idx.name.toLowerCase().includes(sortSearchQuery.toLowerCase())
-                      )
-                      .map((index) => (
-                        <div
-                          key={index.name}
-                          onClick={() => {
-                            handleSetSort(index.fields[0], 'desc');
-                            setIsSortDropdownOpen(false);
-                            setSortSearchQuery('');
-                          }}
-                          style={{
-                            padding: '8px 12px',
-                            fontSize: '12px',
-                            color: 'var(--color-panel-text)',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            transition: 'background-color 0.2s',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                        >
-                          {index.name === '_creationTime' ? (
-                            <Clock size={14} style={{ color: 'var(--color-panel-text-secondary)' }} />
-                          ) : index.name === '_id' ? (
-                            <FileText size={14} style={{ color: 'var(--color-panel-text-secondary)' }} />
-                          ) : (
-                            <Fingerprint size={14} style={{ color: 'var(--color-panel-text-secondary)' }} />
-                          )}
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 500 }}>{index.label}</div>
-                            <div style={{ 
-                              fontSize: '10px', 
-                              color: 'var(--color-panel-text-muted)',
-                              fontFamily: 'monospace',
-                              marginTop: '2px',
-                            }}>
-                              ({index.fields.join(', ')})
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            <SearchableDropdown
+              selectedValue={null}
+              options={sortOptions}
+              onSelect={(field) => handleSetSort(field, 'desc')}
+              placeholder="Select field to sort..."
+              searchPlaceholder="Search fields..."
+              emptyStateText="No fields found"
+              listMaxHeight={300}
+            />
           )}
         </div>
 
@@ -1355,7 +1102,11 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => handleRemoveFilter(index)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveFilter(index);
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
                   style={{
                     padding: '0 8px',
                     color: 'var(--color-panel-text-muted)',
@@ -1611,7 +1362,11 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => handleRemoveFilter(index)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveFilter(index);
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
                   style={{
                     padding: '0 8px',
                     color: 'var(--color-panel-text-muted)',
@@ -1641,21 +1396,23 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
 
         {/* Action Bar */}
         <div style={{ paddingTop: '12px', paddingBottom: '4px' }}>
-          <button
-            type="button"
-            onClick={() => {
-              // Add to indexed filters if there are indexed fields available, otherwise to other filters
-              const indexedFieldsList = allFields.filter(f => isIndexedField(f));
-              const nonIndexedFields = allFields.filter(f => !isIndexedField(f));
-              const newFilter: FilterClause = {
-                field: indexedFieldsList.length > 0 ? indexedFieldsList[0] : (nonIndexedFields[0] || allFields[0] || '_id'),
-                op: 'eq',
-                value: '',
-                enabled: true,
-              };
-              setDraftFilters([...draftFilters, newFilter]);
-            }}
-            style={{
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Add to indexed filters if there are indexed fields available, otherwise to other filters
+                const indexedFieldsList = allFields.filter(f => isIndexedField(f));
+                const nonIndexedFields = allFields.filter(f => !isIndexedField(f));
+                const newFilter: FilterClause = {
+                  field: indexedFieldsList.length > 0 ? indexedFieldsList[0] : (nonIndexedFields[0] || allFields[0] || '_id'),
+                  op: 'eq',
+                  value: '',
+                  enabled: true,
+                };
+                setDraftFilters([...draftFilters, newFilter]);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
               width: '100%',
               display: 'flex',
               alignItems: 'center',
@@ -1699,6 +1456,8 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
       }}>
         <button
           type="submit"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
           style={{
             width: '100%',
             padding: '8px 16px',

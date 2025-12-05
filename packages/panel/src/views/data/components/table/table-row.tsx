@@ -116,7 +116,7 @@ export const TableRow: React.FC<TableRowProps> = ({
         <div
           style={{
             width: 40,
-            height: 40,
+            height: 32,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

@@ -274,6 +274,14 @@ export const DataTable: React.FC<DataTableProps> = ({
   // Detect new rows and updated cells whenever documents change
   useEffect(() => {
     const prevDocs = previousDocumentsRef.current;
+    
+    // Skip highlighting on initial load (when previousDocumentsRef is empty)
+    // Only highlight when there are previous documents to compare against
+    if (prevDocs.length === 0) {
+      previousDocumentsRef.current = documents;
+      return;
+    }
+
     const prevById = new Map(prevDocs.map((doc) => [doc._id, doc]));
 
     const newRowIds: string[] = [];
@@ -817,7 +825,7 @@ export const DataTable: React.FC<DataTableProps> = ({
               />
               <tbody
                 style={{
-                  fontSize: '12px',
+                  fontSize: '11px',
                   fontFamily: 'monospace',
                   color: 'var(--color-panel-text)',
                 }}

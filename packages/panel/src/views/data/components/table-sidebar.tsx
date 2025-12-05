@@ -84,6 +84,7 @@ export const TableSidebar: React.FC<TableSidebarProps> = ({
         overflowY: 'auto',
         padding: '8px 0',
       }}>
+        <div style={{ gap: '4px', display: 'flex', flexDirection: 'column', color: 'var(--color-panel-text-secondary)', fontSize: '12px' }}>
         {isLoading ? (
           <div style={{ padding: '12px', color: 'var(--color-panel-text-secondary)', fontSize: '12px' }}>
             Loading tables...
@@ -127,10 +128,11 @@ export const TableSidebar: React.FC<TableSidebarProps> = ({
             </div>
           ))
         )}
+        </div>
       </div>
 
       {/* Create Table Button */}
-      <div style={{ padding: '12px', borderTop: '1px solid var(--color-panel-border)' }}>
+      <div style={{ padding: '13px', borderTop: '1px solid var(--color-panel-border)' }}>
         <button
           style={{
             display: 'flex',
