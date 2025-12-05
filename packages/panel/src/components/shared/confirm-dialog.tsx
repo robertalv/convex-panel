@@ -2,16 +2,18 @@ import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle } from 'lucide-react';
 import { usePortalEnvironment } from '../../contexts/portal-context';
+import { useThemeSafe } from '../../hooks/useTheme';
 
 export interface ConfirmDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
   title: string;
-  message: string;
+  message: string | React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: 'danger' | 'warning' | 'info';
+  disableCancel?: boolean;
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -23,9 +25,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   variant = 'danger',
+  disableCancel = false,
 }) => {
   const { container, ownerDocument } = usePortalEnvironment();
   const portalTarget = container ?? ownerDocument?.body ?? null;
+  const { theme } = useThemeSafe();
   // Prevent body scroll when dialog is open
   useEffect(() => {
     if (!portalTarget || !ownerDocument?.body) return;
@@ -83,14 +87,16 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'color-mix(in srgb, var(--color-panel-bg) 80%, transparent)',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
           zIndex: 100000,
           animation: 'fadeIn 0.2s ease-out',
+          pointerEvents: 'auto',
         }}
       />
 
       {/* Dialog */}
       <div
+        className={`cp-theme-${theme}`}
         style={{
           position: 'fixed',
           top: '50%',
@@ -106,8 +112,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           animation: 'popupSlideIn 0.3s ease-out',
           display: 'flex',
           flexDirection: 'column',
+          pointerEvents: 'auto',
         }}
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
@@ -139,16 +147,29 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             >
               {title}
             </h3>
-            <p
-              style={{
-                margin: 0,
-                fontSize: '14px',
-                color: 'var(--color-panel-text-muted)',
-                lineHeight: '1.5',
-              }}
-            >
-              {message}
-            </p>
+            {typeof message === 'string' ? (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: '14px',
+                  color: 'var(--color-panel-text-muted)',
+                  lineHeight: '1.5',
+                }}
+              >
+                {message}
+              </p>
+            ) : (
+              <div
+                style={{
+                  margin: 0,
+                  fontSize: '14px',
+                  color: 'var(--color-panel-text-muted)',
+                  lineHeight: '1.5',
+                }}
+              >
+                {message}
+              </div>
+            )}
           </div>
         </div>
 
@@ -162,7 +183,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           }}
         >
           <button
+            type="button"
             onClick={onClose}
+            disabled={disableCancel}
             style={{
               padding: '8px 16px',
               fontSize: '14px',
@@ -171,11 +194,15 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               border: '1px solid var(--color-panel-border)',
               borderRadius: '8px',
               color: 'var(--color-panel-text)',
-              cursor: 'pointer',
+              cursor: disableCancel ? 'not-allowed' : 'pointer',
               transition: 'background 0.15s',
+              pointerEvents: 'auto',
+              opacity: disableCancel ? 0.5 : 1,
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+              if (!disableCancel) {
+                e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+              }
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';
@@ -184,6 +211,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             {cancelLabel}
           </button>
           <button
+            type="button"
             onClick={() => {
               onConfirm();
               onClose();
@@ -198,6 +226,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               color: 'white',
               cursor: 'pointer',
               transition: 'background 0.15s',
+              pointerEvents: 'auto',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = colors.buttonHover;

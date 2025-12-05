@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Copy, Loader2, ExternalLink } from 'lucide-react';
 import { copyToClipboard } from '../../../utils/toast';
-import { createDocumentLink } from './table/data-table-utils';
+import { createDocumentLink, formatTimestamp } from './table/data-table-utils';
 import { useSheetSafe } from '../../../contexts/sheet-context';
+import { Tooltip } from '../../../components/shared/tooltip';
 
 export interface DocumentViewerProps {
   documentId: string;
@@ -119,15 +120,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
   // Format creation date
   const creationDate = document?._creationTime
-    ? new Date(document._creationTime).toLocaleString('en-US', {
-        month: '2-digit',
-        day: '2-digit',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true,
-      })
+    ? formatTimestamp(document._creationTime)
     : null;
 
   if (isLoading) {
@@ -333,9 +326,16 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
           <strong>Table:</strong>{' '}
           <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>{tableName}</span>
         </div>
-        {creationDate && (
+        {creationDate && document?._creationTime && (
           <div style={{ marginBottom: '4px' }}>
-            <strong>Created:</strong> {creationDate}
+            <strong>Created:</strong>{' '}
+            <Tooltip
+              content={document._creationTime.toString()}
+              position="top"
+              maxWidth={300}
+            >
+              <span style={{ cursor: 'help' }}>{creationDate}</span>
+            </Tooltip>
           </div>
         )}
         <div>

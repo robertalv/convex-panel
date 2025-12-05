@@ -670,7 +670,7 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
                 onSchema={onSchema || (() => {})}
                 onIndexes={onIndexes || (() => {})}
                 onMetrics={onMetrics || (() => {})}
-                onClearTable={onClearTable}
+                onClearTable={documentCount > 0 ? onClearTable : undefined}
                 onDeleteTable={onDeleteTable}
               />
             )}
@@ -765,7 +765,7 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
                 onSchema={onSchema || (() => {})}
                 onIndexes={onIndexes || (() => {})}
                 onMetrics={onMetrics || (() => {})}
-                onClearTable={onClearTable}
+                onClearTable={documentCount > 0 ? onClearTable : undefined}
                 onDeleteTable={onDeleteTable}
               />
             )}

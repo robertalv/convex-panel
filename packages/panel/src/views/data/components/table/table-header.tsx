@@ -51,7 +51,7 @@ export const TableHeader: React.FC<TableHeaderProps> = ({
   onColumnResizeHoverLeave,
 }) => {
   return (
-    <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+    <thead style={{ position: 'sticky', top: 0, zIndex: 15 }}>
       <tr
         style={{
           borderBottom: '1px solid var(--color-panel-border)',
@@ -70,7 +70,7 @@ export const TableHeader: React.FC<TableHeaderProps> = ({
             position: 'sticky',
             left: 0,
             backgroundColor: 'var(--color-panel-bg)',
-            zIndex: 11,
+            zIndex: 20,
           }}
         >
           <div

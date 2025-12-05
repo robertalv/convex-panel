@@ -12,7 +12,6 @@ import type {
 } from '../../../../types';
 import { ContextMenu } from '../../../../components/shared/context-menu';
 import { patchDocumentFields, deleteDocuments } from '../../../../utils/api/documents';
-import { useConfirmSafe } from '../../../../contexts/confirm-dialog-context';
 import { toast } from '../../../../utils/toast';
 import { EmptyTableState } from './empty-table-state';
 import { TableHeader } from './table-header';
@@ -68,7 +67,6 @@ export const DataTable: React.FC<DataTableProps> = ({
   setFilters,
   onAddDocument,
 }) => {
-  const { confirm } = useConfirmSafe();
   const [columnOrder, setColumnOrder] = useState<string[]>([]);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const [dragState, setDragState] = useState<{
@@ -260,9 +258,13 @@ export const DataTable: React.FC<DataTableProps> = ({
     [selectedDocumentIds, onSelectionChange],
   );
 
+  // Track filters to detect when they change
+  const previousFiltersRef = useRef<FilterExpression | undefined>(filters);
+
   // Reset highlights when switching tables
   useEffect(() => {
     previousDocumentsRef.current = documents;
+    previousFiltersRef.current = filters;
     setHighlightedRows([]);
     setHighlightedCells({});
     if (highlightTimeoutRef.current !== null) {
@@ -274,11 +276,27 @@ export const DataTable: React.FC<DataTableProps> = ({
   // Detect new rows and updated cells whenever documents change
   useEffect(() => {
     const prevDocs = previousDocumentsRef.current;
+    const prevFilters = previousFiltersRef.current;
+    
+    // Check if filters changed - if so, reset document reference and skip highlighting
+    const filtersChanged = JSON.stringify(prevFilters) !== JSON.stringify(filters);
+    if (filtersChanged) {
+      previousFiltersRef.current = filters;
+      previousDocumentsRef.current = documents;
+      setHighlightedRows([]);
+      setHighlightedCells({});
+      if (highlightTimeoutRef.current !== null) {
+        window.clearTimeout(highlightTimeoutRef.current);
+        highlightTimeoutRef.current = null;
+      }
+      return;
+    }
     
     // Skip highlighting on initial load (when previousDocumentsRef is empty)
     // Only highlight when there are previous documents to compare against
     if (prevDocs.length === 0) {
       previousDocumentsRef.current = documents;
+      previousFiltersRef.current = filters;
       return;
     }
 
@@ -519,19 +537,9 @@ export const DataTable: React.FC<DataTableProps> = ({
     setEditingError(null);
   }, []);
 
-  // Handle delete document with confirmation
+  // Handle delete document
   const handleDeleteDocument = useCallback(async (documentId: string) => {
     if (!adminClient || !selectedTable) return;
-
-    const confirmed = await confirm({
-      title: 'Delete Document',
-      message: `Are you sure you want to delete this document? This action cannot be undone.`,
-      confirmLabel: 'Delete',
-      cancelLabel: 'Cancel',
-      variant: 'danger',
-    });
-
-    if (!confirmed) return;
 
     try {
       await deleteDocuments(selectedTable, [documentId], adminClient, componentId);
@@ -545,7 +553,7 @@ export const DataTable: React.FC<DataTableProps> = ({
       console.error('Error deleting document:', error);
       toast('error', error?.message || 'Failed to delete document');
     }
-  }, [adminClient, selectedTable, componentId, confirm, onDocumentUpdate]);
+  }, [adminClient, selectedTable, componentId, onDocumentUpdate]);
 
   // Handle clicks outside the editor to close it
   useEffect(() => {
@@ -874,7 +882,11 @@ export const DataTable: React.FC<DataTableProps> = ({
         )}
       </div>
 
-      <TableFooter />
+      <TableFooter
+        tableName={selectedTable}
+        tableSchema={tableSchema}
+        documents={documents}
+      />
 
       {cellMenuState && (
         <ContextMenu

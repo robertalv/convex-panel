@@ -18,6 +18,7 @@
     "@erquhart/convex-oss-stats": "^0.8.2",
     "convex": "^1.29.3",
     "convex-helpers": "^0.1.106",
+    "convex-panel/component": "workspace:*",
     "typescript": "^5.9.3"
   }
 }

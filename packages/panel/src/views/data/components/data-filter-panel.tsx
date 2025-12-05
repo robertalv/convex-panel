@@ -4,7 +4,8 @@ import {
   ArrowRight, 
   Info, 
   Fingerprint, 
-  ArrowDownUp, 
+  ArrowDownAZ,
+  ArrowUpAZ,
   Plus,
   X,
   Eye,
@@ -30,9 +31,19 @@ export interface DataFilterPanelProps {
   onVisibleFieldsChange?: (fields: string[]) => void;
   onClose?: () => void;
   openColumnVisibility?: boolean;
+  /** Optional filter history API. If provided, filter history will be persisted. */
+  filterHistoryApi?: {
+    push: (scope: string, state: { filters: FilterExpression; sortConfig: SortConfig | null }) => Promise<void>;
+    undo: (scope: string, count?: number) => Promise<{ filters: FilterExpression; sortConfig: SortConfig | null } | null>;
+    redo: (scope: string, count?: number) => Promise<{ filters: FilterExpression; sortConfig: SortConfig | null } | null>;
+    getStatus: (scope: string) => Promise<{ canUndo: boolean; canRedo: boolean; position: number | null; length: number }>;
+    getCurrentState: (scope: string) => Promise<{ filters: FilterExpression; sortConfig: SortConfig | null } | null>;
+  };
+  /** Optional user ID for scoping filter history. Defaults to 'default' */
+  userId?: string;
 }
 
-// Filter history for navigation
+// Filter history for navigation (fallback when API not provided)
 interface FilterHistoryEntry {
   filters: FilterExpression;
   sortConfig: SortConfig | null;
@@ -49,16 +60,73 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
   onVisibleFieldsChange,
   onClose,
   openColumnVisibility = false,
+  filterHistoryApi,
+  userId = 'default',
 }) => {
   // Draft filters - local state that can be applied or cancelled
   const [draftFilters, setDraftFilters] = useState<FilterClause[]>(filters.clauses || []);
   const [draftSortConfig, setDraftSortConfig] = useState<SortConfig | null>(sortConfig);
   
-  // Filter history for back/forward navigation
+  // Scope for filter history: user:userId:table:tableName
+  const filterHistoryScope = `user:${userId}:table:${selectedTable}`;
+  
+  // Filter history status (fetched when API is available)
+  const [historyStatus, setHistoryStatus] = useState<{ canUndo: boolean; canRedo: boolean; position: number | null; length: number } | null>(null);
+  
+  // Fetch history status when API is available
+  useEffect(() => {
+    if (filterHistoryApi) {
+      filterHistoryApi.getStatus(filterHistoryScope)
+        .then(setHistoryStatus)
+        .catch(() => {
+          // Silently fail if API is not available
+        });
+    } else {
+      setHistoryStatus(null);
+    }
+  }, [filterHistoryScope, filterHistoryApi]);
+  
+  // Fallback: Filter history for back/forward navigation (when API not provided)
   const [filterHistory, setFilterHistory] = useState<FilterHistoryEntry[]>([
     { filters, sortConfig }
   ]);
   const [historyIndex, setHistoryIndex] = useState(0);
+  
+  // Sync local history when filters change externally (only if not using API)
+  useEffect(() => {
+    if (!filterHistoryApi) {
+      const currentEntry = filterHistory[historyIndex];
+      const isDifferent = JSON.stringify(currentEntry?.filters) !== JSON.stringify(filters) ||
+        JSON.stringify(currentEntry?.sortConfig) !== JSON.stringify(sortConfig);
+      
+      if (isDifferent && currentEntry) {
+        // Filters changed externally, update current history entry
+        const updatedHistory = [...filterHistory];
+        updatedHistory[historyIndex] = { filters, sortConfig };
+        setFilterHistory(updatedHistory);
+      }
+    }
+  }, [filters, sortConfig, filterHistoryApi]);
+  
+  // Load current state from API on mount and when scope changes
+  useEffect(() => {
+    if (filterHistoryApi) {
+      filterHistoryApi.getCurrentState(filterHistoryScope).then((state) => {
+        if (state) {
+          setDraftFilters(state.filters.clauses || []);
+          setDraftSortConfig(state.sortConfig);
+          setFilters(state.filters);
+          if (state.sortConfig) {
+            setSortConfig(state.sortConfig);
+          } else {
+            setSortConfig(null);
+          }
+        }
+      }).catch(() => {
+        // Silently fail if API is not available
+      });
+    }
+  }, [filterHistoryScope, filterHistoryApi, setFilters, setSortConfig]);
   
   // Field visibility state
   const [visibleFields, setVisibleFields] = useState<string[]>(
@@ -222,7 +290,7 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
   const otherFilters = draftFilters.filter(f => !isIndexedField(f.field));
 
   // Apply filters - add to history and apply
-  const handleApplyFilters = useCallback(() => {
+  const handleApplyFilters = useCallback(async () => {
     const newFilters: FilterExpression = { clauses: draftFilters.filter(f => f.enabled) };
     setFilters(newFilters);
     if (draftSortConfig) {
@@ -231,69 +299,268 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
       setSortConfig(null);
     }
     
-    // Add to history (only if different from current)
-    const currentEntry = filterHistory[historyIndex];
-    const isDifferent = JSON.stringify(currentEntry.filters) !== JSON.stringify(newFilters) ||
-      JSON.stringify(currentEntry.sortConfig) !== JSON.stringify(draftSortConfig);
-    
-    if (isDifferent) {
-      const newHistory = filterHistory.slice(0, historyIndex + 1);
-      newHistory.push({ filters: newFilters, sortConfig: draftSortConfig });
-      setFilterHistory(newHistory);
-      setHistoryIndex(newHistory.length - 1);
+    // Push to filter history API if available
+    if (filterHistoryApi) {
+      try {
+        await filterHistoryApi.push(filterHistoryScope, {
+          filters: newFilters,
+          sortConfig: draftSortConfig,
+        });
+        // Refresh status after pushing
+        filterHistoryApi.getStatus(filterHistoryScope)
+          .then(setHistoryStatus)
+          .catch(() => {
+            // Silently fail if status refresh fails
+          });
+      } catch (error) {
+        // Silently fail if API is not available
+      }
+    } else {
+      // Fallback: Add to local history (only if different from current)
+      const currentEntry = filterHistory[historyIndex];
+      const isDifferent = JSON.stringify(currentEntry?.filters) !== JSON.stringify(newFilters) ||
+        JSON.stringify(currentEntry?.sortConfig) !== JSON.stringify(draftSortConfig);
+      
+      if (isDifferent) {
+        const newHistory = filterHistory.slice(0, historyIndex + 1);
+        newHistory.push({ filters: newFilters, sortConfig: draftSortConfig });
+        setFilterHistory(newHistory);
+        setHistoryIndex(newHistory.length - 1);
+      }
     }
     
     // Close the filter panel after applying
     onClose?.();
-  }, [draftFilters, draftSortConfig, setFilters, setSortConfig, filterHistory, historyIndex, onClose]);
+  }, [draftFilters, draftSortConfig, setFilters, setSortConfig, filterHistory, historyIndex, onClose, filterHistoryApi, filterHistoryScope]);
 
-  // Navigation handlers
-  const canGoBack = historyIndex > 0;
-  const canGoForward = historyIndex < filterHistory.length - 1;
+  // Navigation handlers - use status from API or local state
+  const canGoBack = filterHistoryApi 
+    ? (historyStatus?.canUndo ?? false)
+    : historyIndex > 0;
+  const canGoForward = filterHistoryApi
+    ? (historyStatus?.canRedo ?? false)
+    : historyIndex < filterHistory.length - 1;
 
-  const handleGoBack = useCallback(() => {
-    if (canGoBack) {
+  const handleGoBack = useCallback(async () => {
+    if (!canGoBack) return;
+    
+    if (filterHistoryApi) {
+      try {
+        const prevState = await filterHistoryApi.undo(filterHistoryScope, 1);
+        
+        // Small delay to ensure backend has processed
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Refresh status to get updated navigation state
+        const newStatus = await filterHistoryApi.getStatus(filterHistoryScope);
+        setHistoryStatus(newStatus);
+        
+        if (prevState) {
+          // We have a previous state, apply it
+          setDraftFilters(prevState.filters.clauses || []);
+          setDraftSortConfig(prevState.sortConfig);
+          setFilters(prevState.filters);
+          if (prevState.sortConfig) {
+            setSortConfig(prevState.sortConfig);
+          } else {
+            setSortConfig(null);
+          }
+        } else {
+          // null means we moved to position null (before any states)
+          // Clear filters to show we're at the beginning
+          setDraftFilters([]);
+          setDraftSortConfig(null);
+          setFilters({ clauses: [] });
+          setSortConfig(null);
+        }
+      } catch (error) {
+        // Silently fail if API is not available
+      }
+    } else {
+      // Fallback: local history
       const prevIndex = historyIndex - 1;
       const entry = filterHistory[prevIndex];
-      setDraftFilters(entry.filters.clauses || []);
-      setDraftSortConfig(entry.sortConfig);
-      setHistoryIndex(prevIndex);
-      // Apply immediately when navigating
-      setFilters(entry.filters);
-      if (entry.sortConfig) {
-        setSortConfig(entry.sortConfig);
-      } else {
-        setSortConfig(null);
+      if (entry) {
+        setDraftFilters(entry.filters.clauses || []);
+        setDraftSortConfig(entry.sortConfig);
+        setHistoryIndex(prevIndex);
+        // Apply immediately when navigating
+        setFilters(entry.filters);
+        if (entry.sortConfig) {
+          setSortConfig(entry.sortConfig);
+        } else {
+          setSortConfig(null);
+        }
       }
     }
-  }, [canGoBack, historyIndex, filterHistory, setFilters, setSortConfig]);
+  }, [canGoBack, historyIndex, filterHistory, setFilters, setSortConfig, filterHistoryApi, filterHistoryScope]);
 
-  const handleGoForward = useCallback(() => {
-    if (canGoForward) {
+  const handleGoForward = useCallback(async () => {
+    if (!canGoForward) return;
+    
+    if (filterHistoryApi) {
+      try {
+        const nextState = await filterHistoryApi.redo(filterHistoryScope, 1);
+        
+        // Small delay to ensure backend has processed
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Refresh status to get updated navigation state
+        const newStatus = await filterHistoryApi.getStatus(filterHistoryScope);
+        setHistoryStatus(newStatus);
+        
+        if (nextState) {
+          // We have a next state, apply it
+          setDraftFilters(nextState.filters.clauses || []);
+          setDraftSortConfig(nextState.sortConfig);
+          setFilters(nextState.filters);
+          if (nextState.sortConfig) {
+            setSortConfig(nextState.sortConfig);
+          } else {
+            setSortConfig(null);
+          }
+        }
+      } catch (error) {
+        // Silently fail if API is not available
+      }
+    } else {
+      // Fallback: local history
       const nextIndex = historyIndex + 1;
       const entry = filterHistory[nextIndex];
-      setDraftFilters(entry.filters.clauses || []);
-      setDraftSortConfig(entry.sortConfig);
-      setHistoryIndex(nextIndex);
-      // Apply immediately when navigating
-      setFilters(entry.filters);
-      if (entry.sortConfig) {
-        setSortConfig(entry.sortConfig);
-      } else {
-        setSortConfig(null);
+      if (entry) {
+        setDraftFilters(entry.filters.clauses || []);
+        setDraftSortConfig(entry.sortConfig);
+        setHistoryIndex(nextIndex);
+        // Apply immediately when navigating
+        setFilters(entry.filters);
+        if (entry.sortConfig) {
+          setSortConfig(entry.sortConfig);
+        } else {
+          setSortConfig(null);
+        }
       }
     }
-  }, [canGoForward, historyIndex, filterHistory, setFilters, setSortConfig]);
+  }, [canGoForward, historyIndex, filterHistory, setFilters, setSortConfig, filterHistoryApi, filterHistoryScope]);
 
   const handleRemoveFilter = (index: number) => {
     setDraftFilters(draftFilters.filter((_, i) => i !== index));
   };
 
   const handleUpdateFilter = (index: number, updates: Partial<FilterClause>) => {
-    const updated = draftFilters.map((filter, i) => 
-      i === index ? { ...filter, ...updates } : filter
-    );
+    const updated = draftFilters.map((filter, i) => {
+      if (i === index) {
+        // If field is being changed, clear the value
+        if (updates.field && updates.field !== filter.field) {
+          return { ...filter, ...updates, value: '' };
+        }
+        return { ...filter, ...updates };
+      }
+      return filter;
+    });
     setDraftFilters(updated);
+  };
+
+  // Helper to get field type from schema
+  const getFieldType = (fieldName: string): string | null => {
+    const field = tableSchema?.fields?.find(f => f.fieldName === fieldName);
+    if (!field) {
+      // Check for special fields
+      if (fieldName === '_id') return 'id';
+      if (fieldName === '_creationTime') return 'number';
+      return null;
+    }
+    return field.shape?.type || null;
+  };
+
+  // Helper to get type indicator based on field type and value
+  const getTypeIndicator = (fieldName: string, value: any): { prefix: string; color: string } | null => {
+    // First, try to get the field type from schema
+    const fieldType = getFieldType(fieldName);
+    
+    // Build type map from typeOptions with appropriate prefixes and colors
+    const getTypeInfo = (type: string): { prefix: string; color: string } | null => {
+      // Map type values to short prefixes
+      const prefixMap: Record<string, string> = {
+        'string': 'str',
+        'boolean': 'bool',
+        'number': 'num',
+        'bigint': 'big',
+        'null': 'null',
+        'object': 'obj',
+        'array': 'arr',
+        'id': 'id',
+        'bytes': 'bytes',
+        'unset': '?',
+      };
+      
+      // Handle Convex-specific numeric types
+      if (type === 'float64' || type === 'int64') {
+        return { prefix: type === 'float64' ? 'num' : 'int', color: 'var(--color-panel-accent)' };
+      }
+      
+      // Check if type exists in typeOptions
+      const typeOption = typeOptions.find(opt => opt.value === type);
+      if (typeOption) {
+        const prefix = prefixMap[type] || type.slice(0, 3);
+        // Color mapping based on type category
+        let color = 'var(--color-panel-text-muted)';
+        if (type === 'boolean' || type === 'number' || type === 'bigint') {
+          color = 'var(--color-panel-accent)';
+        } else if (type === 'string') {
+          color = 'var(--color-panel-error)';
+        }
+        return { prefix, color };
+      }
+      
+      return null;
+    };
+    
+    // If we have a field type, prioritize it (especially when value is empty)
+    const isEmptyValue = value === null || value === undefined || value === '';
+    
+    if (fieldType) {
+      const typeInfo = getTypeInfo(fieldType);
+      if (typeInfo) {
+        // If value is empty, always use field type
+        if (isEmptyValue) {
+          return typeInfo;
+        }
+        // If value is not empty, still prefer field type but allow value type to override if it's more specific
+        return typeInfo;
+      }
+    }
+    
+    // Fallback to value type detection only if no field type or value is not empty
+    if (isEmptyValue) {
+      if (fieldType) {
+        const typeInfo = getTypeInfo(fieldType);
+        if (typeInfo) return typeInfo;
+        return { prefix: fieldType.slice(0, 3) || '?', color: 'var(--color-panel-text-muted)' };
+      }
+      return null;
+    }
+    
+    const valueType = typeof value;
+    
+    if (valueType === 'boolean') {
+      return { prefix: 'bool', color: 'var(--color-panel-accent)' };
+    } else if (valueType === 'number') {
+      return { prefix: 'num', color: 'var(--color-panel-accent)' };
+    } else if (valueType === 'string') {
+      // Only show 'str' if we don't have a field type, or if field type is actually string
+      if (fieldType && fieldType !== 'string') {
+        // Field type exists and is not string, use field type instead
+        const typeInfo = getTypeInfo(fieldType);
+        if (typeInfo) return typeInfo;
+      }
+      return { prefix: 'str', color: 'var(--color-panel-error)' };
+    } else if (Array.isArray(value)) {
+      return { prefix: 'arr', color: 'var(--color-panel-text-muted)' };
+    } else if (valueType === 'object') {
+      return { prefix: 'obj', color: 'var(--color-panel-text-muted)' };
+    }
+    
+    return null;
   };
 
   const handleRemoveSort = () => {
@@ -355,36 +622,41 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
         padding: '0px 12px',
         borderBottom: '1px solid var(--color-panel-border)',
         backgroundColor: 'var(--color-panel-bg-secondary)',
-        height: '48px',
+        height: '40px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
           {/* Navigation History - Full Height */}
           <div style={{
             display: 'flex',
-            alignItems: 'stretch',
-            gap: '0px',
-            overflow: 'hidden',
-            height: '100%',
+            alignItems: 'center',
+            gap: '4px',
           }}>
             <button
               type="button"
               onClick={handleGoBack}
               disabled={!canGoBack}
               style={{
-                color: canGoBack ? 'var(--color-panel-text-muted)' : 'var(--color-panel-text-muted)',
-                opacity: canGoBack ? 1 : 0.5,
-                backgroundColor: 'transparent',
-                border: 'none',
-                cursor: canGoBack ? 'pointer' : 'not-allowed',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                width: '24px',
+                height: '24px',
+                padding: 0,
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: canGoBack ? 'pointer' : 'not-allowed',
+                color: 'var(--color-panel-text-muted)',
+                opacity: canGoBack ? 1 : 0.5,
+                flexShrink: 0,
                 transition: 'all 0.2s',
+                position: 'relative',
+                zIndex: 2,
               }}
               onMouseEnter={(e) => {
                 if (canGoBack) {
                   e.currentTarget.style.color = 'var(--color-panel-text)';
-                  e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
                 }
               }}
               onMouseLeave={(e) => {
@@ -401,21 +673,27 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
               onClick={handleGoForward}
               disabled={!canGoForward}
               style={{
-                padding: '0 8px',
-                color: canGoForward ? 'var(--color-panel-text-muted)' : 'var(--color-panel-text-muted)',
-                opacity: canGoForward ? 1 : 0.5,
-                backgroundColor: 'transparent',
-                border: 'none',
-                cursor: canGoForward ? 'pointer' : 'not-allowed',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                width: '24px',
+                height: '24px',
+                padding: 0,
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: canGoForward ? 'pointer' : 'not-allowed',
+                color: 'var(--color-panel-text-muted)',
+                opacity: canGoForward ? 1 : 0.5,
+                flexShrink: 0,
                 transition: 'all 0.2s',
+                position: 'relative',
+                zIndex: 2,
               }}
               onMouseEnter={(e) => {
                 if (canGoForward) {
                   e.currentTarget.style.color = 'var(--color-panel-text)';
-                  e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
                 }
               }}
               onMouseLeave={(e) => {
@@ -754,51 +1032,34 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
             Sort By
           </span>
           {draftSortConfig ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ flex: 1 }}>
-                  <SearchableDropdown
-                    selectedValue={draftSortConfig.field}
-                    options={sortOptions}
-                    onSelect={(field) => handleSetSort(field, draftSortConfig.direction)}
-                    placeholder="Select field to sort..."
-                    searchPlaceholder="Search fields..."
-                    emptyStateText="No fields found"
-                    listMaxHeight={300}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveSort();
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  style={{
-                    padding: '6px',
-                    color: 'var(--color-panel-text-muted)',
-                    backgroundColor: 'transparent',
-                    border: '1px solid var(--color-panel-border)',
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {/* Field Selector */}
+              <div style={{ flex: 1 }}>
+                <SearchableDropdown
+                  selectedValue={draftSortConfig.field}
+                  options={sortOptions}
+                  onSelect={(field) => handleSetSort(field, draftSortConfig.direction)}
+                  placeholder="Select field to sort..."
+                  searchPlaceholder="Search fields..."
+                  emptyStateText="No fields found"
+                  listMaxHeight={300}
+                  triggerStyle={{
+                    fontSize: '12px',
+                    fontFamily: 'monospace',
+                    color: 'var(--color-panel-text)',
+                    padding: '6px 12px',
+                    minWidth: '100px',
+                    height: '28px !important',
                     borderRadius: '6px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.2s',
+                    backgroundColor: 'var(--color-panel-bg-tertiary)',
+                    border: '1px solid var(--color-panel-border)',
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = 'var(--color-panel-error)';
-                    e.currentTarget.style.borderColor = 'var(--color-panel-error)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = 'var(--color-panel-text-muted)';
-                    e.currentTarget.style.borderColor = 'var(--color-panel-border)';
-                  }}
-                >
-                  <X size={14} />
-                </button>
+                />
               </div>
-              <div
+              
+              {/* Direction Toggle Button */}
+              <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleToggleSortDirection();
@@ -807,15 +1068,19 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '8px 12px',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
                   backgroundColor: 'var(--color-panel-bg-tertiary)',
                   border: '1px solid var(--color-panel-border)',
                   borderRadius: '6px',
                   fontSize: '12px',
+                  fontWeight: 500,
                   color: 'var(--color-panel-text)',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
+                  minWidth: '120px',
+                  height: '35px',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = 'var(--color-panel-text-muted)';
@@ -826,34 +1091,53 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
                   e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <ArrowDownUp size={14} style={{ color: 'var(--color-panel-text-secondary)' }} />
-                  <span style={{ textTransform: 'capitalize' }}>
-                    {draftSortConfig.direction === 'asc' ? 'Ascending' : 'Descending'}
-                  </span>
-                </div>
-                <X
-                  size={12}
-                  style={{
-                    color: 'var(--color-panel-text-muted)',
-                    opacity: 0,
-                    transition: 'opacity 0.2s',
-                    cursor: 'pointer',
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveSort();
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.opacity = '1';
-                    e.currentTarget.style.color = 'var(--color-panel-error)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.opacity = '0';
-                    e.currentTarget.style.color = 'var(--color-panel-text-muted)';
-                  }}
-                />
-              </div>
+                {draftSortConfig.direction === 'asc' ? (
+                  <ArrowUpAZ size={14} style={{ color: 'var(--color-panel-text-secondary)' }} />
+                ) : (
+                  <ArrowDownAZ size={14} style={{ color: 'var(--color-panel-text-secondary)' }} />
+                )}
+                <span style={{ textTransform: 'capitalize' }}>
+                  {draftSortConfig.direction === 'asc' ? 'Ascending' : 'Descending'}
+                </span>
+              </button>
+              
+              {/* Clear Button */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveSort();
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  padding: '6px',
+                  color: 'var(--color-panel-text-muted)',
+                  backgroundColor: 'transparent',
+                  border: '1px solid transparent',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s',
+                  height: '28px',
+                  width: '28px',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--color-panel-text)';
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+                  e.currentTarget.style.borderColor = 'var(--color-panel-border)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.borderColor = 'transparent';
+                }}
+                title="Clear Sort"
+              >
+                <X size={16} />
+              </button>
             </div>
           ) : (
             <SearchableDropdown
@@ -898,12 +1182,12 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
               key={index}
               style={{
                 display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                padding: '12px',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px',
                 backgroundColor: 'var(--color-panel-bg-tertiary)',
                 border: '1px solid var(--color-panel-border)',
-                borderRadius: '8px',
+                borderRadius: '6px',
                 transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => {
@@ -915,155 +1199,161 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
                 e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={filter.enabled}
-                    onChange={(e) => handleUpdateFilter(index, { enabled: e.target.checked })}
-                    style={{
-                      appearance: 'none',
-                      width: '16px',
-                      height: '16px',
-                      backgroundColor: filter.enabled ? 'var(--color-panel-error)' : 'var(--color-panel-bg-secondary)',
-                      border: filter.enabled ? '1px solid var(--color-panel-error)' : '1px solid var(--color-panel-border)',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      position: 'relative',
-                      margin: 0,
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!filter.enabled) {
-                        e.currentTarget.style.borderColor = 'var(--color-panel-error)';
-                        e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--color-panel-bg-secondary) 80%, var(--color-panel-error))';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!filter.enabled) {
-                        e.currentTarget.style.borderColor = 'var(--color-panel-border)';
-                        e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
-                      }
-                    }}
-                  />
-                  {filter.enabled && (
-                    <span
-                      style={{
-                        position: 'absolute',
-                        left: '3px',
-                        top: '1px',
-                        color: 'var(--color-panel-bg)',
-                        fontSize: '11px',
-                        pointerEvents: 'none',
-                        fontWeight: 'bold',
-                        lineHeight: '16px',
-                      }}
-                    >
-                      ✓
-                    </span>
-                  )}
-                </div>
-                <Dropdown
-                  value={filter.field}
-                  options={allFields.map(field => ({
-                    value: field,
-                    label: field,
-                  }))}
-                  onChange={(newField) => handleUpdateFilter(index, { field: newField })}
-                  placeholder="Select field..."
-                  triggerStyle={{
-                    fontSize: '12px',
-                    fontFamily: 'monospace',
-                    color: 'var(--color-panel-text)',
-                    padding: '6px 10px',
-                    minWidth: '140px',
-                    height: '28px',
-                    backgroundColor: 'var(--color-panel-bg-secondary)',
-                    border: '1px solid var(--color-panel-border)',
+              {/* Checkbox */}
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={filter.enabled}
+                  onChange={(e) => handleUpdateFilter(index, { enabled: e.target.checked })}
+                  style={{
+                    appearance: 'none',
+                    width: '14px',
+                    height: '14px',
+                    backgroundColor: filter.enabled ? 'var(--color-panel-error)' : 'var(--color-panel-bg-secondary)',
+                    border: filter.enabled ? '1px solid var(--color-panel-error)' : '1px solid var(--color-panel-border)',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    margin: 0,
+                    transition: 'all 0.2s',
                   }}
-                  dropdownStyle={{
-                    maxHeight: '250px',
+                  onMouseEnter={(e) => {
+                    if (!filter.enabled) {
+                      e.currentTarget.style.borderColor = 'var(--color-panel-error)';
+                      e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--color-panel-bg-secondary) 80%, var(--color-panel-error))';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!filter.enabled) {
+                      e.currentTarget.style.borderColor = 'var(--color-panel-border)';
+                      e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
+                    }
                   }}
                 />
+                {filter.enabled && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: '2px',
+                      top: '0px',
+                      color: 'var(--color-panel-bg)',
+                      fontSize: '10px',
+                      pointerEvents: 'none',
+                      fontWeight: 'bold',
+                      lineHeight: '14px',
+                    }}
+                  >
+                    ✓
+                  </span>
+                )}
               </div>
 
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                backgroundColor: 'var(--color-panel-bg-secondary)',
-                border: '1px solid var(--color-panel-border)',
-                borderRadius: '6px',
-                overflow: 'hidden',
-                height: '36px',
-                boxShadow: '0 1px 3px var(--color-panel-shadow)',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-panel-text-muted)';
-                e.currentTarget.style.boxShadow = '0 2px 6px var(--color-panel-shadow)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-panel-border)';
-                e.currentTarget.style.boxShadow = '0 1px 3px var(--color-panel-shadow)';
-              }}
-              >
-                {/* Operator */}
-                <Dropdown<FilterClause['op']>
-                  value={filter.op}
-                  options={operatorOptions.map(op => ({
-                    value: op.value as FilterClause['op'],
-                    label: op.label,
-                  }))}
-                  onChange={(newOp) => {
-                    handleUpdateFilter(index, { 
-                      op: newOp,
-                      value: (newOp === 'isType' || newOp === 'isNotType') && 
-                             (filter.op !== 'isType' && filter.op !== 'isNotType')
-                        ? '' 
-                        : filter.value
-                    });
-                  }}
-                  minWidth={120}
-                  maxHeight={250}
+              {/* Field Dropdown */}
+              <Dropdown
+                value={filter.field}
+                options={allFields.map(field => ({
+                  value: field,
+                  label: field,
+                }))}
+                onChange={(newField) => handleUpdateFilter(index, { field: newField })}
+                placeholder="Select field..."
+                triggerStyle={{
+                  fontSize: '11px',
+                  fontFamily: 'monospace',
+                  color: 'var(--color-panel-text)',
+                  padding: '4px 8px',
+                  minWidth: '100px',
+                  height: '28px',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--color-panel-bg-secondary)',
+                  border: '1px solid var(--color-panel-border)',
+                }}
+                dropdownStyle={{
+                  maxHeight: '250px',
+                }}
+              />
+
+              {/* Operator */}
+              <Dropdown<FilterClause['op']>
+                value={filter.op}
+                options={operatorOptions.map(op => ({
+                  value: op.value as FilterClause['op'],
+                  label: op.label,
+                }))}
+                onChange={(newOp) => {
+                  handleUpdateFilter(index, { 
+                    op: newOp,
+                    value: (newOp === 'isType' || newOp === 'isNotType') && 
+                           (filter.op !== 'isType' && filter.op !== 'isNotType')
+                      ? '' 
+                      : filter.value
+                  });
+                }}
+                minWidth={100}
+                maxHeight={250}
+                triggerStyle={{
+                  fontSize: '11px',
+                  minWidth: '80px',
+                  height: '28px',
+                  padding: '4px 8px',
+                }}
+              />
+
+              {/* Value Input */}
+              {(filter.op === 'isType' || filter.op === 'isNotType') ? (
+                <Dropdown
+                  value={filter.value || ''}
+                  options={[
+                    { value: '', label: 'Select type...' },
+                    ...typeOptions.map(type => ({
+                      value: type.value,
+                      label: type.label,
+                    })),
+                  ]}
+                  onChange={(newValue) => handleUpdateFilter(index, { value: newValue })}
+                  placeholder="Select type..."
                   triggerStyle={{
-                    minWidth: '40px',
+                    fontSize: '11px',
+                    height: '28px',
+                    padding: '4px 8px',
+                    flex: 1,
+                    minWidth: '120px',
+                  }}
+                  dropdownStyle={{
+                    maxHeight: '200px',
                   }}
                 />
-
-                {/* Value Input */}
-                {(filter.op === 'isType' || filter.op === 'isNotType') ? (
-                  <div style={{
-                    flex: 1,
-                    height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}>
-                    <Dropdown
-                      value={filter.value || ''}
-                      options={[
-                        { value: '', label: 'Select type...' },
-                        ...typeOptions.map(type => ({
-                          value: type.value,
-                          label: type.label,
-                        })),
-                      ]}
-                      onChange={(newValue) => handleUpdateFilter(index, { value: newValue })}
-                      placeholder="Select type..."
-                      triggerStyle={{
-                        border: 'none',
-                        borderRight: 'none',
-                        backgroundColor: 'var(--color-panel-bg-secondary)',
-                        fontSize: '11px',
-                        height: '100%',
-                        flex: 1,
-                      }}
-                      dropdownStyle={{
-                        maxHeight: '200px',
-                      }}
-                      minWidth={150}
-                    />
-                  </div>
-                ) : (
+              ) : (
+                <div style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  height: '28px',
+                  backgroundColor: 'var(--color-panel-bg-secondary)',
+                  border: '1px solid var(--color-panel-border)',
+                  borderRadius: '4px',
+                  padding: '0 6px',
+                  gap: '4px',
+                  minWidth: 0,
+                }}>
+                  {(() => {
+                    const typeIndicator = getTypeIndicator(filter.field, filter.value);
+                    return typeIndicator ? (
+                      <span style={{
+                        color: typeIndicator.color,
+                        fontSize: '9px',
+                        fontFamily: 'monospace',
+                        fontWeight: 600,
+                        padding: '2px 4px',
+                        borderRadius: '3px',
+                        backgroundColor: 'color-mix(in srgb, var(--color-panel-bg) 60%, transparent)',
+                        flexShrink: 0,
+                        lineHeight: '1',
+                      }}>
+                        {typeIndicator.prefix}
+                      </span>
+                    ) : null;
+                  })()}
                   <input
                     type="text"
                     value={typeof filter.value === 'string' ? filter.value : (filter.value !== undefined ? JSON.stringify(filter.value) : '')}
@@ -1081,53 +1371,57 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
                     placeholder="Enter value..."
                     style={{
                       flex: 1,
-                      backgroundColor: 'var(--color-panel-bg-secondary)',
-                      padding: '0 8px',
+                      backgroundColor: 'transparent',
                       fontSize: '11px',
                       color: 'var(--color-panel-text)',
                       border: 'none',
                       outline: 'none',
                       fontFamily: 'monospace',
                       height: '100%',
-                      transition: 'background-color 0.2s',
+                      minWidth: 0,
                     }}
                     onFocus={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--color-panel-bg)';
+                      e.currentTarget.parentElement!.style.borderColor = 'var(--color-panel-accent)';
+                      e.currentTarget.parentElement!.style.backgroundColor = 'var(--color-panel-bg)';
                     }}
                     onBlur={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
+                      e.currentTarget.parentElement!.style.borderColor = 'var(--color-panel-border)';
+                      e.currentTarget.parentElement!.style.backgroundColor = 'var(--color-panel-bg-secondary)';
                     }}
                   />
-                )}
+                </div>
+              )}
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveFilter(index);
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  style={{
-                    padding: '0 8px',
-                    color: 'var(--color-panel-text-muted)',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'color 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = 'var(--color-panel-error)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = 'var(--color-panel-text-muted)';
-                  }}
-                >
-                  <X size={12} />
-                </button>
-              </div>
+              {/* Remove Button */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveFilter(index);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  padding: '0 6px',
+                  color: 'var(--color-panel-text-muted)',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'color 0.2s',
+                  flexShrink: 0,
+                  height: '28px',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--color-panel-error)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                }}
+              >
+                <X size={12} />
+              </button>
             </div>
             );
           })}
@@ -1177,12 +1471,12 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
               key={index}
               style={{
                 display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                padding: '12px',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px',
                 backgroundColor: 'var(--color-panel-bg-tertiary)',
                 border: '1px solid var(--color-panel-border)',
-                borderRadius: '8px',
+                borderRadius: '6px',
                 transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => {
@@ -1194,200 +1488,204 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
                 e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={filter.enabled}
-                    onChange={(e) => handleUpdateFilter(index, { enabled: e.target.checked })}
-                    style={{
-                      appearance: 'none',
-                      width: '16px',
-                      height: '16px',
-                      backgroundColor: filter.enabled ? 'var(--color-panel-accent)' : 'var(--color-panel-bg-secondary)',
-                      border: filter.enabled ? '1px solid var(--color-panel-accent)' : '1px solid var(--color-panel-border)',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      position: 'relative',
-                      margin: 0,
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!filter.enabled) {
-                        e.currentTarget.style.borderColor = 'var(--color-panel-accent)';
-                        e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--color-panel-bg-secondary) 80%, var(--color-panel-accent))';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!filter.enabled) {
-                        e.currentTarget.style.borderColor = 'var(--color-panel-border)';
-                        e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
-                      }
-                    }}
-                  />
-                  {filter.enabled && (
-                    <span
-                      style={{
-                        position: 'absolute',
-                        left: '3px',
-                        top: '1px',
-                        color: 'var(--color-panel-bg)',
-                        fontSize: '11px',
-                        pointerEvents: 'none',
-                        fontWeight: 'bold',
-                        lineHeight: '16px',
-                      }}
-                    >
-                      ✓
-                    </span>
-                  )}
-                </div>
-                <Dropdown
-                  value={filter.field}
-                  options={allFields.map(field => ({
-                    value: field,
-                    label: field,
-                  }))}
-                  onChange={(newField) => handleUpdateFilter(index, { field: newField })}
-                  placeholder="Select field..."
-                  triggerStyle={{
-                    fontSize: '12px',
-                    fontFamily: 'monospace',
-                    color: 'var(--color-panel-text)',
-                    padding: '6px 10px',
-                    minWidth: '140px',
-                    height: '28px',
-                    backgroundColor: 'var(--color-panel-bg-secondary)',
-                    border: '1px solid var(--color-panel-border)',
-                  }}
-                  dropdownStyle={{
-                    maxHeight: '250px',
-                  }}
-                />
-              </div>
-
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                backgroundColor: 'var(--color-panel-bg-secondary)',
-                border: '1px solid var(--color-panel-border)',
-                borderRadius: '6px',
-                overflow: 'hidden',
-                height: '36px',
-                boxShadow: '0 1px 3px var(--color-panel-shadow)',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-panel-text-muted)';
-                e.currentTarget.style.boxShadow = '0 2px 6px var(--color-panel-shadow)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--color-panel-border)';
-                e.currentTarget.style.boxShadow = '0 1px 3px var(--color-panel-shadow)';
-              }}
-              >
-                {/* Operator */}
-                <Dropdown<FilterClause['op']>
-                  value={filter.op}
-                  options={operatorOptions.map(op => ({
-                    value: op.value as FilterClause['op'],
-                    label: op.label,
-                  }))}
-                  onChange={(newOp) => {
-                    handleUpdateFilter(index, { 
-                      op: newOp,
-                      value: (newOp === 'isType' || newOp === 'isNotType') && 
-                             (filter.op !== 'isType' && filter.op !== 'isNotType')
-                        ? '' 
-                        : filter.value
-                    });
-                  }}
-                  minWidth={120}
-                  maxHeight={250}
-                  triggerStyle={{
-                    minWidth: '40px',
-                  }}
-                />
-
-                {/* Value Input */}
-                <div style={{
-                  flex: 1,
-                  backgroundColor: 'var(--color-panel-bg-secondary)',
-                  padding: '0 8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  height: '100%',
-                  overflow: 'hidden',
-                }}>
-                  {(filter.op === 'eq' || filter.op === 'neq') && (
-                    <span style={{
-                      color: 'var(--color-panel-error)',
-                      fontSize: '10px',
-                      fontFamily: 'monospace',
-                      letterSpacing: '0.1em',
-                      opacity: 0.7,
-                      marginRight: '4px',
-                    }}>
-                      ""
-                    </span>
-                  )}
-                  <input
-                    type="text"
-                    value={typeof filter.value === 'string' ? filter.value : (filter.value !== undefined ? JSON.stringify(filter.value) : '')}
-                    onChange={(e) => {
-                      let parsedValue: any = e.target.value;
-                      if (e.target.value.trim() !== '') {
-                        try {
-                          parsedValue = JSON.parse(e.target.value);
-                        } catch {
-                          parsedValue = e.target.value;
-                        }
-                      }
-                      handleUpdateFilter(index, { value: parsedValue });
-                    }}
-                    placeholder="Enter value..."
-                    style={{
-                      flex: 1,
-                      backgroundColor: 'transparent',
-                      fontSize: '11px',
-                      color: 'var(--color-panel-text)',
-                      border: 'none',
-                      outline: 'none',
-                      fontFamily: 'monospace',
-                      height: '100%',
-                      marginLeft: (filter.op === 'eq' || filter.op === 'neq') ? '0' : '0',
-                    }}
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveFilter(index);
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
+              {/* Checkbox */}
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={filter.enabled}
+                  onChange={(e) => handleUpdateFilter(index, { enabled: e.target.checked })}
                   style={{
-                    padding: '0 8px',
-                    color: 'var(--color-panel-text-muted)',
-                    backgroundColor: 'transparent',
-                    border: 'none',
+                    appearance: 'none',
+                    width: '14px',
+                    height: '14px',
+                    backgroundColor: filter.enabled ? 'var(--color-panel-accent)' : 'var(--color-panel-bg-secondary)',
+                    border: filter.enabled ? '1px solid var(--color-panel-accent)' : '1px solid var(--color-panel-border)',
+                    borderRadius: '3px',
                     cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'color 0.2s',
+                    position: 'relative',
+                    margin: 0,
+                    transition: 'all 0.2s',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.color = 'var(--color-panel-error)';
+                    if (!filter.enabled) {
+                      e.currentTarget.style.borderColor = 'var(--color-panel-accent)';
+                      e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--color-panel-bg-secondary) 80%, var(--color-panel-accent))';
+                    }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                    if (!filter.enabled) {
+                      e.currentTarget.style.borderColor = 'var(--color-panel-border)';
+                      e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
+                    }
                   }}
-                >
-                  <X size={12} />
-                </button>
+                />
+                {filter.enabled && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: '2px',
+                      top: '0px',
+                      color: 'var(--color-panel-bg)',
+                      fontSize: '10px',
+                      pointerEvents: 'none',
+                      fontWeight: 'bold',
+                      lineHeight: '14px',
+                    }}
+                  >
+                    ✓
+                  </span>
+                )}
               </div>
+
+              {/* Field Dropdown */}
+              <Dropdown
+                value={filter.field}
+                options={allFields.map(field => ({
+                  value: field,
+                  label: field,
+                }))}
+                onChange={(newField) => handleUpdateFilter(index, { field: newField })}
+                placeholder="Select field..."
+                triggerStyle={{
+                  fontSize: '11px',
+                  fontFamily: 'monospace',
+                  color: 'var(--color-panel-text)',
+                  padding: '4px 8px',
+                  minWidth: '100px',
+                  height: '28px',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--color-panel-bg-secondary)',
+                  border: '1px solid var(--color-panel-border)',
+                }}
+                dropdownStyle={{
+                  maxHeight: '250px',
+                }}
+              />
+
+              {/* Operator */}
+              <Dropdown<FilterClause['op']>
+                value={filter.op}
+                options={operatorOptions.map(op => ({
+                  value: op.value as FilterClause['op'],
+                  label: op.label,
+                }))}
+                onChange={(newOp) => {
+                  handleUpdateFilter(index, { 
+                    op: newOp,
+                    value: (newOp === 'isType' || newOp === 'isNotType') && 
+                           (filter.op !== 'isType' && filter.op !== 'isNotType')
+                      ? '' 
+                      : filter.value
+                  });
+                }}
+                minWidth={100}
+                maxHeight={250}
+                triggerStyle={{
+                  fontSize: '11px',
+                  minWidth: '80px',
+                  height: '28px',
+                  padding: '4px 8px',
+                }}
+              />
+
+              {/* Value Input */}
+              <div style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                height: '28px',
+                backgroundColor: 'var(--color-panel-bg-secondary)',
+                border: '1px solid var(--color-panel-border)',
+                borderRadius: '4px',
+                padding: '0 6px',
+                gap: '4px',
+                minWidth: 0,
+              }}>
+                {(() => {
+                  const typeIndicator = getTypeIndicator(filter.field, filter.value);
+                  return typeIndicator ? (
+                    <span style={{
+                      color: typeIndicator.color,
+                      fontSize: '9px',
+                      fontFamily: 'monospace',
+                      fontWeight: 600,
+                      padding: '2px 4px',
+                      borderRadius: '3px',
+                      backgroundColor: 'color-mix(in srgb, var(--color-panel-bg) 60%, transparent)',
+                      flexShrink: 0,
+                      lineHeight: '1',
+                    }}>
+                      {typeIndicator.prefix}
+                    </span>
+                  ) : null;
+                })()}
+                <input
+                  type="text"
+                  value={typeof filter.value === 'string' ? filter.value : (filter.value !== undefined ? JSON.stringify(filter.value) : '')}
+                  onChange={(e) => {
+                    let parsedValue: any = e.target.value;
+                    if (e.target.value.trim() !== '') {
+                      try {
+                        parsedValue = JSON.parse(e.target.value);
+                      } catch {
+                        parsedValue = e.target.value;
+                      }
+                    }
+                    handleUpdateFilter(index, { value: parsedValue });
+                  }}
+                  placeholder="Enter value..."
+                  style={{
+                    flex: 1,
+                    backgroundColor: 'transparent',
+                    fontSize: '11px',
+                    color: 'var(--color-panel-text)',
+                    border: 'none',
+                    outline: 'none',
+                    fontFamily: 'monospace',
+                    height: '100%',
+                    minWidth: 0,
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.parentElement!.style.borderColor = 'var(--color-panel-accent)';
+                    e.currentTarget.parentElement!.style.backgroundColor = 'var(--color-panel-bg)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.parentElement!.style.borderColor = 'var(--color-panel-border)';
+                    e.currentTarget.parentElement!.style.backgroundColor = 'var(--color-panel-bg-secondary)';
+                  }}
+                />
+              </div>
+
+              {/* Remove Button */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveFilter(index);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  padding: '0 6px',
+                  color: 'var(--color-panel-text-muted)',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'color 0.2s',
+                  flexShrink: 0,
+                  height: '28px',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--color-panel-error)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                }}
+              >
+                <X size={12} />
+              </button>
             </div>
             );
           })}

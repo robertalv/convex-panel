@@ -26,9 +26,21 @@ export function SheetProvider({ children }: SheetProviderProps) {
   const [sheetContent, setSheetContent] = useState<SheetContent | null>(null);
 
   const openSheet = useCallback((content: SheetContent) => {
-    setSheetContent(content);
-    setIsOpen(true);
-  }, []);
+    // If a sheet is already open, close it first before opening the new one
+    if (isOpen) {
+      setIsOpen(false);
+      setSheetContent(null);
+      // Small delay to allow close animation to start, then open new sheet
+      setTimeout(() => {
+        setSheetContent(content);
+        setIsOpen(true);
+      }, 100);
+    } else {
+      // No sheet is open, just open the new one
+      setSheetContent(content);
+      setIsOpen(true);
+    }
+  }, [isOpen]);
 
   const closeSheet = useCallback(() => {
     setIsOpen(false);

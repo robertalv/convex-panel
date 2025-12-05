@@ -164,6 +164,7 @@ export const ROUTES = {
   GET_PERIODIC_BACKUP_CONFIG: '/api/dashboard/deployments/{deploymentId}/get_periodic_backup_config',
   DISABLE_PERIODIC_BACKUP: '/api/v1/deployments/{deploymentId}/disable_periodic_backup',
   DELETE_COMPONENT: '/api/v1/delete_component',
+  DELETE_TABLES: '/api/delete_tables',
   UPDATE_ENVIRONMENT_VARIABLES: '/api/update_environment_variables',
   QUERY: '/api/query',
   STORAGE: '/api/storage',

@@ -1,7 +1,8 @@
 import React from 'react';
 import { Loader2, ExternalLink, Copy } from 'lucide-react';
-import { createDocumentLink } from './table/data-table-utils';
+import { createDocumentLink, formatTimestamp } from './table/data-table-utils';
 import { useSheetSafe } from '../../../contexts/sheet-context';
+import { Tooltip } from '../../../components/shared/tooltip';
 
 export interface DocumentPreviewProps {
   documentId: string;
@@ -169,15 +170,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
   // Format creation date
   const creationDate = document._creationTime
-    ? new Date(document._creationTime).toLocaleString('en-US', {
-        month: '2-digit',
-        day: '2-digit',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true,
-      })
+    ? formatTimestamp(document._creationTime)
     : 'Unknown';
 
   // Create dashboard link
@@ -277,7 +270,18 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
           >
             {tableName}
           </span>
-          , created {creationDate}
+          , created{' '}
+          {document._creationTime ? (
+            <Tooltip
+              content={document._creationTime.toString()}
+              position="top"
+              maxWidth={300}
+            >
+              <span style={{ cursor: 'help' }}>{creationDate}</span>
+            </Tooltip>
+          ) : (
+            creationDate
+          )}
         </div>
       </div>
 

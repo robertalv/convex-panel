@@ -1,7 +1,31 @@
 import React from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
+import type { TableDefinition } from '../../../../types';
+import { useSheetSafe } from '../../../../contexts/sheet-context';
+import { SchemaSheet } from '../schema-sheet';
 
-export const TableFooter: React.FC = () => {
+export interface TableFooterProps {
+  tableName: string;
+  tableSchema?: TableDefinition[string];
+  documents?: any[];
+}
+
+export const TableFooter: React.FC<TableFooterProps> = ({ tableName, tableSchema, documents }) => {
+  const { openSheet } = useSheetSafe();
+
+  const handleOpenSchema = () => {
+    openSheet({
+      content: (
+        <SchemaSheet
+          tableName={tableName}
+          tableSchema={tableSchema}
+          documents={documents}
+        />
+      ),
+      width: '600px',
+    });
+  };
+
   return (
     <div
       style={{
@@ -15,6 +39,8 @@ export const TableFooter: React.FC = () => {
       }}
     >
       <button
+        type="button"
+        onClick={handleOpenSchema}
         style={{
           display: 'flex',
           alignItems: 'center',

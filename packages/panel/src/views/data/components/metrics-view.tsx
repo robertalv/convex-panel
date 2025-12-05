@@ -1,7 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { X } from 'lucide-react';
 import { fetchTableRate } from '../../../utils/api/metrics';
 import type { TimeseriesBucket } from '../../../utils/api/types';
-import { Card } from '../../../components/shared/card';
+import { useSheetSafe } from '../../../contexts/sheet-context';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
+import { format } from 'date-fns';
 
 export interface MetricsViewProps {
   tableName: string;
@@ -10,12 +21,69 @@ export interface MetricsViewProps {
   componentId?: string | null;
 }
 
+// Calculate time buckets based on time range (similar to Convex's calcBuckets)
+function calcBuckets(start: Date, end: Date): {
+  startTime: Date;
+  endTime: Date;
+  numBuckets: number;
+  timeMultiplier: number;
+  formatTime: (time: Date) => string;
+} {
+  let startMins = start.getTime() / 1000 / 60;
+  const endMins = end.getTime() / 1000 / 60;
+  const timeDiffMins = endMins - startMins;
+  const threeDays = 60 * 72;
+  const threeHours = 60 * 3;
+  const secondsInMinute = 60;
+  const secondsInHour = 60 * 60;
+  const secondsInDay = 60 * 60 * 24;
+
+  let numBuckets = 1;
+  let timeMultiplier = 60;
+
+  if (timeDiffMins <= threeHours) {
+    numBuckets = Math.max(Math.round(timeDiffMins), 1);
+    startMins = endMins - numBuckets;
+    timeMultiplier = secondsInMinute;
+  } else if (timeDiffMins <= threeDays) {
+    numBuckets = Math.round(timeDiffMins / 60);
+    startMins = endMins - numBuckets * 60;
+    timeMultiplier = secondsInHour;
+  } else {
+    numBuckets = Math.round(timeDiffMins / 60 / 24);
+    startMins = endMins - numBuckets * 60 * 24;
+    timeMultiplier = secondsInDay;
+  }
+
+  function formatTime(time: Date): string {
+    if (timeMultiplier === secondsInMinute) {
+      return format(time, 'h:mm a');
+    }
+    if (timeMultiplier === secondsInHour) {
+      return format(time, 'hh a');
+    }
+    return format(time, 'yyyy-MM-dd');
+  }
+
+  const startTime = new Date(startMins * 1000 * 60);
+  const endTime = new Date(endMins * 1000 * 60);
+
+  return {
+    startTime,
+    endTime,
+    numBuckets,
+    timeMultiplier,
+    formatTime,
+  };
+}
+
 export const MetricsView: React.FC<MetricsViewProps> = ({
   tableName,
   deploymentUrl,
   accessToken,
   componentId,
 }) => {
+  const { closeSheet } = useSheetSafe();
   const [readsData, setReadsData] = useState<TimeseriesBucket[]>([]);
   const [writesData, setWritesData] = useState<TimeseriesBucket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,18 +101,30 @@ export const MetricsView: React.FC<MetricsViewProps> = ({
       setError(null);
 
       try {
-        // Fetch metrics for the last hour with 30 buckets (2-minute intervals)
+        // Fetch metrics for the last hour
         const end = new Date();
         const start = new Date(end.getTime() - 60 * 60 * 1000); // 1 hour ago
-        const numBuckets = 30;
+        
+        // Calculate optimal buckets based on time range
+        const { startTime, endTime, numBuckets, timeMultiplier } = calcBuckets(start, end);
 
         const [reads, writes] = await Promise.all([
-          fetchTableRate(deploymentUrl, tableName, 'rowsRead', start, end, numBuckets, accessToken),
-          fetchTableRate(deploymentUrl, tableName, 'rowsWritten', start, end, numBuckets, accessToken),
+          fetchTableRate(deploymentUrl, tableName, 'rowsRead', startTime, endTime, numBuckets, accessToken),
+          fetchTableRate(deploymentUrl, tableName, 'rowsWritten', startTime, endTime, numBuckets, accessToken),
         ]);
 
-        setReadsData(reads);
-        setWritesData(writes);
+        // Apply time multiplier to convert to rate per time unit
+        const adjustedReads = reads.map(bucket => ({
+          ...bucket,
+          metric: bucket.metric !== null ? bucket.metric * timeMultiplier : null,
+        }));
+        const adjustedWrites = writes.map(bucket => ({
+          ...bucket,
+          metric: bucket.metric !== null ? bucket.metric * timeMultiplier : null,
+        }));
+
+        setReadsData(adjustedReads);
+        setWritesData(adjustedWrites);
         setLastUpdated(new Date());
       } catch (err: any) {
         console.error('Error fetching table metrics:', err);
@@ -175,38 +255,172 @@ export const MetricsView: React.FC<MetricsViewProps> = ({
   const readsTrend = getTrendPercent(readsData);
   const writesTrend = getTrendPercent(writesData);
 
+  // Format chart data for recharts
+  const chartData = useMemo(() => {
+    if (readsData.length === 0 && writesData.length === 0) {
+      return [];
+    }
+
+    // Get formatTime function from calcBuckets
+    const end = new Date();
+    const start = new Date(end.getTime() - 60 * 60 * 1000);
+    const { formatTime } = calcBuckets(start, end);
+
+    const maxLength = Math.max(readsData.length, writesData.length);
+    const data = [];
+
+    for (let i = 0; i < maxLength; i++) {
+      const readBucket = readsData[i];
+      const writeBucket = writesData[i];
+      const time = readBucket?.time || writeBucket?.time;
+
+      if (time) {
+        data.push({
+          time: formatTime(time),
+          reads: readBucket?.metric ?? 0,
+          writes: writeBucket?.metric ?? 0,
+        });
+      }
+    }
+
+    return data;
+  }, [readsData, writesData]);
+
   return (
     <div
       style={{
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        width: '100%',
         backgroundColor: 'var(--color-panel-bg-secondary)',
-        padding: '20px',
-        overflow: 'auto',
       }}
     >
-      <Card
-        title="Table metrics"
-        style={{ maxWidth: '100%', overflow: 'auto' }}
-        action={
-          <span style={{ fontSize: '11px', color: 'var(--color-panel-text-muted)' }}>
-            Table{' '}
-            <code style={{ fontFamily: 'monospace', fontSize: '11px' }}>{tableName}</code>
-          </span>
-        }
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0px 12px',
+          borderBottom: '1px solid var(--color-panel-border)',
+          backgroundColor: 'var(--color-panel-bg-secondary)',
+          height: '40px',
+          flexShrink: 0,
+        }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-          <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-panel-text-secondary)' }}>
-            Reads and writes over the last hour. Values are aggregated into fixed time buckets.
-          </p>
-          {lastUpdated && (
-            <span style={{ fontSize: '11px', color: 'var(--color-panel-text-muted)' }}>
-              Updated {formatTime(lastUpdated)} • Auto‑refreshing every 30s
-            </span>
-          )}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '14px',
+            fontWeight: 500,
+            color: 'var(--color-panel-text)',
+          }}
+        >
+          <span>Metrics</span>
+          <span
+            style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: 'var(--color-panel-text-muted)',
+            }}
+          >
+            for{' '}
+            <code
+              style={{
+                fontFamily: 'monospace',
+                fontSize: '12px',
+                padding: '2px 4px',
+                borderRadius: '3px',
+                backgroundColor: 'var(--color-panel-bg-tertiary)',
+                border: '1px solid var(--color-panel-border)',
+              }}
+            >
+              {tableName}
+            </code>
+          </span>
         </div>
+
+        {/* Close Button */}
+        {closeSheet && (
+          <button
+            type="button"
+            onClick={closeSheet}
+            style={{
+              padding: '6px',
+              color: 'var(--color-panel-text-secondary)',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '4px',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--color-panel-text)';
+              e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <X size={18} />
+          </button>
+        )}
+      </div>
+
+      {/* Content */}
+      <div
+        style={{
+          flex: 1,
+          overflow: 'auto',
+          padding: '20px',
+        }}
+      >
+        {isLoading && (
+          <div
+            style={{
+              padding: '12px',
+              fontSize: '12px',
+              color: 'var(--color-panel-text-muted)',
+            }}
+          >
+            Loading metrics…
+          </div>
+        )}
+
+        {error && !isLoading && (
+          <div
+            style={{
+              padding: '12px',
+              marginBottom: '12px',
+              fontSize: '12px',
+              color: 'var(--color-panel-error)',
+              backgroundColor: 'var(--color-panel-bg-tertiary)',
+              border: '1px solid var(--color-panel-border)',
+              borderRadius: '6px',
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {!isLoading && !error && (
+          <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+              <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-panel-text-secondary)' }}>
+                Reads and writes over the last hour. Values are aggregated into fixed time buckets.
+              </p>
+              {lastUpdated && (
+                <span style={{ fontSize: '11px', color: 'var(--color-panel-text-muted)' }}>
+                  Updated {formatTime(lastUpdated)} • Auto‑refreshing every 30s
+                </span>
+              )}
+            </div>
 
         <div
           style={{
@@ -247,32 +461,141 @@ export const MetricsView: React.FC<MetricsViewProps> = ({
           />
         </div>
 
+
+        {/* Charts */}
         <div
           style={{
             marginTop: '24px',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-            gap: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px',
           }}
         >
-          <MetricChartCard
-            title="Reads"
-            description="Rows read per interval"
-            data={readsData}
-            color="var(--color-panel-accent)"
-            loading={isLoading}
-            error={error}
-          />
-          <MetricChartCard
-            title="Writes"
-            description="Rows written per interval"
-            data={writesData}
-            color="var(--color-panel-warning)"
-            loading={isLoading}
-            error={error}
-          />
+          <div>
+            <h3
+              style={{
+                margin: '0 0 12px 0',
+                fontSize: '14px',
+                fontWeight: 600,
+                color: 'var(--color-panel-text)',
+              }}
+            >
+              Reads
+            </h3>
+            <div
+              style={{
+                backgroundColor: 'var(--color-panel-bg-tertiary)',
+                border: '1px solid var(--color-panel-border)',
+                borderRadius: '6px',
+                padding: '16px',
+                height: '200px',
+              }}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} syncId="table-metrics">
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="var(--color-panel-border)"
+                    opacity={0.3}
+                  />
+                  <XAxis
+                    dataKey="time"
+                    stroke="var(--color-panel-text-muted)"
+                    tick={{ fill: 'var(--color-panel-text-muted)', fontSize: 12 }}
+                    tickLine={{ stroke: 'var(--color-panel-text-muted)' }}
+                  />
+                  <YAxis
+                    stroke="var(--color-panel-text-muted)"
+                    tick={{ fill: 'var(--color-panel-text-muted)', fontSize: 12 }}
+                    tickLine={false}
+                    width={60}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'var(--color-panel-bg)',
+                      border: '1px solid var(--color-panel-border)',
+                      borderRadius: '6px',
+                      color: 'var(--color-panel-text)',
+                    }}
+                    labelStyle={{ color: 'var(--color-panel-text)' }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="reads"
+                    stroke="var(--color-panel-accent)"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div>
+            <h3
+              style={{
+                margin: '0 0 12px 0',
+                fontSize: '14px',
+                fontWeight: 600,
+                color: 'var(--color-panel-text)',
+              }}
+            >
+              Writes
+            </h3>
+            <div
+              style={{
+                backgroundColor: 'var(--color-panel-bg-tertiary)',
+                border: '1px solid var(--color-panel-border)',
+                borderRadius: '6px',
+                padding: '16px',
+                height: '200px',
+              }}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} syncId="table-metrics">
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="var(--color-panel-border)"
+                    opacity={0.3}
+                  />
+                  <XAxis
+                    dataKey="time"
+                    stroke="var(--color-panel-text-muted)"
+                    tick={{ fill: 'var(--color-panel-text-muted)', fontSize: 12 }}
+                    tickLine={{ stroke: 'var(--color-panel-text-muted)' }}
+                  />
+                  <YAxis
+                    stroke="var(--color-panel-text-muted)"
+                    tick={{ fill: 'var(--color-panel-text-muted)', fontSize: 12 }}
+                    tickLine={false}
+                    width={60}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'var(--color-panel-bg)',
+                      border: '1px solid var(--color-panel-border)',
+                      borderRadius: '6px',
+                      color: 'var(--color-panel-text)',
+                    }}
+                    labelStyle={{ color: 'var(--color-panel-text)' }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="writes"
+                    stroke="var(--color-panel-warning)"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
-      </Card>
+          </>
+        )}
+      </div>
     </div>
   );
 };
@@ -280,14 +603,13 @@ export const MetricsView: React.FC<MetricsViewProps> = ({
 const StatsCard = ({ label, value, color }: { label: string; value: string; color: string }) => (
   <div
     style={{
-      backgroundColor: 'var(--color-panel-bg)',
+      backgroundColor: 'var(--color-panel-bg-tertiary)',
       border: '1px solid var(--color-panel-border)',
-      borderRadius: 10,
+      borderRadius: '6px',
       padding: '12px 14px',
       display: 'flex',
       flexDirection: 'column',
       gap: 4,
-      boxShadow: '0 10px 25px rgba(0, 0, 0, 0.25)',
     }}
   >
     <span style={{ fontSize: 11, color: 'var(--color-panel-text-muted)' }}>{label}</span>
@@ -312,14 +634,13 @@ const MetricDetailCard = ({
 }) => (
   <div
     style={{
-      backgroundColor: 'var(--color-panel-bg)',
+      backgroundColor: 'var(--color-panel-bg-tertiary)',
       border: '1px solid var(--color-panel-border)',
-      borderRadius: 12,
+      borderRadius: '6px',
       padding: '16px',
       display: 'flex',
       flexDirection: 'column',
       gap: '10px',
-      boxShadow: '0 15px 30px rgba(0, 0, 0, 0.25)',
     }}
   >
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -370,180 +691,4 @@ const MetricDetailCard = ({
   </div>
 );
 
-interface MetricChartCardProps {
-  title: string;
-  description: string;
-  data: TimeseriesBucket[];
-  color: string;
-  loading: boolean;
-  error: string | null;
-}
-
-const formatAxisLabel = (date: Date | undefined) =>
-  date
-    ? date.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : '';
-
-const MetricChartCard: React.FC<MetricChartCardProps> = ({
-  title,
-  description,
-  data,
-  color,
-  loading,
-  error,
-}) => {
-  const sanitized = useMemo(() => data.filter((bucket) => typeof bucket.metric === 'number'), [data]);
-  const maxValue = useMemo(() => {
-    const values = sanitized.map((bucket) => bucket.metric || 0);
-    return values.length ? Math.max(...values, 1) : 1;
-  }, [sanitized]);
-
-  const chartWidth = 320;
-  const chartHeight = 140;
-  const padding = 8;
-
-  const chartPath = useMemo(() => {
-    if (sanitized.length === 0) return '';
-    return sanitized
-      .map((bucket, index) => {
-        const x =
-          sanitized.length === 1
-            ? chartWidth
-            : (index / (sanitized.length - 1)) * chartWidth;
-        const value = bucket.metric || 0;
-        const normalized = maxValue === 0 ? 0 : value / maxValue;
-        const y = chartHeight - normalized * (chartHeight - padding) + padding / 2;
-        return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
-      })
-      .join(' ');
-  }, [sanitized, maxValue]);
-
-  const gradientId = useMemo(
-    () => `table-metric-${title.toLowerCase().replace(/\s+/g, '-')}`,
-    [title]
-  );
-
-  const renderBody = () => {
-    if (loading) {
-      return (
-        <div style={{ fontSize: '12px', color: 'var(--color-panel-text-muted)' }}>
-          Loading chart…
-        </div>
-      );
-    }
-
-    if (error) {
-      return (
-        <div style={{ fontSize: '12px', color: 'var(--color-panel-error)' }}>
-          {error}
-        </div>
-      );
-    }
-
-    if (sanitized.length === 0 || !chartPath) {
-      return (
-        <div style={{ fontSize: '12px', color: 'var(--color-panel-text-muted)' }}>
-          No data available.
-        </div>
-      );
-    }
-
-    const areaPath = `${chartPath} L ${chartWidth},${chartHeight} L 0,${chartHeight} Z`;
-    const startLabel = formatAxisLabel(sanitized[0]?.time);
-    const endLabel = formatAxisLabel(sanitized[sanitized.length - 1]?.time);
-
-    return (
-      <>
-        <svg
-          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-          preserveAspectRatio="none"
-          style={{ width: '100%', height: 180 }}
-        >
-          <defs>
-            <linearGradient id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.25 }} />
-              <stop offset="100%" style={{ stopColor: color, stopOpacity: 0 }} />
-            </linearGradient>
-          </defs>
-          {[0.25, 0.5, 0.75].map((ratio) => (
-            <line
-              key={ratio}
-              x1="0"
-              y1={chartHeight * ratio}
-              x2={chartWidth}
-              y2={chartHeight * ratio}
-              stroke="var(--color-panel-border)"
-              strokeDasharray="4 4"
-              strokeWidth="1"
-              opacity="0.4"
-            />
-          ))}
-          <path d={areaPath} fill={`url(#${gradientId})`} stroke="none" />
-          <path
-            d={chartPath}
-            fill="none"
-            stroke={color}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            fontSize: '11px',
-            color: 'var(--color-panel-text-muted)',
-            marginTop: '4px',
-          }}
-        >
-          <span>{startLabel}</span>
-          <span>{endLabel}</span>
-        </div>
-      </>
-    );
-  };
-
-  return (
-    <div
-      style={{
-        backgroundColor: 'var(--color-panel-bg)',
-        border: '1px solid var(--color-panel-border)',
-        borderRadius: 12,
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px',
-        boxShadow: '0 20px 35px rgba(0, 0, 0, 0.25)',
-        overflow: 'auto'
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-panel-text)' }}>
-            {title}
-          </div>
-          <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-panel-text-muted)' }}>
-            {description}
-          </p>
-        </div>
-        <span
-          style={{
-            fontSize: '11px',
-            padding: '2px 8px',
-            borderRadius: '999px',
-            backgroundColor: 'var(--color-panel-bg-secondary)',
-            color: 'var(--color-panel-text-muted)',
-          }}
-        >
-          Last hour
-        </span>
-      </div>
-      {renderBody()}
-    </div>
-  );
-};
 

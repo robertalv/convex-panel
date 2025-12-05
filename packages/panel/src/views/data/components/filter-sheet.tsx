@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { DataFilterPanel } from './data-filter-panel';
 import type { FilterExpression, SortConfig, TableDefinition } from '../../../types';
 
@@ -14,6 +14,10 @@ export interface FilterSheetProps {
   visibleFields?: string[];
   onVisibleFieldsChange?: (fields: string[]) => void;
   openColumnVisibility?: boolean;
+  /** Optional admin client for filter history persistence */
+  adminClient?: any;
+  /** Optional user ID for scoping filter history */
+  userId?: string;
 }
 
 export const FilterSheet: React.FC<FilterSheetProps> = ({
@@ -28,7 +32,45 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
   visibleFields,
   onVisibleFieldsChange,
   openColumnVisibility,
+  adminClient,
+  userId = 'default',
 }) => {
+  // Create filter history API using adminClient
+  const filterHistoryApi = useMemo(() => {
+    if (!adminClient) return undefined;
+    
+    return {
+      push: async (scope: string, state: { filters: FilterExpression; sortConfig: SortConfig | null }) => {
+        await adminClient.mutation('filterHistory:push' as any, {
+          scope,
+          state,
+        });
+      },
+      undo: async (scope: string, count?: number) => {
+        return await adminClient.mutation('filterHistory:undo' as any, {
+          scope,
+          count,
+        });
+      },
+      redo: async (scope: string, count?: number) => {
+        return await adminClient.mutation('filterHistory:redo' as any, {
+          scope,
+          count,
+        });
+      },
+      getStatus: async (scope: string) => {
+        const result = await adminClient.query('filterHistory:getStatus' as any, {
+          scope,
+        });
+        return result || { canUndo: false, canRedo: false, position: null, length: 0 };
+      },
+      getCurrentState: async (scope: string) => {
+        return await adminClient.query('filterHistory:getCurrentState' as any, {
+          scope,
+        });
+      },
+    };
+  }, [adminClient]);
   // Prevent body scroll when sheet is open
   useEffect(() => {
     if (isOpen) {
@@ -111,6 +153,8 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
             onVisibleFieldsChange={onVisibleFieldsChange}
             onClose={onClose}
             openColumnVisibility={openColumnVisibility}
+            filterHistoryApi={filterHistoryApi}
+            userId={userId}
           />
         </div>
       </div>

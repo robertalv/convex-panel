@@ -5,7 +5,7 @@ import schema from "./component/schema.js";
 const modules = import.meta.glob("./component/**/*.ts");
 
 /**
- * Register the component with the test convex instance.
+ * Register the filter history component with the test convex instance.
  * @param t - The test convex instance, e.g. from calling `convexTest`.
  * @param name - The name of the component, as registered in convex.config.ts.
  */

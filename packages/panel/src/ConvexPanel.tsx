@@ -15,7 +15,6 @@ import { useActiveTab } from './hooks/useActiveTab';
 import { ThemeProvider } from './hooks/useTheme';
 import type { Theme } from './hooks/useTheme';
 import { SheetProvider } from './contexts/sheet-context';
-import { ConfirmDialogProvider } from './contexts/confirm-dialog-context';
 import { PortalProvider } from './contexts/portal-context';
 import { getStorageItem, setStorageItem } from './utils/storage';
 import { STORAGE_KEYS } from './utils/constants';
@@ -348,7 +347,6 @@ const ConvexPanel = ({
     <PortalProvider value={portalContainer ?? null}>
     <ThemeProvider defaultTheme={defaultTheme}>
       <SheetProvider>
-        <ConfirmDialogProvider>
           <ToastProvider position="bottom-right">
           <BottomSheet
           isOpen={isOpen}
@@ -423,7 +421,6 @@ const ConvexPanel = ({
               warnings={validationError.warnings}
             />
           )}
-        </ConfirmDialogProvider>
       </SheetProvider>
     </ThemeProvider>
     </PortalProvider>

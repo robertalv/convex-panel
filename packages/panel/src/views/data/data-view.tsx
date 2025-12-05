@@ -7,12 +7,16 @@ import { AddDocumentSheet } from './components/add-document-sheet';
 import { SchemaView } from './components/schema-view';
 import { IndexesView } from './components/indexes-view';
 import { MetricsView } from './components/metrics-view';
+import { ConfirmDialog } from '../../components/shared/confirm-dialog';
+import { ClearTableConfirmation } from './components/clear-table-confirmation';
 import type { CustomQuery } from '../../types/functions';
 import { useTableData } from '../../hooks/useTableData';
 import { useComponents } from '../../hooks/useComponents';
 import { saveTableFilters } from '../../utils/storage';
 import { useSheetSafe } from '../../contexts/sheet-context';
 import { useShowGlobalRunner } from '../../lib/functionRunner';
+import { deleteTable } from '../../utils/api/documents';
+import { getAdminClientInfo } from '../../utils/adminClient';
 
 export interface DataViewProps {
   convexUrl?: string;
@@ -39,6 +43,8 @@ export const DataView: React.FC<DataViewProps> = ({
   const [visibleFields, setVisibleFields] = useState<string[]>([]);
   const [isColumnVisibilityOpen, setIsColumnVisibilityOpen] = useState(false);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+  const [isDeleteTableDialogOpen, setIsDeleteTableDialogOpen] = useState(false);
+  const [isClearTableDialogOpen, setIsClearTableDialogOpen] = useState(false);
   const { openSheet } = useSheetSafe();
   const showGlobalRunner = useShowGlobalRunner();
 
@@ -63,10 +69,23 @@ export const DataView: React.FC<DataViewProps> = ({
 
   const tableSchema = tableData.tables[tableData.selectedTable];
   const availableFields = tableSchema?.fields?.map(field => field.fieldName) || [];
+  
+  const documentFields = useMemo(() => {
+    const fieldsSet = new Set<string>();
+    tableData.documents.forEach(doc => {
+      Object.keys(doc).forEach(key => {
+        if (key !== '_id' && key !== '_creationTime') {
+          fieldsSet.add(key);
+        }
+      });
+    });
+    return Array.from(fieldsSet);
+  }, [tableData.documents]);
+  
   const allFields = useMemo(() => {
-    const combined = ['_id', ...availableFields, '_creationTime'];
+    const combined = ['_id', ...availableFields, ...documentFields, '_creationTime'];
     return combined.filter((col, index, self) => self.indexOf(col) === index);
-  }, [availableFields]);
+  }, [availableFields, documentFields]);
 
   const hiddenFieldsCount = useMemo(() => {
     if (allFields.length === 0) return 0;
@@ -96,14 +115,28 @@ export const DataView: React.FC<DataViewProps> = ({
         lastFieldsStringRef.current = fieldsString;
         setSelectedDocumentIds([]);
       } else if (fieldsChanged) {
-        const missingFields = allFields.filter(field => !visibleFields.includes(field));
-        if (missingFields.length > 0) {
-          setVisibleFields([...new Set([...visibleFields, ...missingFields])]);
+        // If we only had system fields before and now have more, show all fields
+        const hadOnlySystemFields = visibleFields.length <= 2 && 
+          visibleFields.every(f => f === '_id' || f === '_creationTime');
+        const nowHasMoreFields = allFields.length > 2;
+        
+        if (hadOnlySystemFields && nowHasMoreFields) {
+          setVisibleFields([...allFields]);
+        } else {
+          // Otherwise, just add missing fields
+          const missingFields = allFields.filter(field => !visibleFields.includes(field));
+          if (missingFields.length > 0) {
+            setVisibleFields([...new Set([...visibleFields, ...missingFields])]);
+          }
         }
         lastFieldsStringRef.current = fieldsString;
       }
+    } else if (currentTable && allFields.length === 2 && allFields.includes('_id') && allFields.includes('_creationTime')) {
+      if (visibleFields.length === 0 || !visibleFields.includes('_id') || !visibleFields.includes('_creationTime')) {
+        setVisibleFields(['_id', '_creationTime']);
+      }
     }
-  }, [tableData.selectedTable, allFields]);
+  }, [tableData.selectedTable, allFields, visibleFields]);
 
   useEffect(() => {
     setSelectedDocumentIds((prev) =>
@@ -128,6 +161,31 @@ export const DataView: React.FC<DataViewProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedComponent]);
 
+  useEffect(() => {
+    const handleFunctionCompleted = (event: CustomEvent) => {
+      const { success, udfType, componentId } = event.detail;
+      
+      if (success && (udfType === 'mutation' || udfType === 'action')) {
+        const eventComponentId = componentId === 'app' ? null : componentId;
+        const currentComponentId = selectedComponentId === 'app' ? null : selectedComponentId;
+        
+        if (eventComponentId === currentComponentId || (eventComponentId === null && currentComponentId === null)) {
+          setTimeout(() => {
+            if (tableData.selectedTable) {
+              tableData.fetchTableData(tableData.selectedTable, null);
+            }
+          }, 100);
+        }
+      }
+    };
+
+    window.addEventListener('convex-panel-function-completed', handleFunctionCompleted as EventListener);
+
+    return () => {
+      window.removeEventListener('convex-panel-function-completed', handleFunctionCompleted as EventListener);
+    };
+  }, [tableData, selectedComponentId]);
+
   return (
     <>
       <div className="cp-data-container">
@@ -139,6 +197,14 @@ export const DataView: React.FC<DataViewProps> = ({
           selectedComponent={selectedComponent}
           onComponentSelect={setSelectedComponent}
           availableComponents={componentNames}
+          convexUrl={convexUrl}
+          accessToken={accessToken}
+          adminClient={adminClient}
+          componentId={selectedComponentId}
+          onTableCreated={() => {
+            // Refresh tables after creation
+            tableData.fetchTables();
+          }}
         />
 
         <div className="cp-data-main">
@@ -223,6 +289,12 @@ export const DataView: React.FC<DataViewProps> = ({
                 width: '90vw',
               });
             }}
+            onClearTable={() => {
+              setIsClearTableDialogOpen(true);
+            }}
+            onDeleteTable={() => {
+              setIsDeleteTableDialogOpen(true);
+            }}
           />
           
           <DataTable
@@ -297,6 +369,7 @@ export const DataView: React.FC<DataViewProps> = ({
         visibleFields={visibleFields}
         onVisibleFieldsChange={setVisibleFields}
         openColumnVisibility={isColumnVisibilityOpen}
+        adminClient={adminClient}
       />
 
       <AddDocumentSheet
@@ -312,6 +385,72 @@ export const DataView: React.FC<DataViewProps> = ({
             tableData.fetchTableData(tableData.selectedTable, null);
           }
         }}
+      />
+
+      <ClearTableConfirmation
+        isOpen={isClearTableDialogOpen}
+        onClose={() => setIsClearTableDialogOpen(false)}
+        onConfirm={async () => {
+          // Refresh table data after clearing
+          if (tableData.selectedTable) {
+            await tableData.fetchTableData(tableData.selectedTable, null);
+          }
+          setSelectedDocumentIds([]);
+        }}
+        tableName={tableData.selectedTable}
+        numRows={tableData.documentCount}
+        adminClient={adminClient}
+        componentId={selectedComponentId}
+        onError={onError}
+      />
+
+      <ConfirmDialog
+        isOpen={isDeleteTableDialogOpen}
+        onClose={() => setIsDeleteTableDialogOpen(false)}
+        onConfirm={async () => {
+          if (!tableData.selectedTable || !adminClient || !convexUrl) {
+            return;
+          }
+
+          try {
+            const clientInfo = getAdminClientInfo(adminClient, convexUrl);
+            const finalAdminKey = accessToken || clientInfo.adminKey;
+
+            if (!clientInfo.deploymentUrl || !finalAdminKey) {
+              onError?.('Missing deployment URL or admin key');
+              return;
+            }
+
+            const result = await deleteTable(
+              clientInfo.deploymentUrl,
+              finalAdminKey,
+              [tableData.selectedTable],
+              selectedComponentId
+            );
+
+            if (!result.success) {
+              onError?.(result.error || 'Failed to delete table');
+              return;
+            }
+
+            // Refresh tables list and select first available table
+            await tableData.fetchTables();
+            const tableNames = Object.keys(tableData.tables);
+            if (tableNames.length > 0) {
+              tableData.setSelectedTable(tableNames[0]);
+            } else {
+              tableData.setSelectedTable('');
+            }
+          } catch (error: any) {
+            console.error('Error deleting table:', error);
+            onError?.(error?.message || 'Failed to delete table');
+          }
+        }}
+        title="Delete table"
+        message={`Are you sure you want to permanently delete the table ${tableData.selectedTable}?`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
       />
     </>
   );

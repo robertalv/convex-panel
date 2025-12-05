@@ -9,6 +9,66 @@ import { editorOptions } from './editor-options';
 
 const emptyObject = '{\n\n}';
 
+const formatAsJsObject = (val: any, indent: number = 2, currentIndent: number = 0): string => {
+  if (val === null) return 'null';
+  if (val === undefined) return 'undefined';
+  
+  if (Array.isArray(val)) {
+    if (val.length === 0) return '[]';
+    const nextIndent = currentIndent + indent;
+    const items = val.map(item => {
+      const formatted = formatAsJsObject(item, indent, nextIndent);
+      const lines = formatted.split('\n');
+      return lines.map(line => ' '.repeat(nextIndent) + line).join('\n');
+    });
+    return '[\n' + items.join(',\n') + '\n' + ' '.repeat(currentIndent) + ']';
+  }
+  
+  if (typeof val === 'object') {
+    const keys = Object.keys(val);
+    if (keys.length === 0) return '{\n\n}';
+    
+    const nextIndent = currentIndent + indent;
+    const entries = keys.map(key => {
+      const value = formatAsJsObject(val[key], indent, nextIndent);
+      const keyStr = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? key : JSON.stringify(key);
+      const valueLines = value.split('\n');
+      
+      if (valueLines.length === 1) {
+        return ' '.repeat(nextIndent) + `${keyStr}: ${value}`;
+      }
+      const firstLine = ' '.repeat(nextIndent) + `${keyStr}: ${valueLines[0]}`;
+      const restLines = valueLines.slice(1).map(line => ' '.repeat(nextIndent) + line);
+      return [firstLine, ...restLines].join('\n');
+    });
+    
+    return '{\n' + entries.join(',\n') + '\n' + ' '.repeat(currentIndent) + '}';
+  }
+  
+  if (typeof val === 'string') return JSON.stringify(val);
+  if (typeof val === 'boolean') return String(val);
+  if (typeof val === 'number') return String(val);
+  return JSON.stringify(val);
+};
+
+const parseJsObject = (code: string): any => {
+  const trimmed = code.trim();
+  if (!trimmed) return undefined;
+  
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    try {
+      const wrapped = trimmed.startsWith('[') || trimmed.startsWith('{') 
+        ? `(${trimmed})` 
+        : trimmed;
+      return new Function('return ' + wrapped)();
+    } catch (e: any) {
+      throw new Error(`Invalid syntax: ${e.message}`);
+    }
+  }
+};
+
 export type ObjectEditorProps = {
   defaultValue?: Value;
   onChange(v?: Value): void;
@@ -31,6 +91,13 @@ export type ObjectEditorProps = {
   fixedOverflowWidgets?: boolean;
   language?: string;
   indentTopLevel?: boolean;
+  validationMarkers?: Array<{
+    row: number;
+    column: number;
+    endRow: number;
+    endColumn: number;
+    message: string;
+  }>;
 };
 
 export function ObjectEditor(props: ObjectEditorProps) {
@@ -55,6 +122,7 @@ export function ObjectEditor(props: ObjectEditorProps) {
     disabled = false,
     language = 'javascript',
     indentTopLevel = false,
+    validationMarkers = [],
   } = props;
 
   const { theme } = useThemeSafe();
@@ -74,7 +142,7 @@ export function ObjectEditor(props: ObjectEditorProps) {
     if (JSON.stringify(val) === '[{}]') {
       return `[${emptyObject}]`;
     }
-    return JSON.stringify(val, null, indentTopLevel ? 2 : 0);
+    return formatAsJsObject(val, indentTopLevel ? 2 : 0);
   }, [indentTopLevel]);
 
   const [defaultValueString, setDefaultValueString] = useState(() => formatDefaultValue(defaultValue));
@@ -117,11 +185,11 @@ export function ObjectEditor(props: ObjectEditorProps) {
       }
 
       try {
-        const parsed = JSON.parse(code);
+        const parsed = parseJsObject(code);
         onChange(parsed);
         onError?.([]);
       } catch (e: any) {
-        const errorMessage = e instanceof Error ? e.message : 'Invalid JSON';
+        const errorMessage = e instanceof Error ? e.message : 'Invalid syntax';
         onError?.([errorMessage]);
       }
     },
@@ -234,6 +302,21 @@ export function ObjectEditor(props: ObjectEditorProps) {
         path={path.replace(':', '_')}
         onChange={handleChange}
         onMount={handleMount}
+        markers={validationMarkers.map(m => ({
+          startRow: m.row,
+          startCol: m.column,
+          endRow: m.endRow,
+          endCol: m.endColumn,
+          className: 'ace_error',
+          type: 'text',
+          message: m.message,
+        })) as any}
+        annotations={validationMarkers.map(m => ({
+          row: m.row,
+          column: m.column,
+          text: m.message,
+          type: 'error',
+        })) as any}
         options={{
           ...editorOptions,
           lineNumbers: showLineNumbers ? 'on' : 'off',

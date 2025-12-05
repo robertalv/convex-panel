@@ -60,6 +60,23 @@ export const Sheet: React.FC<SheetProps> = ({
 
   const sheetContent = (
     <>
+      {/* Backdrop - only show when not in container */}
+      {!isInContainer && (
+        <div
+          onClick={onClose}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: fullscreen ? 99998 : 9999,
+            animation: 'fadeIn 0.2s ease-out',
+          }}
+        />
+      )}
+
       {/* Sheet */}
       <div
         style={{

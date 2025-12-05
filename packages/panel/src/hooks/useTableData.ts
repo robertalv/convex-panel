@@ -9,7 +9,7 @@ import type {
   UseTableDataReturn,
   SortConfig
 } from '../types';
-import { saveActiveTable, getTableFilters } from '../utils/storage';
+import { saveActiveTable, getTableFilters, saveTableFilters } from '../utils/storage';
 import { fetchTablesFromApi } from '../utils/api/tables';
 import { patchDocumentFields } from '../utils/api/documents';
 import { mockFetchTablesFromApi } from '../utils/mockData';
@@ -585,8 +585,46 @@ export const useTableData = ({
   }, [filters]);
 
   /**
+   * Persist filters whenever they change
+   * Priority:
+   * 1. If adminClient is available, push to filterHistory (backend)
+   * 2. Otherwise, save to localStorage (fallback)
+   * Only save after filters have been loaded for the current table to avoid
+   * overwriting saved filters during initial load
+   */
+  useEffect(() => {
+    if (selectedTable && filtersLoadedRef.current[selectedTable]) {
+      // Priority 1: Save to filterHistory if adminClient is available
+      if (adminClient && !useMockData) {
+        // Push to filterHistory backend to persist current state
+        // Scope format: user:userId:table:tableName (using 'default' as userId for now)
+        const scope = `user:default:table:${selectedTable}`;
+        
+        adminClient.mutation('filterHistory:push' as any, {
+          scope,
+          state: {
+            filters,
+            sortConfig,
+          },
+        }).catch((error: any) => {
+          // If filterHistory fails, fall back to localStorage
+          console.warn('Failed to save to filterHistory, falling back to localStorage:', error);
+          saveTableFilters(selectedTable, filters);
+        });
+      } else {
+        // Priority 2: Save to localStorage (fallback when adminClient not available)
+        saveTableFilters(selectedTable, filters);
+      }
+    }
+  }, [filters, sortConfig, selectedTable, adminClient, useMockData]);
+
+  /**
    * Handle table selection: reset state and load saved filters
    * This effect runs when the table changes and prepares for a fresh fetch
+   * 
+   * Priority:
+   * 1. If adminClient is available, load from filterHistory (backend)
+   * 2. Otherwise, fall back to localStorage
    */
   useEffect(() => {
     if (selectedTable) {
@@ -601,22 +639,55 @@ export const useTableData = ({
         
         // Load filters from storage if we haven't already loaded them for this table
         if (!filtersLoadedRef.current[selectedTable]) {
-          const savedFilters = getTableFilters(selectedTable);
-          
-          // Only update filters if they're different from current filters
-          const currentFiltersJson = JSON.stringify(filtersRef.current);
-          const savedFiltersJson = JSON.stringify(savedFilters);
-          
-          if (currentFiltersJson !== savedFiltersJson) {
-            // Use functional update to avoid dependency on setFilters
-            setFilters(() => savedFilters);
+          // Priority 1: Load from filterHistory if adminClient is available
+          if (adminClient && !useMockData) {
+            // Load from filterHistory backend
+            // Scope format: user:userId:table:tableName (using 'default' as userId for now)
+            const scope = `user:default:table:${selectedTable}`;
+            
+            adminClient.query('filterHistory:getCurrentState' as any, { scope })
+              .then((state: { filters: FilterExpression; sortConfig: SortConfig | null } | null) => {
+                if (state) {
+                  setFilters(state.filters);
+                  if (state.sortConfig) {
+                    setSortConfig(state.sortConfig);
+                  } else {
+                    setSortConfig(null);
+                  }
+                }
+                filtersLoadedRef.current[selectedTable] = true;
+              })
+              .catch((error: any) => {
+                // If filterHistory fails, fall back to localStorage
+                console.warn('Failed to load from filterHistory, falling back to localStorage:', error);
+                const savedFilters = getTableFilters(selectedTable);
+                const currentFiltersJson = JSON.stringify(filtersRef.current);
+                const savedFiltersJson = JSON.stringify(savedFilters);
+                
+                if (currentFiltersJson !== savedFiltersJson) {
+                  setFilters(() => savedFilters);
+                }
+                filtersLoadedRef.current[selectedTable] = true;
+              });
+          } else {
+            // Priority 2: Load from localStorage (fallback when adminClient not available)
+            const savedFilters = getTableFilters(selectedTable);
+            
+            // Only update filters if they're different from current filters
+            const currentFiltersJson = JSON.stringify(filtersRef.current);
+            const savedFiltersJson = JSON.stringify(savedFilters);
+            
+            if (currentFiltersJson !== savedFiltersJson) {
+              // Use functional update to avoid dependency on setFilters
+              setFilters(() => savedFilters);
+            }
+            
+            filtersLoadedRef.current[selectedTable] = true;
           }
-          
-          filtersLoadedRef.current[selectedTable] = true;
         }
       }
     }
-  }, [selectedTable]);
+  }, [selectedTable, adminClient, useMockData]);
   
   /**
    * Fetch data when selected table changes
@@ -946,23 +1017,26 @@ export const useTableData = ({
    * Periodically refetch the current table so external writes
    * (for example, from an app using Convex directly) are reflected
    * in the panel without manual reload.
+   * 
+   * DISABLED: Polling disabled to prevent excessive queries and blinking.
+   * Data will only refresh when explicitly requested (filters, sort, manual refresh).
    */
-  useEffect(() => {
-    if (!selectedTable || useMockData || !adminClient) return;
+  // useEffect(() => {
+  //   if (!selectedTable || useMockData || !adminClient) return;
 
-    // Short interval to feel "instant" when other apps write data,
-    // while still avoiding an excessive load on the admin endpoint.
-    const REFRESH_INTERVAL_MS = 500;
+  //   // Short interval to feel "instant" when other apps write data,
+  //   // while still avoiding an excessive load on the admin endpoint.
+  //   const REFRESH_INTERVAL_MS = 500;
 
-    const intervalId = window.setInterval(() => {
-      // Use the first page (cursor null) so we always see the latest data.
-      fetchTableData(selectedTable, null);
-    }, REFRESH_INTERVAL_MS);
+  //   const intervalId = window.setInterval(() => {
+  //     // Use the first page (cursor null) so we always see the latest data.
+  //     fetchTableData(selectedTable, null);
+  //   }, REFRESH_INTERVAL_MS);
 
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [selectedTable, fetchTableData, useMockData, adminClient]);
+  //   return () => {
+  //     window.clearInterval(intervalId);
+  //   };
+  // }, [selectedTable, fetchTableData, useMockData, adminClient]);
 
   return {
     tables,

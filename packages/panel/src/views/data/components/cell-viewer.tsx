@@ -1,7 +1,6 @@
 import React from 'react';
-import { Copy } from 'lucide-react';
-import { formatValue, getValueColor } from './table/data-table-utils';
-import { copyToClipboard } from '../../../utils/toast';
+import { formatValue, formatTimestamp, getValueColor } from './table/data-table-utils';
+import { Tooltip } from '../../../components/shared/tooltip';
 
 export interface CellViewerProps {
   column: string;
@@ -12,87 +11,24 @@ export interface CellViewerProps {
 export const CellViewer: React.FC<CellViewerProps> = ({
   column,
   value,
-  rowId,
 }) => {
   const isUnset = value === null || value === undefined;
-  const formattedValue = formatValue(value);
+  const isCreationTime = column === '_creationTime' && typeof value === 'number';
+  const formattedValue = isCreationTime ? formatTimestamp(value) : formatValue(value);
   const valueColor = getValueColor(value);
 
-  // Determine if the value is a JSON object/array
   const isJsonValue = typeof value === 'object' && value !== null && !(value instanceof Date);
   const jsonString = isJsonValue ? JSON.stringify(value, null, 2) : null;
-
-  const handleCopy = () => {
-    const textToCopy = isJsonValue ? jsonString : formattedValue;
-    copyToClipboard(textToCopy || '');
-  };
 
   return (
     <div
       style={{
-        padding: '20px',
-        minHeight: '100%',
+        padding: '8px',
+        maxHeight: '100%',
         display: 'flex',
         flexDirection: 'column',
       }}
     >
-      {/* Header */}
-      <div
-        style={{
-          marginBottom: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontSize: '13px',
-              color: 'var(--color-panel-text-muted)',
-              marginBottom: '4px',
-            }}
-          >
-            Column
-          </div>
-          <div
-            style={{
-              fontSize: '14px',
-              color: 'var(--color-panel-text)',
-              fontFamily: 'monospace',
-              fontWeight: 500,
-            }}
-          >
-            {column}
-          </div>
-        </div>
-        <button
-          onClick={handleCopy}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            background: 'none',
-            border: 'none',
-            color: 'var(--color-panel-accent)',
-            cursor: 'pointer',
-            fontSize: '12px',
-            padding: '6px 12px',
-            borderRadius: '6px',
-            transition: 'background 0.15s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-          }}
-        >
-          <Copy size={14} />
-          <span>Copy</span>
-        </button>
-      </div>
-
       {/* Value Content */}
       <div
         style={{
@@ -130,23 +66,45 @@ export const CellViewer: React.FC<CellViewerProps> = ({
             {jsonString}
           </pre>
         ) : (
-          <div
-            style={{
-              color: valueColor,
-              fontSize: '14px',
-              fontFamily: typeof value === 'string' && value.length > 100 ? 'monospace' : 'inherit',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              lineHeight: '1.6',
-            }}
-          >
-            {formattedValue}
-          </div>
+          isCreationTime ? (
+            <Tooltip
+              content={value.toString()}
+              position="top"
+              maxWidth={300}
+            >
+              <div
+                style={{
+                  color: valueColor,
+                  fontSize: '14px',
+                  fontFamily: 'inherit',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  lineHeight: '1.6',
+                  cursor: 'help',
+                }}
+              >
+                {formattedValue}
+              </div>
+            </Tooltip>
+          ) : (
+            <div
+              style={{
+                color: valueColor,
+                fontSize: '14px',
+                fontFamily: typeof value === 'string' && value.length > 100 ? 'monospace' : 'inherit',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                lineHeight: '1.6',
+              }}
+            >
+              {formattedValue}
+            </div>
+          )
         )}
       </div>
 
       {/* Metadata */}
-      <div
+      {/* <div
         style={{
           marginTop: '16px',
           paddingTop: '16px',
@@ -171,7 +129,7 @@ export const CellViewer: React.FC<CellViewerProps> = ({
             <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>{rowId}</span>
           </div>
         )}
-      </div>
+      </div> */}
     </div>
   );
 };

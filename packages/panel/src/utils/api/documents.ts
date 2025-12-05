@@ -1,3 +1,5 @@
+import { ROUTES } from '../constants';
+
 /**
  * Updates specified fields for given document IDs in a table
  * @param table - The table name
@@ -68,6 +70,94 @@ export const deleteDocuments = async (
 };
 
 /**
+ * Clears a page of documents from a table
+ * @param adminClient - The Convex admin client instance
+ * @param tableName - The table name
+ * @param cursor - Optional cursor for pagination
+ * @param componentId - Optional component ID
+ * @returns Result with continueCursor, deleted count, and hasMore flag
+ */
+export const clearTablePage = async (
+  adminClient: any,
+  tableName: string,
+  cursor: string | null = null,
+  componentId: string | null = null
+): Promise<{ continueCursor: string; deleted: number; hasMore: boolean }> => {
+  if (!adminClient) {
+    throw new Error("Admin client is not available");
+  }
+
+  try {
+    const result = await adminClient.mutation(
+      "_system/frontend/clearTablePage:default" as any,
+      {
+        tableName,
+        cursor,
+        componentId,
+      }
+    );
+
+    return {
+      continueCursor: result.continueCursor || null,
+      deleted: result.deleted || 0,
+      hasMore: result.hasMore || false,
+    };
+  } catch (error) {
+    console.error("Error clearing table page:", error);
+    throw error;
+  }
+};
+
+/**
+ * Deletes a table
+ * @param deploymentUrl - The deployment URL
+ * @param adminKey - The admin key
+ * @param tableNames - Array of table names to delete
+ * @param componentId - Optional component ID
+ * @returns Success status
+ */
+export const deleteTable = async (
+  deploymentUrl: string,
+  adminKey: string,
+  tableNames: string[],
+  componentId: string | null = null
+): Promise<{ success: boolean; error?: string }> => {
+  if (!deploymentUrl || !adminKey) {
+    return {
+      success: false,
+      error: 'Missing deployment URL or admin key',
+    };
+  }
+
+  try {
+    const body = JSON.stringify({ tableNames, componentId });
+    const response = await fetch(`${deploymentUrl}${ROUTES.DELETE_TABLES}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Convex ${adminKey}`,
+        'Content-Type': 'application/json',
+      },
+      body,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+      return {
+        success: false,
+        error: error.message || `HTTP error! status: ${response.status}`,
+      };
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error?.message || 'Failed to delete table',
+    };
+  }
+};
+
+/**
  * Inserts documents into a table
  * @param table - The table name
  * @param documents - Array of documents to insert
@@ -128,6 +218,17 @@ export const insertDocuments = async (
     }
   } catch (error: any) {
     console.error("Error inserting documents:", error);
-    throw error;
+    
+    // Extract more detailed error message from Convex errors
+    if (error?.data) {
+      // ConvexError with data field
+      throw new Error(error.data);
+    } else if (error?.message) {
+      // Standard Error object
+      throw error;
+    } else {
+      // Unknown error format
+      throw new Error(`Failed to insert documents: ${String(error)}`);
+    }
   }
 };

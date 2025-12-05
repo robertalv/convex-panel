@@ -3,7 +3,7 @@ import { MoreVertical, Link2 } from 'lucide-react';
 import { Tooltip } from '../../../../components/shared/tooltip';
 import { DocumentPreview } from '../document-preview';
 import { InlineCellEditor } from './inline-cell-editor';
-import { formatValue, getValueColor, isConvexId, createDocumentLink } from './data-table-utils';
+import { formatValue, formatTimestamp, getValueColor, isConvexId, createDocumentLink } from './data-table-utils';
 import type { ColumnMeta } from './data-table-utils';
 
 export interface TableCellProps {
@@ -210,19 +210,41 @@ export const TableCell: React.FC<TableCellProps> = ({
                 </div>
               </Tooltip>
             )}
-            <span
-              style={{
-                color: isUnset ? 'var(--color-panel-text-muted)' : getValueColor(value),
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                fontStyle: isUnset ? 'italic' : 'normal',
-                flex: 1,
-                minWidth: 0,
-              }}
-            >
-              {formatValue(value)}
-            </span>
+            {column === '_creationTime' && typeof value === 'number' ? (
+              <Tooltip
+                content={value.toString()}
+                position="top"
+                maxWidth={300}
+              >
+                <span
+                  style={{
+                    color: isUnset ? 'var(--color-panel-text-muted)' : getValueColor(value),
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    fontStyle: isUnset ? 'italic' : 'normal',
+                    flex: 1,
+                    minWidth: 0,
+                  }}
+                >
+                  {formatTimestamp(value)}
+                </span>
+              </Tooltip>
+            ) : (
+              <span
+                style={{
+                  color: isUnset ? 'var(--color-panel-text-muted)' : getValueColor(value),
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  fontStyle: isUnset ? 'italic' : 'normal',
+                  flex: 1,
+                  minWidth: 0,
+                }}
+              >
+                {formatValue(value)}
+              </span>
+            )}
           </div>
           {(isHovered || isMenuOpen) && (
             <button

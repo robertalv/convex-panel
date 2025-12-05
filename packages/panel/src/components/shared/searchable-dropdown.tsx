@@ -22,6 +22,7 @@ interface SearchableDropdownProps<T> {
   triggerIcon?: React.ReactNode;
   listMaxHeight?: number;
   getIsSelected?: (selectedValue: T | null, option: SearchableDropdownOption<T>) => boolean;
+  triggerStyle?: React.CSSProperties;
 }
 
 const defaultPlaceholder = 'Select option...';
@@ -37,6 +38,7 @@ export function SearchableDropdown<T>({
   triggerIcon,
   listMaxHeight = 300,
   getIsSelected,
+  triggerStyle,
 }: SearchableDropdownProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -147,6 +149,7 @@ export function SearchableDropdown<T>({
           e.stopPropagation();
         }}
         style={{
+          ...triggerStyle,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',

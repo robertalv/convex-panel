@@ -1,5 +1,6 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useEffect, useRef } from 'react';
 import type { TabId } from '../types/tabs';
+import { useSheetSafe } from '../contexts/sheet-context';
 
 // Lazy load all views for code splitting
 const HealthView = lazy(() => import('../views/health/health-view').then(m => ({ default: m.HealthView })));
@@ -113,6 +114,17 @@ const tabRenderers: Record<TabId, TabRenderer> = {
 };
 
 export const MainViews: React.FC<MainViewsProps> = ({ activeTab, containerProps }) => {
+  const { closeSheet } = useSheetSafe();
+  const prevActiveTabRef = useRef<TabId | null>(null);
+
+  // Close sheet when switching to a different view
+  useEffect(() => {
+    if (prevActiveTabRef.current !== null && prevActiveTabRef.current !== activeTab) {
+      closeSheet();
+    }
+    prevActiveTabRef.current = activeTab;
+  }, [activeTab, closeSheet]);
+
   const render = tabRenderers[activeTab] || tabRenderers.health;
   return (
     <Suspense fallback={<ViewLoadingFallback />}>

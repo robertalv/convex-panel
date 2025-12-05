@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { X } from 'lucide-react';
 import { useThemeSafe } from '../../hooks/useTheme';
 import { useSheetSafe } from '../../contexts/sheet-context';
 import { usePortalTarget } from '../../contexts/portal-context';
@@ -79,6 +80,119 @@ function matchesShortcut(
   return metaMatch && ctrlMatch && shiftMatch && altMatch;
 }
 
+const ViewingContentWrapper: React.FC<{ title?: string; children: React.ReactNode }> = ({ title, children }) => {
+  const { closeSheet } = useSheetSafe();
+
+  // Parse title to separate "Viewing" from field name
+  const parseTitle = (title?: string) => {
+    if (!title) return { prefix: null, fieldName: null };
+    
+    // Check if title starts with "Viewing " (case-insensitive)
+    const viewingMatch = title.match(/^Viewing\s+(.+)$/i);
+    if (viewingMatch) {
+      return { prefix: 'Viewing', fieldName: viewingMatch[1] };
+    }
+    
+    // If no "Viewing" prefix, treat entire title as field name
+    return { prefix: null, fieldName: title };
+  };
+
+  const { prefix, fieldName } = parseTitle(title);
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        backgroundColor: 'var(--color-panel-bg-secondary)',
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0px 12px',
+          borderBottom: '1px solid var(--color-panel-border)',
+          backgroundColor: 'var(--color-panel-bg-secondary)',
+          height: '40px',
+          flexShrink: 0,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '14px',
+            fontWeight: 500,
+            color: 'var(--color-panel-text)',
+          }}
+        >
+          {prefix && <span>{prefix}</span>}
+          {fieldName && (
+            <span
+              style={{
+                fontSize: '12px',
+                fontWeight: 500,
+                fontFamily: 'monospace',
+                border: '1px solid var(--color-panel-border)',
+                borderRadius: '6px',
+                padding: '4px',
+                color: 'var(--color-panel-text)',
+              }}
+            >
+              {fieldName}
+            </span>
+          )}
+        </div>
+
+        {/* Close Button */}
+        {closeSheet && (
+          <button
+            type="button"
+            onClick={closeSheet}
+            style={{
+              padding: '6px',
+              color: 'var(--color-panel-text-secondary)',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '4px',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--color-panel-text)';
+              e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <X size={18} />
+          </button>
+        )}
+      </div>
+
+      {/* Content */}
+      <div
+        style={{
+          flex: 1,
+          overflow: 'auto',
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
+
 export const ContextMenu: React.FC<ContextMenuProps> = ({
   items,
   position,
@@ -109,7 +223,11 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       if (item.viewing) {
         openSheet({
           title: item.viewing.title,
-          content: item.viewing.content,
+          content: (
+            <ViewingContentWrapper title={item.viewing.title}>
+              {item.viewing.content}
+            </ViewingContentWrapper>
+          ),
           width: item.viewing.width,
         });
         onClose();
@@ -126,6 +244,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     const handleMouseDown = (event: MouseEvent) => {
       if (!menuRef.current) return;
       const target = event.target as Node;
+      // Only close if the click is truly outside both menus
       if (!menuRef.current.contains(target) &&
         !(submenuRef.current && submenuRef.current.contains(target))) {
         onClose();
@@ -177,7 +296,11 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           if (item.viewing) {
             openSheet({
               title: item.viewing.title,
-              content: item.viewing.content,
+              content: (
+                <ViewingContentWrapper title={item.viewing.title}>
+                  {item.viewing.content}
+                </ViewingContentWrapper>
+              ),
               width: item.viewing.width,
             });
             onClose();
@@ -201,7 +324,11 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             if (item.viewing) {
               openSheet({
                 title: item.viewing.title,
-                content: item.viewing.content,
+                content: (
+                  <ViewingContentWrapper title={item.viewing.title}>
+                    {item.viewing.content}
+                  </ViewingContentWrapper>
+                ),
                 width: item.viewing.width,
               });
               onClose();
@@ -249,6 +376,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         zIndex: 100000,
         pointerEvents: 'auto',
       }}
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
     >
       {items.map((item, index) => {
         if ('type' in item && item.type === 'divider') {
@@ -316,6 +445,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
+                event.preventDefault();
 
                 // Don't close if there's a submenu
                 if (hasSubmenu) {
@@ -326,7 +456,11 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 if (action.viewing) {
                   openSheet({
                     title: action.viewing.title,
-                    content: action.viewing.content,
+                    content: (
+                      <ViewingContentWrapper title={action.viewing.title}>
+                        {action.viewing.content}
+                      </ViewingContentWrapper>
+                    ),
                     width: action.viewing.width,
                   });
                   onClose();
@@ -335,6 +469,9 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 
                 action.onClick();
                 onClose();
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
               }}
               style={{
                 width: '100%',
@@ -390,6 +527,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                   pointerEvents: 'auto',
                 }}
                 onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
                 onMouseEnter={() => {
                   // Clear any pending close timeout
                   if (closeSubmenuTimeoutRef.current) {
@@ -423,8 +561,12 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation();
+                        event.preventDefault();
                         subAction.onClick();
                         onClose();
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
                       }}
                       style={{
                         width: '100%',

@@ -74,6 +74,21 @@ export const createDocumentLink = (
   }
 };
 
+/**
+ * Format a timestamp value (like _creationTime) as a human-readable date
+ */
+export const formatTimestamp = (value: number): string => {
+  return new Date(value).toLocaleString('en-US', {
+    month: 'numeric',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
+};
+
 export const formatValue = (value: any): string => {
   if (value === null || value === undefined) {
     return 'unset';

@@ -10,6 +10,7 @@
 
 import type * as crons from "../crons.js";
 import type * as dummyjson from "../dummyjson.js";
+import type * as filterHistory from "../filterHistory.js";
 import type * as http from "../http.js";
 import type * as loops from "../loops.js";
 import type * as stats from "../stats.js";
@@ -24,6 +25,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   dummyjson: typeof dummyjson;
+  filterHistory: typeof filterHistory;
   http: typeof http;
   loops: typeof loops;
   stats: typeof stats;
@@ -537,6 +539,94 @@ export declare const components: {
           userId?: string;
         },
         { success: boolean }
+      >;
+    };
+  };
+  filterHistory: {
+    lib: {
+      clear: FunctionReference<"mutation", "internal", { scope: string }, null>;
+      createCheckpoint: FunctionReference<
+        "mutation",
+        "internal",
+        { name: string; scope: string },
+        null
+      >;
+      deleteCheckpoint: FunctionReference<
+        "mutation",
+        "internal",
+        { name: string; scope: string },
+        null
+      >;
+      deleteScope: FunctionReference<
+        "mutation",
+        "internal",
+        { scope: string },
+        null
+      >;
+      getCheckpointState: FunctionReference<
+        "query",
+        "internal",
+        { name: string; scope: string },
+        any | null
+      >;
+      getCurrentState: FunctionReference<
+        "query",
+        "internal",
+        { scope: string },
+        any | null
+      >;
+      getStateAtPosition: FunctionReference<
+        "query",
+        "internal",
+        { position: number; scope: string },
+        any | null
+      >;
+      getStatus: FunctionReference<
+        "query",
+        "internal",
+        { scope: string },
+        {
+          canRedo: boolean;
+          canUndo: boolean;
+          length: number;
+          position: number | null;
+        }
+      >;
+      listCheckpoints: FunctionReference<
+        "query",
+        "internal",
+        { scope: string },
+        Array<{ name: string; position: number | null }>
+      >;
+      listStates: FunctionReference<
+        "query",
+        "internal",
+        { scope: string },
+        Array<{ position: number; state: any }>
+      >;
+      push: FunctionReference<
+        "mutation",
+        "internal",
+        { maxStates?: number; scope: string; state: any },
+        null
+      >;
+      redo: FunctionReference<
+        "mutation",
+        "internal",
+        { count?: number; scope: string },
+        any | null
+      >;
+      restoreCheckpoint: FunctionReference<
+        "mutation",
+        "internal",
+        { maxStates?: number; name: string; scope: string },
+        any
+      >;
+      undo: FunctionReference<
+        "mutation",
+        "internal",
+        { count?: number; scope: string },
+        any | null
       >;
     };
   };

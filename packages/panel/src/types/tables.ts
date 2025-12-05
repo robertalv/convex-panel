@@ -15,12 +15,15 @@ export interface TableField {
     type: string;
     fields?: TableField[];
     tableName?: string;
+    value?: any; // For union, literal, array element types
     float64Range?: {
       hasSpecialValues: boolean;
     };
     shape?: {
       type: string;
       tableName?: string;
+      value?: any; // For nested union, literal types
+      fields?: TableField[];
     };
   };
 }

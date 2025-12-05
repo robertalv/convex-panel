@@ -24,31 +24,107 @@ import type { FunctionReference } from "convex/server";
 export type ComponentApi<Name extends string | undefined = string | undefined> =
   {
     lib: {
-      add: FunctionReference<
+      clear: FunctionReference<
         "mutation",
         "internal",
-        { targetId: string; text: string; userId: string },
-        string,
+        { scope: string },
+        null,
         Name
       >;
-      list: FunctionReference<
+      createCheckpoint: FunctionReference<
+        "mutation",
+        "internal",
+        { name: string; scope: string },
+        null,
+        Name
+      >;
+      deleteCheckpoint: FunctionReference<
+        "mutation",
+        "internal",
+        { name: string; scope: string },
+        null,
+        Name
+      >;
+      deleteScope: FunctionReference<
+        "mutation",
+        "internal",
+        { scope: string },
+        null,
+        Name
+      >;
+      getCheckpointState: FunctionReference<
         "query",
         "internal",
-        { limit?: number; targetId: string },
-        Array<{
-          _creationTime: number;
-          _id: string;
-          targetId: string;
-          text: string;
-          userId: string;
-        }>,
+        { name: string; scope: string },
+        any | null,
         Name
       >;
-      translate: FunctionReference<
-        "action",
+      getCurrentState: FunctionReference<
+        "query",
         "internal",
-        { baseUrl: string; commentId: string },
-        string,
+        { scope: string },
+        any | null,
+        Name
+      >;
+      getStateAtPosition: FunctionReference<
+        "query",
+        "internal",
+        { position: number; scope: string },
+        any | null,
+        Name
+      >;
+      getStatus: FunctionReference<
+        "query",
+        "internal",
+        { scope: string },
+        {
+          canRedo: boolean;
+          canUndo: boolean;
+          length: number;
+          position: number | null;
+        },
+        Name
+      >;
+      listCheckpoints: FunctionReference<
+        "query",
+        "internal",
+        { scope: string },
+        Array<{ name: string; position: number | null }>,
+        Name
+      >;
+      listStates: FunctionReference<
+        "query",
+        "internal",
+        { scope: string },
+        Array<{ position: number; state: any }>,
+        Name
+      >;
+      push: FunctionReference<
+        "mutation",
+        "internal",
+        { maxStates?: number; scope: string; state: any },
+        null,
+        Name
+      >;
+      redo: FunctionReference<
+        "mutation",
+        "internal",
+        { count?: number; scope: string },
+        any | null,
+        Name
+      >;
+      restoreCheckpoint: FunctionReference<
+        "mutation",
+        "internal",
+        { maxStates?: number; name: string; scope: string },
+        any,
+        Name
+      >;
+      undo: FunctionReference<
+        "mutation",
+        "internal",
+        { count?: number; scope: string },
+        any | null,
         Name
       >;
     };

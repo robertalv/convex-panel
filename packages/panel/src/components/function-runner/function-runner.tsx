@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Play, Settings, Code as CodeIcon, Copy, ArrowLeft, ArrowRight, Maximize2, Minimize2, Columns, Rows } from 'lucide-react';
 import { copyToClipboard } from '../../utils/toast';
 import type { ModuleFunction } from '../../utils/api/functionDiscovery';
@@ -123,6 +123,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(isExpanded ?? false);
   const [isResizingOutput, setIsResizingOutput] = useState(false);
   const { theme: _theme } = useThemeSafe();
+  const lastDispatchedResultRef = useRef<any>(null);
 
   useEffect(() => {
     if (typeof isVertical === 'boolean') {
@@ -375,6 +376,32 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
   const isRunning = isCustomQuery ? customQueryLoading : loading;
   const currentResult = isCustomQuery ? customQueryResult : result;
   const currentTiming = isCustomQuery ? customQueryTiming : lastRequestTiming;
+
+  useEffect(() => {
+    if (currentResult?.success && !isRunning && currentResult !== lastDispatchedResultRef.current) {
+      const udfType = isCustomQuery ? 'query' : (moduleFunction?.udfType || 'query');
+      
+      if (udfType === 'mutation' || udfType === 'action') {
+        lastDispatchedResultRef.current = currentResult;
+        
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('convex-panel-function-completed', {
+            detail: {
+              success: true,
+              udfType,
+              functionIdentifier: moduleFunction?.identifier || 'customQuery',
+              componentId: currentComponentId,
+            }
+          }));
+        }
+      }
+    }
+    
+    // Reset dispatched result when function changes or starts running
+    if (isRunning || !currentResult) {
+      lastDispatchedResultRef.current = null;
+    }
+  }, [currentResult, isRunning, isCustomQuery, moduleFunction?.udfType, moduleFunction?.identifier, currentComponentId]);
 
   useEffect(() => {
     if (autoRun && selectedFunction && !isRunning) {

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Fingerprint, Search, ArrowUpRight } from 'lucide-react';
-import { Card } from '../../../components/shared/card';
+import { Fingerprint, Search, ArrowUpRight, X } from 'lucide-react';
+import { useSheetSafe } from '../../../contexts/sheet-context';
 
 export interface Index {
   table?: string;
@@ -50,6 +50,7 @@ export const IndexesView: React.FC<IndexesViewProps> = ({
   adminClient,
   componentId,
 }) => {
+  const { closeSheet } = useSheetSafe();
   const [fetchedIndexes, setFetchedIndexes] = useState<Index[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -123,28 +124,102 @@ export const IndexesView: React.FC<IndexesViewProps> = ({
   return (
     <div
       style={{
-        padding: '20px',
+        display: 'flex',
+        flexDirection: 'column',
         height: '100%',
-        overflow: 'auto',
         backgroundColor: 'var(--color-panel-bg-secondary)',
       }}
     >
-      <Card
-        title="Indexes"
-        style={{ maxWidth: '100%' }}
-        action={
-          <span style={{ fontSize: '11px', color: 'var(--color-panel-text-muted)' }}>
-            Table{' '}
-            <code style={{ fontFamily: 'monospace', fontSize: '11px' }}>
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0px 12px',
+          borderBottom: '1px solid var(--color-panel-border)',
+          backgroundColor: 'var(--color-panel-bg-secondary)',
+          height: '40px',
+          flexShrink: 0,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '14px',
+            fontWeight: 500,
+            color: 'var(--color-panel-text)',
+          }}
+        >
+          <span>Indexes</span>
+          <span
+            style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: 'var(--color-panel-text-muted)',
+            }}
+          >
+            for{' '}
+            <code
+              style={{
+                fontFamily: 'monospace',
+                fontSize: '12px',
+                padding: '2px 4px',
+                borderRadius: '3px',
+                backgroundColor: 'var(--color-panel-bg-tertiary)',
+                border: '1px solid var(--color-panel-border)',
+              }}
+            >
               {tableName}
             </code>
           </span>
-        }
+        </div>
+
+        {/* Close Button */}
+        {closeSheet && (
+          <button
+            type="button"
+            onClick={closeSheet}
+            style={{
+              padding: '6px',
+              color: 'var(--color-panel-text-secondary)',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '4px',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--color-panel-text)';
+              e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <X size={18} />
+          </button>
+        )}
+      </div>
+
+      {/* Content */}
+      <div
+        style={{
+          flex: 1,
+          overflow: 'auto',
+          padding: '20px',
+        }}
       >
         {isLoading && (
           <div
             style={{
-              padding: '8px 0 4px',
+              padding: '12px',
               fontSize: '12px',
               color: 'var(--color-panel-text-muted)',
             }}
@@ -155,18 +230,23 @@ export const IndexesView: React.FC<IndexesViewProps> = ({
         {error && !isLoading && (
           <div
             style={{
-              marginTop: '4px',
+              padding: '12px',
               marginBottom: '12px',
               fontSize: '12px',
               color: 'var(--color-panel-error)',
+              backgroundColor: 'var(--color-panel-bg-tertiary)',
+              border: '1px solid var(--color-panel-border)',
+              borderRadius: '6px',
             }}
           >
             {error}
           </div>
         )}
 
-      {/* Regular Indexes */}
-      <div style={{ marginBottom: '24px' }}>
+        {!isLoading && !error && (
+          <>
+            {/* Regular Indexes */}
+            <div style={{ marginBottom: '24px' }}>
         <div
           style={{
             display: 'flex',
@@ -188,27 +268,7 @@ export const IndexesView: React.FC<IndexesViewProps> = ({
           </h3>
         </div>
 
-        {isLoading ? (
-          <div
-            style={{
-              padding: '12px',
-              color: 'var(--color-panel-text-muted)',
-              fontSize: '12px',
-            }}
-          >
-            Loading indexes…
-          </div>
-        ) : error ? (
-          <div
-            style={{
-              padding: '12px',
-              color: 'var(--color-panel-error)',
-              fontSize: '12px',
-            }}
-          >
-            Error: {error}
-          </div>
-        ) : groupedIndexes.database.length > 0 ? (
+        {groupedIndexes.database.length > 0 ? (
           <div
             style={{
               display: 'flex',
@@ -227,6 +287,9 @@ export const IndexesView: React.FC<IndexesViewProps> = ({
               color: 'var(--color-panel-text-muted)',
               fontSize: '12px',
               fontStyle: 'italic',
+              backgroundColor: 'var(--color-panel-bg-tertiary)',
+              border: '1px solid var(--color-panel-border)',
+              borderRadius: '6px',
             }}
           >
             <code style={{ fontFamily: 'monospace' }}>{tableName}</code> has no indexes.
@@ -275,6 +338,9 @@ export const IndexesView: React.FC<IndexesViewProps> = ({
               color: 'var(--color-panel-text-muted)',
               fontSize: '12px',
               fontStyle: 'italic',
+              backgroundColor: 'var(--color-panel-bg-tertiary)',
+              border: '1px solid var(--color-panel-border)',
+              borderRadius: '6px',
             }}
           >
             {tableName} has no search indexes.
@@ -323,13 +389,18 @@ export const IndexesView: React.FC<IndexesViewProps> = ({
               color: 'var(--color-panel-text-muted)',
               fontSize: '12px',
               fontStyle: 'italic',
+              backgroundColor: 'var(--color-panel-bg-tertiary)',
+              border: '1px solid var(--color-panel-border)',
+              borderRadius: '6px',
             }}
           >
             {tableName} has no vector indexes.
           </div>
         )}
       </div>
-      </Card>
+          </>
+        )}
+      </div>
     </div>
   );
 };
@@ -342,12 +413,19 @@ function IndexRow({ index }: { index: Index }) {
     <div
       style={{
         padding: '12px',
-        backgroundColor: 'var(--color-panel-bg-secondary)',
+        backgroundColor: 'var(--color-panel-bg-tertiary)',
         border: '1px solid var(--color-panel-border)',
-        borderRadius: '4px',
+        borderRadius: '6px',
         display: 'flex',
         flexDirection: 'column',
         gap: '8px',
+        transition: 'border-color 0.15s',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = 'var(--color-panel-accent)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'var(--color-panel-border)';
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -365,9 +443,12 @@ function IndexRow({ index }: { index: Index }) {
           <span
             style={{
               fontSize: '11px',
-              color: 'var(--color-panel-text-muted)',
-              textDecoration: 'underline',
-              textDecorationStyle: 'dotted',
+              padding: '2px 6px',
+              color: 'var(--color-panel-text-secondary)',
+              backgroundColor: 'var(--color-panel-bg-secondary)',
+              border: '1px solid var(--color-panel-border)',
+              borderRadius: '4px',
+              fontFamily: 'monospace',
             }}
           >
             Staged
@@ -422,8 +503,18 @@ function IndexRow({ index }: { index: Index }) {
       </div>
 
       {index.backfill.state === 'backfilling' && (
-        <div style={{ paddingLeft: '8px', fontSize: '12px', color: 'var(--color-panel-text-secondary)' }}>
-          <div style={{ marginBottom: '4px' }}>Backfill in progress</div>
+        <div
+          style={{
+            padding: '8px',
+            marginTop: '4px',
+            fontSize: '12px',
+            color: 'var(--color-panel-text-secondary)',
+            backgroundColor: 'var(--color-panel-bg-secondary)',
+            border: '1px solid var(--color-panel-border)',
+            borderRadius: '4px',
+          }}
+        >
+          <div style={{ marginBottom: '6px', fontWeight: 500 }}>Backfill in progress</div>
           {index.backfill.stats && index.backfill.stats.totalDocs !== null && (
             <div
               style={{
@@ -451,8 +542,18 @@ function IndexRow({ index }: { index: Index }) {
       )}
 
       {index.backfill.state === 'backfilled' && (
-        <div style={{ paddingLeft: '8px', fontSize: '12px', color: 'var(--color-panel-text-secondary)' }}>
-          <div style={{ marginBottom: '4px' }}>Backfill completed</div>
+        <div
+          style={{
+            padding: '8px',
+            marginTop: '4px',
+            fontSize: '12px',
+            color: 'var(--color-panel-text-secondary)',
+            backgroundColor: 'var(--color-panel-bg-secondary)',
+            border: '1px solid var(--color-panel-border)',
+            borderRadius: '4px',
+          }}
+        >
+          <div style={{ marginBottom: '6px', fontWeight: 500 }}>Backfill completed</div>
           <div
             style={{
               width: '100%',

@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Code, Box, Fingerprint, BarChart3, X, Trash2 } from 'lucide-react';
+import { Code, Box, Fingerprint, BarChart3, RotateCcw, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { useThemeSafe } from '../../../hooks/useTheme';
+import { usePortalTarget } from '../../../contexts/portal-context';
 
 export interface TableMenuDropdownProps {
   isOpen: boolean;
@@ -27,6 +29,8 @@ export const TableMenuDropdown: React.FC<TableMenuDropdownProps> = ({
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
+  const { theme } = useThemeSafe();
+  const portalTarget = usePortalTarget();
 
   // Update position when it changes and ensure it's visible
   useEffect(() => {
@@ -160,7 +164,7 @@ export const TableMenuDropdown: React.FC<TableMenuDropdownProps> = ({
     ...(onClearTable
       ? [
           {
-            icon: <X size={14} />,
+            icon: <RotateCcw size={14} />,
             label: 'Clear Table',
             onClick: () => {
               onClearTable();
@@ -186,21 +190,22 @@ export const TableMenuDropdown: React.FC<TableMenuDropdownProps> = ({
   ];
 
   // Ensure we have valid position before rendering
-  if (!adjustedPosition || adjustedPosition.x < 0 || adjustedPosition.y < 0) {
+  if (!adjustedPosition || adjustedPosition.x < 0 || adjustedPosition.y < 0 || !portalTarget) {
     return null;
   }
 
   return createPortal(
     <div
       ref={menuRef}
+      className={`cp-theme-${theme}`}
       style={{
         position: 'fixed',
         left: `${Math.max(0, adjustedPosition.x)}px`,
         top: `${Math.max(0, adjustedPosition.y)}px`,
-        backgroundColor: 'var(--color-panel-bg-secondary)',
+        backgroundColor: 'var(--color-panel-bg-tertiary)',
         border: '1px solid var(--color-panel-border)',
         borderRadius: '8px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+        boxShadow: '0 4px 16px var(--color-panel-shadow)',
         zIndex: 100000,
         width: '180px',
         padding: '4px',
@@ -209,6 +214,7 @@ export const TableMenuDropdown: React.FC<TableMenuDropdownProps> = ({
         pointerEvents: 'auto',
       }}
       onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
     >
       {menuItems.map((item, index) => (
         <button
@@ -243,7 +249,7 @@ export const TableMenuDropdown: React.FC<TableMenuDropdownProps> = ({
         </button>
       ))}
     </div>,
-    document.body
+    portalTarget
   );
 };
 
