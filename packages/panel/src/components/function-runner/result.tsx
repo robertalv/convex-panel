@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
-import Editor, { type BeforeMount } from '../editor/lazy-monaco-editor';
+import Editor from '../editor/lazy-editor';
 import type { FunctionResult as FunctionResultType } from '../../utils/api/functionExecution';
 import { useThemeSafe } from '../../hooks/useTheme';
+import { getConvexPanelTheme } from '../editor/editor-theme';
 
 interface ResultProps {
   result?: FunctionResultType;
@@ -14,7 +15,6 @@ export const Result: React.FC<ResultProps> = ({
   loading = false,
 }) => {
   const { theme } = useThemeSafe();
-  const [monaco, setMonaco] = useState<Parameters<BeforeMount>[0]>();
   
   const resultString = useMemo(() => {
     if (!result) return '';
@@ -24,70 +24,6 @@ export const Result: React.FC<ResultProps> = ({
     return result.errorMessage || 'Unknown error';
   }, [result]);
 
-  const handleEditorWillMount: BeforeMount = (monacoInstance) => {
-    setMonaco(monacoInstance);
-
-    const getThemeColor = (varName: string, fallback: string = '#0F1115') => {
-      const themeElement = document.querySelector('.cp-theme-dark, .cp-theme-light') || document.documentElement;
-      const color = getComputedStyle(themeElement).getPropertyValue(varName).trim();
-      return color || fallback;
-    };
-
-    const toMonacoColor = (hex: string) => hex.replace('#', '');
-
-    try {
-      monacoInstance.editor.defineTheme('convex-dark', {
-        base: 'vs-dark',
-        inherit: true,
-        rules: [
-          { token: 'comment', foreground: toMonacoColor(getThemeColor('--color-panel-text-muted', '#6b7280')), fontStyle: 'italic' },
-          { token: 'keyword', foreground: 'c084fc' },
-          { token: 'string', foreground: 'fbbf24' },
-          { token: 'number', foreground: 'fb923c' },
-        ],
-        colors: {
-          'editor.background': '#00000000',
-          'editor.foreground': getThemeColor('--color-panel-text', '#d1d5db'),
-          'editor.lineHighlightBackground': '#00000000',
-          'editor.selectionBackground': getThemeColor('--color-panel-active', 'rgba(255, 255, 255, 0.1)'),
-          'editorCursor.foreground': getThemeColor('--color-panel-text', '#d1d5db'),
-        },
-      });
-    } catch {
-      // Theme already defined
-    }
-
-    try {
-      monacoInstance.editor.defineTheme('convex-light', {
-        base: 'vs',
-        inherit: true,
-        rules: [
-          { token: 'comment', foreground: toMonacoColor(getThemeColor('--color-panel-text-muted', '#9ca3af')), fontStyle: 'italic' },
-          { token: 'keyword', foreground: '7c3aed' },
-          { token: 'string', foreground: 'd97706' },
-          { token: 'number', foreground: 'ea580c' },
-        ],
-        colors: {
-          'editor.background': '#00000000',
-          'editor.foreground': getThemeColor('--color-panel-text', '#111827'),
-          'editor.lineHighlightBackground': '#00000000',
-          'editor.selectionBackground': getThemeColor('--color-panel-active', 'rgba(0, 0, 0, 0.1)'),
-          'editorCursor.foreground': getThemeColor('--color-panel-text', '#111827'),
-        },
-      });
-    } catch {
-      // Theme already defined
-    }
-  };
-
-  useEffect(() => {
-    if (monaco) {
-      const monacoTheme = theme === 'light' ? 'convex-light' : 'convex-dark';
-      monaco.editor.setTheme(monacoTheme);
-    }
-  }, [theme, monaco]);
-
-  const monacoTheme = theme === 'light' ? 'convex-light' : 'convex-dark';
   const hasLogs = !!(result?.logLines && result.logLines.length > 0);
 
   return (
@@ -109,9 +45,11 @@ export const Result: React.FC<ResultProps> = ({
         {!result && !loading ? (
           <div
             style={{
-              color: '#6b7280',
-              fontSize: '14px',
+              fontSize: '12px',
+              color: 'var(--color-panel-text-muted)',
               fontStyle: 'italic',
+              fontFamily: 'monospace',
+              padding: '16px',
             }}
           >
             Run this function to produce a result.
@@ -119,11 +57,11 @@ export const Result: React.FC<ResultProps> = ({
         ) : loading ? (
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              color: '#9ca3af',
-              fontSize: '14px',
+              fontSize: '12px',
+              color: 'var(--color-panel-text-muted)',
+              fontStyle: 'italic',
+              fontFamily: 'monospace',
+              padding: '16px',
             }}
           >
             <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
@@ -181,15 +119,11 @@ export const Result: React.FC<ResultProps> = ({
                 <Editor
                   height="100%"
                   language="json"
-                  theme={monacoTheme}
+                  theme={getConvexPanelTheme(theme)}
                   value={resultString}
-                  beforeMount={handleEditorWillMount}
                   options={{
-                    automaticLayout: true,
-                    minimap: { enabled: false },
                     scrollBeyondLastLine: false,
                     fontSize: 13,
-                    fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
                     lineNumbers: 'off',
                     lineNumbersMinChars: 0,
                     scrollbar: {
@@ -201,11 +135,8 @@ export const Result: React.FC<ResultProps> = ({
                     readOnly: true,
                     domReadOnly: true,
                     contextmenu: true,
-                    selectOnLineNumbers: false,
                     glyphMargin: false,
                     folding: true,
-                    lineDecorationsWidth: 0,
-                    renderWhitespace: 'selection',
                   }}
                 />
               </div>

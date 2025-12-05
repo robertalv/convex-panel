@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Sheet } from '../../../components/shared/sheet';
 import type { FunctionExecutionLog } from '../../../types';
 import { Card } from '../../../components/shared/card';
 
@@ -6,6 +7,7 @@ interface FunctionExecutionDetailSheetProps {
   log: FunctionExecutionLog | null;
   isOpen: boolean;
   onClose: () => void;
+  container?: HTMLElement | null;
 }
 
 type DetailTab = 'execution' | 'request' | 'functions';
@@ -45,8 +47,10 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
   log,
   isOpen,
   onClose,
+  container: propContainer,
 }) => {
   const [activeTab, setActiveTab] = useState<DetailTab>('execution');
+  const container = propContainer || null;
 
   if (!isOpen || !log) {
     return null;
@@ -67,20 +71,12 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
     identityType,
   } = log;
 
-  return (
+  const sheetContent = (
     <div
       style={{
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        bottom: 0,
-        width: 420,
-        borderLeft: '1px solid var(--color-panel-border)',
-        backgroundColor: 'var(--color-panel-bg)',
-        boxShadow: 'var(--color-panel-shadow)',
         display: 'flex',
         flexDirection: 'column',
-        zIndex: 40,
+        height: '100%',
       }}
     >
       <div
@@ -464,6 +460,17 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
         )}
       </div>
     </div>
+  );
+
+  return (
+    <Sheet
+      isOpen={isOpen}
+      onClose={onClose}
+      width="420px"
+      container={container}
+    >
+      {sheetContent}
+    </Sheet>
   );
 };
 

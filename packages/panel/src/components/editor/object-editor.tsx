@@ -1,9 +1,10 @@
 import  { useState, useCallback, useEffect, useRef } from 'react';
-import Editor from './lazy-monaco-editor';
-import type { BeforeMount, OnMount } from './lazy-monaco-editor';
+import Editor from './lazy-editor';
+import type { OnMount } from './lazy-editor';
+import type { Ace } from 'ace-builds';
 import type { Value } from 'convex/values';
 import { useThemeSafe } from '../../hooks/useTheme';
-import { setupMonacoThemes, getMonacoTheme } from './monaco-theme';
+import { getConvexPanelTheme } from './editor-theme';
 import { editorOptions } from './editor-options';
 
 const emptyObject = '{\n\n}';
@@ -52,7 +53,6 @@ export function ObjectEditor(props: ObjectEditorProps) {
     disableFolding = false,
     size = 'md',
     disabled = false,
-    fixedOverflowWidgets = true,
     language = 'javascript',
     indentTopLevel = false,
   } = props;
@@ -64,21 +64,43 @@ export function ObjectEditor(props: ObjectEditorProps) {
     saveActionRef.current = saveAction;
   }, [saveAction]);
 
-  const [defaultValueString] = useState(() => {
-    if (defaultValue === undefined) {
+  const formatDefaultValue = useCallback((val: Value | undefined): string => {
+    if (val === undefined) {
       return '';
     }
-    if (JSON.stringify(defaultValue) === '{}') {
+    if (JSON.stringify(val) === '{}') {
       return emptyObject;
     }
-    if (JSON.stringify(defaultValue) === '[{}]') {
+    if (JSON.stringify(val) === '[{}]') {
       return `[${emptyObject}]`;
     }
-    return JSON.stringify(defaultValue, null, indentTopLevel ? 2 : 0);
-  });
+    return JSON.stringify(val, null, indentTopLevel ? 2 : 0);
+  }, [indentTopLevel]);
+
+  const [defaultValueString, setDefaultValueString] = useState(() => formatDefaultValue(defaultValue));
 
   const numLinesFromCode = (code: string) => code.split('\n').length + 1;
   const [numLines, setNumLines] = useState(numLinesFromCode(defaultValueString));
+  const editorRef = useRef<Ace.Editor | null>(null);
+  const previousDefaultValueRef = useRef<Value | undefined>(defaultValue);
+
+  // Update editor content when defaultValue changes (e.g., when schema loads)
+  useEffect(() => {
+    const newValueString = formatDefaultValue(defaultValue);
+    const previousValueString = formatDefaultValue(previousDefaultValueRef.current);
+    
+    if (newValueString !== previousValueString && editorRef.current) {
+      const currentValue = editorRef.current.getValue();
+      // Only update if editor is empty or matches the previous defaultValue
+      if (!currentValue || currentValue.trim() === '' || currentValue === previousValueString) {
+        editorRef.current.setValue(newValueString, -1);
+        setDefaultValueString(newValueString);
+        setNumLines(numLinesFromCode(newValueString));
+      }
+    }
+    
+    previousDefaultValueRef.current = defaultValue;
+  }, [defaultValue, formatDefaultValue]);
 
   const editorLineHeight = size === 'sm' ? 13 : 18;
   const editorHeight = Math.min(Math.max(numLines, 2), 15) * editorLineHeight;
@@ -106,46 +128,37 @@ export function ObjectEditor(props: ObjectEditorProps) {
     [onChange, onChangeInnerText, onError],
   );
 
-  const handleBeforeMount: BeforeMount = (monacoInstance) => {
-    setupMonacoThemes(monacoInstance);
-
-    monacoInstance.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
-      noSemanticValidation: true,
-      noSyntaxValidation: true,
-      noSuggestionDiagnostics: true,
-      diagnosticCodesToIgnore: [7028],
+  const handleMount: OnMount = (aceEditor: Ace.Editor) => {
+    editorRef.current = aceEditor;
+    aceEditor.commands.addCommand({
+      name: 'cp-focus-next',
+      bindKey: { win: 'Tab', mac: 'Tab' },
+      exec: () => moveFocus(true),
     });
-  };
-
-  const handleMount: OnMount = (editor, monacoInstance) => {
-    editor.onKeyDown((e) => {
-      if (e.keyCode === monacoInstance.KeyCode.Tab) {
-        e.preventDefault();
-        moveFocus(!e.shiftKey);
-      }
+    aceEditor.commands.addCommand({
+      name: 'cp-focus-prev',
+      bindKey: { win: 'Shift-Tab', mac: 'Shift-Tab' },
+      exec: () => moveFocus(false),
     });
 
     if (disableFind) {
-      editor.addAction({
-        id: 'find',
-        label: 'find',
-        keybindings: [monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyF],
-        run: () => {},
+      aceEditor.commands.addCommand({
+        name: 'cp-disable-find',
+        bindKey: { win: 'Ctrl-F', mac: 'Command-F' },
+        exec: () => {},
       });
     }
 
     if (saveAction) {
-      const keybindings = [monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.Enter];
-      if (enterSaves) {
-        keybindings.push(monacoInstance.KeyCode.Enter);
-      }
-      editor.addAction({
-        id: 'saveAction',
-        label: 'Save value',
-        keybindings,
-        run() {
-          saveActionRef.current?.();
-        },
+      const bindings = enterSaves
+        ? [{ win: 'Ctrl-Enter', mac: 'Command-Enter' }, { win: 'Enter', mac: 'Enter' }]
+        : [{ win: 'Ctrl-Enter', mac: 'Command-Enter' }];
+      bindings.forEach((bindKey) => {
+        aceEditor.commands.addCommand({
+          name: `cp-save-${bindKey.win}`,
+          bindKey,
+          exec: () => saveActionRef.current?.(),
+        });
       });
     }
 
@@ -153,9 +166,9 @@ export function ObjectEditor(props: ObjectEditorProps) {
       return;
     }
 
-    editor.focus();
+    aceEditor.focus();
 
-    const code = editor.getValue();
+    const code = aceEditor.getValue();
     if (!code) {
       return;
     }
@@ -178,10 +191,8 @@ export function ObjectEditor(props: ObjectEditorProps) {
       isObject || isArray || (isString && !isMultiLineObject)
         ? lastLine.length : lastLine.length + 1;
 
-    editor.setPosition({
-      lineNumber: code.split('\n').length - (isMultiLineObject ? 1 : 0),
-      column,
-    });
+    const targetRow = code.split('\n').length - (isMultiLineObject ? 2 : 1);
+    aceEditor.gotoLine(targetRow + 1, column, true);
   };
 
   return (
@@ -217,32 +228,19 @@ export function ObjectEditor(props: ObjectEditorProps) {
         height="100%"
         width="100%"
         className={editorClassname}
-        defaultLanguage={language}
+        language={language}
         defaultValue={defaultValueString}
-        theme={getMonacoTheme(theme)}
+        theme={getConvexPanelTheme(theme)}
         path={path.replace(':', '_')}
         onChange={handleChange}
-        beforeMount={handleBeforeMount}
         onMount={handleMount}
         options={{
           ...editorOptions,
-          contextmenu: false,
-          ...(showLineNumbers
-            ? {
-                lineNumbers: 'on',
-                lineNumbersMinChars: 5,
-                lineDecorationsWidth: 10,
-              }
-            : {}),
-          ...(size === 'sm' && {
-            fontSize: 12,
-            lineHeight: 13,
-          }),
+          lineNumbers: showLineNumbers ? 'on' : 'off',
+          fontSize: size === 'sm' ? 12 : editorOptions?.fontSize ?? 13,
           readOnly: disabled,
           domReadOnly: disabled,
-          tabIndex: disabled ? -1 : undefined,
           folding: !disableFolding,
-          fixedOverflowWidgets,
           padding: padding ? { top: 8 } : undefined,
         }}
         loading={null}

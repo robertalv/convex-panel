@@ -1,5 +1,4 @@
 import type { Plugin } from 'vite';
-import { normalizePath } from 'vite';
 
 /**
  * Remove ConvexPanel imports and JSX usage from production builds.

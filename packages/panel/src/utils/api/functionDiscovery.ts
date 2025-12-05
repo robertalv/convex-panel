@@ -104,6 +104,7 @@ export async function discoverFunctions(
       }
     }
     
+    console.log("Component query supported:", componentQuerySupported);
     const apiSpec = allApiSpecs;
     const functions: ModuleFunction[] = [];
     

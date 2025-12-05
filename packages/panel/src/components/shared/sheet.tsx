@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 export interface SheetProps {
@@ -9,16 +8,23 @@ export interface SheetProps {
   title?: string;
   children: ReactNode;
   width?: string;
+  height?: string;
+  maxHeight?: string;
+  minHeight?: string;
   container?: HTMLElement | null;
+  fullscreen?: boolean;
 }
 
 export const Sheet: React.FC<SheetProps> = ({
   isOpen,
   onClose,
-  title,
   children,
   width = '500px',
+  height,
+  maxHeight,
+  minHeight,
   container,
+  fullscreen = false,
 }) => {
   // Prevent body scroll when sheet is open (only if not in container)
   useEffect(() => {
@@ -50,100 +56,32 @@ export const Sheet: React.FC<SheetProps> = ({
   const isInContainer = Boolean(container);
   const portalTarget = container || document.body;
   const positionType = isInContainer ? 'absolute' : 'fixed';
+  const hasHeightConstraints = Boolean(height || maxHeight || minHeight);
 
   const sheetContent = (
     <>
-      {/* Backdrop - show for both container and non-container cases */}
-      <div
-        onClick={onClose}
-        style={{
-          position: positionType,
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: isInContainer 
-            ? 'rgba(0, 0, 0, 0.3)' 
-            : 'color-mix(in srgb, var(--color-panel-bg) 80%, transparent)',
-          zIndex: 9999,
-          animation: 'fadeIn 0.2s ease-out',
-        }}
-      />
-
       {/* Sheet */}
       <div
         style={{
           position: positionType,
           top: 0,
+          left: fullscreen && isInContainer ? 0 : undefined,
           right: 0,
           bottom: 0,
-          width: width,
-          maxWidth: isInContainer ? '100%' : '90vw',
+          width: fullscreen && isInContainer ? '100%' : (fullscreen ? '100vw' : width),
+          maxWidth: fullscreen && isInContainer ? '100%' : (fullscreen ? '100vw' : (isInContainer ? '50vw' : '90vw')),
+          height: fullscreen && isInContainer ? '100%' : (fullscreen ? '100vh' : (hasHeightConstraints ? height : undefined)),
+          maxHeight: fullscreen && isInContainer ? '100%' : (fullscreen ? '100vh' : (hasHeightConstraints ? maxHeight : undefined)),
+          minHeight: fullscreen && isInContainer ? '100%' : (fullscreen ? '100vh' : (hasHeightConstraints ? minHeight : undefined)),
           backgroundColor: 'var(--color-panel-bg-secondary)',
-          borderLeft: '1px solid var(--color-panel-border)',
-          zIndex: 10000,
+          borderLeft: fullscreen && isInContainer ? 'none' : '1px solid var(--color-panel-border)',
+          zIndex: fullscreen ? 99999 : 10000,
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '-4px 0 24px var(--color-panel-shadow)',
+          boxShadow: fullscreen && isInContainer ? undefined : (isInContainer ? undefined : '-4px 0 24px var(--color-panel-shadow)'),
           animation: 'slideInRight 0.3s ease-out',
         }}
-        onClick={(e) => e.stopPropagation()}
       >
-        {/* Close button - always show in top right */}
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '16px',
-            right: '16px',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '6px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--color-panel-text-muted)',
-            borderRadius: '4px',
-            transition: 'background 0.15s, color 0.15s',
-            zIndex: 10001,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
-            e.currentTarget.style.color = 'var(--color-panel-text)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = 'var(--color-panel-text-muted)';
-          }}
-        >
-          <X size={18} />
-        </button>
-
-        {/* Header */}
-        {title && (
-          <div
-            style={{
-              padding: '16px 20px',
-              borderBottom: '1px solid var(--color-panel-border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              minHeight: '56px',
-            }}
-          >
-            <h2
-              style={{
-                margin: 0,
-                fontSize: '16px',
-                fontWeight: 600,
-                color: 'var(--color-panel-text)',
-              }}
-            >
-              {title}
-            </h2>
-          </div>
-        )}
 
         {/* Content */}
         <div

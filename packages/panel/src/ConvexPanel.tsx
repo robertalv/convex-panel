@@ -87,6 +87,18 @@ const ConvexPanel = ({
   });
   const [activeTab, setActiveTab] = useActiveTab();
 
+  // Listen for navigation event from function runner to switch to functions tab
+  useEffect(() => {
+    const handleNavigateToFunctions = () => {
+      setActiveTab('functions');
+    };
+
+    window.addEventListener('convex-panel-navigate-to-functions-code', handleNavigateToFunctions);
+    return () => {
+      window.removeEventListener('convex-panel-navigate-to-functions-code', handleNavigateToFunctions);
+    };
+  }, [setActiveTab]);
+
   let convexFromContext: any;
   let convexError: Error | null = null;
   try {

@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Play, Search, Pause, CodeXml } from 'lucide-react';
-import Editor from '../../components/editor/lazy-monaco-editor';
-import type { BeforeMount } from '../../components/editor/lazy-monaco-editor';
+import Editor from '../../components/editor/lazy-editor';
 import type { ModuleFunction as TypedModuleFunction, FunctionExecutionLog } from '../../types';
 import type { ModuleFunction } from '../../utils/api/functionDiscovery';
 import { useShowGlobalRunner } from '../../lib/functionRunner';
@@ -10,13 +9,13 @@ import { getAdminKey } from '../../utils/adminClient';
 import { ComponentSelector } from '../../components/component-selector';
 import { useComponents } from '../../hooks/useComponents';
 import { useFunctionLogStream } from '../../hooks';
-import { Card } from '../../components/shared/card';
 import { HealthCard } from '../health/components/health-card';
 import { useThemeSafe } from '../../hooks/useTheme';
 import { EmptyFunctionsState } from './components/empty-functions-state';
 import { FunctionExecutionDetailSheet } from './components/function-execution-detail-sheet';
 import { fetchUdfExecutionStats, aggregateFunctionStats } from '../../utils/api/metrics';
 import { fetchSourceCode } from '../../utils/api/functions';
+import { getConvexPanelTheme } from '../../components/editor/editor-theme';
 
 export interface FunctionsViewProps {
   adminClient: any;
@@ -42,7 +41,6 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
   useMockData = false,
   onError,
 }) => {
-  // Load initial state from localStorage
   const [selectedFunction, setSelectedFunction] = useState<any | null>(null);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState(() => {
@@ -52,7 +50,6 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
     return '';
   });
   const [activeTab, setActiveTab] = useState<TabType>('statistics');
-  const [monaco, setMonaco] = useState<Parameters<BeforeMount>[0]>();
   const { theme } = useThemeSafe();
   const showGlobalRunner = useShowGlobalRunner();
 
@@ -77,24 +74,26 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
     onError,
   });
 
-  // Statistics data
   const [invocationData, setInvocationData] = useState<number[]>([]);
   const [executionTimeData, setExecutionTimeData] = useState<number[]>([]);
   const [errorData, setErrorData] = useState<number[]>([]);
   const [cacheHitData, setCacheHitData] = useState<number[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
 
-  // Code data
   const [sourceCode, setSourceCode] = useState<string | null>(null);
   const [codeLoading, setCodeLoading] = useState(false);
+  const [shouldHighlightFunction, setShouldHighlightFunction] = useState(false);
+  const editorRef = useRef<any>(null);
+  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isHighlightingRef = useRef<boolean>(false);
 
-  // Logs data
   const [logs, setLogs] = useState<FunctionExecutionLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [, setLogCursor] = useState<number | string>('now');
   const [selectedExecution, setSelectedExecution] = useState<FunctionExecutionLog | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   const deploymentUrl = deployUrl || baseUrl;
   const adminKey = getAdminKey(adminClient) || accessToken;
@@ -131,12 +130,106 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
           const func = group.functions.find(f => f.identifier === savedFunctionId);
           if (func) {
             setSelectedFunction(func);
+            const shouldSwitchToCode = localStorage.getItem('convex-panel-functions-view-code-tab');
+            if (shouldSwitchToCode === 'true') {
+              setActiveTab('code');
+              setShouldHighlightFunction(true);
+              localStorage.removeItem('convex-panel-functions-view-code-tab');
+            }
             break;
           }
         }
       }
     }
   }, [groupedFunctions, selectedFunction]);
+
+  const highlightFunctionInCode = React.useCallback((editor: any, code: string, functionName: string) => {
+    if (!editor || !code || !functionName || isHighlightingRef.current) {
+      return;
+    }
+
+    isHighlightingRef.current = true;
+
+    const escapedName = functionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const patterns = [
+      new RegExp(`(export\\s+(const|async\\s+const|function|async\\s+function)\\s+${escapedName})`, 'g'),
+      new RegExp(`(const\\s+${escapedName}\\s*=)`, 'g'),
+      new RegExp(`(function\\s+${escapedName})`, 'g'),
+    ];
+
+    const lines = code.split('\n');
+    let found = false;
+    
+    for (let i = 0; i < lines.length; i++) {
+      for (const pattern of patterns) {
+        if (pattern.test(lines[i])) {
+          const session = editor.getSession();
+          
+          if ((session as any).highlightMarker) {
+            session.removeMarker((session as any).highlightMarker);
+          }
+          
+          let Range: any = null;
+          try {
+            Range = (window as any).ace?.require?.('ace/range')?.Range;
+            if (!Range && (editor as any).require) {
+              Range = (editor as any).require('ace/range').Range;
+            }
+          } catch (e) {
+            // Range not available, will just scroll
+          }
+          
+          if (Range) {
+            const range = new Range(i, 0, i, lines[i].length);
+            (session as any).highlightMarker = session.addMarker(range, 'ace_highlight', 'fullLine', false);
+          }
+          
+          editor.gotoLine(i + 1, 0, true);
+          
+          setTimeout(() => {
+            if ((session as any).highlightMarker) {
+              session.removeMarker((session as any).highlightMarker);
+              (session as any).highlightMarker = null;
+            }
+            isHighlightingRef.current = false;
+            setShouldHighlightFunction(false);
+          }, 3000);
+          
+          found = true;
+          break;
+        }
+      }
+      if (found) break;
+    }
+    
+    if (!found) {
+      isHighlightingRef.current = false;
+      setShouldHighlightFunction(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleNavigateToCode = (event: CustomEvent) => {
+      const { functionIdentifier } = event.detail;
+      if (functionIdentifier && groupedFunctions.length > 0) {
+        for (const group of groupedFunctions) {
+          const func = group.functions.find(f => f.identifier === functionIdentifier);
+          if (func) {
+            setSelectedFunction(func);
+            setActiveTab('code');
+            setShouldHighlightFunction(true);
+            localStorage.removeItem('convex-panel-functions-view-code-tab');
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('convex-panel-navigate-to-functions-code', handleNavigateToCode as EventListener);
+    return () => {
+      window.removeEventListener('convex-panel-navigate-to-functions-code', handleNavigateToCode as EventListener);
+    };
+  }, [groupedFunctions]);
 
   // Expand all paths when grouped functions change
   useEffect(() => {
@@ -238,6 +331,32 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
       clearInterval(interval);
     };
   }, [selectedFunction, adminClient, deploymentUrl, accessToken, useMockData, onError]);
+
+  // Trigger highlight when source code loads and highlighting is requested
+  useEffect(() => {
+    // Clear any pending highlight timeout
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = null;
+    }
+
+    // Only highlight if all conditions are met and we're not already highlighting
+    if (shouldHighlightFunction && sourceCode && selectedFunction && editorRef.current && !isHighlightingRef.current) {
+      highlightTimeoutRef.current = setTimeout(() => {
+        if (editorRef.current && shouldHighlightFunction && sourceCode && selectedFunction && !isHighlightingRef.current) {
+          highlightFunctionInCode(editorRef.current, sourceCode, selectedFunction.name);
+        }
+        highlightTimeoutRef.current = null;
+      }, 100);
+    }
+
+    return () => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+        highlightTimeoutRef.current = null;
+      }
+    };
+  }, [sourceCode, shouldHighlightFunction, selectedFunction]); // highlightFunctionInCode is stable (memoized with empty deps)
 
   useEffect(() => {
     if (activeTab !== 'code' || !selectedFunction || !deploymentUrl || !accessToken || useMockData) {
@@ -388,73 +507,6 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
     return 300;
   };
 
-  // Monaco editor setup
-  const handleEditorWillMount: BeforeMount = (monacoInstance) => {
-    setMonaco(monacoInstance);
-
-    const getThemeColor = (varName: string, fallback: string = '#0F1115') => {
-      const themeElement = document.querySelector('.cp-theme-dark, .cp-theme-light') || document.documentElement;
-      const color = getComputedStyle(themeElement).getPropertyValue(varName).trim();
-      return color || fallback;
-    };
-
-    const toMonacoColor = (hex: string) => hex.replace('#', '');
-
-    monacoInstance.editor.defineTheme('convex-dark', {
-      base: 'vs-dark',
-      inherit: true,
-      rules: [
-        { token: 'comment', foreground: toMonacoColor(getThemeColor('--color-panel-text-muted', '#6b7280')), fontStyle: 'italic' },
-        { token: 'keyword', foreground: 'c084fc' },
-        { token: 'string', foreground: 'fbbf24' },
-        { token: 'number', foreground: 'fb923c' },
-      ],
-      colors: {
-        'editor.background': getThemeColor('--color-panel-bg', '#0F1115'),
-        'editor.foreground': getThemeColor('--color-panel-text', '#d1d5db'),
-        'editor.lineHighlightBackground': getThemeColor('--color-panel-bg-secondary', '#16181D'),
-        'editor.selectionBackground': getThemeColor('--color-panel-active', 'rgba(255, 255, 255, 0.1)'),
-        'editorCursor.foreground': getThemeColor('--color-panel-text', '#d1d5db'),
-        'editorLineNumber.foreground': getThemeColor('--color-panel-text-muted', '#6b7280'),
-        'editorLineNumber.activeForeground': getThemeColor('--color-panel-text', '#d1d5db'),
-        'editorIndentGuide.background': getThemeColor('--color-panel-border', '#2D313A'),
-        'editorIndentGuide.activeBackground': getThemeColor('--color-panel-text-muted', '#6b7280'),
-        'editorWhitespace.foreground': getThemeColor('--color-panel-border', '#2D313A'),
-      },
-    });
-
-    monacoInstance.editor.defineTheme('convex-light', {
-      base: 'vs',
-      inherit: true,
-      rules: [
-        { token: 'comment', foreground: toMonacoColor(getThemeColor('--color-panel-text-muted', '#9ca3af')), fontStyle: 'italic' },
-        { token: 'keyword', foreground: '7c3aed' },
-        { token: 'string', foreground: 'd97706' },
-        { token: 'number', foreground: 'ea580c' },
-      ],
-      colors: {
-        'editor.background': getThemeColor('--color-panel-bg', '#ffffff'),
-        'editor.foreground': getThemeColor('--color-panel-text', '#111827'),
-        'editor.lineHighlightBackground': getThemeColor('--color-panel-bg-secondary', '#f9fafb'),
-        'editor.selectionBackground': getThemeColor('--color-panel-active', 'rgba(0, 0, 0, 0.1)'),
-        'editorCursor.foreground': getThemeColor('--color-panel-text', '#111827'),
-        'editorLineNumber.foreground': getThemeColor('--color-panel-text-muted', '#9ca3af'),
-        'editorLineNumber.activeForeground': getThemeColor('--color-panel-text', '#111827'),
-        'editorIndentGuide.background': getThemeColor('--color-panel-border', '#e5e7eb'),
-        'editorIndentGuide.activeBackground': getThemeColor('--color-panel-text-muted', '#9ca3af'),
-        'editorWhitespace.foreground': getThemeColor('--color-panel-border', '#e5e7eb'),
-      },
-    });
-  };
-
-  // Update Monaco theme when theme changes
-  useEffect(() => {
-    if (monaco) {
-      const monacoTheme = theme === 'light' ? 'convex-light' : 'convex-dark';
-      monaco.editor.setTheme(monacoTheme);
-    }
-  }, [theme, monaco]);
-
   // Determine language from file path
   const getLanguageFromPath = (path: string | undefined): string => {
     if (!path) return 'typescript';
@@ -473,7 +525,7 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
     }
   };
 
-  const monacoTheme = theme === 'light' ? 'convex-light' : 'convex-dark';
+  const convexPanelTheme = getConvexPanelTheme(theme);
 
   // Live function log streaming (only when logs tab active and real data)
   const isLogsTabActive = activeTab === 'logs';
@@ -660,7 +712,10 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
       </div>
 
       {/* Main Content */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-panel-bg)' }}>
+      <div 
+        ref={containerRef}
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-panel-bg)' }}
+      >
         {/* Header */}
         <div
           style={{
@@ -957,133 +1012,97 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                     minHeight: 0,
                   }}
                 >
-                  <Card
+                  <div
                     style={{
                       flex: 1,
                       display: 'flex',
                       flexDirection: 'column',
-                      overflow: 'hidden',
                       minHeight: 0,
                     }}
                   >
                     <div
                       style={{
                         flex: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
                         minHeight: 0,
+                        overflow: 'hidden',
                       }}
                     >
-                      <div style={{ marginBottom: '16px', flexShrink: 0 }}>
-                        <div style={{ fontSize: '14px', color: 'var(--color-panel-text-secondary)', marginBottom: '8px' }}>
-                          <span style={{ fontWeight: 600 }}>Path: </span>
-                          {selectedFunction.file?.path ? removeJsExtension(selectedFunction.file.path) : 'N/A'}
+                      {codeLoading ? (
+                        <div
+                          style={{
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--color-panel-text-muted)',
+                            fontSize: '14px',
+                            padding: '32px',
+                            textAlign: 'center',
+                          }}
+                        >
+                          Loading source code...
                         </div>
-                        {selectedFunction.args && typeof selectedFunction.args === 'string' && (
-                          <div style={{ fontSize: '14px', color: 'var(--color-panel-text-secondary)', marginBottom: '16px' }}>
-                            <span style={{ fontWeight: 600 }}>Args Validator: </span>
-                            <pre
-                              style={{
-                                backgroundColor: 'var(--color-panel-code-bg)',
-                                padding: '8px',
-                                borderRadius: '4px',
-                                marginTop: '8px',
-                                fontSize: '12px',
-                                fontFamily: 'monospace',
-                                overflowX: 'auto',
-                                color: 'var(--color-panel-text)',
-                              }}
-                            >
-                              {selectedFunction.args}
-                            </pre>
-                          </div>
-                        )}
-                      </div>
-                      <div
-                        style={{
-                          flex: 1,
-                          minHeight: 0,
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {codeLoading ? (
-                          <div
-                            style={{
-                              height: '100%',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: 'var(--color-panel-text-muted)',
-                              fontSize: '14px',
-                              padding: '32px',
-                              textAlign: 'center',
+                      ) : sourceCode && sourceCode !== 'null' ? (
+                        <div
+                          style={{
+                            height: '100%',
+                            border: '1px solid var(--color-panel-border)',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <Editor
+                            height="100%"
+                            language={getLanguageFromPath(selectedFunction.file?.path)}
+                            theme={convexPanelTheme}
+                            value={sourceCode}
+                            options={{
+                              scrollBeyondLastLine: false,
+                              fontSize: 13,
+                              lineNumbers: 'on',
+                              lineNumbersMinChars: 3,
+                              scrollbar: {
+                                horizontalScrollbarSize: 8,
+                                verticalScrollbarSize: 8,
+                              },
+                              wordWrap: 'on',
+                              tabSize: 2,
+                              readOnly: true,
+                              domReadOnly: true,
+                              contextmenu: true,
+                              glyphMargin: false,
+                              folding: true,
                             }}
-                          >
-                            Loading source code...
-                          </div>
-                        ) : sourceCode && sourceCode !== 'null' ? (
-                          <div
-                            style={{
-                              height: '100%',
-                              border: '1px solid var(--color-panel-border)',
-                              borderRadius: '4px',
-                              overflow: 'hidden',
+                            onMount={(editor) => {
+                              editorRef.current = editor;
+                              // The useEffect will handle highlighting when conditions are met
+                              // This just sets the ref so the effect can access the editor
                             }}
-                          >
-                            <Editor
-                              height="100%"
-                              language={getLanguageFromPath(selectedFunction.file?.path)}
-                              theme={monacoTheme}
-                              value={sourceCode}
-                              beforeMount={handleEditorWillMount}
-                              options={{
-                                automaticLayout: true,
-                                minimap: { enabled: false },
-                                scrollBeyondLastLine: false,
-                                fontSize: 13,
-                                fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
-                                lineNumbers: 'on',
-                                lineNumbersMinChars: 3,
-                                scrollbar: {
-                                  horizontalScrollbarSize: 8,
-                                  verticalScrollbarSize: 8,
-                                },
-                                wordWrap: 'on',
-                                tabSize: 2,
-                                readOnly: true,
-                                domReadOnly: true,
-                                contextmenu: true,
-                                selectOnLineNumbers: true,
-                                glyphMargin: false,
-                                folding: true,
-                                lineDecorationsWidth: 10,
-                              }}
-                            />
-                          </div>
-                        ) : (
-                          <div
-                            style={{
-                              height: '100%',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: 'var(--color-panel-text-muted)',
-                              fontSize: '14px',
-                              padding: '32px',
-                              textAlign: 'center',
-                            }}
-                          >
-                            Source code not available
-                          </div>
-                        )}
-                      </div>
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--color-panel-text-muted)',
+                            fontSize: '14px',
+                            padding: '32px',
+                            textAlign: 'center',
+                          }}
+                        >
+                          Source code not available
+                        </div>
+                      )}
                     </div>
-                  </Card>
+                  </div>
                 </div>
               )}
 
               {activeTab === 'logs' && (
-                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', overflow: 'visible' }}>
                   <div
                     style={{
                       padding: '8px',
@@ -1199,8 +1218,12 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                                 : 'transparent',
                           }}
                           onClick={() => {
+                            console.log('[FunctionsView] Log clicked:', log);
+                            console.log('[FunctionsView] Setting selectedExecution to:', log);
+                            console.log('[FunctionsView] Setting isDetailOpen to: true');
                             setSelectedExecution(log);
                             setIsDetailOpen(true);
+                            console.log('[FunctionsView] State updated');
                           }}
                           onMouseEnter={(e) => {
                             if (selectedExecution?.id !== log.id) {
@@ -1266,7 +1289,11 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                   <FunctionExecutionDetailSheet
                     log={selectedExecution}
                     isOpen={isDetailOpen}
-                    onClose={() => setIsDetailOpen(false)}
+                    onClose={() => {
+                      console.log('[FunctionsView] Closing detail sheet');
+                      setIsDetailOpen(false);
+                    }}
+                    container={containerRef.current}
                   />
                 </div>
               )}

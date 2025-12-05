@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { X, Plus, AlertCircle, CheckCircle2, Loader2, Info } from 'lucide-react';
 import { ObjectEditor } from '../../../components/editor';
-import { useThemeSafe } from '../../../hooks/useTheme';
 import { insertDocuments } from '../../../utils/api/documents';
 import { toast } from 'sonner';
 import type { TableSchema } from '../../../types';
@@ -72,17 +71,43 @@ const getDefaultDocument = (tableSchema?: TableSchema): GenericDocument => {
         const type = field.shape.type || 'any';
         let exampleValue: Value;
         
-        if (field.shape.tableName) {
+        // Handle nested types (e.g., shape.shape.type for optional or union types)
+        const actualType = field.shape.shape?.type || type;
+        
+        if (field.shape.tableName || actualType === 'id') {
           exampleValue = ''; // Reference field (ID)
-        } else if (type === 'number') {
+        } else if (actualType === 'number' || actualType === 'float64') {
           exampleValue = 0;
-        } else if (type === 'boolean') {
+        } else if (actualType === 'boolean') {
           exampleValue = false;
-        } else if (type === 'array') {
+        } else if (actualType === 'array') {
           exampleValue = [];
-        } else if (type === 'object') {
-          exampleValue = {};
+        } else if (actualType === 'object') {
+          // For nested objects, try to generate nested structure if fields are available
+          if (field.shape.fields && field.shape.fields.length > 0) {
+            const nestedObj: GenericDocument = {};
+            field.shape.fields
+              .filter(nestedField => !nestedField.fieldName.startsWith('_'))
+              .forEach(nestedField => {
+                const nestedType = nestedField.shape.type || 'any';
+                if (nestedType === 'number' || nestedType === 'float64') {
+                  nestedObj[nestedField.fieldName] = 0;
+                } else if (nestedType === 'boolean') {
+                  nestedObj[nestedField.fieldName] = false;
+                } else if (nestedType === 'array') {
+                  nestedObj[nestedField.fieldName] = [];
+                } else {
+                  nestedObj[nestedField.fieldName] = '';
+                }
+              });
+            exampleValue = Object.keys(nestedObj).length > 0 ? nestedObj : {};
+          } else {
+            exampleValue = {};
+          }
+        } else if (actualType === 'bytes') {
+          exampleValue = '';
         } else {
+          // Default to empty string for strings and other types
           exampleValue = '';
         }
         
@@ -94,11 +119,8 @@ const getDefaultDocument = (tableSchema?: TableSchema): GenericDocument => {
     }
   }
   
-  // Fallback default
-  return {
-    exampleField: 'example value',
-    anotherField: 123,
-  };
+  // Return empty object if no schema fields, which will be formatted as empty object template
+  return {};
 };
 
 export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
@@ -110,8 +132,8 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
   onDocumentAdded,
   onToggleSchema,
   isSchemaOpen = false,
-  onInsertField,
   onGetEditorContent,
+  onInsertField,
 }) => {
   const [value, setValue] = useState<Value | undefined>(undefined);
   const [documents, setDocuments] = useState<GenericDocument[]>([]);
@@ -122,7 +144,6 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
   const [editorContent, setEditorContent] = useState<string>('');
   const randomNumberRef = useRef<number>(Math.random());
 
-  // Initialize with default document
   const defaultDocument = useMemo(() => getDefaultDocument(tableSchema), [tableSchema]);
 
   useEffect(() => {
@@ -136,12 +157,10 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
     }
   }, [selectedTable, defaultDocument]);
 
-  // Handle value change from ObjectEditor
   const onChange = useCallback(
     (newValue?: Value) => {
       setValue(newValue);
       
-      // Remove system fields if present
       const cleanValue = newValue 
         ? (Array.isArray(newValue)
             ? newValue
@@ -160,7 +179,6 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
     []
   );
 
-  // Validation
   let validationError: string | undefined;
   if (isInvalidObject) {
     validationError = 'Please fix the errors above to continue.';
@@ -179,7 +197,6 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
 
   const disabled = validationError !== undefined || isSubmitting;
 
-  // Handle form submission
   const handleSubmit = useCallback(async () => {
     if (disabled || !adminClient) {
       return;
@@ -222,12 +239,10 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
     }
   }, [adminClient, documents, selectedTable, componentId, disabled, defaultDocument, onDocumentAdded]);
 
-  // Function to get current editor content (for backward compatibility)
   const getEditorContent = useCallback(() => {
     return editorContent;
   }, [editorContent]);
 
-  // Expose functions to parent via refs (for backward compatibility)
   useEffect(() => {
     if (onGetEditorContent) {
       onGetEditorContent.current = getEditorContent;
@@ -239,8 +254,8 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
     };
   }, [getEditorContent, onGetEditorContent]);
 
-  // Note: onInsertField is kept for backward compatibility but ObjectEditor doesn't support
-  // field insertion the same way. If needed, this could be enhanced later.
+
+  console.log("On ", onInsertField);
 
   return (
     <div
@@ -374,11 +389,12 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
         }}
       >
         <ObjectEditor
+          key={`${selectedTable}-${randomNumberRef.current}`}
           defaultValue={value}
           onChange={onChange}
           onChangeInnerText={(text) => setEditorContent(text)}
           onError={(errors) => setIsInvalidObject(errors.length > 0)}
-          path={`document/${randomNumberRef.current}`}
+          path={`document/${selectedTable}/${randomNumberRef.current}`}
           fullHeight
           autoFocus
           saveAction={handleSubmit}

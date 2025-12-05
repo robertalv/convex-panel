@@ -5,6 +5,7 @@ export interface SheetContent {
   title?: string;
   content: ReactNode;
   width?: string;
+  fullscreen?: boolean;
 }
 
 interface SheetContextValue {

@@ -2,7 +2,20 @@
  * Common/shared types used across the panel
  */
 
-import type { EditorProps, DiffEditorProps } from "@monaco-editor/react";
+type EditorOptions = {
+  lineNumbers?: 'on' | 'off';
+  minimap?: { enabled?: boolean };
+  scrollbar?: {
+    alwaysConsumeMouseWheel?: boolean;
+    horizontalScrollbarSize?: number;
+    verticalScrollbarSize?: number;
+    useShadows?: boolean;
+    vertical?: 'visible' | 'auto' | 'hidden';
+  };
+  [key: string]: any;
+};
+
+type DiffEditorOptions = EditorOptions;
 
 export interface ThemeClasses {
   container?: string;
@@ -41,8 +54,7 @@ export interface ConvexPanelSettings {
   showSuccessCheckbox: boolean;
 }
 
-export const editorOptions: EditorProps["options"] &
-  DiffEditorProps["options"] = {
+export const editorOptions: EditorOptions & DiffEditorOptions = {
   tabFocusMode: false,
   automaticLayout: true,
   minimap: { enabled: false },

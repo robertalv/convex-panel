@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   ChevronDown,
   ChevronUp,
-  X,
   HelpCircle,
   Sun,
   Moon,
@@ -23,6 +22,7 @@ import { Sidebar } from './sidebar';
 import { useActiveTab } from '../hooks/useActiveTab';
 import { useIsGlobalRunnerShown, useShowGlobalRunner } from '../lib/functionRunner';
 import { useFunctionRunnerShortcuts } from '../hooks/useFunctionRunnerShortcuts';
+import { useGlobalLocalStorage } from '../hooks/useGlobalLocalStorage';
 import type { TabId } from '../types/tabs';
 import type { Team, Project, EnvType } from '../types';
 import { useThemeSafe } from '../hooks/useTheme';
@@ -391,6 +391,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
   const isRunnerShown = useIsGlobalRunnerShown();
   const showGlobalRunner = useShowGlobalRunner();
+  const [isGlobalRunnerVertical, setIsGlobalRunnerVertical] = useGlobalLocalStorage('functionRunnerOrientation', false);
+  const [isRunnerExpanded, setIsRunnerExpanded] = useState(false);
   
   useFunctionRunnerShortcuts();
 
@@ -554,64 +556,93 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       {isPanelExpanded && (
         <>
           <div className="cp-flex cp-flex-1 cp-overflow-hidden">
-            {isRunnerShown ? (
-              <GlobalFunctionTester
-                adminClient={adminClient}
-                deploymentUrl={deploymentUrl}
-                componentId={null}
-              />
-            ) : (
-              <>
-                <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
+            <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
 
-                <div className="cp-main-content" ref={mainContentRef} style={{ position: 'relative', overflow: 'hidden' }}>
-                    {/* Deployment Paused Banner */}
-                    {isAuthenticated && deploymentState === 'paused' && (
-                      <div
-                        style={{
-                          backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                          border: '1px solid rgba(239, 68, 68, 0.2)',
-                          color: '#f87171',
-                          padding: '12px 24px',
-                          textAlign: 'center',
-                          fontSize: '14px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        <span>This deployment is paused. Resume your deployment on the </span>
-                        <button
-                          type="button"
-                          onClick={handleSettingsClick}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#60a5fa',
-                            textDecoration: 'underline',
-                            cursor: 'pointer',
-                            padding: 0,
-                            fontSize: '14px',
-                            fontWeight: 500,
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = '#93c5fd';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = '#60a5fa';
-                          }}
-                        >
-                          settings
-                        </button>
-                        <span> page.</span>
-                      </div>
-                    )}
-                  {children}
-                  {isPanelExpanded && <GlobalSheet container={sheetContainer} />}
-                </div>
-              </>
-            )}
+            <div 
+              className="cp-main-content" 
+              ref={mainContentRef} 
+              style={{ 
+                display: 'flex',
+                flexDirection: !isGlobalRunnerVertical ? 'column' : 'row',
+                flex: 1,
+                overflow: 'hidden',
+                minHeight: 0,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
+              {/* Main content area - hidden when runner is expanded */}
+              <div
+                style={{
+                  height: isRunnerExpanded && isRunnerShown ? 0 : undefined,
+                  width: isRunnerExpanded && isRunnerShown ? 0 : undefined,
+                  flex: isRunnerExpanded && isRunnerShown ? 0 : 1,
+                  overflow: isRunnerExpanded && isRunnerShown ? 'hidden' : 'auto',
+                  minHeight: 0,
+                  minWidth: 0,
+                  position: 'relative',
+                }}
+              >
+                {/* Deployment Paused Banner */}
+                {isAuthenticated && deploymentState === 'paused' && (
+                  <div
+                    style={{
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      color: '#f87171',
+                      padding: '12px 24px',
+                      textAlign: 'center',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <span>This deployment is paused. Resume your deployment on the </span>
+                    <button
+                      type="button"
+                      onClick={handleSettingsClick}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#60a5fa',
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontSize: '14px',
+                        fontWeight: 500,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = '#93c5fd';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = '#60a5fa';
+                      }}
+                    >
+                      settings
+                    </button>
+                    <span> page.</span>
+                  </div>
+                )}
+                {children}
+                {isPanelExpanded && <GlobalSheet container={sheetContainer} />}
+              </div>
+
+              {/* Function Runner - always rendered when shown, positioned at bottom */}
+              {isRunnerShown && (
+                <GlobalFunctionTester
+                  adminClient={adminClient}
+                  deploymentUrl={deploymentUrl}
+                  componentId={null}
+                  isVertical={isGlobalRunnerVertical}
+                  setIsVertical={setIsGlobalRunnerVertical}
+                  isExpanded={isRunnerExpanded}
+                  setIsExpanded={setIsRunnerExpanded}
+                  container={sheetContainer}
+                />
+              )}
+            </div>
           </div>
 
           {!isRunnerShown && isAuthenticated && (

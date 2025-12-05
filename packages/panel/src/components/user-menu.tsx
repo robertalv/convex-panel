@@ -5,7 +5,6 @@ import { useProfile } from '../hooks/useProfile';
 import { usePortalTarget } from '../contexts/portal-context';
 import { useThemeSafe } from '../hooks/useTheme';
 import { buildDashboardUrl } from '../utils/dashboard-urls';
-import type { ProfileResponse } from '../utils/api/types';
 
 export interface UserMenuProps {
   accessToken?: string;

@@ -23,6 +23,7 @@ export const GlobalSheet: React.FC<GlobalSheetProps> = ({ container }) => {
       title={sheetContent.title}
       width={sheetContent.width}
       container={container}
+      fullscreen={sheetContent.fullscreen}
     >
       {sheetContent.content}
     </Sheet>

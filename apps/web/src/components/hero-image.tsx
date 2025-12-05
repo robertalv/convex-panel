@@ -4,8 +4,8 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { DynamicImage } from "./dynamic-image";
 
-const heroImageLight = "/hero2-light.png";
-const heroImageDark = "/hero2.png";
+const heroImageLight = "/hero3-light.png";
+const heroImageDark = "/hero3.png";
 
 export function HeroImage() {
   const [isLoaded, setIsLoaded] = useState(false);

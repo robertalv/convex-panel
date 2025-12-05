@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Play, Settings, Code as CodeIcon, Copy, ArrowLeft, ArrowRight } from 'lucide-react';
+import { X, Play, Settings, Code as CodeIcon, Copy, ArrowLeft, ArrowRight, Maximize2, Minimize2, Columns, Rows } from 'lucide-react';
 import { copyToClipboard } from '../../utils/toast';
 import type { ModuleFunction } from '../../utils/api/functionDiscovery';
 import { useFunctionResult } from '../../hooks/useFunctionResult';
@@ -16,6 +16,66 @@ import type { CustomQuery } from '../../types/functions';
 import type { ExecutableUdfType } from '../../types/convex';
 import { ObjectEditor } from '../editor';
 
+// Type definition for ValidatorJSON (simplified version of Convex's ValidatorJSON)
+type ValidatorJSON = {
+  type: string;
+  value?: any;
+  optional?: boolean;
+  fieldType?: ValidatorJSON;
+  keys?: ValidatorJSON;
+  values?: { fieldType: ValidatorJSON };
+};
+
+// Generate default value from a validator JSON (similar to Convex's defaultValueForValidator)
+const defaultValueForValidator = (validator: ValidatorJSON): Value | undefined => {
+  switch (validator.type) {
+    case 'null':
+      return null;
+    case 'string':
+      return '';
+    case 'boolean':
+      return false;
+    case 'number':
+    case 'float64':
+      return 0;
+    case 'bigint':
+      return BigInt(0);
+    case 'bytes':
+      return '';
+    case 'any':
+      return {};
+    case 'literal':
+      return validator.value;
+    case 'id':
+      return '';
+    case 'object':
+      if (!validator.value) {
+        return {};
+      }
+      return Object.fromEntries(
+        Object.entries(validator.value)
+          .map(([fieldName, objectField]: [string, any]) => [
+            fieldName,
+            objectField.optional
+              ? undefined
+              : defaultValueForValidator(objectField.fieldType || objectField),
+          ])
+          .filter((d) => d !== undefined && d[1] !== undefined)
+      );
+    case 'union':
+      if (!validator.value || validator.value.length === 0) {
+        return null;
+      }
+      return defaultValueForValidator(validator.value[0]);
+    case 'record':
+      return {};
+    case 'array':
+      return [];
+    default:
+      return {};
+  }
+};
+
 export interface FunctionRunnerProps {
   onClose: () => void;
   adminClient: any;
@@ -28,6 +88,10 @@ export interface FunctionRunnerProps {
   onFunctionSelect?: (fn: ModuleFunction | CustomQuery) => void;
   autoRun?: boolean;
   onAutoRunComplete?: () => void;
+  isVertical?: boolean;
+  setIsVertical?: (vertical: boolean) => void;
+  isExpanded?: boolean;
+  setIsExpanded?: (expanded: boolean) => void;
 }
 
 export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
@@ -42,6 +106,10 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
   onFunctionSelect,
   autoRun = false,
   onAutoRunComplete,
+  isVertical,
+  setIsVertical,
+  isExpanded,
+  setIsExpanded,
 }) => {
   const [selectedComponent, setSelectedComponent] = useState<string | null>(propComponentId || 'app');
   const [selectedFunction, setSelectedFunction] = useState<ModuleFunction | CustomQuery | null>(propSelectedFunction || null);
@@ -51,7 +119,65 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
   const [runHistoryItem, setRunHistoryItem] = useState<RunHistoryItem | undefined>();
   const [historyIndex, setHistoryIndex] = useState(0);
   const [argsError, setArgsError] = useState<string[]>([]);
+  const [isVerticalLayout, setIsVerticalLayout] = useState(isVertical ?? false);
+  const [isFullscreen, setIsFullscreen] = useState(isExpanded ?? false);
+  const [isResizingOutput, setIsResizingOutput] = useState(false);
   const { theme: _theme } = useThemeSafe();
+
+  useEffect(() => {
+    if (typeof isVertical === 'boolean') {
+      setIsVerticalLayout(isVertical);
+    }
+  }, [isVertical]);
+
+  useEffect(() => {
+    if (typeof isExpanded === 'boolean') {
+      setIsFullscreen(isExpanded);
+    }
+  }, [isExpanded]);
+
+  const handleExpandedToggle = () => {
+    const next = !isFullscreen;
+    setIsFullscreen(next);
+    setIsExpanded?.(next);
+  };
+
+  useEffect(() => {
+    if (!isResizingOutput) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isVerticalLayout) return;
+      
+      // Get the function runner container
+      const runnerContainer = document.querySelector('.cp-function-runner') as HTMLElement;
+      if (!runnerContainer) return;
+
+      const containerRect = runnerContainer.getBoundingClientRect();
+      const containerHeight = containerRect.height;
+      
+      // Calculate new output height from bottom of container
+      const newOutputHeight = containerRect.bottom - e.clientY;
+      
+      // Clamp between min (200px) and max (80% of container)
+      const minHeight = 200;
+      const maxHeight = containerHeight * 0.8;
+      const clampedHeight = Math.max(minHeight, Math.min(newOutputHeight, maxHeight));
+      
+      localStorage.setItem('convex-panel-function-runner-output-height', clampedHeight.toString());
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingOutput(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizingOutput, isVerticalLayout]);
 
   useEffect(() => {
     if (propComponentId !== undefined) {
@@ -144,13 +270,46 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
       onFunctionSelect(fn);
     }
     if (!runHistoryItem) {
-      setArgs({});
+      // Generate default arguments from function's args validator
+      if (!('type' in fn) && fn.args) {
+        try {
+          const argsValidator = JSON.parse(fn.args) as ValidatorJSON;
+          const defaultArgs = defaultValueForValidator(argsValidator) as Record<string, Value> | undefined;
+          setArgs(defaultArgs || {});
+        } catch (e) {
+          // If parsing fails, use empty object
+          setArgs({});
+        }
+      } else {
+        setArgs({});
+      }
     }
   };
 
   const isCustomQuery = selectedFunction && 'type' in selectedFunction && selectedFunction.type === 'customQuery';
   const moduleFunction = !isCustomQuery ? (selectedFunction as ModuleFunction | null) : null;
   const currentComponentId = selectedComponent === 'app' ? null : selectedComponent;
+
+  // Generate default arguments when function changes (as a fallback for prop changes)
+  useEffect(() => {
+    if (moduleFunction && moduleFunction.args && !runHistoryItem) {
+      try {
+        const argsValidator = JSON.parse(moduleFunction.args) as ValidatorJSON;
+        const defaultArgs = defaultValueForValidator(argsValidator) as Record<string, Value> | undefined;
+        if (defaultArgs && Object.keys(defaultArgs).length > 0) {
+          setArgs(defaultArgs);
+        } else {
+          setArgs({});
+        }
+      } catch (e) {
+        // If parsing fails, use empty object
+        setArgs({});
+      }
+    } else if (!moduleFunction && !isCustomQuery && !runHistoryItem) {
+      // Clear args when no function is selected (only if not restoring from history)
+      setArgs({});
+    }
+  }, [moduleFunction?.identifier, moduleFunction?.componentId, moduleFunction?.args, runHistoryItem, isCustomQuery]);
 
   const { runHistory } = useRunHistory(
     moduleFunction?.identifier || 'customQuery',
@@ -232,28 +391,50 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
     }
   }, [autoRun, selectedFunction, isRunning, isCustomQuery, moduleFunction, runCustomQuery, runFunction, onAutoRunComplete]);
 
+  const layoutDirection = isVerticalLayout ? 'column' : 'row';
+
+  const containerStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    width: '100%',
+    minHeight: (isFullscreen || isVerticalLayout) ? undefined : '24rem',
+    maxHeight: (isFullscreen || isVerticalLayout) ? undefined : '24rem',
+    backgroundColor: 'var(--color-panel-bg-secondary)',
+    flex: (isFullscreen || isVerticalLayout) ? 1 : undefined,
+    minWidth: isVerticalLayout ? undefined : '450px',
+    flexShrink: 0,
+  };
+
   return (
     <div
       className="cp-function-runner"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        width: '100%',
-        backgroundColor: 'var(--color-panel-bg-secondary)',
-      }}
+      style={containerStyle}
     >
       {/* Runner content area */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div style={{ 
+        flex: 1, 
+        display: 'flex', 
+        overflow: 'hidden', 
+        flexDirection: layoutDirection, 
+        gap: 0,
+        position: 'relative',
+        borderTop: !isVerticalLayout ? '1px solid var(--color-panel-border)' : 'none',
+      }}>
         {/* Left Pane: Function Input */}
         <div
           style={{
-            width: '450px',
+            width: isVerticalLayout ? '100%' : '650px',
             display: 'flex',
             flexDirection: 'column',
-            borderRight: '1px solid var(--color-panel-border)',
+            borderRight: isVerticalLayout ? 'none' : '1px solid var(--color-panel-border)',
+            borderBottom: isVerticalLayout ? '1px solid var(--color-panel-border)' : 'none',
+            borderTop: isVerticalLayout && isFullscreen ? '1px solid var(--color-panel-border)' : 'none',
             backgroundColor: 'var(--color-panel-bg)',
             flexShrink: 0,
+            flex: isVerticalLayout ? 1 : undefined,
+            minHeight: 0,
+            overflow: 'hidden',
           }}
         >
           <div
@@ -262,6 +443,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
               padding: '0 16px',
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'space-between',
               borderBottom: '1px solid var(--color-panel-border)',
               backgroundColor: 'var(--color-panel-bg-secondary)',
             }}
@@ -269,6 +451,155 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-panel-text)' }}>
               Function Input
             </span>
+            {isVerticalLayout && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  className="cp-icon-btn"
+                  style={{
+                    padding: '4px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--color-panel-text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '24px',
+                    height: '24px',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.color = 'var(--color-panel-text)';
+                    e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={async () => {
+                    if (currentResult) {
+                      const text = currentResult.success
+                        ? JSON.stringify(currentResult.value, null, 2)
+                        : currentResult.errorMessage || '';
+                      await copyToClipboard(text);
+                    }
+                  }}
+                  title="Copy result"
+                  type="button"
+                >
+                  <Copy
+                    style={{
+                      width: '14px',
+                      height: '14px',
+                    }}
+                  />
+                </button>
+                <button
+                  className="cp-icon-btn"
+                  style={{
+                    padding: '4px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--color-panel-text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '24px',
+                    height: '24px',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.color = 'var(--color-panel-text)';
+                    e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={() => {
+                    const next = !isVerticalLayout;
+                    setIsVerticalLayout(next);
+                    setIsVertical?.(next);
+                  }}
+                  title={isVerticalLayout ? 'Align horizontally' : 'Align vertically'}
+                  type="button"
+                >
+                  {isVerticalLayout ? (
+                    <Columns style={{ width: '14px', height: '14px' }} />
+                  ) : (
+                    <Rows style={{ width: '14px', height: '14px' }} />
+                  )}
+                </button>
+                <button
+                  className="cp-icon-btn"
+                  style={{
+                    padding: '4px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--color-panel-text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '24px',
+                    height: '24px',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.color = 'var(--color-panel-text)';
+                    e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={handleExpandedToggle}
+                  title={isFullscreen ? 'Exit full screen' : 'Expand'}
+                  type="button"
+                >
+                  {isFullscreen ? (
+                    <Minimize2 style={{ width: '14px', height: '14px' }} />
+                  ) : (
+                    <Maximize2 style={{ width: '14px', height: '14px' }} />
+                  )}
+                </button>
+                <button
+                  onClick={onClose}
+                  className="cp-icon-btn"
+                  style={{
+                    padding: '4px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--color-panel-text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '24px',
+                    height: '24px',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.color = 'var(--color-panel-text)';
+                    e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                  title="Close"
+                  type="button"
+                >
+                  <X
+                    style={{
+                      width: '14px',
+                      height: '14px',
+                    }}
+                  />
+                </button>
+              </div>
+            )}
           </div>
 
           <div
@@ -279,6 +610,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
               gap: '12px',
               overflowY: 'auto',
               flex: 1,
+              minHeight: 0,
             }}
           >
             {/* Context Selector */}
@@ -317,20 +649,36 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <button
+                      onClick={() => {
+                        if (moduleFunction) {
+                          if (typeof window !== 'undefined') {
+                            localStorage.setItem('convex-panel-functions-selected-function', moduleFunction.identifier);
+                            localStorage.setItem('convex-panel-functions-view-code-tab', 'true');
+                            window.dispatchEvent(new CustomEvent('convex-panel-navigate-to-functions-code', {
+                              detail: { functionIdentifier: moduleFunction.identifier }
+                            }));
+                          }
+                        }
+                      }}
+                      disabled={!moduleFunction}
                       style={{
                         padding: '4px',
                         borderRadius: '4px',
                         border: 'none',
                         background: 'transparent',
-                        color: 'var(--color-panel-text-muted)',
-                        cursor: 'pointer',
+                        color: moduleFunction ? 'var(--color-panel-text-muted)' : 'var(--color-panel-text-muted)',
+                        opacity: moduleFunction ? 1 : 0.5,
+                        cursor: moduleFunction ? 'pointer' : 'not-allowed',
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+                        if (moduleFunction) {
+                          e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+                        }
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = 'transparent';
                       }}
+                      title={moduleFunction ? 'View function code' : 'Select a function to view code'}
                     >
                       <CodeIcon style={{ width: '12px', height: '12px' }} />
                     </button>
@@ -397,6 +745,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                   }}
                 >
                   <ObjectEditor
+                    key={`${moduleFunction?.identifier || 'no-function'}-${moduleFunction?.componentId || 'no-component'}`}
                     defaultValue={args}
                     onChange={(value) => {
                       if (value !== undefined) {
@@ -408,10 +757,11 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                     onError={(errors) => {
                       setArgsError(errors);
                     }}
-                    path="function-arguments"
+                    path={`function-arguments-${moduleFunction?.identifier || 'no-function'}`}
                     language="json"
                     showLineNumbers={true}
                     fullHeight
+                    indentTopLevel={true}
                     className=""
                     editorClassname=""
                   />
@@ -524,6 +874,9 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
             display: 'flex',
             flexDirection: 'column',
             backgroundColor: 'var(--color-panel-bg-secondary)',
+            borderTop: isVerticalLayout ? '1px solid var(--color-panel-border)' : 'none',
+            overflow: 'hidden',
+            minHeight: 0,
           }}
         >
           <div
@@ -535,6 +888,9 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
               justifyContent: 'space-between',
               borderBottom: '1px solid var(--color-panel-border)',
               backgroundColor: 'var(--color-panel-bg-secondary)',
+              position: 'relative',
+              zIndex: 10,
+              flexShrink: 0,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -604,83 +960,155 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                 </>
               )}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                className="cp-icon-btn"
-                style={{
-                  padding: '4px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'transparent',
-                  color: 'var(--color-panel-text-muted)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '24px',
-                  height: '24px',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.color = 'var(--color-panel-text)';
-                  e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.color = 'var(--color-panel-text-muted)';
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-                onClick={async () => {
-                  if (currentResult) {
-                    const text = currentResult.success
-                      ? JSON.stringify(currentResult.value, null, 2)
-                      : currentResult.errorMessage || '';
-                    await copyToClipboard(text);
-                  }
-                }}
-                title="Copy result"
-                type="button"
-              >
-                <Copy
+            {!isVerticalLayout && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  className="cp-icon-btn"
                   style={{
-                    width: '14px',
-                    height: '14px',
+                    padding: '4px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--color-panel-text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '24px',
+                    height: '24px',
                   }}
-                />
-              </button>
-              <button
-                onClick={onClose}
-                className="cp-icon-btn"
-                style={{
-                  padding: '4px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'transparent',
-                  color: 'var(--color-panel-text-muted)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '24px',
-                  height: '24px',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.color = 'var(--color-panel-text)';
-                  e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.color = 'var(--color-panel-text-muted)';
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-                title="Close"
-                type="button"
-              >
-                <X
+                  onMouseEnter={e => {
+                    e.currentTarget.style.color = 'var(--color-panel-text)';
+                    e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={async () => {
+                    if (currentResult) {
+                      const text = currentResult.success
+                        ? JSON.stringify(currentResult.value, null, 2)
+                        : currentResult.errorMessage || '';
+                      await copyToClipboard(text);
+                    }
+                  }}
+                  title="Copy result"
+                  type="button"
+                >
+                  <Copy
+                    style={{
+                      width: '14px',
+                      height: '14px',
+                    }}
+                  />
+                </button>
+                <button
+                  className="cp-icon-btn"
                   style={{
-                    width: '14px',
-                    height: '14px',
+                    padding: '4px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--color-panel-text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '24px',
+                    height: '24px',
                   }}
-                />
-              </button>
-            </div>
+                  onMouseEnter={e => {
+                    e.currentTarget.style.color = 'var(--color-panel-text)';
+                    e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={() => {
+                    const next = !isVerticalLayout;
+                    setIsVerticalLayout(next);
+                    setIsVertical?.(next);
+                  }}
+                  title={isVerticalLayout ? 'Align horizontally' : 'Align vertically'}
+                  type="button"
+                >
+                  {isVerticalLayout ? (
+                    <Columns style={{ width: '14px', height: '14px' }} />
+                  ) : (
+                    <Rows style={{ width: '14px', height: '14px' }} />
+                  )}
+                </button>
+                <button
+                  className="cp-icon-btn"
+                  style={{
+                    padding: '4px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--color-panel-text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '24px',
+                    height: '24px',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.color = 'var(--color-panel-text)';
+                    e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={handleExpandedToggle}
+                  title={isFullscreen ? 'Exit full screen' : 'Expand'}
+                  type="button"
+                >
+                  {isFullscreen ? (
+                    <Minimize2 style={{ width: '14px', height: '14px' }} />
+                  ) : (
+                    <Maximize2 style={{ width: '14px', height: '14px' }} />
+                  )}
+                </button>
+                <button
+                  onClick={onClose}
+                  className="cp-icon-btn"
+                  style={{
+                    padding: '4px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--color-panel-text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '24px',
+                    height: '24px',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.color = 'var(--color-panel-text)';
+                    e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                  title="Close"
+                  type="button"
+                >
+                  <X
+                    style={{
+                      width: '14px',
+                      height: '14px',
+                    }}
+                  />
+                </button>
+              </div>
+            )}
           </div>
 
           <div
@@ -714,6 +1142,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
                   color: 'var(--color-panel-text-muted)',
                   fontStyle: 'italic',
                   fontFamily: 'monospace',
+                  padding: '16px',
                 }}
               >
                 Run this function to produce a result.

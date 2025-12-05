@@ -158,6 +158,7 @@ export const LogsView: React.FC<LogsViewProps> = ({
     if (!adminClient || useMockData) return;
 
     setIsLoadingFunctions(true);
+    console.log("Loading functions...", isLoadingFunctions);
     discoverFunctions(adminClient, useMockData)
       .then((funcs) => {
         setFunctions(funcs);

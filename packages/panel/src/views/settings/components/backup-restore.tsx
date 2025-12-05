@@ -8,7 +8,10 @@ import { RestoreBackupSheet } from './restore-backup-sheet';
 import { DeleteBackupSheet } from './delete-backup-sheet';
 import { RestoreDetailsSheet } from './restore-details-sheet';
 import { useSheetSafe } from '../../../contexts/sheet-context';
-import type { CloudBackupResponse, PeriodicBackupConfig } from '../../../utils/api/types';
+import type { 
+  CloudBackupResponse, 
+  // PeriodicBackupConfig 
+} from '../../../utils/api/types';
 import { createBackup, listBackups, getPeriodicBackupConfig, getLatestRestore, confirmSnapshotImport, getBackup, configurePeriodicBackup, disablePeriodicBackup, downloadBackup, restoreBackup, deleteBackup } from '../../../utils/api/backups';
 import { getDeploymentIdFromUrl } from '../../../utils/api/deployments';
 import { extractDeploymentName, getTeamTokenFromEnv } from '../../../utils/api/utils';
@@ -191,7 +194,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
   periodicBackupsEnabled = false,
 }) => {
   const [allBackups, setAllBackups] = useState<CloudBackupResponse[]>([]);
-  const [periodicConfig, setPeriodicConfig] = useState<PeriodicBackupConfig | null>(null);
+  // const [periodicBackupConfig, setPeriodicBackupConfig] = useState<PeriodicBackupConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
@@ -866,12 +869,13 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
       if (currentDeploymentId) {
         try {
           const config = await getPeriodicBackupConfig(currentDeploymentId, token);
-          setPeriodicConfig(config);
+          // TODO: Will finish this later when we have a way to configure periodic backups
+          // setPeriodicConfig(config);
           setAutomaticBackup(config !== null);
         } catch (err: any) {
           // If config doesn't exist or fails, that's okay
           // The function should return null for errors, but catch just in case
-          setPeriodicConfig(null);
+          // setPeriodicConfig(null);
           setAutomaticBackup(false);
         }
       } else {

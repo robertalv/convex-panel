@@ -1,52 +1,16 @@
-import type { EditorProps, DiffEditorProps } from '@monaco-editor/react';
+import type { EditorProps } from './lazy-editor';
 
-export const editorOptions: EditorProps['options'] & DiffEditorProps['options'] = {
-  tabFocusMode: false,
-  automaticLayout: true,
-  minimap: { enabled: false },
-  overviewRulerBorder: false,
+export const editorOptions: EditorProps['options'] = {
   scrollBeyondLastLine: false,
-  find: {
-    addExtraSpaceOnTop: false,
-    autoFindInSelection: 'never',
-    seedSearchStringFromSelection: 'never',
-  },
   lineNumbers: 'on',
   glyphMargin: false,
-  lineDecorationsWidth: 4,
   lineNumbersMinChars: 2,
   scrollbar: {
-    alwaysConsumeMouseWheel: true,
     horizontalScrollbarSize: 8,
     verticalScrollbarSize: 8,
-    useShadows: false,
-    vertical: 'auto',
   },
-  suggest: { preview: false },
-  hideCursorInOverviewRuler: true,
-  quickSuggestions: false,
-  parameterHints: { enabled: false },
-  suggestOnTriggerCharacters: false,
-  snippetSuggestions: 'none',
-  contextmenu: false,
-  codeLens: false,
-  disableLayerHinting: true,
-  inlayHints: { enabled: 'off' },
-  inlineSuggest: { enabled: false },
-  lightbulb: { enabled: false },
-  hover: { above: false },
-  guides: {
-    bracketPairs: true,
-    bracketPairsHorizontal: true,
-    highlightActiveBracketPair: true,
-    indentation: true,
-    highlightActiveIndentation: true,
-  },
-  bracketPairColorization: { enabled: true },
-  matchBrackets: 'always',
-  tabCompletion: 'off',
-  selectionHighlight: true,
-  occurrencesHighlight: 'singleFile',
-  renderLineHighlight: 'line',
+  wordWrap: 'off',
+  fontSize: 13,
+  folding: true,
 };
 

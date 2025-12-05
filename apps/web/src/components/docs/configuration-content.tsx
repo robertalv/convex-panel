@@ -95,7 +95,7 @@ export function ConfigurationContent() {
               code={`// Example: Panel automatically detects from ConvexProvider
 <ConvexProvider client={convex}>
   <App />
-  <ConvexPanel /> {/* No props needed! */}
+  <ConvexPanel /> // No props needed!
 </ConvexProvider>`}
               title="Auto-detection Example"
               language="typescript"

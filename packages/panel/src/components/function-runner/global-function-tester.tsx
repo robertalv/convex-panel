@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { FunctionRunner } from './function-runner';
 import { discoverFunctions } from '../../utils/api/functionDiscovery';
 import type { ModuleFunction } from '../../utils/api/functionDiscovery';
 import { fetchComponents } from '../../utils/api/functions';
 import { useIsGlobalRunnerShown, useHideGlobalRunner, useGlobalRunnerSelectedItem, useGlobalRunnerAutoRun } from '../../lib/functionRunner';
 import type { CustomQuery } from '../../types/functions';
+import { useSheetSafe } from '../../contexts/sheet-context';
 
 interface GlobalFunctionTesterProps {
   adminClient: any;
@@ -14,21 +15,23 @@ interface GlobalFunctionTesterProps {
   setIsVertical?: (vertical: boolean) => void;
   isExpanded?: boolean;
   setIsExpanded?: (expanded: boolean) => void;
+  container?: HTMLElement | null;
 }
 
 export const GlobalFunctionTester: React.FC<GlobalFunctionTesterProps> = ({
   adminClient,
   componentId,
   deploymentUrl,
-  isVertical: _isVertical = false,
-  setIsVertical: _setIsVertical,
-  isExpanded: _isExpanded = false,
-  setIsExpanded: _setIsExpanded,
+  isVertical = false,
+  setIsVertical,
+  isExpanded = false,
+  setIsExpanded,
 }) => {
   const isShowing = useIsGlobalRunnerShown();
   const hideGlobalRunner = useHideGlobalRunner();
   const [selectedItem, setSelectedItem] = useGlobalRunnerSelectedItem();
   const [autoRun, setAutoRun] = useGlobalRunnerAutoRun();
+  const { openSheet, closeSheet } = useSheetSafe();
   const [availableFunctions, setAvailableFunctions] = useState<ModuleFunction[]>([]);
   const [components, setComponents] = useState<any[]>([]);
 
@@ -134,32 +137,82 @@ export const GlobalFunctionTester: React.FC<GlobalFunctionTesterProps> = ({
     });
   };
 
-  return (
-    <div
-      style={{
-        flex: 1,
-        display: 'flex',
-        overflow: 'hidden',
-        backgroundColor: '#0F1115',
+  const handleClose = useCallback(() => {
+    setAutoRun(false);
+    hideGlobalRunner();
+    if (isVertical) {
+      closeSheet();
+    }
+  }, [isVertical, closeSheet]);
+
+  const sheetContent = useMemo(() => (
+    <FunctionRunner
+      onClose={handleClose}
+      adminClient={adminClient}
+      deploymentUrl={deploymentUrl}
+      selectedFunction={selectedFunction}
+      componentId={componentId || selectedItem?.componentId || null}
+      availableFunctions={availableFunctions}
+      availableComponents={componentList}
+      componentIdMap={componentIdMap}
+      onFunctionSelect={handleFunctionSelect}
+      autoRun={autoRun}
+      onAutoRunComplete={() => setAutoRun(false)}
+      isVertical={true}
+      setIsVertical={(val) => {
+        setIsVertical?.(val);
+        if (!val) {
+          closeSheet();
+        }
       }}
-    >
-          <FunctionRunner
-            onClose={() => {
-              setAutoRun(false);
-              hideGlobalRunner();
-            }}
-            adminClient={adminClient}
-            deploymentUrl={deploymentUrl}
-            selectedFunction={selectedFunction}
-            componentId={componentId || selectedItem?.componentId || null}
-            availableFunctions={availableFunctions}
-            availableComponents={componentList}
-            componentIdMap={componentIdMap}
-            onFunctionSelect={handleFunctionSelect}
-            autoRun={autoRun}
-            onAutoRunComplete={() => setAutoRun(false)}
-          />
-    </div>
+      isExpanded={isExpanded}
+      setIsExpanded={setIsExpanded}
+    />
+  ), [handleClose, adminClient, deploymentUrl, selectedFunction, componentId, selectedItem, availableFunctions, componentList, componentIdMap, handleFunctionSelect, autoRun, isExpanded, setIsExpanded, setIsVertical, closeSheet]);
+
+  // Open Sheet when vertical mode is activated
+  useEffect(() => {
+    if (!isShowing) {
+      closeSheet();
+      return;
+    }
+
+    if (isVertical) {
+      openSheet({
+        width: isExpanded ? '100%' : '500px',
+        content: sheetContent,
+        fullscreen: isExpanded,
+      });
+    } else {
+      closeSheet();
+    }
+  }, [isVertical, isShowing, isExpanded, openSheet, closeSheet, sheetContent]);
+
+  // When vertical, don't render inline - Sheet handles it
+  if (isVertical) {
+    return null;
+  }
+
+  return (
+    <FunctionRunner
+      onClose={handleClose}
+      adminClient={adminClient}
+      deploymentUrl={deploymentUrl}
+      selectedFunction={selectedFunction}
+      componentId={componentId || selectedItem?.componentId || null}
+      availableFunctions={availableFunctions}
+      availableComponents={componentList}
+      componentIdMap={componentIdMap}
+      onFunctionSelect={handleFunctionSelect}
+      autoRun={autoRun}
+      onAutoRunComplete={() => setAutoRun(false)}
+      isVertical={false}
+      setIsVertical={(val) => {
+        setIsVertical?.(val);
+      }}
+      isExpanded={isExpanded}
+      setIsExpanded={setIsExpanded}
+    />
   );
 };
 
