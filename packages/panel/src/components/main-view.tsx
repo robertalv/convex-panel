@@ -1,13 +1,28 @@
-import React from 'react';
-import { HealthView } from '../views/health/health-view';
-import { DataView } from '../views/data/data-view';
-import { FunctionsView } from '../views/functions';
-import { SchedulesView } from '../views/schedules';
-import { FilesView } from '../views/files';
-import { LogsView } from '../views/logs';
-import { ComponentsView } from '../views/components';
-import { SettingsView } from '../views/settings';
+import React, { lazy, Suspense } from 'react';
 import type { TabId } from '../types/tabs';
+
+// Lazy load all views for code splitting
+const HealthView = lazy(() => import('../views/health/health-view').then(m => ({ default: m.HealthView })));
+const DataView = lazy(() => import('../views/data/data-view').then(m => ({ default: m.DataView })));
+const FunctionsView = lazy(() => import('../views/functions').then(m => ({ default: m.FunctionsView })));
+const SchedulesView = lazy(() => import('../views/schedules').then(m => ({ default: m.SchedulesView })));
+const FilesView = lazy(() => import('../views/files').then(m => ({ default: m.FilesView })));
+const LogsView = lazy(() => import('../views/logs').then(m => ({ default: m.LogsView })));
+const ComponentsView = lazy(() => import('../views/components').then(m => ({ default: m.ComponentsView })));
+const SettingsView = lazy(() => import('../views/settings').then(m => ({ default: m.SettingsView })));
+
+// Loading fallback component
+const ViewLoadingFallback: React.FC<{ height?: string }> = ({ height = '400px' }) => (
+  <div style={{ 
+    display: 'flex', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    height,
+    color: 'var(--cp-text-secondary, #666)'
+  }}>
+    <div>Loading...</div>
+  </div>
+);
 
 interface MainViewsProps {
   activeTab: TabId;
@@ -99,5 +114,9 @@ const tabRenderers: Record<TabId, TabRenderer> = {
 
 export const MainViews: React.FC<MainViewsProps> = ({ activeTab, containerProps }) => {
   const render = tabRenderers[activeTab] || tabRenderers.health;
-  return render(containerProps);
+  return (
+    <Suspense fallback={<ViewLoadingFallback />}>
+      {render(containerProps)}
+    </Suspense>
+  );
 };

@@ -12,6 +12,14 @@ const sharedExternal = [
   // Heavy UI libraries - DON'T bundle these!
   'monaco-editor',
   '@monaco-editor/react',
+  'ace-builds',
+  'ace-builds/**',
+  'ace-builds/src-noconflict/**',
+  'ace-builds/src-noconflict/mode-*',
+  'ace-builds/src-noconflict/theme-*',
+  'ace-builds/src-noconflict/worker-*',
+  'ace-builds/src-noconflict/ext-*',
+  'react-ace',
   'lucide-react',
   'framer-motion',
   'recharts',
@@ -42,7 +50,9 @@ const getEsbuildOptions = (useClient = false) => (options: any) => {
   if (useClient) {
     options.banner = { js: '"use client";' };
   }
-  options.external = [...(options.external || []), '*.css'];
+  // Add CSS to external, but keep existing externals from tsup config
+  const existingExternal = Array.isArray(options.external) ? options.external : [];
+  options.external = [...existingExternal, '*.css'];
   options.treeShaking = true;
   options.legalComments = 'none';
 };
@@ -171,7 +181,8 @@ export default defineConfig([
       };
     },
     esbuildOptions(options) {
-      options.external = [...(options.external || []), '*.css', '*.vue'];
+      const existingExternal = Array.isArray(options.external) ? options.external : [];
+      options.external = [...existingExternal, '*.css', '*.vue'];
       options.treeShaking = true;
       options.legalComments = 'none';
     },

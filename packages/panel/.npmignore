@@ -12,6 +12,9 @@ __tests__
 *.test.ts
 *.test.tsx
 
+# Source maps - exclude from npm package to reduce size
+*.map
+
 # Misc
 .DS_Store
 .env
