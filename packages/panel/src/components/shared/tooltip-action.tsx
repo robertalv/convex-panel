@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { usePortalTarget } from '../../contexts/portal-context';
+import { useThemeSafe } from '../../hooks/useTheme';
 
 export const TooltipAction: React.FC<{ 
   icon: React.ReactNode; 
@@ -16,6 +17,7 @@ export const TooltipAction: React.FC<{
   const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const portalTarget = usePortalTarget();
+  const { theme } = useThemeSafe();
 
   useEffect(() => {
     if (showTooltip && triggerRef.current) {
@@ -23,8 +25,8 @@ export const TooltipAction: React.FC<{
         if (!triggerRef.current) return;
         const rect = triggerRef.current.getBoundingClientRect();
         const tooltipRect = tooltipRef.current?.getBoundingClientRect();
-        const tooltipHeight = tooltipRect?.height || 80; // Estimate if not yet rendered
-        const tooltipWidth = tooltipRect?.width || 200;
+        const tooltipHeight = tooltipRect?.height || 40; // Estimate if not yet rendered
+        const tooltipWidth = tooltipRect?.width || 100;
         const margin = 8;
         
         // Check if there's enough space below
@@ -119,22 +121,16 @@ export const TooltipAction: React.FC<{
         createPortal(
           <div 
             ref={tooltipRef}
-            className="cp-tooltip-action-tooltip" 
+            className={`cp-theme-${theme} cp-tooltip-action-tooltip`}
             style={{ 
               opacity: showTooltip ? 1 : 0,
               position: 'fixed',
               top: `${tooltipPosition.top}px`,
               right: `${tooltipPosition.right}px`,
+              padding: '6px 10px',
             }}
-            data-placement={tooltipPosition.placement}
           >
             {text}
-            <div 
-              className="cp-tooltip-action-arrow" 
-              style={{
-                [tooltipPosition.placement === 'top' ? 'bottom' : 'top']: '-4px',
-              }}
-            />
           </div>,
           portalTarget
         )

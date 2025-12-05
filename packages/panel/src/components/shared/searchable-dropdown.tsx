@@ -139,7 +139,13 @@ export function SearchableDropdown<T>({
     <div style={{ position: 'relative' }}>
       <div
         ref={triggerRef}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+        }}
         style={{
           display: 'flex',
           alignItems: 'center',

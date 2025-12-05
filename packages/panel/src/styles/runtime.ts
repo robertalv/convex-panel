@@ -2148,18 +2148,21 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   display: inline-block;
 }
 .cp-tooltip-content {
-  position: absolute;
-  padding: 8px 12px;
-  background-color: var(--color-panel-bg-tertiary);
-  border: 1px solid var(--color-panel-border);
-  color: var(--color-panel-text);
+  position: fixed;
+  padding: 12px 16px;
+  background-color: var(--color-panel-bg-tertiary) !important;
+  border: 1px solid var(--color-panel-border) !important;
+  color: var(--color-panel-text) !important;
   font-size: 12px;
-  border-radius: 4px;
-  pointer-events: none;
-  z-index: 50;
+  border-radius: 6px;
+  pointer-events: auto;
+  z-index: 99999 !important;
   box-shadow: 0 10px 15px -3px var(--color-panel-shadow);
-  white-space: nowrap;
+  white-space: normal;
   line-height: 1.5;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 200px;
 }
 .cp-tooltip-action-btn {
   cursor: pointer;
@@ -2175,24 +2178,22 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   color: var(--color-panel-text);
 }
 .cp-tooltip-action-tooltip {
-  padding: 8px 12px;
-  background-color: var(--color-panel-bg-tertiary);
-  border: 1px solid var(--color-panel-border);
-  color: var(--color-panel-text);
+  padding: 6px 10px;
+  background-color: var(--color-panel-bg-tertiary) !important;
+  border: 1px solid var(--color-panel-border) !important;
+  color: var(--color-panel-text) !important;
   font-size: 12px;
-  border-radius: 4px;
+  border-radius: 8px;
   transition: opacity 0.2s;
-  pointer-events: none;
-  z-index: 99999;
+  pointer-events: auto;
+  z-index: 99999 !important;
   box-shadow: 0 10px 15px -3px var(--color-panel-shadow);
-  min-width: 192px;
   max-width: 300px;
   text-align: center;
   line-height: 1.5;
   white-space: normal;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  transform: translateX(8px);
 }
 .cp-tooltip-action-arrow {
   position: absolute;

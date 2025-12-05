@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { usePortalTarget } from '../../contexts/portal-context';
+import { useThemeSafe } from '../../hooks/useTheme';
 
 interface TooltipProps {
   content: ReactNode;
@@ -25,6 +26,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const tooltipRef = useRef<HTMLDivElement>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const portalTarget = usePortalTarget();
+  const { theme } = useThemeSafe();
 
   useEffect(() => {
     if (showTooltip && triggerRef.current) {
@@ -41,16 +43,16 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
         if (position === 'top') {
           left = rect.left + rect.width / 2 - tooltipWidth / 2;
-          top = rect.top - tooltipHeight - margin - 4; // 4px for arrow
+          top = rect.top - tooltipHeight - margin;
         } else if (position === 'bottom') {
           left = rect.left + rect.width / 2 - tooltipWidth / 2;
-          top = rect.bottom + margin + 4;
+          top = rect.bottom + margin;
         } else if (position === 'left') {
-          left = rect.left - tooltipWidth - margin - 4;
+          left = rect.left - tooltipWidth - margin;
           top = rect.top + rect.height / 2 - tooltipHeight / 2;
         } else {
           // right
-          left = rect.right + margin + 4;
+          left = rect.right + margin;
           top = rect.top + rect.height / 2 - tooltipHeight / 2;
         }
 
@@ -71,15 +73,15 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
       if (position === 'top') {
         initialLeft = rect.left + rect.width / 2 - estimatedWidth / 2;
-        initialTop = rect.top - estimatedHeight - margin - 4;
+        initialTop = rect.top - estimatedHeight - margin;
       } else if (position === 'bottom') {
         initialLeft = rect.left + rect.width / 2 - estimatedWidth / 2;
-        initialTop = rect.bottom + margin + 4;
+        initialTop = rect.bottom + margin;
       } else if (position === 'left') {
-        initialLeft = rect.left - estimatedWidth - margin - 4;
+        initialLeft = rect.left - estimatedWidth - margin;
         initialTop = rect.top + rect.height / 2 - estimatedHeight / 2;
       } else {
-        initialLeft = rect.right + margin + 4;
+        initialLeft = rect.right + margin;
         initialTop = rect.top + rect.height / 2 - estimatedHeight / 2;
       }
 
@@ -108,57 +110,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
     }
   }, [showTooltip, maxWidth, position]);
 
-  const getArrowStyle = () => {
-    if (position === 'top') {
-      return {
-        position: 'absolute' as const,
-        bottom: '-4px',
-        left: '50%',
-        transform: 'translateX(-50%) rotate(45deg)',
-        width: '8px',
-        height: '8px',
-        backgroundColor: 'var(--color-panel-bg-tertiary)',
-        borderBottom: '1px solid var(--color-panel-border)',
-        borderRight: '1px solid var(--color-panel-border)',
-      };
-    } else if (position === 'bottom') {
-      return {
-        position: 'absolute' as const,
-        top: '-4px',
-        left: '50%',
-        transform: 'translateX(-50%) rotate(45deg)',
-        width: '8px',
-        height: '8px',
-        backgroundColor: 'var(--color-panel-bg-tertiary)',
-        borderTop: '1px solid var(--color-panel-border)',
-        borderLeft: '1px solid var(--color-panel-border)',
-      };
-    } else if (position === 'left') {
-      return {
-        position: 'absolute' as const,
-        right: '-4px',
-        top: '50%',
-        transform: 'translateY(-50%) rotate(45deg)',
-        width: '8px',
-        height: '8px',
-        backgroundColor: 'var(--color-panel-bg-tertiary)',
-        borderTop: '1px solid var(--color-panel-border)',
-        borderRight: '1px solid var(--color-panel-border)',
-      };
-    } else {
-      return {
-        position: 'absolute' as const,
-        left: '-4px',
-        top: '50%',
-        transform: 'translateY(-50%) rotate(45deg)',
-        width: '8px',
-        height: '8px',
-        backgroundColor: 'var(--color-panel-bg-tertiary)',
-        borderBottom: '1px solid var(--color-panel-border)',
-        borderLeft: '1px solid var(--color-panel-border)',
-      };
-    }
-  };
 
   const handleTriggerMouseEnter = () => {
     // Clear any pending hide timeout
@@ -215,21 +166,21 @@ export const Tooltip: React.FC<TooltipProps> = ({
         createPortal(
           <div
             ref={tooltipRef}
+            className={`cp-theme-${theme} cp-tooltip-content`}
             style={{
               position: 'fixed',
               top: `${tooltipPosition.top}px`,
               left: `${tooltipPosition.left}px`,
-              padding: '12px 16px',
-              backgroundColor: 'var(--color-panel-bg-tertiary)',
+              padding: '6px 10px',
+              backgroundColor: 'var(--color-panel-bg-secondary)',
               border: '1px solid var(--color-panel-border)',
               color: 'var(--color-panel-text)',
               fontSize: '12px',
-              borderRadius: '6px',
+              borderRadius: '8px',
               transition: 'opacity 0.2s',
               pointerEvents: 'auto',
               zIndex: 99999,
               boxShadow: '0 10px 15px -3px var(--color-panel-shadow)',
-              minWidth: '200px',
               maxWidth: `${maxWidth}px`,
               lineHeight: '1.5',
               whiteSpace: 'normal',
@@ -240,7 +191,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
             onMouseLeave={handleTooltipMouseLeave}
           >
             {content}
-            <div style={getArrowStyle()} />
           </div>,
           portalTarget
         )

@@ -1,11 +1,35 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { X, Plus, AlertCircle, CheckCircle2, Loader2, Info } from 'lucide-react';
-import Editor from '../../../components/editor/lazy-monaco-editor';
-import type { BeforeMount, OnMount } from '../../../components/editor/lazy-monaco-editor';
+import { ObjectEditor } from '../../../components/editor';
 import { useThemeSafe } from '../../../hooks/useTheme';
 import { insertDocuments } from '../../../utils/api/documents';
 import { toast } from 'sonner';
 import type { TableSchema } from '../../../types';
+import type { Value } from 'convex/values';
+
+// Helper to check if value is a plain object
+function isPlainObject(value: any): value is Record<string, any> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.prototype.toString.call(value) === '[object Object]'
+  );
+}
+
+// Helper to omit properties from an object
+function omitBy<T extends Record<string, any>>(
+  obj: T,
+  predicate: (value: any, key: string) => boolean
+): Partial<T> {
+  const result: Partial<T> = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key) && !predicate(obj[key], key)) {
+      result[key] = obj[key];
+    }
+  }
+  return result;
+}
 
 export interface AddDocumentPanelProps {
   selectedTable: string;
@@ -20,45 +44,61 @@ export interface AddDocumentPanelProps {
   onGetEditorContent?: React.MutableRefObject<(() => string) | null>;
 }
 
-const defaultDocumentTemplate = (tableSchema?: TableSchema) => {
+// Helper type for generic document
+type GenericDocument = Record<string, Value>;
+
+// Helper to check if value is a document or array of documents
+function isDocument(
+  value: Value | undefined,
+  allowMultipleDocuments: boolean,
+): value is GenericDocument | GenericDocument[] {
+  return (
+    isPlainObject(value) ||
+    (allowMultipleDocuments &&
+      Array.isArray(value) &&
+      value.length >= 1 &&
+      value.every(isPlainObject))
+  );
+}
+
+// Generate default document value from schema
+const getDefaultDocument = (tableSchema?: TableSchema): GenericDocument => {
   if (tableSchema && tableSchema.fields && tableSchema.fields.length > 0) {
-    // Use actual field names from schema
-    const fieldEntries = tableSchema.fields
+    const defaultDoc: GenericDocument = {};
+    
+    tableSchema.fields
       .filter(field => !field.fieldName.startsWith('_')) // Exclude system fields
-      .slice(0, 5) // Limit to first 5 fields for readability
-      .map(field => {
+      .forEach(field => {
         const type = field.shape.type || 'any';
-        let exampleValue: string;
+        let exampleValue: Value;
         
         if (field.shape.tableName) {
-          exampleValue = '""'; // Reference field
+          exampleValue = ''; // Reference field (ID)
         } else if (type === 'number') {
-          exampleValue = '0';
+          exampleValue = 0;
         } else if (type === 'boolean') {
-          exampleValue = 'false';
+          exampleValue = false;
         } else if (type === 'array') {
-          exampleValue = '[]';
+          exampleValue = [];
         } else if (type === 'object') {
-          exampleValue = '{}';
+          exampleValue = {};
         } else {
-          exampleValue = '""';
+          exampleValue = '';
         }
         
-        return `    "${field.fieldName}": ${exampleValue}${field.optional ? '' : ''}`;
+        defaultDoc[field.fieldName] = exampleValue;
       });
     
-    if (fieldEntries.length > 0) {
-      return `[\n  {\n${fieldEntries.join(',\n')}\n  }\n]`;
+    if (Object.keys(defaultDoc).length > 0) {
+      return defaultDoc;
     }
   }
   
-  // Fallback template
-  return `[
-  {
-    "exampleField": "example value",
-    "anotherField": 123
-  }
-]`;
+  // Fallback default
+  return {
+    exampleField: 'example value',
+    anotherField: 123,
+  };
 };
 
 export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
@@ -73,313 +113,100 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
   onInsertField,
   onGetEditorContent,
 }) => {
-  const { theme } = useThemeSafe();
-  const [code, setCode] = useState<string>('');
+  const [value, setValue] = useState<Value | undefined>(undefined);
+  const [documents, setDocuments] = useState<GenericDocument[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [monaco, setMonaco] = useState<Parameters<BeforeMount>[0]>();
-  const editorRef = useRef<any>(null);
+  const [isInvalidObject, setIsInvalidObject] = useState(false);
+  const [editorContent, setEditorContent] = useState<string>('');
+  const randomNumberRef = useRef<number>(Math.random());
 
-  // Initialize code with template
+  // Initialize with default document
+  const defaultDocument = useMemo(() => getDefaultDocument(tableSchema), [tableSchema]);
+
   useEffect(() => {
     if (selectedTable) {
-      setCode(defaultDocumentTemplate(tableSchema));
+      const defaultValue = [defaultDocument];
+      setValue(defaultValue);
+      setDocuments(defaultValue);
       setError(null);
       setSuccess(false);
+      setIsInvalidObject(false);
     }
-  }, [selectedTable, tableSchema]);
+  }, [selectedTable, defaultDocument]);
 
-  // Define Monaco theme
-  const beforeMount: BeforeMount = (monacoInstance) => {
-    setMonaco(monacoInstance);
-    
-    // Helper to get theme color from CSS variable
-    const getThemeColor = (varName: string, fallback: string = '#0F1115') => {
-      // Try to find an element with the theme class
-      const themeElement = document.querySelector('.cp-theme-dark, .cp-theme-light') || document.documentElement;
-      const color = getComputedStyle(themeElement).getPropertyValue(varName).trim();
-      return color || fallback;
-    };
-
-    // Helper to convert hex to Monaco format (without #)
-    const toMonacoColor = (hex: string) => hex.replace('#', '');
-
-    // Define convex-dark theme
-    monacoInstance.editor.defineTheme('convex-dark', {
-      base: 'vs-dark',
-      inherit: true,
-      rules: [
-        { token: 'comment', foreground: toMonacoColor(getThemeColor('--color-panel-text-muted', '#6b7280')), fontStyle: 'italic' },
-        { token: 'keyword', foreground: 'c084fc' },
-        { token: 'string', foreground: 'fbbf24' },
-        { token: 'number', foreground: 'fb923c' },
-      ],
-      colors: {
-        'editor.background': getThemeColor('--color-panel-bg', '#0F1115'),
-        'editor.foreground': getThemeColor('--color-panel-text', '#d1d5db'),
-        'editor.lineHighlightBackground': 'transparent',
-        'editor.lineHighlightBorder': 'transparent',
-        'editor.currentLineBackground': 'transparent',
-        'editor.currentLineBorder': 'transparent',
-        'editor.selectionBackground': getThemeColor('--color-panel-active', 'rgba(255, 255, 255, 0.1)'),
-        'editorCursor.foreground': getThemeColor('--color-panel-text', '#d1d5db'),
-        'editorLineNumber.foreground': getThemeColor('--color-panel-text-muted', '#6b7280'),
-        'editorLineNumber.activeForeground': getThemeColor('--color-panel-text', '#d1d5db'),
-        'editorIndentGuide.background': getThemeColor('--color-panel-border', '#2D313A'),
-        'editorIndentGuide.activeBackground': getThemeColor('--color-panel-text-muted', '#6b7280'),
-        'editorWhitespace.foreground': getThemeColor('--color-panel-border', '#2D313A'),
-        'editorError.foreground': getThemeColor('--color-panel-error', '#ef4444'),
-        'editorWarning.foreground': getThemeColor('--color-panel-warning', '#eab308'),
-      },
-    });
-
-    // Define convex-light theme
-    monacoInstance.editor.defineTheme('convex-light', {
-      base: 'vs',
-      inherit: true,
-      rules: [
-        { token: 'comment', foreground: toMonacoColor(getThemeColor('--color-panel-text-muted', '#9ca3af')), fontStyle: 'italic' },
-        { token: 'keyword', foreground: '7c3aed' },
-        { token: 'string', foreground: 'd97706' },
-        { token: 'number', foreground: 'ea580c' },
-      ],
-      colors: {
-        'editor.background': getThemeColor('--color-panel-bg', '#ffffff'),
-        'editor.foreground': getThemeColor('--color-panel-text', '#111827'),
-        'editor.lineHighlightBackground': 'transparent',
-        'editor.lineHighlightBorder': 'transparent',
-        'editor.currentLineBackground': 'transparent',
-        'editor.currentLineBorder': 'transparent',
-        'editor.selectionBackground': getThemeColor('--color-panel-active', 'rgba(0, 0, 0, 0.1)'),
-        'editorCursor.foreground': getThemeColor('--color-panel-text', '#111827'),
-        'editorLineNumber.foreground': getThemeColor('--color-panel-text-muted', '#9ca3af'),
-        'editorLineNumber.activeForeground': getThemeColor('--color-panel-text', '#111827'),
-        'editorIndentGuide.background': getThemeColor('--color-panel-border', '#e5e7eb'),
-        'editorIndentGuide.activeBackground': getThemeColor('--color-panel-text-muted', '#9ca3af'),
-        'editorWhitespace.foreground': getThemeColor('--color-panel-border', '#e5e7eb'),
-        'editorError.foreground': getThemeColor('--color-panel-error', '#ef4444'),
-        'editorWarning.foreground': getThemeColor('--color-panel-warning', '#eab308'),
-      },
-    });
-
-    const monacoTheme = theme === 'light' ? 'convex-light' : 'convex-dark';
-    monacoInstance.editor.setTheme(monacoTheme);
-  };
-
-  // Update Monaco theme when theme changes
-  useEffect(() => {
-    if (monaco) {
-      const monacoTheme = theme === 'light' ? 'convex-light' : 'convex-dark';
-      monaco.editor.setTheme(monacoTheme);
-    }
-  }, [theme, monaco]);
-
-  // Function to insert field name into editor
-  const insertFieldName = useCallback((fieldName: string) => {
-    if (!editorRef.current) return;
-    
-    const editor = editorRef.current;
-    const selection = editor.getSelection();
-    const model = editor.getModel();
-    
-    if (!model || !selection) return;
-    
-    // Get the full text and cursor position
-    const lineNumber = selection.startLineNumber;
-    const column = selection.startColumn;
-    const lineText = model.getLineContent(lineNumber);
-    const beforeCursor = lineText.substring(0, column - 1);
-    const afterCursor = lineText.substring(column - 1);
-    
-    // Get field info for default value
-    const field = tableSchema?.fields?.find(f => f.fieldName === fieldName);
-    let defaultValue = '""';
-    if (field) {
-      const type = field.shape.type || 'any';
-      if (type === 'number') {
-        defaultValue = '0';
-      } else if (type === 'boolean') {
-        defaultValue = 'false';
-      } else if (type === 'array') {
-        defaultValue = '[]';
-      } else if (type === 'object') {
-        defaultValue = '{}';
-      } else if (field.shape.tableName) {
-        defaultValue = '""'; // Reference field
-      }
-    }
-    
-    // Determine what to insert based on context
-    let textToInsert = '';
-    
-    // Check if we're inside an object (between { and })
-    const textBefore = model.getValueInRange({
-      startLineNumber: 1,
-      startColumn: 1,
-      endLineNumber: lineNumber,
-      endColumn: column,
-    });
-    
-    // Count braces to see if we're in an object
-    const openBraces = (textBefore.match(/\{/g) || []).length;
-    const closeBraces = (textBefore.match(/\}/g) || []).length;
-    const isInObject = openBraces > closeBraces;
-    
-    // Check if there's already content before cursor on this line (excluding whitespace)
-    const hasContentBefore = beforeCursor.trim().length > 0 && !beforeCursor.trim().match(/^[\s\{\[\,]*$/);
-    
-    // Check if there's content after cursor that needs a comma
-    const hasContentAfter = afterCursor.trim().length > 0 && !afterCursor.trim().match(/^[\s\]\}]*,?[\s\]\}]*$/);
-    
-    if (isInObject) {
-      // We're inside an object, insert as key-value pair
-      if (hasContentBefore && !beforeCursor.trim().endsWith(',') && !beforeCursor.trim().endsWith('{')) {
-        // Need to add comma before
-        textToInsert = `, "${fieldName}": ${defaultValue}`;
-      } else {
-        // No comma needed, or we're at the start
-        textToInsert = `"${fieldName}": ${defaultValue}`;
-      }
+  // Handle value change from ObjectEditor
+  const onChange = useCallback(
+    (newValue?: Value) => {
+      setValue(newValue);
       
-      // Add comma after if there's more content
-      if (hasContentAfter && !afterCursor.trim().startsWith(',')) {
-        textToInsert += ',';
-      }
-    } else {
-      // Not in an object, just insert the field name as a string
-      if (hasContentBefore && !beforeCursor.trim().endsWith(',') && !beforeCursor.trim().endsWith('[')) {
-        textToInsert = `, "${fieldName}"`;
+      // Remove system fields if present
+      const cleanValue = newValue 
+        ? (Array.isArray(newValue)
+            ? newValue
+            : isPlainObject(newValue)
+              ? omitBy(newValue as Record<string, Value>, (_v: Value, k: string) => k.startsWith('_'))
+              : newValue)
+        : undefined;
+
+      if (isDocument(cleanValue, true)) {
+        const docsArray = Array.isArray(cleanValue) ? cleanValue : [cleanValue];
+        setDocuments(docsArray);
       } else {
-        textToInsert = `"${fieldName}"`;
+        setDocuments([]);
       }
-      
-      if (hasContentAfter && !afterCursor.trim().startsWith(',')) {
-        textToInsert += ',';
-      }
-    }
-    
-    // Insert the text
-    editor.executeEdits('insert-field', [{
-      range: selection,
-      text: textToInsert,
-    }]);
-    
-    // Move cursor after inserted text
-    const newPosition = {
-      lineNumber: lineNumber,
-      column: column + textToInsert.length,
-    };
-    editor.setPosition(newPosition);
-    editor.focus();
-  }, [tableSchema]);
+    },
+    []
+  );
 
-  // Function to get current editor content
-  const getEditorContent = useCallback(() => {
-    if (!editorRef.current) return '';
-    const model = editorRef.current.getModel();
-    return model ? model.getValue() : '';
-  }, []);
+  // Validation
+  let validationError: string | undefined;
+  if (isInvalidObject) {
+    validationError = 'Please fix the errors above to continue.';
+  } else if (!isDocument(value, true)) {
+    validationError = 'Please enter a document or an array of documents to continue.';
+  } else if (documents.length === 0) {
+    validationError = 'At least one document is required.';
+  }
 
-  // Expose insert function and get content function to parent via ref
+  const [submitErrorMessage, setSubmitErrorMessage] = useState<string | undefined>(undefined);
+  const validationMessage = validationError ?? submitErrorMessage;
+
   useEffect(() => {
-    if (onInsertField) {
-      onInsertField.current = insertFieldName;
-    }
-    if (onGetEditorContent) {
-      onGetEditorContent.current = getEditorContent;
-    }
-    return () => {
-      if (onInsertField) {
-        onInsertField.current = null;
-      }
-      if (onGetEditorContent) {
-        onGetEditorContent.current = null;
-      }
-    };
-  }, [insertFieldName, onInsertField, getEditorContent, onGetEditorContent]);
+    setSubmitErrorMessage(undefined);
+  }, [validationError, documents]);
 
-  const onMount: OnMount = (editor) => {
-    editorRef.current = editor;
-    
-    // Disable error squiggles for JSON (we'll validate on submit)
-    const monaco = editor.getModel()?.getLanguageId();
-    if (monaco) {
-      // Remove all diagnostics/markers
-      editor.deltaDecorations([], []);
-    }
-    
-    // Disable line highlight by updating editor options
-    editor.updateOptions({
-      renderLineHighlight: 'none',
-      hideCursorInOverviewRuler: true,
-      overviewRulerLanes: 0,
-    });
-    
-    // Force disable line highlight via CSS if needed
-    const editorElement = editor.getContainerDomNode();
-    if (editorElement) {
-      const style = document.createElement('style');
-      style.textContent = `
-        .monaco-editor .current-line {
-          background: transparent !important;
-          border: none !important;
-        }
-        .monaco-editor .view-line {
-          background: transparent !important;
-        }
-      `;
-      editorElement.appendChild(style);
-    }
-    
-    // Focus the editor
-    editor.focus();
-  };
+  const disabled = validationError !== undefined || isSubmitting;
 
+  // Handle form submission
   const handleSubmit = useCallback(async () => {
-    if (!adminClient || !code.trim()) {
-      setError('Admin client is not available or document is empty');
+    if (disabled || !adminClient) {
       return;
     }
 
+    setSubmitErrorMessage(undefined);
     setIsSubmitting(true);
     setError(null);
     setSuccess(false);
 
     try {
-      // Parse JSON
-      let documents: any[];
-      try {
-        const parsed = JSON.parse(code);
-        documents = Array.isArray(parsed) ? parsed : [parsed];
-      } catch (parseError) {
-        setError('Invalid JSON. Please check your syntax.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Validate documents
-      if (documents.length === 0) {
-        setError('At least one document is required.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Remove _id and _creationTime if present (these are system fields)
-      documents = documents.map(doc => {
+      // Remove system fields from documents
+      const cleanDocuments = documents.map(doc => {
         const { _id, _creationTime, ...rest } = doc;
         return rest;
       });
 
-      // Insert documents
-      await insertDocuments(selectedTable, documents, adminClient, componentId || null);
+      await insertDocuments(selectedTable, cleanDocuments, adminClient, componentId || null);
 
       setSuccess(true);
-      toast.success(`Successfully added ${documents.length} document${documents.length > 1 ? 's' : ''} to ${selectedTable}`);
+      toast.success(`Successfully added ${cleanDocuments.length} document${cleanDocuments.length > 1 ? 's' : ''} to ${selectedTable}`);
       
       // Reset form after a short delay
       setTimeout(() => {
-        setCode(defaultDocumentTemplate(tableSchema));
+        const defaultValue = [defaultDocument];
+        setValue(defaultValue);
+        setDocuments(defaultValue);
         setSuccess(false);
         if (onDocumentAdded) {
           onDocumentAdded();
@@ -388,11 +215,32 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
     } catch (err: any) {
       const errorMessage = err?.message || 'Failed to insert documents';
       setError(errorMessage);
+      setSubmitErrorMessage(errorMessage);
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
-  }, [adminClient, code, selectedTable, componentId, onDocumentAdded]);
+  }, [adminClient, documents, selectedTable, componentId, disabled, defaultDocument, onDocumentAdded]);
+
+  // Function to get current editor content (for backward compatibility)
+  const getEditorContent = useCallback(() => {
+    return editorContent;
+  }, [editorContent]);
+
+  // Expose functions to parent via refs (for backward compatibility)
+  useEffect(() => {
+    if (onGetEditorContent) {
+      onGetEditorContent.current = getEditorContent;
+    }
+    return () => {
+      if (onGetEditorContent) {
+        onGetEditorContent.current = null;
+      }
+    };
+  }, [getEditorContent, onGetEditorContent]);
+
+  // Note: onInsertField is kept for backward compatibility but ObjectEditor doesn't support
+  // field insertion the same way. If needed, this could be enhanced later.
 
   return (
     <div
@@ -428,7 +276,7 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
             Add new documents to {selectedTable}
           </h2>
           <a
-            href="https://docs.convex.dev/database/writing-data"
+            href="https://docs.convex.dev/dashboard/deployments/data#creating-documents"
             target="_blank"
             rel="noopener noreferrer"
             style={{
@@ -516,54 +364,30 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
 
       {/* Editor */}
       <div
+        className="cp-add-document-editor"
         style={{
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          borderBottom: '1px solid var(--color-panel-border)',
         }}
       >
-        <div
-          style={{
-            flex: 1,
-            borderBottom: '1px solid var(--color-panel-border)',
-          }}
-        >
-          <Editor
-            height="100%"
-            language="json"
-            value={code}
-            onChange={(value: string | undefined) => {
-              setCode(value || '');
-              setError(null);
-              setSuccess(false);
-            }}
-            theme={theme === 'light' ? 'convex-light' : 'convex-dark'}
-            beforeMount={beforeMount}
-            onMount={onMount}
-            options={{
-              minimap: { enabled: false },
-              fontSize: 13,
-              lineNumbers: 'on',
-              scrollBeyondLastLine: false,
-              wordWrap: 'on',
-              formatOnPaste: true,
-              formatOnType: true,
-              readOnly: false,
-              domReadOnly: false,
-              contextmenu: true,
-              automaticLayout: true,
-              renderWhitespace: 'none',
-              glyphMargin: false,
-              folding: false,
-              lineDecorationsWidth: 0,
-              lineNumbersMinChars: 3,
-              padding: { top: 16, bottom: 16 },
-              renderLineHighlight: 'none',
-              hideCursorInOverviewRuler: true,
-            }}
-          />
-        </div>
+        <ObjectEditor
+          defaultValue={value}
+          onChange={onChange}
+          onChangeInnerText={(text) => setEditorContent(text)}
+          onError={(errors) => setIsInvalidObject(errors.length > 0)}
+          path={`document/${randomNumberRef.current}`}
+          fullHeight
+          autoFocus
+          saveAction={handleSubmit}
+          showLineNumbers
+          language="json"
+          indentTopLevel={true}
+          className=""
+          editorClassname=""
+        />
       </div>
 
       {/* Footer */}
@@ -616,6 +440,25 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
           </div>
         )}
 
+        {validationMessage && !error && !success && (
+          <div
+            style={{
+              padding: '12px',
+              borderRadius: '6px',
+              backgroundColor: 'color-mix(in srgb, var(--color-panel-warning) 10%, transparent)',
+              border: '1px solid var(--color-panel-warning)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              color: 'var(--color-panel-warning)',
+              fontSize: '12px',
+            }}
+          >
+            <AlertCircle size={16} />
+            <span>{validationMessage}</span>
+          </div>
+        )}
+
         {/* Actions */}
         <div
           style={{
@@ -649,34 +492,34 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting || !code.trim()}
+            disabled={disabled}
             style={{
               padding: '8px 16px',
               borderRadius: '6px',
               border: 'none',
-              background: isSubmitting || !code.trim()
+              background: disabled
                 ? 'var(--color-panel-bg-tertiary)'
                 : 'var(--color-panel-accent)',
-              color: isSubmitting || !code.trim()
+              color: disabled
                 ? 'var(--color-panel-text-muted)'
                 : 'var(--color-panel-bg)',
-              cursor: isSubmitting || !code.trim() ? 'not-allowed' : 'pointer',
+              cursor: disabled ? 'not-allowed' : 'pointer',
               fontSize: '12px',
               fontWeight: 500,
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: isSubmitting || !code.trim()
+              boxShadow: disabled
                 ? 'none'
                 : '0 2px 8px color-mix(in srgb, var(--color-panel-accent) 20%, transparent)',
             }}
             onMouseEnter={(e) => {
-              if (!isSubmitting && code.trim()) {
+              if (!disabled) {
                 e.currentTarget.style.background = 'var(--color-panel-accent-hover)';
               }
             }}
             onMouseLeave={(e) => {
-              if (!isSubmitting && code.trim()) {
+              if (!disabled) {
                 e.currentTarget.style.background = 'var(--color-panel-accent)';
               }
             }}
@@ -696,7 +539,7 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
         </div>
       </div>
 
-      {/* Spinner animation & editor overrides */}
+      {/* Spinner animation and Monaco editor styles */}
       <style>{`
         @keyframes spin {
           from {
@@ -706,9 +549,8 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
             transform: rotate(360deg);
           }
         }
-
-        /* Ensure Monaco's internal IME textarea doesn't show up as an extra text area */
-        .cp-add-document-panel .monaco-editor textarea.ime-text-area {
+        
+        .cp-add-document-editor .monaco-editor textarea.ime-text-area {
           position: absolute !important;
           width: 0 !important;
           height: 0 !important;
@@ -722,8 +564,7 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
           pointer-events: none !important;
         }
 
-        /* Hide Monaco's native edit context div that otherwise looks like an empty input row */
-        .cp-add-document-panel .monaco-editor .native-edit-context {
+        .cp-add-document-editor .monaco-editor .native-edit-context {
           position: absolute !important;
           top: 0 !important;
           left: 0 !important;
@@ -738,8 +579,19 @@ export const AddDocumentPanel: React.FC<AddDocumentPanelProps> = ({
           overflow: hidden !important;
           pointer-events: none !important;
         }
+
+        .cp-add-document-editor .monaco-editor .margin {
+          display: none !important;
+        }
+
+        .cp-add-document-editor .monaco-editor .monaco-scrollable-element {
+          left: 0 !important;
+        }
+
+        .cp-add-document-editor .monaco-editor .native-edit-context {
+          left: 0 !important;
+        }
       `}</style>
     </div>
   );
 };
-

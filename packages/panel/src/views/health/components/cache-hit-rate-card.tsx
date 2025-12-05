@@ -49,7 +49,6 @@ export const CacheHitRateCard: React.FC<CacheHitRateCardProps> = ({
 
     fetchData();
 
-    // Refresh every 30 seconds for real-time tracking
     const interval = setInterval(fetchData, 30000);
 
     return () => {

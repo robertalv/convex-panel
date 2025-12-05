@@ -93,7 +93,7 @@ export const insertDocuments = async (
     // Try using system mutation first (available on newer Convex versions/plans)
     try {
       const result = await adminClient.mutation(
-        "_system/frontend/insertDocuments" as any,
+        "_system/frontend/addDocument" as any,
         {
           table,
           documents,
@@ -102,12 +102,12 @@ export const insertDocuments = async (
       );
       return result;
     } catch (systemError: any) {
-      console.warn("System insertDocuments mutation not available, trying user-defined mutation...", systemError);
+      console.warn("System addDocument mutation not available, trying user-defined mutation...", systemError);
 
       // Try calling a user-defined mutation as fallback
       try {
         const result = await adminClient.mutation(
-          "panel:insertDocuments" as any,
+          "panel:addDocument" as any,
           {
             table,
             documents,
@@ -115,11 +115,11 @@ export const insertDocuments = async (
         );
         return result;
       } catch (userMutationError: any) {
-        console.warn("User-defined panel:insertDocuments mutation not found", userMutationError);
+        console.warn("User-defined panel:addDocument mutation not found", userMutationError);
 
         // Neither system nor user mutation exists - throw upgrade error
         const upgradeError: any = new Error(
-          `Cannot insert documents: The system mutation is unavailable on your plan.`
+          `Cannot add documents: The system mutation is unavailable on your plan.`
         );
         upgradeError.code = 'UPGRADE_REQUIRED';
         upgradeError.isUpgradeError = true;
