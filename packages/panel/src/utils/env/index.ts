@@ -8,7 +8,7 @@
  */
 
 // Import types (ensures build-time declarations are available)
-import './types';
+export * from './types';
 
 // Export platform detection utilities
 export { isDevelopment, isNextJSEnv } from './platform';

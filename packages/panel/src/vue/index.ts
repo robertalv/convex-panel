@@ -20,34 +20,10 @@
 
 export { default as ConvexPanel } from './ConvexPanelVue.vue';
 export { default } from './ConvexPanelVue.vue';
-
-// Re-export types
 export type { ConvexPanelProps } from '../ConvexPanel';
 
-// Re-export other useful exports
 export {
-  useOAuth,
-  ThemeProvider,
-  useTheme,
-  useThemeSafe,
-  isDevelopment,
-  BottomSheet,
-  AuthPanel,
   AppErrorBoundary,
   AppContentWrapper,
-  LogType,
-  buildAuthorizationUrl,
-  exchangeCodeForToken,
-  handleOAuthCallback,
-  getStoredToken,
-  storeToken,
-  clearToken,
-} from '../index';
-export type {
-  UseOAuthReturn,
-  Theme,
-  OAuthConfig,
-  OAuthToken,
-  TokenScope,
 } from '../index';
 
