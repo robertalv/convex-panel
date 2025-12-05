@@ -10,16 +10,16 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 const navLinks = [
-  { label: "Visit Convex", href: "https://convex.link/cpanel" },
-  // { label: "Docs", href: "/docs" },
+  { label: "Home", href: "/" },
+  { label: "Docs", href: "/docs" },
   // { label: "Changelog", href: "/changelog" },
 ];
 
 export function Header() {
   const stars = useQuery(api.stats.getConvexPanelStars) ?? 0;
   const { location } = useRouterState();
-  const currentPath = location.pathname || "/";
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const currentPath = location.pathname || "/";
 
   return (
     <header className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4">
@@ -35,17 +35,15 @@ export function Header() {
         <ul className="hidden md:flex items-center gap-1 text-[11px] md:text-xs font-medium mx-2">
           {navLinks.map((link) => (
             <li key={link.href}>
-              <a
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                to={link.href}
                 className={`px-3 py-1.5 rounded-full border transition-all duration-200 ${link.href === currentPath
                   ? "bg-background-tertiary text-content-primary border-border"
                   : "border-transparent text-content-secondary hover:text-content-primary hover:bg-background-secondary/50"
                   }`}
               >
                 {link.label}
-              </a>
+              </Link>
             </li>
           ))}
         </ul>

@@ -1,6 +1,6 @@
 {
   "name": "convex-panel",
-  "version": "0.2.18",
+  "version": "0.2.20",
   "description": "A React component for monitoring and debugging Convex applications",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -156,5 +156,8 @@
   "bugs": {
     "url": "https://github.com/robertalv/convex-panel/issues"
   },
-  "homepage": "https://convexpanel.dev"
+  "homepage": "https://convexpanel.dev",
+  "bin": {
+    "convex-panel": "./bin/convex-panel.js"
+  }
 }

@@ -22,14 +22,27 @@ const OAUTH_MARKER = "exchangeOAuthCode";
 const ROUTE_MARKER = 'path: "/oauth/exchange"';
 
 async function main() {
-  const projectRoot = process.cwd();
-  const convexDir = path.join(projectRoot, "convex");
-  const httpPath = path.join(convexDir, "http.ts");
-
-  try {
-    await fs.mkdir(convexDir, { recursive: true });
-  } catch {
-    // ignore mkdir errors; convex dir may already exist
+  const currentDir = process.cwd();
+  const currentDirName = path.basename(currentDir);
+  
+  let httpPath;
+  
+  // If user is in the convex folder, work with http.ts directly
+  if (currentDirName === "convex") {
+    httpPath = path.join(currentDir, "http.ts");
+  } else {
+    // If user is in project root, work with convex/http.ts
+    const convexDir = path.join(currentDir, "convex");
+    httpPath = path.join(convexDir, "http.ts");
+    
+    // Only create convex directory if it doesn't exist and we need to create the file
+    try {
+      await fs.access(convexDir);
+      // Directory exists, no need to create it
+    } catch {
+      // Directory doesn't exist, but we'll create it only if we need to create the file
+      // We'll handle this when we try to write the file
+    }
   }
 
   let httpContent = "";
@@ -40,8 +53,19 @@ async function main() {
   } catch (err) {
     if (err.code === "ENOENT") {
       httpExists = false;
+      // If file doesn't exist and we're in project root, ensure convex directory exists
+      if (currentDirName !== "convex") {
+        const convexDir = path.dirname(httpPath);
+        try {
+          await fs.mkdir(convexDir, { recursive: true });
+        } catch (mkdirErr) {
+          // If directory creation fails, it might be a permissions issue
+          // We'll try to create the file anyway, which will also create the directory
+        }
+      }
     } else {
-      console.error("[convex-panel] Failed to read convex/http.ts:", err.message);
+      const fileDisplayName = currentDirName === "convex" ? "http.ts" : "convex/http.ts";
+      console.error(`[convex-panel] Failed to read ${fileDisplayName}:`, err.message);
       process.exit(1);
     }
   }
@@ -51,13 +75,17 @@ async function main() {
       'import { httpRouter } from "convex/server";\n' +
       'const http = httpRouter();\n\n' +
       "export default http;\n";
-    console.log("Created new convex/http.ts file.");
+    const fileDisplayName = currentDirName === "convex" ? "http.ts" : "convex/http.ts";
+    console.log(`[convex-panel] Created new ${fileDisplayName} file.`);
+  } else {
+    const fileDisplayName = currentDirName === "convex" ? "http.ts" : "convex/http.ts";
+    console.log(`[convex-panel] Found existing ${fileDisplayName} file. Will append OAuth handlers.`);
   }
 
   // If we've already added the OAuth handler or route, do nothing.
   if (httpContent.includes(OAUTH_MARKER) || httpContent.includes(ROUTE_MARKER)) {
     console.log(
-      "OAuth HTTP action already present in convex/http.ts; no changes made."
+      "[convex-panel] OAuth HTTP action already present in convex/http.ts; no changes made."
     );
     return;
   }
@@ -353,9 +381,16 @@ http.route({
   }
 
   await fs.writeFile(httpPath, updated, "utf8");
-  console.log(
-    "Added OAuth HTTP action routes to convex/http.ts (path: /oauth/exchange)."
-  );
+  const fileDisplayName = currentDirName === "convex" ? "http.ts" : "convex/http.ts";
+  if (httpExists) {
+    console.log(
+      `[convex-panel] Successfully appended OAuth HTTP action routes to existing ${fileDisplayName} (path: /oauth/exchange).`
+    );
+  } else {
+    console.log(
+      `[convex-panel] Successfully created ${fileDisplayName} with OAuth HTTP action routes (path: /oauth/exchange).`
+    );
+  }
 }
 
 main().catch((err) => {

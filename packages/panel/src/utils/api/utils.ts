@@ -107,17 +107,6 @@ export function getTeamTokenFromEnv(): string | null {
       // Check CONVEX_ACCESS_TOKEN first (works if exposed in next.config.js env config)
       const accessToken = process.env.CONVEX_ACCESS_TOKEN;
       if (accessToken && typeof accessToken === 'string' && accessToken.trim()) {
-        // Debug logging in development
-        if (typeof window !== 'undefined') {
-          try {
-            const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            if (isDev) {
-              console.log('[getTeamTokenFromEnv] Found CONVEX_ACCESS_TOKEN from process.env');
-            }
-          } catch {
-            // Ignore logging errors
-          }
-        }
         return accessToken.trim();
       }
       

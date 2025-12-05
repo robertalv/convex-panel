@@ -131,9 +131,6 @@ const ConvexPanel = ({
         if (nextData?.env) {
           const nextUrl = nextData.env.NEXT_PUBLIC_CONVEX_URL || nextData.env.VITE_CONVEX_URL;
           if (nextUrl) {
-            if (isDevelopment()) {
-              console.log('[ConvexPanel] Found deployUrl in window.__NEXT_DATA__.env:', nextUrl);
-            }
             return nextUrl;
           }
         }
@@ -235,10 +232,9 @@ const ConvexPanel = ({
   }
 
   const toggleOpen = useCallback(() => {
-    // Don't allow expansion if not authenticated
-    if (!isAuthenticated) return;
+    // Always allow expansion - users can see instructions even when not authenticated
     setIsOpen(prev => !prev);
-  }, [isAuthenticated]);
+  }, []);
 
   const [validationError, setValidationError] = useState<{
     errors: string[];
@@ -318,6 +314,23 @@ const ConvexPanel = ({
     }
   }, [oauthConfig, oauth]);
 
+  // Handle logout
+  const handleLogout = useCallback(() => {
+    // Clear OAuth token if using OAuth
+    if (oauth.logout) {
+      oauth.logout();
+    }
+    // Reset panel state
+    setIsOpen(false);
+    // Clear any stored authentication state
+    if (typeof window !== 'undefined') {
+      // Clear any other auth-related storage if needed
+      localStorage.removeItem(STORAGE_KEYS.OAUTH_TOKEN);
+    }
+    // Force a page reload to reset all state
+    window.location.reload();
+  }, [oauth]);
+
   // Root container with scoped styles - no CSS imports
   return (
     <PortalProvider value={portalContainer ?? null}>
@@ -326,7 +339,7 @@ const ConvexPanel = ({
         <ConfirmDialogProvider>
           <ToastProvider position="bottom-right">
           <BottomSheet
-          isOpen={isAuthenticated ? isOpen : false}
+          isOpen={isOpen}
           onClose={toggleOpen}
           projectName={deployUrl ? undefined : ''}
           deploymentUrl={deployUrl}
@@ -334,10 +347,12 @@ const ConvexPanel = ({
           isAuthenticated={isAuthenticated}
           oauthConfig={oauthConfig}
           onConnect={handleConnect}
+          onLogout={handleLogout}
           activeTab={activeTab}
           onTabChange={setActiveTab}
           adminClient={adminClient}
           accessToken={effectiveAccessToken}
+          isOAuthToken={!!oauth.token?.access_token}
           teamSlug={teamSlug}
           projectSlug={projectSlug}
           team={team}
@@ -349,6 +364,10 @@ const ConvexPanel = ({
               onConnect={handleConnect}
               error={oauth.error}
               isLoading={oauth.isLoading}
+              deploymentUrl={deployUrl}
+              teamSlug={teamSlug}
+              projectSlug={projectSlug}
+              accessToken={effectiveAccessToken}
             />
           ) : (
             <MainViews

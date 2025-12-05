@@ -39,6 +39,7 @@ export default defineConfig(({ mode }) => {
     ],
     resolve: {
       alias: {
+        '@shared': path.resolve(__dirname, '../../packages/shared/src'),
         'convex-panel/styles.css': path.resolve(
           __dirname,
           '../../packages/panel/src/styles/tailwind.css',

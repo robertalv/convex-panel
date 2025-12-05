@@ -51,7 +51,7 @@ export function Hero() {
 
           <h1 className="mt-4 md:mt-6 text-3xl md:text-[40px] leading-tight font-serif text-content-primary">
             The debugging and observability panel{" "}
-            <span className="text-primary">for your Convex apps.</span>
+            <span className="text-accent">for your <a href="https://convex.link/cpanel" target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-content-primary transition-colors">Convex</a> apps.</span>
             <span className="block mt-2 text-xl md:text-[28px] text-content-secondary">
               Built for <WordAnimation /> who want to ship faster with less
               guesswork.

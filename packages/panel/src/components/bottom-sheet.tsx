@@ -8,6 +8,7 @@ import {
   Moon,
   Sparkles,
   ExternalLink,
+  BookOpen,
 } from 'lucide-react';
 import { ConvexLogo } from './icons';
 import { AskAI } from './ask-ai';
@@ -27,6 +28,8 @@ import type { Team, Project, EnvType } from '../types';
 import { useThemeSafe } from '../hooks/useTheme';
 import { useHasSubscription } from '../hooks/useTeamOrbSubscription';
 import { SupportPopup } from './support-popup';
+import { SetupInstructions } from './setup-instructions';
+import { UserMenu } from './user-menu';
 import { fetchDeploymentMetadata } from '../utils/api/deployments';
 import { extractDeploymentName, extractProjectName } from '../utils/api/utils';
 import { fetchProjectInfo } from '../utils/api/teams';
@@ -41,11 +44,13 @@ interface BottomSheetProps {
   environment?: EnvType;
   isAuthenticated?: boolean;
   onConnect?: () => void;
+  onLogout?: () => void;
   oauthConfig?: any;
   activeTab?: TabId;
   onTabChange?: (tab: TabId) => void;
   adminClient?: any;
   accessToken?: string;
+  isOAuthToken?: boolean;
   teamSlug?: string;
   projectSlug?: string;
   team?: Team;
@@ -67,12 +72,14 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   environment: providedEnvironment = 'development',
   isAuthenticated,
   onConnect,
+  onLogout,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   oauthConfig: _oauthConfig,
   activeTab: externalActiveTab,
   onTabChange,
   adminClient,
   accessToken,
+  isOAuthToken = false,
   teamSlug,
   projectSlug,
   team,
@@ -82,6 +89,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   const activeTab = externalActiveTab ?? internalActiveTab;
   const [isResizing, setIsResizing] = useState(false);
   const [isSupportPopupOpen, setIsSupportPopupOpen] = useState(false);
+  const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
   const [customHeight, setCustomHeight] = useState<number | null>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(PANEL_HEIGHT_STORAGE_KEY);
@@ -92,7 +100,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   const [sheetContainer, setSheetContainer] = useState<HTMLElement | null>(null);
   
   // Calculate isPanelExpanded early so it can be used in the callback ref
-  const isPanelExpanded = Boolean(isAuthenticated && isOpen);
+  // Allow expansion even when not authenticated so users can see instructions
+  const isPanelExpanded = Boolean(isOpen);
   
   // Callback ref to track the main content container
   const mainContentRef = useCallback((node: HTMLDivElement | null) => {
@@ -349,16 +358,15 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   };
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    if (!isAuthenticated) return;
+    // Allow resizing even when not authenticated
     e.preventDefault();
     setIsResizing(true);
-  }, [isAuthenticated]);
+  }, []);
 
   useEffect(() => {
     if (!isResizing) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isAuthenticated) return;
       const newHeight = window.innerHeight - e.clientY;
       const clampedHeight = Math.max(
         PANEL_MIN_HEIGHT,
@@ -379,7 +387,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, isAuthenticated]);
+  }, [isResizing]);
 
   const isRunnerShown = useIsGlobalRunnerShown();
   const showGlobalRunner = useShowGlobalRunner();
@@ -388,7 +396,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
   const getHeight = () => {
     const minHeight = PANEL_COLLAPSED_HEIGHT;
-    if (!isAuthenticated) return minHeight;
+    // Allow expansion even when not authenticated so users can see instructions
     if (!isOpen) return minHeight;
     if (customHeight !== null) return `${customHeight}px`;
     return PANEL_DEFAULT_HEIGHT;
@@ -454,6 +462,20 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
   const headerRightContent = (
     <>
+      {!isAuthenticated && (
+        <button
+          type="button"
+          className="cp-support-btn"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setIsInstructionsOpen(true);
+          }}
+          title="View setup instructions"
+        >
+          <BookOpen size={14} /> Instructions
+        </button>
+      )}
       {showUpgradeButton && (
         <button
           type="button"
@@ -481,16 +503,23 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       >
         {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
       </button>
-      <div className="cp-separator" />
-      {isAuthenticated ? (
+      {isAuthenticated && isOAuthToken && (
+        <UserMenu
+          accessToken={accessToken}
+          teamSlug={teamSlug}
+          projectSlug={projectSlug}
+          onLogout={onLogout}
+        />
+      )}
+      
+      {isAuthenticated && (
+        <>
+        <div className="cp-separator" />
         <button type="button" onClick={onClose} className="cp-icon-btn cp-theme-toggle-btn">
           {isOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
         </button>
-      ) : (
-        <button type="button" onClick={onClose} className="cp-icon-btn">
-          <X size={16} />
-        </button>
-      )}
+        </>
+)}
     </>
   );
 
@@ -605,6 +634,16 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         isOpen={isSupportPopupOpen}
         onClose={() => setIsSupportPopupOpen(false)}
         hasProAccess={hasSubscription === true}
+      />
+
+      {/* Setup Instructions */}
+      <SetupInstructions
+        isOpen={isInstructionsOpen}
+        onClose={() => setIsInstructionsOpen(false)}
+        deploymentUrl={deploymentUrl}
+        teamSlug={teamSlug}
+        projectSlug={projectSlug}
+        accessToken={accessToken}
       />
     </div>
   );

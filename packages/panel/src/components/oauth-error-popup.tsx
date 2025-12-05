@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, AlertTriangle, ExternalLink, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, AlertTriangle, ExternalLink, CheckCircle2, Circle } from 'lucide-react';
 import { CONVEX_PANEL_API_DOMAIN, ROUTES } from '../utils/constants';
 
 export interface OAuthErrorPopupProps {
@@ -17,6 +17,34 @@ export const OAuthErrorPopup: React.FC<OAuthErrorPopupProps> = ({
   errors,
   warnings = [],
 }) => {
+  const [serverStatus, setServerStatus] = useState<'loading' | 'online' | 'offline'>('loading');
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const checkServerHealth = async () => {
+      try {
+        const healthUrl = `https://${CONVEX_PANEL_API_DOMAIN}${ROUTES.HEALTH_ENDPOINT}`;
+        const response = await fetch(healthUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (response.ok) {
+          setServerStatus('online');
+        } else {
+          setServerStatus('offline');
+        }
+      } catch (error) {
+        setServerStatus('offline');
+      }
+    };
+
+    checkServerHealth();
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const hasErrors = errors.length > 0;
@@ -42,6 +70,7 @@ export const OAuthErrorPopup: React.FC<OAuthErrorPopupProps> = ({
         justifyContent: 'center',
         zIndex: 100000,
         padding: '20px',
+        pointerEvents: 'auto',
       }}
     >
       <div
@@ -56,8 +85,10 @@ export const OAuthErrorPopup: React.FC<OAuthErrorPopupProps> = ({
           overflowY: 'auto',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
           border: '1px solid var(--cp-border, #333)',
+          pointerEvents: 'auto',
         }}
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
@@ -79,7 +110,12 @@ export const OAuthErrorPopup: React.FC<OAuthErrorPopupProps> = ({
             </h2>
           </div>
           <button
-            onClick={onClose}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
             style={{
               background: 'none',
               border: 'none',
@@ -91,6 +127,7 @@ export const OAuthErrorPopup: React.FC<OAuthErrorPopupProps> = ({
               justifyContent: 'center',
               borderRadius: '4px',
               transition: 'background-color 0.2s',
+              pointerEvents: 'auto',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'var(--cp-bg-secondary, #2a2a2a)';
@@ -184,9 +221,10 @@ export const OAuthErrorPopup: React.FC<OAuthErrorPopupProps> = ({
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <a
-              href="https://convexpanel.dev/docs"
+              href="/docs"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -194,6 +232,8 @@ export const OAuthErrorPopup: React.FC<OAuthErrorPopupProps> = ({
                 color: '#3b82f6',
                 textDecoration: 'none',
                 fontSize: '14px',
+                cursor: 'pointer',
+                pointerEvents: 'auto',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.textDecoration = 'underline';
@@ -206,9 +246,10 @@ export const OAuthErrorPopup: React.FC<OAuthErrorPopupProps> = ({
               Documentation
             </a>
             <a
-              href={`${CONVEX_PANEL_API_DOMAIN}${ROUTES.HEALTH_ENDPOINT}`}
+              href="https://github.com/robertalv/convex-panel/issues"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -216,6 +257,8 @@ export const OAuthErrorPopup: React.FC<OAuthErrorPopupProps> = ({
                 color: '#3b82f6',
                 textDecoration: 'none',
                 fontSize: '14px',
+                cursor: 'pointer',
+                pointerEvents: 'auto',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.textDecoration = 'underline';
@@ -225,8 +268,51 @@ export const OAuthErrorPopup: React.FC<OAuthErrorPopupProps> = ({
               }}
             >
               <ExternalLink size={14} />
-              Check API Server Status
+              Report a Bug
             </a>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+                color: 'var(--cp-text-primary, #fff)',
+              }}
+            >
+              {serverStatus === 'loading' && (
+                <>
+                  <Circle size={14} style={{ color: '#9ca3af' }} />
+                  <span style={{ color: 'var(--cp-text-secondary, #888)' }}>Checking server status...</span>
+                </>
+              )}
+              {serverStatus === 'online' && (
+                <>
+                  <div
+                    style={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: '#22c55e',
+                      boxShadow: '0 0 8px rgba(34, 197, 94, 0.5)',
+                    }}
+                  />
+                  <span>Server Online</span>
+                </>
+              )}
+              {serverStatus === 'offline' && (
+                <>
+                  <div
+                    style={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: '#ef4444',
+                    }}
+                  />
+                  <span style={{ color: 'var(--cp-text-secondary, #888)' }}>Server Offline</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -234,7 +320,12 @@ export const OAuthErrorPopup: React.FC<OAuthErrorPopupProps> = ({
         <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
           {!hasErrors && hasWarnings && (
             <button
-              onClick={onClose}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onClose();
+              }}
               style={{
                 backgroundColor: 'transparent',
                 color: 'var(--cp-text-secondary, #888)',
@@ -245,6 +336,7 @@ export const OAuthErrorPopup: React.FC<OAuthErrorPopupProps> = ({
                 fontWeight: 500,
                 cursor: 'pointer',
                 transition: 'all 0.2s',
+                pointerEvents: 'auto',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = 'var(--cp-bg-secondary, #2a2a2a)';
@@ -257,7 +349,10 @@ export const OAuthErrorPopup: React.FC<OAuthErrorPopupProps> = ({
             </button>
           )}
           <button
-            onClick={() => {
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               if (hasErrors) {
                 onClose();
               } else if (hasWarnings && onContinue) {
@@ -276,6 +371,7 @@ export const OAuthErrorPopup: React.FC<OAuthErrorPopupProps> = ({
               fontWeight: 500,
               cursor: 'pointer',
               transition: 'background-color 0.2s',
+              pointerEvents: 'auto',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = hasErrors ? '#dc2626' : '#2563eb';

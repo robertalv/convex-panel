@@ -6,7 +6,6 @@
 // Build-time injected variables (replaced at build time)
 declare const __NEXT_PUBLIC_CONVEX_URL__: string | undefined;
 
-import { isDevelopment } from './platform';
 import { getEnvVar } from './core';
 
 /**
@@ -56,23 +55,6 @@ export const getConvexUrl = (provided?: string): string | undefined => {
   // 3. Use getEnvVar which checks NEXT_PUBLIC_ and VITE_ prefixes
   const envUrl = getEnvVar('CONVEX_URL');
   if (envUrl) return envUrl;
-  
-  // Debug logging in development
-  if (typeof window !== 'undefined' && isDevelopment()) {
-    try {
-      const processEnv = typeof process !== 'undefined' ? process.env : undefined;
-      const nextDataEnv = (window as any).__NEXT_DATA__?.env;
-      console.log('[getConvexUrl] Debug:', {
-        provided,
-        buildTimeUrl: typeof __NEXT_PUBLIC_CONVEX_URL__ !== 'undefined' ? __NEXT_PUBLIC_CONVEX_URL__ : undefined,
-        envUrl,
-        processEnvNextPublic: processEnv?.NEXT_PUBLIC_CONVEX_URL,
-        nextDataEnvNextPublic: nextDataEnv?.NEXT_PUBLIC_CONVEX_URL,
-      });
-    } catch (e) {
-      // Ignore logging errors
-    }
-  }
   
   return envUrl;
 };

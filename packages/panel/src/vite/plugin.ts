@@ -96,7 +96,6 @@ export type ConvexPanelVitePluginConfig = {
  */
 export function convexPanel(config?: ConvexPanelVitePluginConfig): Plugin {
   const removeOnBuild = config?.removeOnBuild ?? true;
-  const logging = config?.logging ?? false;
 
   return {
     name: 'convex-panel:remove-on-build',
@@ -112,13 +111,6 @@ export function convexPanel(config?: ConvexPanelVitePluginConfig): Plugin {
 
       const transform = removeConvexPanel(code, id);
       if (!transform) return null;
-
-      if (logging) {
-        const relativePath = id.replace(normalizePath(process.cwd()), '');
-        console.log(
-          `[convex-panel] Removed ConvexPanel code from: ${relativePath}`,
-        );
-      }
 
       return transform;
     },

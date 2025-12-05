@@ -76,8 +76,6 @@ export async function discoverFunctions(
     let componentQuerySupported = false;
     let componentQueryAttempts = 0;
 
-    console.log("Component Query Supported?", componentQuerySupported);
-    
     // Fetch component functions sequentially to avoid overwhelming the API
     for (const component of componentsList) {
       if (component.id && component.state === 'active' && component.name) {

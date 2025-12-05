@@ -867,7 +867,6 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
         try {
           const config = await getPeriodicBackupConfig(currentDeploymentId, token);
           setPeriodicConfig(config);
-          console.log('periodic config', periodicConfig);
           setAutomaticBackup(config !== null);
         } catch (err: any) {
           // If config doesn't exist or fails, that's okay

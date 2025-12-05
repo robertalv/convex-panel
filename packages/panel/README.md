@@ -2,6 +2,7 @@
 
 [![NPM Version](https://img.shields.io/npm/v/convex-panel)](https://www.npmjs.com/package/convex-panel)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Bundlephobia](https://badgen.net/bundlephobia/minzip/convex-panel@latest)](https://bundlephobia.com/package/convex-panel)
 
 A powerful development panel for [Convex](https://convex.dev) applications that provides real-time logs, data inspection, function testing, health monitoring, and more.
 

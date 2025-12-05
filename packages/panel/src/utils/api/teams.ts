@@ -20,42 +20,44 @@ import { callConvexQuery } from './helpers';
  * @param useBearerToken - Whether to use bearer token format
  * @returns The profile response
  */
+/**
+ * Fetch user profile to get team information
+ * @param accessToken - The access token to use
+ * @param useBearerToken - Whether to use bearer token format
+ * @returns The profile response
+ */
 export async function fetchProfile(
   accessToken: string,
   useBearerToken: boolean = true
 ): Promise<ProfileResponse | null> {
-  try {
-    const endpoint = `https://${CONVEX_API_DOMAIN}${ROUTES.DASHBOARD_PROFILE}`;
-    const authHeader = useBearerToken
-      ? `Bearer ${accessToken}`
-      : `Convex ${accessToken}`;
+  const endpoint = `https://${CONVEX_API_DOMAIN}${ROUTES.DASHBOARD_PROFILE}`;
+  const authHeader = useBearerToken
+    ? `Bearer ${accessToken}`
+    : `Convex ${accessToken}`;
 
-    const response = await fetch(endpoint, {
-      method: 'GET',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json',
-      },
-    });
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-0.0.0',
+    },
+  });
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null;
+  if (!response.ok) {
+    // Handle service account error - this is expected when using service account tokens
+    if (response.status === 403 || response.status === 400) {
+      const error = await response.json().catch(() => null);
+      if (error?.code === 'ServiceAccount') {
+        return null; // Return null gracefully for service accounts
       }
-      if (response.status === 403) {
-        return null;
-      }
-      const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-      throw new Error(`Failed to fetch profile: ${response.status}, message: ${error.message || 'Unknown error'}`);
     }
-
-    return response.json();
-  } catch (error: any) {
-    if (!error?.message?.includes('403') && !error?.message?.includes('service account')) {
-      console.error('Error fetching profile:', error);
-    }
-    return null;
+    
+    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(`Failed to fetch profile: ${response.status}, message: ${error.message || 'Unknown error'}`);
   }
+
+  return response.json();
 }
 
 /**
@@ -184,6 +186,7 @@ export async function fetchTeams(
     headers: {
       'Authorization': authHeader,
       'Content-Type': 'application/json',
+      'Convex-Client': 'dashboard-0.0.0',
     },
   });
 
