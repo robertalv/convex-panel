@@ -2,6 +2,7 @@ import React, { useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { DataFilterPanel } from './data-filter-panel';
 import type { FilterExpression, SortConfig, TableDefinition } from '../../../types';
+import { createSessionStorageFilterHistoryApi } from '../../../utils/filterHistoryStorage';
 
 export interface FilterSheetProps {
   isOpen: boolean;
@@ -39,43 +40,72 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
   userId = 'default',
   container,
 }) => {
-  // Create filter history API using adminClient
   const filterHistoryApi = useMemo(() => {
-    if (!adminClient) return undefined;
+    if (adminClient) {
+      const sessionStorageApi = createSessionStorageFilterHistoryApi();
+      
+      return {
+        push: async (scope: string, state: { filters: FilterExpression; sortConfig: SortConfig | null }) => {
+          try {
+            await adminClient.mutation('convexPanel:push' as any, {
+              scope,
+              state,
+            });
+          } catch (error) {
+            // Fallback to sessionStorage if component is not installed
+            await sessionStorageApi.push(scope, state);
+          }
+        },
+        undo: async (scope: string, count?: number) => {
+          try {
+            return await adminClient.mutation('convexPanel:undo' as any, {
+              scope,
+              count,
+            });
+          } catch (error) {
+            // Fallback to sessionStorage if component is not installed
+            return await sessionStorageApi.undo(scope, count);
+          }
+        },
+        redo: async (scope: string, count?: number) => {
+          try {
+            return await adminClient.mutation('convexPanel:redo' as any, {
+              scope,
+              count,
+            });
+          } catch (error) {
+            // Fallback to sessionStorage if component is not installed
+            return await sessionStorageApi.redo(scope, count);
+          }
+        },
+        getStatus: async (scope: string) => {
+          try {
+            const result = await adminClient.query('convexPanel:getStatus' as any, {
+              scope,
+            });
+            return result || { canUndo: false, canRedo: false, position: null, length: 0 };
+          } catch (error) {
+            // Fallback to sessionStorage if component is not installed
+            return await sessionStorageApi.getStatus(scope);
+          }
+        },
+        getCurrentState: async (scope: string) => {
+          try {
+            return await adminClient.query('convexPanel:getCurrentState' as any, {
+              scope,
+            });
+          } catch (error) {
+            // Fallback to sessionStorage if component is not installed
+            return await sessionStorageApi.getCurrentState(scope);
+          }
+        },
+      };
+    }
     
-    return {
-      push: async (scope: string, state: { filters: FilterExpression; sortConfig: SortConfig | null }) => {
-        await adminClient.mutation('convexPanel:push' as any, {
-          scope,
-          state,
-        });
-      },
-      undo: async (scope: string, count?: number) => {
-        return await adminClient.mutation('convexPanel:undo' as any, {
-          scope,
-          count,
-        });
-      },
-      redo: async (scope: string, count?: number) => {
-        return await adminClient.mutation('convexPanel:redo' as any, {
-          scope,
-          count,
-        });
-      },
-      getStatus: async (scope: string) => {
-        const result = await adminClient.query('convexPanel:getStatus' as any, {
-          scope,
-        });
-        return result || { canUndo: false, canRedo: false, position: null, length: 0 };
-      },
-      getCurrentState: async (scope: string) => {
-        return await adminClient.query('convexPanel:getCurrentState' as any, {
-          scope,
-        });
-      },
-    };
+    // if no adminClient available, use sessionStorage fallback
+    return createSessionStorageFilterHistoryApi();
   }, [adminClient]);
-  // Prevent body scroll when sheet is open (only if not in container)
+  // if the sheet is open, prevent the body from scrolling
   useEffect(() => {
     if (!container && isOpen) {
       document.body.style.overflow = 'hidden';

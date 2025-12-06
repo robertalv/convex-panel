@@ -40,6 +40,7 @@ export const STORAGE_KEYS: Record<string, string> = {
   BOTTOM_SHEET_EXPANDED: `${STORAGE_PREFIX}:bottom-sheet-expanded`,
   DEPLOYMENT_STATE_CHANGED: `${STORAGE_PREFIX}:deployment-state-changed`,
   FILTER_HISTORY_RETENTION_MS: `${STORAGE_PREFIX}:filter-history-retention-ms`,
+  FILTER_HISTORY_SESSION_PREFIX: `${STORAGE_PREFIX}:filter-history-session`,
 }
 
 export const PANEL_MIN_HEIGHT = 40;
