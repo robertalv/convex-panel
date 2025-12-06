@@ -87,7 +87,7 @@ component by calling `use`:
 ```ts
 // convex/convex.config.ts
 import { defineApp } from "convex/server";
-import convexPanel from "convex-panel/component/convex.config.js";
+import convexPanel from "@convex-panel/component/convex.config.js";
 
 const app = defineApp();
 app.use(convexPanel);
@@ -120,7 +120,7 @@ You can register HTTP routes for the component to expose HTTP endpoints:
 
 ```ts
 import { httpRouter } from "convex/server";
-import { registerRoutes } from "convex-panel/component";
+import { registerRoutes } from "@convex-panel/component";
 import { components } from "./_generated/api";
 
 const http = httpRouter();
