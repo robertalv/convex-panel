@@ -2,6 +2,7 @@ import type {
   GenericDataModel,
   GenericMutationCtx,
   GenericQueryCtx,
+  GenericActionCtx,
 } from "convex/server";
 import type { ComponentApi } from "../component/_generated/component.js";
 
@@ -11,6 +12,10 @@ type MutationCtx = Pick<
 >;
 
 type QueryCtx = Pick<GenericQueryCtx<GenericDataModel>, "runQuery">;
+
+type RunActionCtx = {
+  runAction: GenericActionCtx<GenericDataModel>["runAction"];
+};
 
 /**
  * Filter state structure: contains filters and sort configuration
@@ -283,6 +288,22 @@ export class FilterHistory<FilterScope extends string = string> {
     return (await ctx.runQuery(this.component.lib.listStates, {
       scope,
     })) as Array<{ position: number; state: FilterState }>;
+  }
+
+  /**
+   * Clean up old filter history states that are older than the specified retention period.
+   * Preserves the current head state even if it's old (user might be viewing it).
+   * Also cleans up orphaned scopes with no states.
+   * 
+   * Users should call this from their own cron jobs. See example usage in the README.
+   */
+  async cleanup(
+    ctx: RunActionCtx,
+    retentionHours: number,
+  ): Promise<{ deletedStates: number; deletedScopes: number }> {
+    return (await ctx.runAction(this.component.lib.cleanup, {
+      retentionHours,
+    })) as { deletedStates: number; deletedScopes: number };
   }
 
   /**

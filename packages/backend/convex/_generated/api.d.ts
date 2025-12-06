@@ -10,7 +10,6 @@
 
 import type * as crons from "../crons.js";
 import type * as dummyjson from "../dummyjson.js";
-import type * as filterHistory from "../filterHistory.js";
 import type * as http from "../http.js";
 import type * as loops from "../loops.js";
 import type * as stats from "../stats.js";
@@ -25,7 +24,6 @@ import type {
 declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   dummyjson: typeof dummyjson;
-  filterHistory: typeof filterHistory;
   http: typeof http;
   loops: typeof loops;
   stats: typeof stats;
@@ -542,8 +540,14 @@ export declare const components: {
       >;
     };
   };
-  filterHistory: {
+  convexPanel: {
     lib: {
+      cleanup: FunctionReference<
+        "action",
+        "internal",
+        { retentionHours: number },
+        { deletedScopes: number; deletedStates: number }
+      >;
       clear: FunctionReference<"mutation", "internal", { scope: string }, null>;
       createCheckpoint: FunctionReference<
         "mutation",

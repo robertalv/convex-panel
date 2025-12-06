@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Sheet } from '../../../components/shared/sheet';
 import type { FunctionExecutionLog } from '../../../types';
 import { Card } from '../../../components/shared/card';
+import { X, Info, Copy, ChevronUp, ChevronDown, ArrowUp, AlertCircle } from 'lucide-react';
+import { TooltipAction } from '../../../components/shared/tooltip-action';
 
 interface FunctionExecutionDetailSheetProps {
   log: FunctionExecutionLog | null;
@@ -18,10 +20,39 @@ const formatDateTime = (timestamp: number) => {
   return date.toLocaleString([], {
     month: 'short',
     day: 'numeric',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
   });
+};
+
+const formatTimestampWithRelative = (timestamp: number) => {
+  if (!timestamp) return { absolute: 'N/A', relative: '' };
+  const date = new Date(timestamp);
+  const month = date.toLocaleString('en-US', { month: 'short' });
+  const day = date.getDate().toString().padStart(2, '0');
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const seconds = date.getSeconds().toString().padStart(2, '0');
+  const milliseconds = date.getMilliseconds().toString().padStart(3, '0');
+  const absolute = `${month} ${day}, ${hours}:${minutes}:${seconds}.${milliseconds}`;
+  
+  const now = Date.now();
+  const diffMs = now - timestamp;
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const relative = diffMinutes === 1 ? '1 minute ago' : `${diffMinutes} minutes ago`;
+  
+  return { absolute, relative };
+};
+
+const formatCompute = (memoryMb?: number, durationMs?: number) => {
+  if (!memoryMb || !durationMs) return '0.0000000 GB-hr (0 MB for 0s)';
+  const memoryGb = memoryMb / 1024;
+  const durationHours = durationMs / (1000 * 60 * 60);
+  const gbHours = memoryGb * durationHours;
+  const durationSeconds = durationMs / 1000;
+  return `${gbHours.toFixed(7)} GB-hr (${memoryMb} MB for ${durationSeconds.toFixed(2)}s)`;
 };
 
 const formatBytes = (bytes?: number) => {
@@ -50,6 +81,7 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
   container: propContainer,
 }) => {
   const [activeTab, setActiveTab] = useState<DetailTab>('execution');
+  const [resourcesExpanded, setResourcesExpanded] = useState(true);
   const container = propContainer || null;
 
   if (!isOpen || !log) {
@@ -65,11 +97,15 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
     durationMs,
     environment,
     usageStats,
-    returnBytes,
     requestId,
     caller,
     identityType,
+    success,
+    error,
   } = log;
+
+  const timestampInfo = formatTimestampWithRelative(startedAt);
+  const hasError = !success || error;
 
   const sheetContent = (
     <div
@@ -79,50 +115,128 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
         height: '100%',
       }}
     >
+      {/* Header */}
       <div
         style={{
-          height: 48,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 16px',
+          padding: '0px 12px',
           borderBottom: '1px solid var(--color-panel-border)',
+          backgroundColor: 'var(--color-panel-bg-secondary)',
+          height: '40px',
+          flexShrink: 0,
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: 'var(--color-panel-text)',
-            }}
-          >
-            Execution details
-          </div>
-          <div
-            style={{
-              fontSize: 11,
-              color: 'var(--color-panel-text-muted)',
-              fontFamily: 'monospace',
-            }}
-          >
-            {functionIdentifier}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+            <span style={{ fontSize: '12px', color: 'var(--color-panel-text-secondary)' }}>
+              {timestampInfo.absolute}
+            </span>
+            <span style={{ fontSize: '12px', color: 'var(--color-panel-text-muted)' }}>
+              ({timestampInfo.relative})
+            </span>
+            {hasError && (
+              <span
+                style={{
+                  fontSize: '12px',
+                  color: 'var(--color-panel-error)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <AlertCircle size={14} />
+                failure
+              </span>
+            )}
           </div>
         </div>
+
+        {/* Close Button */}
         <button
+          type="button"
           onClick={onClose}
           style={{
+            padding: '6px',
+            color: 'var(--color-panel-text-secondary)',
+            backgroundColor: 'transparent',
             border: 'none',
-            background: 'transparent',
-            color: 'var(--color-panel-text-muted)',
             cursor: 'pointer',
-            fontSize: 20,
-            lineHeight: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '4px',
+            transition: 'all 0.2s',
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--color-panel-text)';
+            e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
+            e.currentTarget.style.backgroundColor = 'transparent';
           }}
         >
-          ×
+          <X size={18} />
         </button>
       </div>
+
+      {hasError && error && (
+        <div
+          style={{
+            margin: '16px',
+            padding: '12px',
+            backgroundColor: 'var(--color-background-error)',
+            border: '1px solid var(--color-border-error)',
+            borderRadius: '6px',
+            position: 'relative',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'var(--color-content-error)',
+              marginBottom: '8px',
+            }}
+          >
+            Error
+          </div>
+          <div
+            style={{
+              fontSize: '12px',
+              color: 'var(--color-content-error)',
+              fontFamily: 'monospace',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}
+          >
+            {error}
+          </div>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(error);
+            }}
+            style={{
+              position: 'absolute',
+              top: '8px',
+              right: '8px',
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--color-content-error)',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            title="Copy error"
+          >
+            <Copy size={14} />
+          </button>
+        </div>
+      )}
 
       <div
         style={{
@@ -244,115 +358,136 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
                 <span style={{ color: 'var(--color-panel-text-muted)' }}>
                   Environment
                 </span>
-                <span style={{ color: 'var(--color-panel-text-secondary)' }}>
+                <span style={{ color: 'var(--color-panel-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   {environment || 'Convex'}
+                  <TooltipAction
+                    icon={<Info size={12} style={{ color: 'var(--color-panel-text-muted)' }} />}
+                    text="The runtime environment where this function executed"
+                  />
                 </span>
               </div>
 
               <div
                 style={{
                   marginTop: 16,
-                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
                   marginBottom: 8,
-                  color: 'var(--color-panel-text)',
                 }}
               >
-                Resources Used
+                <div
+                  style={{
+                    fontWeight: 600,
+                    color: 'var(--color-panel-text)',
+                  }}
+                >
+                  Resources Used
+                </div>
+                <button
+                  onClick={() => setResourcesExpanded(!resourcesExpanded)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--color-panel-text-muted)',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  {resourcesExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
               </div>
 
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  rowGap: 8,
-                  columnGap: 16,
-                  fontSize: 12,
-                }}
-              >
-                <div>
-                  <div
-                    style={{
-                      color: 'var(--color-panel-text-muted)',
-                      marginBottom: 2,
-                    }}
-                  >
-                    DB Bandwidth
+              {resourcesExpanded && (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    fontSize: 12,
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        color: 'var(--color-panel-text-muted)',
+                        marginBottom: 2,
+                      }}
+                    >
+                      Compute
+                    </div>
+                    <div
+                      style={{
+                        color: 'var(--color-panel-text-secondary)',
+                      }}
+                    >
+                      {formatCompute(usageStats?.memory_used_mb, durationMs)}
+                    </div>
                   </div>
-                  <div
-                    style={{
-                      color: 'var(--color-panel-text-secondary)',
-                    }}
-                  >
-                    {`Read ${formatBytes(
-                      usageStats?.database_read_bytes,
-                    )}, wrote ${formatBytes(
-                      usageStats?.database_write_bytes,
-                    )}`}
-                  </div>
-                </div>
 
-                <div>
-                  <div
-                    style={{
-                      color: 'var(--color-panel-text-muted)',
-                      marginBottom: 2,
-                    }}
-                  >
-                    File Bandwidth
+                  <div>
+                    <div
+                      style={{
+                        color: 'var(--color-panel-text-muted)',
+                        marginBottom: 2,
+                      }}
+                    >
+                      DB Bandwidth
+                    </div>
+                    <div
+                      style={{
+                        color: 'var(--color-panel-text-secondary)',
+                      }}
+                    >
+                      {`Accessed ${usageStats?.database_read_documents || 0} documents, ${formatBytes(
+                        usageStats?.database_read_bytes,
+                      )} read, ${formatBytes(usageStats?.database_write_bytes)} written`}
+                    </div>
                   </div>
-                  <div
-                    style={{
-                      color: 'var(--color-panel-text-secondary)',
-                    }}
-                  >
-                    {`Read ${formatBytes(
-                      usageStats?.storage_read_bytes,
-                    )}, wrote ${formatBytes(
-                      usageStats?.storage_write_bytes,
-                    )}`}
-                  </div>
-                </div>
 
-                <div>
-                  <div
-                    style={{
-                      color: 'var(--color-panel-text-muted)',
-                      marginBottom: 2,
-                    }}
-                  >
-                    Vector Bandwidth
+                  <div>
+                    <div
+                      style={{
+                        color: 'var(--color-panel-text-muted)',
+                        marginBottom: 2,
+                      }}
+                    >
+                      File Bandwidth
+                    </div>
+                    <div
+                      style={{
+                        color: 'var(--color-panel-text-secondary)',
+                      }}
+                    >
+                      {`${formatBytes(usageStats?.storage_read_bytes)} read, ${formatBytes(
+                        usageStats?.storage_write_bytes,
+                      )} written`}
+                    </div>
                   </div>
-                  <div
-                    style={{
-                      color: 'var(--color-panel-text-secondary)',
-                    }}
-                  >
-                    {`Read ${formatBytes(
-                      usageStats?.vector_index_read_bytes,
-                    )}, wrote ${formatBytes(
-                      usageStats?.vector_index_write_bytes,
-                    )}`}
-                  </div>
-                </div>
 
-                <div>
-                  <div
-                    style={{
-                      color: 'var(--color-panel-text-muted)',
-                      marginBottom: 2,
-                    }}
-                  >
-                    Return Size
-                  </div>
-                  <div
-                    style={{
-                      color: 'var(--color-panel-text-secondary)',
-                    }}
-                  >
-                    {formatBytes(returnBytes)}
+                  <div>
+                    <div
+                      style={{
+                        color: 'var(--color-panel-text-muted)',
+                        marginBottom: 2,
+                      }}
+                    >
+                      Vector Bandwidth
+                    </div>
+                    <div
+                      style={{
+                        color: 'var(--color-panel-text-secondary)',
+                      }}
+                    >
+                      {`${formatBytes(usageStats?.vector_index_read_bytes)} read, ${formatBytes(
+                        usageStats?.vector_index_write_bytes,
+                      )} written`}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </Card>
         )}
@@ -411,22 +546,34 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
                 <span style={{ color: 'var(--color-panel-text-muted)' }}>
                   Identity
                 </span>
-                <span style={{ color: 'var(--color-panel-text-secondary)' }}>
-                  {identityType || 'Unknown'}
+                <span style={{ color: 'var(--color-panel-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {identityType || 'System'}
+                  <TooltipAction
+                    icon={<Info size={12} style={{ color: 'var(--color-panel-text-muted)' }} />}
+                    text="The identity that executed this function"
+                  />
                 </span>
 
                 <span style={{ color: 'var(--color-panel-text-muted)' }}>
                   Caller
                 </span>
-                <span style={{ color: 'var(--color-panel-text-secondary)' }}>
-                  {caller || 'Unknown'}
+                <span style={{ color: 'var(--color-panel-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {caller || 'Cron Job'}
+                  <TooltipAction
+                    icon={<Info size={12} style={{ color: 'var(--color-panel-text-muted)' }} />}
+                    text="What triggered this function execution"
+                  />
                 </span>
 
                 <span style={{ color: 'var(--color-panel-text-muted)' }}>
                   Environment
                 </span>
-                <span style={{ color: 'var(--color-panel-text-secondary)' }}>
+                <span style={{ color: 'var(--color-panel-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   {environment || 'Convex'}
+                  <TooltipAction
+                    icon={<Info size={12} style={{ color: 'var(--color-panel-text-muted)' }} />}
+                    text="The runtime environment where this function executed"
+                  />
                 </span>
               </div>
             </div>
@@ -434,29 +581,40 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
         )}
 
         {activeTab === 'functions' && (
-          <Card>
-            <div style={{ fontSize: 12 }}>
-              <div
-                style={{
-                  marginBottom: 8,
-                  color: 'var(--color-panel-text)',
-                  fontWeight: 600,
-                }}
-              >
-                Functions Called
-              </div>
-              <div
-                style={{
-                  color: 'var(--color-panel-text-secondary)',
-                  fontSize: 12,
-                }}
-              >
-                Detailed call graphs are not yet available from the public
-                logging endpoints. This panel will show a function outline once
-                that data is exposed.
-              </div>
+          <div style={{ fontSize: 12 }}>
+            <div
+              style={{
+                marginBottom: 12,
+                color: 'var(--color-panel-text-secondary)',
+                fontSize: 12,
+              }}
+            >
+              This is an outline of the functions called in this request.
             </div>
-          </Card>
+            <Card
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {hasError ? (
+                  <AlertCircle size={16} style={{ color: 'var(--color-panel-error)' }} />
+                ) : (
+                  <div style={{ width: 16, height: 16 }} />
+                )}
+                <span style={{ fontFamily: 'monospace', color: 'var(--color-panel-text)' }}>
+                  {functionIdentifier}
+                </span>
+                <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                  ({formatDuration(durationMs)})
+                </span>
+              </div>
+              <ArrowUp size={16} style={{ color: 'var(--color-panel-text-muted)' }} />
+            </Card>
+          </div>
         )}
       </div>
     </div>

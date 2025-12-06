@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { DataFilterPanel } from './data-filter-panel';
 import type { FilterExpression, SortConfig, TableDefinition } from '../../../types';
 
@@ -18,6 +19,8 @@ export interface FilterSheetProps {
   adminClient?: any;
   /** Optional user ID for scoping filter history */
   userId?: string;
+  /** Optional container element to render the sheet inside */
+  container?: HTMLElement | null;
 }
 
 export const FilterSheet: React.FC<FilterSheetProps> = ({
@@ -34,6 +37,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
   openColumnVisibility,
   adminClient,
   userId = 'default',
+  container,
 }) => {
   // Create filter history API using adminClient
   const filterHistoryApi = useMemo(() => {
@@ -41,47 +45,49 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
     
     return {
       push: async (scope: string, state: { filters: FilterExpression; sortConfig: SortConfig | null }) => {
-        await adminClient.mutation('filterHistory:push' as any, {
+        await adminClient.mutation('convexPanel:push' as any, {
           scope,
           state,
         });
       },
       undo: async (scope: string, count?: number) => {
-        return await adminClient.mutation('filterHistory:undo' as any, {
+        return await adminClient.mutation('convexPanel:undo' as any, {
           scope,
           count,
         });
       },
       redo: async (scope: string, count?: number) => {
-        return await adminClient.mutation('filterHistory:redo' as any, {
+        return await adminClient.mutation('convexPanel:redo' as any, {
           scope,
           count,
         });
       },
       getStatus: async (scope: string) => {
-        const result = await adminClient.query('filterHistory:getStatus' as any, {
+        const result = await adminClient.query('convexPanel:getStatus' as any, {
           scope,
         });
         return result || { canUndo: false, canRedo: false, position: null, length: 0 };
       },
       getCurrentState: async (scope: string) => {
-        return await adminClient.query('filterHistory:getCurrentState' as any, {
+        return await adminClient.query('convexPanel:getCurrentState' as any, {
           scope,
         });
       },
     };
   }, [adminClient]);
-  // Prevent body scroll when sheet is open
+  // Prevent body scroll when sheet is open (only if not in container)
   useEffect(() => {
-    if (isOpen) {
+    if (!container && isOpen) {
       document.body.style.overflow = 'hidden';
-    } else {
+    } else if (!container) {
       document.body.style.overflow = '';
     }
     return () => {
-      document.body.style.overflow = '';
+      if (!container) {
+        document.body.style.overflow = '';
+      }
     };
-  }, [isOpen]);
+  }, [isOpen, container]);
 
   // Handle escape key
   useEffect(() => {
@@ -96,38 +102,44 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
 
   if (!isOpen) return null;
 
-  return (
+  const isInContainer = Boolean(container);
+  const portalTarget = container || document.body;
+  const positionType = isInContainer ? 'absolute' : 'fixed';
+
+  const sheetContent = (
     <>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'color-mix(in srgb, var(--color-panel-bg) 80%, transparent)',
-          zIndex: 999,
-          animation: 'fadeIn 0.2s ease-out',
-        }}
-      />
+      {/* Backdrop - only show when not in container */}
+      {!isInContainer && (
+        <div
+          onClick={onClose}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'color-mix(in srgb, var(--color-panel-bg) 80%, transparent)',
+            zIndex: 999,
+            animation: 'fadeIn 0.2s ease-out',
+          }}
+        />
+      )}
 
       {/* Sheet */}
       <div
         style={{
-          position: 'fixed',
+          position: positionType,
           top: 0,
           right: 0,
           bottom: 0,
           width: '480px',
-          maxWidth: '90vw',
+          maxWidth: isInContainer ? '50vw' : '90vw',
           backgroundColor: 'var(--color-panel-bg)',
           borderLeft: '1px solid var(--color-panel-border)',
-          zIndex: 1000,
+          zIndex: isInContainer ? 1000 : 1000,
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '-4px 0 24px var(--color-panel-shadow)',
+          boxShadow: isInContainer ? undefined : '-4px 0 24px var(--color-panel-shadow)',
           animation: 'slideInRight 0.3s ease-out',
         }}
         onClick={(e) => e.stopPropagation()}
@@ -181,5 +193,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
       `}</style>
     </>
   );
+
+  return createPortal(sheetContent, portalTarget);
 };
 

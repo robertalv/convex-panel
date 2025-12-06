@@ -87,10 +87,10 @@ component by calling `use`:
 ```ts
 // convex/convex.config.ts
 import { defineApp } from "convex/server";
-import convexPanelComponent from "convex-panel/component/convex.config.js";
+import convexPanel from "convex-panel/component/convex.config.js";
 
 const app = defineApp();
-app.use(convexPanelComponent);
+app.use(convexPanel);
 
 export default app;
 ```
@@ -103,7 +103,7 @@ import { components } from "./_generated/api";
 export const addComment = mutation({
   args: { text: v.string(), targetId: v.string() },
   handler: async (ctx, args) => {
-    return await ctx.runMutation(components.convexPanelComponent.lib.add, {
+    return await ctx.runMutation(components.convexPanel.lib.add, {
       text: args.text,
       targetId: args.targetId,
       userId: await getAuthUserId(ctx),
@@ -125,7 +125,7 @@ import { components } from "./_generated/api";
 
 const http = httpRouter();
 
-registerRoutes(http, components.convexPanelComponent, {
+registerRoutes(http, components.convexPanel, {
   pathPrefix: "/comments",
 });
 

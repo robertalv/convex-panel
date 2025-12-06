@@ -184,4 +184,48 @@ export function updateRecentlyViewedTable(tableName: string): void {
   
   // Save to storage
   setStorageItem(STORAGE_KEYS.RECENTLY_VIEWED_TABLES, trimmedRecentTables);
+}
+
+/**
+ * Default filter history retention time: 24 hours in milliseconds
+ */
+const DEFAULT_FILTER_HISTORY_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Get filter history retention time from storage
+ * Returns retention time in milliseconds
+ */
+export function getFilterHistoryRetentionMs(): number {
+  return getStorageItem<number>(
+    STORAGE_KEYS.FILTER_HISTORY_RETENTION_MS,
+    DEFAULT_FILTER_HISTORY_RETENTION_MS
+  );
+}
+
+/**
+ * Set filter history retention time in storage
+ * @param retentionMs - Retention time in milliseconds
+ */
+export function setFilterHistoryRetentionMs(retentionMs: number): void {
+  // Ensure minimum of 1 hour
+  const minRetention = 60 * 60 * 1000; // 1 hour
+  const validRetention = Math.max(retentionMs, minRetention);
+  setStorageItem(STORAGE_KEYS.FILTER_HISTORY_RETENTION_MS, validRetention);
+}
+
+/**
+ * Get filter history retention time in hours (for display)
+ */
+export function getFilterHistoryRetentionHours(): number {
+  const retentionMs = getFilterHistoryRetentionMs();
+  return retentionMs / (60 * 60 * 1000);
+}
+
+/**
+ * Set filter history retention time from hours
+ * @param retentionHours - Retention time in hours
+ */
+export function setFilterHistoryRetentionHours(retentionHours: number): void {
+  const retentionMs = retentionHours * 60 * 60 * 1000;
+  setFilterHistoryRetentionMs(retentionMs);
 } 

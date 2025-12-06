@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
+import { Check } from 'lucide-react';
 
 export interface CheckboxProps
   extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -41,6 +42,7 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
           cursor: props.disabled ? 'not-allowed' : 'pointer',
           opacity: props.disabled ? 0.5 : 1,
           transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+          position: 'relative',
           ...style,
         }}
       > 
@@ -55,13 +57,29 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
             borderRadius: 6,
             cursor: 'pointer',
             border: props.checked ? '1px solid transparent' : '1px solid var(--color-panel-border)',
-            backgroundColor: props.checked ? 'var(--color-panel-success)' : 'var(--color-panel-bg-tertiary)',
-            boxShadow: props.checked
-              ? '0 0 6px color-mix(in srgb, var(--color-panel-success) 60%, transparent)'
-              : '0 1px 2px var(--color-panel-shadow)',
+            backgroundColor: props.checked ? 'var(--color-panel-accent)' : 'var(--color-panel-bg-tertiary)',
+            // Not sure about this yet.
+            // boxShadow: props.checked
+            //   ? '0 0 6px color-mix(in srgb, var(--color-panel-accent) 60%, transparent)'
+            //   : '0 1px 2px var(--color-panel-shadow)',
             transition: 'all 0.15s ease',
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: 0,
           }}
         />
+        {props.checked && (
+          <Check
+            size={size * 0.75}
+            style={{
+              position: 'absolute',
+              color: 'var(--color-panel-text-on-primary)',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
       </label>
     );
   },

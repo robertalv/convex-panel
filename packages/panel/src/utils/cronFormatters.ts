@@ -4,17 +4,28 @@ export function formatCronSchedule(schedule: CronSchedule): string {
   if (!schedule) return "Unknown schedule";
 
   switch (schedule.type) {
-    case "interval":
-      return `Every ${schedule.seconds} seconds`;
+    case "interval": {
+      const seconds = Number(schedule.seconds);
+      if (seconds < 60) {
+        return `Every ${seconds} second${seconds !== 1 ? 's' : ''}`;
+      } else if (seconds < 3600) {
+        const minutes = Math.floor(seconds / 60);
+        return `Every ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+      } else {
+        const hours = Math.floor(seconds / 3600);
+        return `Every ${hours} hour${hours !== 1 ? 's' : ''}`;
+      }
+    }
     case "hourly":
-      return `Every hour at minute ${schedule.minuteUTC}`;
+      return `Every hour at minute ${Number(schedule.minuteUTC)}`;
     case "daily":
-      return `Every day at ${schedule.hourUTC}:${schedule.minuteUTC.toString().padStart(2, '0')} UTC`;
-    case "weekly":
+      return `Every day at ${Number(schedule.hourUTC)}:${Number(schedule.minuteUTC).toString().padStart(2, '0')} UTC`;
+    case "weekly": {
       const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      return `Every ${days[Number(schedule.dayOfWeek)]} at ${schedule.hourUTC}:${schedule.minuteUTC.toString().padStart(2, '0')} UTC`;
+      return `Every ${days[Number(schedule.dayOfWeek)]} at ${Number(schedule.hourUTC)}:${Number(schedule.minuteUTC).toString().padStart(2, '0')} UTC`;
+    }
     case "monthly":
-      return `Every month on day ${schedule.day} at ${schedule.hourUTC}:${schedule.minuteUTC.toString().padStart(2, '0')} UTC`;
+      return `Every month on day ${Number(schedule.day)} at ${Number(schedule.hourUTC)}:${Number(schedule.minuteUTC).toString().padStart(2, '0')} UTC`;
     case "cron":
       return `Cron: ${schedule.cronExpr}`;
     default:

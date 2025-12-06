@@ -3,7 +3,7 @@
  * Handles fetching and deleting components
  */
 
-import { ROUTES, SYSTEM_QUERIES } from '../constants';
+import { SYSTEM_QUERIES } from '../constants';
 import type { Component } from './types';
 
 /**
@@ -50,15 +50,15 @@ export async function getComponents(
  * @param deploymentUrl - The deployment URL
  * @param adminKey - The admin key
  * @param componentId - The component ID
- * @returns The boolean
+ * @returns Promise<void>
  */
 export async function deleteComponent(
   deploymentUrl: string,
   adminKey: string,
   componentId: string
-): Promise<boolean> {
-  const response = await fetch(`${deploymentUrl}${ROUTES.DELETE_COMPONENT}`, {
-    method: 'DELETE',
+): Promise<void> {
+  const response = await fetch(`${deploymentUrl}/api/delete_component`, {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Convex ${adminKey}`,
@@ -72,7 +72,5 @@ export async function deleteComponent(
     const error = await response.json().catch(() => ({ message: 'Unknown error' }));
     throw new Error(`HTTP error! status: ${response.status}, message: ${error.message || 'Unknown error'}`);
   }
-
-  return response.status === 200;
 }
 

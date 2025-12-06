@@ -34,7 +34,7 @@ export const TableFooter: React.FC<TableFooterProps> = ({ tableName, tableSchema
         backgroundColor: 'var(--color-panel-bg)',
         display: 'flex',
         alignItems: 'center',
-        padding: '0 16px',
+        padding: '0 8px',
         flexShrink: 0,
       }}
     >

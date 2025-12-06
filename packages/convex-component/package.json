@@ -66,6 +66,7 @@
     "react": "^18.3.1 || ^19.0.0"
   },
   "devDependencies": {
+    "@convex-dev/crons": "^0.2.0",
     "@convex-dev/eslint-plugin": "^1.0.0",
     "@edge-runtime/vm": "^5.0.0",
     "@eslint/eslintrc": "^3.3.1",

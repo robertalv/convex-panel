@@ -1109,67 +1109,97 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                       borderBottom: '1px solid var(--color-panel-border)',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between',
                       backgroundColor: 'var(--color-panel-bg)',
                       marginBottom: '16px',
+                      gap: '8px',
                     }}
                   >
-                    <div style={{ position: 'relative', flex: 1, marginRight: '16px' }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
                       <Search
                         style={{
                           position: 'absolute',
                           left: '10px',
-                          top: '10px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
                           width: '14px',
                           height: '14px',
                           color: 'var(--color-panel-text-muted)',
+                          pointerEvents: 'none',
                         }}
                       />
                       <input
                         type="text"
-                        placeholder="Filter logs..."
+                        placeholder="Q Filter logs..."
                         style={{
                           width: '100%',
-                          backgroundColor: 'var(--color-panel-bg-tertiary)',
+                          backgroundColor: 'var(--color-panel-bg-secondary)',
                           border: '1px solid var(--color-panel-border)',
-                          borderRadius: '6px',
+                          borderRadius: '8px',
                           height: '32px',
                           paddingLeft: '32px',
                           paddingRight: '12px',
                           fontSize: '12px',
                           color: 'var(--color-panel-text)',
                           outline: 'none',
+                          transition: 'border-color 0.2s ease, background-color 0.2s ease',
+                          boxSizing: 'border-box',
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--color-panel-accent)';
+                          e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--color-panel-border)';
+                          e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
                         }}
                       />
                     </div>
                     <button
                       onClick={() => setIsPaused(!isPaused)}
                       style={{
-                        padding: '4px 12px',
+                        height: '32px',
+                        padding: '0 12px',
                         fontSize: '12px',
-                        borderRadius: '6px',
+                        borderRadius: '4px',
                         fontWeight: 500,
                         display: 'flex',
                         alignItems: 'center',
+                        justifyContent: 'center',
                         gap: '6px',
-                        backgroundColor: isPaused ? 'var(--color-panel-bg-tertiary)' : 'var(--color-panel-accent)',
-                        color: isPaused ? 'var(--color-panel-text-secondary)' : 'var(--color-panel-text)',
-                        border: 'none',
+                        border: isPaused ? 'none' : '1px solid var(--color-panel-border)',
+                        backgroundColor: isPaused ? 'var(--color-panel-accent)' : 'var(--color-panel-bg-tertiary)',
+                        color: isPaused ? '#fff' : 'var(--color-panel-text-secondary)',
                         cursor: 'pointer',
-                        transition: 'background-color 0.15s, color 0.15s',
+                        transition: 'all 0.2s',
+                        boxSizing: 'border-box',
+                        flexShrink: 0,
                       }}
                       onMouseEnter={(e) => {
-                        if (isPaused) {
-                          e.currentTarget.style.color = 'var(--color-panel-text)';
+                        if (!isPaused) {
+                          e.currentTarget.style.backgroundColor = 'var(--color-panel-accent)';
+                          e.currentTarget.style.color = '#fff';
+                        } else {
+                          e.currentTarget.style.backgroundColor = 'var(--color-panel-accent-hover)';
                         }
                       }}
                       onMouseLeave={(e) => {
-                        if (isPaused) {
+                        if (!isPaused) {
+                          e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
                           e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
+                        } else {
+                          e.currentTarget.style.backgroundColor = 'var(--color-panel-accent)';
                         }
                       }}
                     >
-                      <Pause size={12} /> {isPaused ? 'Resume' : 'Pause'}
+                      {isPaused ? (
+                        <>
+                          <Play size={12} /> Resume
+                        </>
+                      ) : (
+                        <>
+                          <Pause size={12} /> Pause
+                        </>
+                      )}
                     </button>
                   </div>
 
@@ -1263,7 +1293,7 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                               <span style={{ color: 'var(--color-panel-text-muted)' }}>-</span>
                             )}
                           </div>
-                          <div style={{ flex: 1, color: 'var(--color-panel-text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ flex: 1, color: 'var(--color-panel-text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, overflow: 'hidden' }}>
                             <span
                               style={{
                                 width: '16px',
@@ -1271,13 +1301,40 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                                 color: 'var(--color-panel-text-muted)',
                                 fontWeight: 700,
                                 fontSize: '10px',
+                                flexShrink: 0,
                               }}
                             >
                               {log.udfType === 'query' ? 'Q' : log.udfType === 'mutation' ? 'M' : log.udfType === 'action' ? 'A' : 'H'}
                             </span>
-                            <span style={{ color: 'var(--color-panel-text-muted)' }}>{log.functionIdentifier}</span>
+                            <span 
+                              style={{ 
+                                color: 'var(--color-panel-text-muted)', 
+                                overflow: 'hidden', 
+                                textOverflow: 'ellipsis', 
+                                whiteSpace: 'nowrap',
+                                flexShrink: 1,
+                                minWidth: 0,
+                                maxWidth: log.error ? '250px' : 'none',
+                              }}
+                              title={log.functionIdentifier}
+                            >
+                              {log.functionIdentifier}
+                            </span>
                             {log.error && (
-                              <span style={{ color: 'var(--color-panel-error)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.error}</span>
+                              <span 
+                                style={{ 
+                                  color: 'var(--color-panel-error)', 
+                                  overflow: 'hidden', 
+                                  textOverflow: 'ellipsis', 
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 1,
+                                  minWidth: 0,
+                                  maxWidth: '250px',
+                                }}
+                                title={log.error}
+                              >
+                                {log.error}
+                              </span>
                             )}
                           </div>
                         </div>

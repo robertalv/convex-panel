@@ -1,7 +1,8 @@
 import type { Id } from "./_generated/dataModel.js";
 import { v } from "convex/values";
 import type { MutationCtx } from "./_generated/server.js";
-import { mutation, query } from "./_generated/server.js";
+import { mutation, query, internalMutation, action } from "./_generated/server.js";
+import { internal } from "./_generated/api.js";
 
 /**
  * Prune states ahead of current head and insert a new state.
@@ -654,5 +655,107 @@ export const listStates = query({
       position: s.index,
       state: s.state,
     }));
+  },
+});
+
+/**
+ * Internal mutation that performs the actual cleanup work.
+ * Called by the public cleanup action.
+ */
+export const cleanupInternal = internalMutation({
+  args: {
+    retentionHours: v.number(),
+  },
+  returns: v.object({
+    deletedStates: v.number(),
+    deletedScopes: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const retentionMs = args.retentionHours * 60 * 60 * 1000;
+    const cutoffTime = Date.now() - retentionMs;
+    let deletedStates = 0;
+    let deletedScopes = 0;
+
+    console.log(`[filterHistory cleanup] Starting cleanup with retention: ${args.retentionHours} hours (${retentionMs}ms), cutoff time: ${new Date(cutoffTime).toISOString()}`);
+
+    // Get all scopes
+    const allScopes = await ctx.db.query("scopes").collect();
+
+    for (const scope of allScopes) {
+      // Get all states for this scope
+      const states = await ctx.db
+        .query("states")
+        .withIndex("by_scope", (q) => q.eq("scope", scope._id))
+        .collect();
+
+      // If no states, delete the scope
+      if (states.length === 0) {
+        // Also delete any checkpoints
+        const checkpoints = await ctx.db
+          .query("checkpoints")
+          .withIndex("by_scope", (q) => q.eq("scope", scope._id))
+          .collect();
+        
+        for (const checkpoint of checkpoints) {
+          await ctx.db.delete(checkpoint._id);
+        }
+        
+        await ctx.db.delete(scope._id);
+        deletedScopes++;
+        continue;
+      }
+
+      // Find the head state index
+      const headIndex = scope.head;
+      
+      // Delete old states that are not the head
+      for (const state of states) {
+        // Skip if this is the current head state (preserve it)
+        if (headIndex !== null && state.index === headIndex) {
+          continue;
+        }
+
+        // Check if state is older than cutoff
+        if (state._creationTime < cutoffTime) {
+          await ctx.db.delete(state._id);
+          deletedStates++;
+        }
+      }
+    }
+
+    const result = {
+      deletedStates,
+      deletedScopes,
+    };
+    
+    console.log(`[filterHistory cleanup] Completed: deleted ${deletedStates} states, ${deletedScopes} scopes`);
+    
+    return result;
+  },
+});
+
+/**
+ * Clean up old filter history states that are older than the specified retention period.
+ * Preserves the current head state even if it's old (user might be viewing it).
+ * Also cleans up orphaned scopes with no states.
+ * 
+ * Users should call this from their own cron jobs. See example usage in the README.
+ */
+export const cleanup = action({
+  args: {
+    retentionHours: v.number(),
+  },
+  returns: v.object({
+    deletedStates: v.number(),
+    deletedScopes: v.number(),
+  }),
+  handler: async (ctx, args): Promise<{ deletedStates: number; deletedScopes: number }> => {
+    const result: { deletedStates: number; deletedScopes: number } = await ctx.runMutation(
+      (internal as any).lib.cleanupInternal,
+      {
+        retentionHours: args.retentionHours,
+      },
+    );
+    return result;
   },
 });

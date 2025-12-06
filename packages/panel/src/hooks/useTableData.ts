@@ -585,38 +585,17 @@ export const useTableData = ({
   }, [filters]);
 
   /**
-   * Persist filters whenever they change
-   * Priority:
-   * 1. If adminClient is available, push to filterHistory (backend)
-   * 2. Otherwise, save to localStorage (fallback)
+   * Note: filterHistory is only saved when user clicks "Apply Filter" in the filter sheet
    * Only save after filters have been loaded for the current table to avoid
-   * overwriting saved filters during initial load
+   * overwriting saved filters during initial load and we're also persisting the filters to the backend.
    */
   useEffect(() => {
     if (selectedTable && filtersLoadedRef.current[selectedTable]) {
-      // Priority 1: Save to filterHistory if adminClient is available
-      if (adminClient && !useMockData) {
-        // Push to filterHistory backend to persist current state
-        // Scope format: user:userId:table:tableName (using 'default' as userId for now)
-        const scope = `user:default:table:${selectedTable}`;
-        
-        adminClient.mutation('filterHistory:push' as any, {
-          scope,
-          state: {
-            filters,
-            sortConfig,
-          },
-        }).catch((error: any) => {
-          // If filterHistory fails, fall back to localStorage
-          console.warn('Failed to save to filterHistory, falling back to localStorage:', error);
-          saveTableFilters(selectedTable, filters);
-        });
-      } else {
-        // Priority 2: Save to localStorage (fallback when adminClient not available)
-        saveTableFilters(selectedTable, filters);
-      }
+      // Save to localStorage (fallback is persistence)
+      // filterHistory is only saved when "Apply Filter" is clicked
+      saveTableFilters(selectedTable, filters);
     }
-  }, [filters, sortConfig, selectedTable, adminClient, useMockData]);
+  }, [filters, selectedTable]);
 
   /**
    * Handle table selection: reset state and load saved filters
@@ -645,7 +624,7 @@ export const useTableData = ({
             // Scope format: user:userId:table:tableName (using 'default' as userId for now)
             const scope = `user:default:table:${selectedTable}`;
             
-            adminClient.query('filterHistory:getCurrentState' as any, { scope })
+            adminClient.query('convexPanel:getCurrentState' as any, { scope })
               .then((state: { filters: FilterExpression; sortConfig: SortConfig | null } | null) => {
                 if (state) {
                   setFilters(state.filters);

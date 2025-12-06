@@ -342,6 +342,9 @@ importers:
 
   packages/convex-component:
     devDependencies:
+      '@convex-dev/crons':
+        specifier: ^0.2.0
+        version: 0.2.0(convex@1.29.3(react@19.2.1))
       '@convex-dev/eslint-plugin':
         specifier: ^1.0.0
         version: 1.0.0(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3)
@@ -1955,7 +1958,7 @@ packages:
   '@radix-ui/react-compose-refs@1.1.2':
     resolution: {integrity: sha512-z4eqJvfiNnFMHIIvXP3CY57y2WJs5g2v3X0zm9mEJkrkNv4rDxu+sg9Jh8EkXyeqBkB7SOcboo9dMVqhyrACIg==}
     peerDependencies:
-      '@types/react': '*'
+      '@types/react': 19.0.0
       react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
     peerDependenciesMeta:
       '@types/react':
@@ -6584,6 +6587,11 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
+
+  '@convex-dev/crons@0.2.0(convex@1.29.3(react@19.2.1))':
+    dependencies:
+      convex: 1.29.3(react@19.2.1)
+      cron-parser: 4.9.0
 
   '@convex-dev/crons@0.2.0(convex@1.30.0(react@19.2.1))':
     dependencies:

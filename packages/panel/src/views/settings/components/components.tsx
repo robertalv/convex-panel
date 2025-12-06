@@ -256,6 +256,7 @@ export const Components: React.FC<ComponentsProps> = ({
     ? components.find((c) => c.id === componentToDelete)
     : null;
 
+
   // Filter and sort components like Convex does
   const sortedComponents = [...components]
     .filter((component) => component.name !== null && component.name !== undefined && component.name !== '')
@@ -529,18 +530,43 @@ export const Components: React.FC<ComponentsProps> = ({
                         fontFamily: 'monospace',
                       }}
                     >
-                      {/* Component Path */}
+                      {/* Component Path - Always clickable */}
                       <div
                         style={{
                           display: 'flex',
                           alignItems: 'center',
+                          gap: '8px',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
-                          color: 'var(--color-panel-text)',
+                          // color: 'var(--color-panel-text)',
+                          // cursor: 'pointer',
+                          flex: 1,
                         }}
+                        onClick={() => {
+                          // TODO: This is too add a bit more context about the components
+                          // I was thinking of creating components where user can adjust settings on the panel
+                          // openSheet({
+                          //   title: component.path || component.name || 'Component Details',
+                          //   width: '500px',
+                          //   content: (
+                          //     <ComponentDetailSheet
+                          //       component={component}
+                          //       adminClient={adminClient}
+                          //     />
+                          //   ),
+                          // });
+                        }}
+                        // onMouseEnter={(e) => {
+                        //   e.currentTarget.style.color = 'var(--color-panel-accent)';
+                        // }}
+                        // onMouseLeave={(e) => {
+                        //   e.currentTarget.style.color = 'var(--color-panel-text)';
+                        // }}
                       >
-                        {component.path}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {component.path}
+                        </span>
                         {!isActive && (
                           <span
                             style={{

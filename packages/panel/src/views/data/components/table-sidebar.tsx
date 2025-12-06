@@ -235,7 +235,7 @@ export const TableSidebar: React.FC<TableSidebarProps> = ({
       </div>
 
       {/* Create Table Section */}
-      <div style={{ padding: '8px', borderTop: '1px solid var(--color-panel-border)' }}>
+      <div style={{ padding: '13px', borderTop: '1px solid var(--color-panel-border)' }}>
         {newTableName !== undefined ? (
           <form onSubmit={handleCreateTable} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <input

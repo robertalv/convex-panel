@@ -4,6 +4,7 @@ import { TableToolbar } from './components/table-toolbar';
 import { DataTable } from './components/table/data-table';
 import { FilterSheet } from './components/filter-sheet';
 import { AddDocumentSheet } from './components/add-document-sheet';
+import { EditDocumentSheet } from './components/edit-document-sheet';
 import { SchemaView } from './components/schema-view';
 import { IndexesView } from './components/indexes-view';
 import { MetricsView } from './components/metrics-view';
@@ -12,11 +13,13 @@ import { ClearTableConfirmation } from './components/clear-table-confirmation';
 import type { CustomQuery } from '../../types/functions';
 import { useTableData } from '../../hooks/useTableData';
 import { useComponents } from '../../hooks/useComponents';
+import { useContainerRef } from '../../hooks/useContainerRef';
 import { saveTableFilters } from '../../utils/storage';
 import { useSheetSafe } from '../../contexts/sheet-context';
 import { useShowGlobalRunner } from '../../lib/functionRunner';
-import { deleteTable } from '../../utils/api/documents';
+import { deleteTable, deleteDocuments } from '../../utils/api/documents';
 import { getAdminClientInfo } from '../../utils/adminClient';
+import { toast } from '../../utils/toast';
 
 export interface DataViewProps {
   convexUrl?: string;
@@ -40,11 +43,15 @@ export const DataView: React.FC<DataViewProps> = ({
 }) => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isAddDocumentOpen, setIsAddDocumentOpen] = useState(false);
+  const [isEditDocumentOpen, setIsEditDocumentOpen] = useState(false);
+  const [wasEditSheetManuallyClosed, setWasEditSheetManuallyClosed] = useState(false);
   const [visibleFields, setVisibleFields] = useState<string[]>([]);
   const [isColumnVisibilityOpen, setIsColumnVisibilityOpen] = useState(false);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [isDeleteTableDialogOpen, setIsDeleteTableDialogOpen] = useState(false);
   const [isClearTableDialogOpen, setIsClearTableDialogOpen] = useState(false);
+  const [isDeleteRowsDialogOpen, setIsDeleteRowsDialogOpen] = useState(false);
+  const [rowsToDelete, setRowsToDelete] = useState<string[]>([]);
   const { openSheet } = useSheetSafe();
   const showGlobalRunner = useShowGlobalRunner();
 
@@ -93,8 +100,16 @@ export const DataView: React.FC<DataViewProps> = ({
     return count;
   }, [allFields.length, visibleFields.length, visibleFields]);
 
+  const allRowsSelected = useMemo(() => {
+    if (tableData.documents.length === 0) return false;
+    return tableData.documents.every(doc => selectedDocumentIds.includes(doc._id));
+  }, [tableData.documents, selectedDocumentIds]);
+
+  const isEditingAllAndMoreThanOne = allRowsSelected && selectedDocumentIds.length > 1;
+
   const lastTableRef = useRef<string | null>(null);
   const lastFieldsStringRef = useRef<string>('');
+  const [dataViewRef, containerRef] = useContainerRef('.cp-main-content');
 
   const handleOpenAddDocument = () => {
     if (!tableData.selectedTable) return;
@@ -115,7 +130,6 @@ export const DataView: React.FC<DataViewProps> = ({
         lastFieldsStringRef.current = fieldsString;
         setSelectedDocumentIds([]);
       } else if (fieldsChanged) {
-        // If we only had system fields before and now have more, show all fields
         const hadOnlySystemFields = visibleFields.length <= 2 && 
           visibleFields.every(f => f === '_id' || f === '_creationTime');
         const nowHasMoreFields = allFields.length > 2;
@@ -143,6 +157,28 @@ export const DataView: React.FC<DataViewProps> = ({
       prev.filter((id) => tableData.documents.some((doc) => doc._id === id)),
     );
   }, [tableData.documents]);
+
+  const prevSelectedIdsRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    const idsChanged = 
+      prevSelectedIdsRef.current.length !== selectedDocumentIds.length ||
+      prevSelectedIdsRef.current.some((id, idx) => id !== selectedDocumentIds[idx]);
+    
+    if (idsChanged) {
+      prevSelectedIdsRef.current = selectedDocumentIds;
+      setWasEditSheetManuallyClosed(false);
+    }
+  }, [selectedDocumentIds]);
+
+  useEffect(() => {
+    if (selectedDocumentIds.length > 0 && !isEditDocumentOpen && !wasEditSheetManuallyClosed) {
+      setIsEditDocumentOpen(true);
+    } else if (selectedDocumentIds.length === 0 && isEditDocumentOpen) {
+      setIsEditDocumentOpen(false);
+      setWasEditSheetManuallyClosed(false);
+    }
+  }, [selectedDocumentIds.length, isEditDocumentOpen, wasEditSheetManuallyClosed]);
 
   const hasInitialized = useRef(false);
 
@@ -188,7 +224,7 @@ export const DataView: React.FC<DataViewProps> = ({
 
   return (
     <>
-      <div className="cp-data-container">
+      <div className="cp-data-container" ref={dataViewRef}>
         <TableSidebar
           tables={tableData.tables}
           selectedTable={tableData.selectedTable}
@@ -202,7 +238,6 @@ export const DataView: React.FC<DataViewProps> = ({
           adminClient={adminClient}
           componentId={selectedComponentId}
           onTableCreated={() => {
-            // Refresh tables after creation
             tableData.fetchTables();
           }}
         />
@@ -215,7 +250,6 @@ export const DataView: React.FC<DataViewProps> = ({
             onAddDocument={handleOpenAddDocument}
             onColumnVisibilityToggle={() => {
               setIsColumnVisibilityOpen(!isColumnVisibilityOpen);
-              // Also open filter panel if not already open
               if (!isFilterOpen) {
                 setIsFilterOpen(true);
               }
@@ -223,24 +257,85 @@ export const DataView: React.FC<DataViewProps> = ({
             hiddenFieldsCount={hiddenFieldsCount}
             selectedCount={selectedDocumentIds.length}
             onDeleteSelected={() => {
-              // TODO: Implement delete selected rows
-            }}
-            onEditSelected={() => {
-              // TODO: Implement edit selected rows
+              if (selectedDocumentIds.length === 0) return;
+              
+              if (isEditingAllAndMoreThanOne) {
+                setIsClearTableDialogOpen(true);
+              } else {
+                setRowsToDelete([...selectedDocumentIds]);
+                setIsDeleteRowsDialogOpen(true);
+              }
             }}
             filters={tableData.filters}
             sortConfig={tableData.sortConfig}
             onRemoveFilter={(index) => {
               const newClauses = [...(tableData.filters.clauses || [])];
               newClauses.splice(index, 1);
-              tableData.setFilters({ clauses: newClauses });
+              const newFilters = { clauses: newClauses };
+              tableData.setFilters(newFilters);
+              
+              // Save to filterHistory when filter is removed
+              if (adminClient && !useMockData && tableData.selectedTable) {
+                const scope = `user:default:table:${tableData.selectedTable}`;
+                adminClient.mutation('convexPanel:push' as any, {
+                  scope,
+                  state: {
+                    filters: newFilters,
+                    sortConfig: tableData.sortConfig,
+                  },
+                }, { componentId: 'convexPanel' }).catch((error: any) => {
+                  console.warn('Failed to save filter removal to filterHistory:', error);
+                });
+              }
             }}
-            onClearFilters={() => {
-              tableData.setFilters({ clauses: [] });
+            onClearFilters={async () => {
+              const newFilters = { clauses: [] };
+              const newSortConfig = null;
+              
+              // Check if current state is already empty before pushing
+              if (adminClient && !useMockData && tableData.selectedTable) {
+                const scope = `user:default:table:${tableData.selectedTable}`;
+                try {
+                  const currentState = await adminClient.query('convexPanel:getCurrentState' as any, { scope });
+                  
+                  const isAlreadyEmpty = 
+                    (!currentState || 
+                     (currentState.filters?.clauses?.length === 0 && !currentState.sortConfig));
+                  
+                  if (!isAlreadyEmpty) {
+                    // Only push if not already empty
+                    await adminClient.mutation('convexPanel:push' as any, {
+                      scope,
+                      state: {
+                        filters: newFilters,
+                        sortConfig: newSortConfig,
+                      },
+                    }, { componentId: 'convexPanel' });
+                  }
+                } catch (error: any) {
+                  console.warn('Failed to check/save filter clear to filterHistory:', error);
+                }
+              }
+              
+              tableData.setFilters(newFilters);
               tableData.setSortConfig(null);
             }}
             onRemoveSort={() => {
               tableData.setSortConfig(null);
+              
+              // Save to filterHistory when sort is removed
+              if (adminClient && !useMockData && tableData.selectedTable) {
+                const scope = `user:default:table:${tableData.selectedTable}`;
+                adminClient.mutation('convexPanel:push' as any, {
+                  scope,
+                  state: {
+                    filters: tableData.filters,
+                    sortConfig: null,
+                  },
+                }, { componentId: 'convexPanel' }).catch((error: any) => {
+                  console.warn('Failed to save sort removal to filterHistory:', error);
+                });
+              }
             }}
             onCustomQuery={() => {
               const customQuery: CustomQuery = {
@@ -370,6 +465,7 @@ export const DataView: React.FC<DataViewProps> = ({
         onVisibleFieldsChange={setVisibleFields}
         openColumnVisibility={isColumnVisibilityOpen}
         adminClient={adminClient}
+        container={containerRef}
       />
 
       <AddDocumentSheet
@@ -380,18 +476,37 @@ export const DataView: React.FC<DataViewProps> = ({
         componentId={selectedComponentId}
         adminClient={adminClient}
         onDocumentAdded={() => {
-          // Refetch table data after adding documents
           if (tableData.selectedTable) {
             tableData.fetchTableData(tableData.selectedTable, null);
           }
         }}
+        container={containerRef}
+      />
+
+      <EditDocumentSheet
+        isOpen={isEditDocumentOpen}
+        onClose={() => {
+          setIsEditDocumentOpen(false);
+          setWasEditSheetManuallyClosed(true);
+        }}
+        selectedDocumentIds={selectedDocumentIds}
+        documents={tableData.documents}
+        selectedTable={tableData.selectedTable}
+        tables={tableData.tables}
+        adminClient={adminClient}
+        componentId={selectedComponentId}
+        onDocumentUpdate={() => {
+          if (tableData.selectedTable) {
+            tableData.fetchTableData(tableData.selectedTable, null);
+          }
+        }}
+        container={containerRef}
       />
 
       <ClearTableConfirmation
         isOpen={isClearTableDialogOpen}
         onClose={() => setIsClearTableDialogOpen(false)}
         onConfirm={async () => {
-          // Refresh table data after clearing
           if (tableData.selectedTable) {
             await tableData.fetchTableData(tableData.selectedTable, null);
           }
@@ -433,7 +548,6 @@ export const DataView: React.FC<DataViewProps> = ({
               return;
             }
 
-            // Refresh tables list and select first available table
             await tableData.fetchTables();
             const tableNames = Object.keys(tableData.tables);
             if (tableNames.length > 0) {
@@ -448,6 +562,61 @@ export const DataView: React.FC<DataViewProps> = ({
         }}
         title="Delete table"
         message={`Are you sure you want to permanently delete the table ${tableData.selectedTable}?`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        isOpen={isDeleteRowsDialogOpen}
+        onClose={() => {
+          setIsDeleteRowsDialogOpen(false);
+          setRowsToDelete([]);
+        }}
+        onConfirm={async () => {
+          if (!tableData.selectedTable || !adminClient || rowsToDelete.length === 0) {
+            return;
+          }
+
+          try {
+            const normalizedComponentId = selectedComponentId === 'app' || selectedComponentId === null 
+              ? null 
+              : selectedComponentId;
+
+            const result = await deleteDocuments(
+              tableData.selectedTable,
+              rowsToDelete,
+              adminClient,
+              normalizedComponentId
+            );
+
+            if (result && typeof result === 'object' && 'success' in result) {
+              if (!result.success) {
+                toast('error', result.error || 'Failed to delete documents');
+                return;
+              }
+            }
+
+            const count = rowsToDelete.length;
+            toast(
+              'success',
+              `Deleted ${count} ${count === 1 ? 'document' : 'documents'}.`
+            );
+
+            setSelectedDocumentIds([]);
+            if (tableData.selectedTable) {
+              tableData.fetchTableData(tableData.selectedTable, null);
+            }
+          } catch (error: any) {
+            console.error('Error deleting documents:', error);
+            toast('error', error?.message || 'Failed to delete documents');
+          } finally {
+            setIsDeleteRowsDialogOpen(false);
+            setRowsToDelete([]);
+          }
+        }}
+        title={`Delete ${rowsToDelete.length.toLocaleString()} selected document${rowsToDelete.length > 1 ? 's' : ''}`}
+        message="Are you sure you want to permanently delete these documents?"
         confirmLabel="Delete"
         cancelLabel="Cancel"
         variant="danger"
