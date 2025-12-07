@@ -147,7 +147,6 @@ export const GlobalFunctionTester: React.FC<GlobalFunctionTesterProps> = ({
 
   const sheetContent = useMemo(() => (
     <FunctionRunner
-      accessToken={adminClient.accessToken}
       onClose={handleClose}
       adminClient={adminClient}
       deploymentUrl={deploymentUrl}
