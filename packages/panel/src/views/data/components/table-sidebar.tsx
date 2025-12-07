@@ -217,14 +217,10 @@ export const TableSidebar: React.FC<TableSidebarProps> = ({
               onMouseEnter={(e) => {
                 if (selectedTable !== tableName) {
                   e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
-                  e.currentTarget.style.opacity = '0.5';
                 }
               }}
               onMouseLeave={(e) => {
-                if (selectedTable !== tableName) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.opacity = '1';
-                }
+                e.currentTarget.style.backgroundColor = selectedTable === tableName ? 'var(--color-panel-bg-tertiary)' : 'transparent';
               }}
             >
               <span style={{ fontSize: '12px' }}>{tableName}</span>

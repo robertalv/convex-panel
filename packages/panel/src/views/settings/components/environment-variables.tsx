@@ -30,10 +30,12 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
   const [editValue, setEditValue] = useState('');
   const [originalEditName, setOriginalEditName] = useState<string>('');
   const [isAddingNew, setIsAddingNew] = useState(false);
-  const [newVarName, setNewVarName] = useState('');
-  const [newVarValue, setNewVarValue] = useState('');
+  const [newVars, setNewVars] = useState<Array<{ name: string; value: string; id: string }>>([]);
   const [varToDelete, setVarToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [focusedInputId, setFocusedInputId] = useState<string | null>(null);
   const tableContentRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,8 +49,8 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
   }, [adminClient]);
 
   useEffect(() => {
-    if (isAddingNew && tableContentRef.current) {
-      // Scroll to bottom when adding new row
+    if (newVars.length > 0 && tableContentRef.current) {
+      // Scroll to bottom when adding new rows
       setTimeout(() => {
         tableContentRef.current?.scrollTo({
           top: tableContentRef.current.scrollHeight,
@@ -56,7 +58,7 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
         });
       }, 100);
     }
-  }, [isAddingNew]);
+  }, [newVars.length]);
 
   const loadEnvironmentVariables = async () => {
     if (!adminClient) return;
@@ -215,20 +217,165 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
     }
   };
 
+  // Adapted from Convex's implementation
+  // Regex pattern to match environment variable lines
+  const LINE_REGEX = /(?:^|^)\s*(?:export\s+)?([\w.-]+)(?:\s*=\s*?|:\s+?)(\s*'(?:\\'|[^'])*'|\s*"(?:\\"|[^"])*"|\s*`(?:\\`|[^`])*`|[^#\r\n]+)?\s*(?:#.*)?(?:$|$)/gm;
+
+  const parseEnvFile = (content: string): Array<{ name: string; value: string }> => {
+    const vars: Array<{ name: string; value: string }> = [];
+    const obj: Record<string, string> = {};
+
+    // Convert line breaks to same format
+    const lines = content.replace(/\r\n?/gm, '\n');
+    let match = LINE_REGEX.exec(lines);
+
+    while (match !== null) {
+      const key = match[1];
+      // Default undefined or null to empty string
+      let value = match[2] || '';
+      
+      // Remove whitespace
+      value = value.trim();
+      
+      // Check if double quoted
+      const maybeQuote = value[0];
+      
+      // Remove surrounding quotes
+      value = value.replace(/^(['"`])([\s\S]*)\1$/gm, '$2');
+      
+      // Expand newlines if double quoted
+      if (maybeQuote === '"') {
+        value = value.replace(/\\n/g, '\n');
+        value = value.replace(/\\r/g, '\r');
+      }
+      
+      // Add to object (this will handle duplicates by keeping the last one)
+      if (key) {
+        obj[key] = value;
+      }
+      
+      match = LINE_REGEX.exec(lines);
+    }
+
+    // Convert to array format
+    return Object.entries(obj).map(([name, value]) => ({ name, value }));
+  };
+
+  const validateDuplicateNames = (vars: Array<{ name: string; value: string; id: string }>): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    const nameOccurrences = new Map<string, number>();
+    
+    // Count occurrences of each name
+    vars.forEach(v => {
+      if (v.name) {
+        nameOccurrences.set(v.name, (nameOccurrences.get(v.name) || 0) + 1);
+      }
+    });
+    
+    // Check against existing environment variables
+    envVars.forEach(envVar => {
+      nameOccurrences.set(envVar.name, (nameOccurrences.get(envVar.name) || 0) + 1);
+    });
+    
+    // Mark duplicates
+    vars.forEach(v => {
+      if (v.name && nameOccurrences.get(v.name)! > 1) {
+        errors[v.id] = 'Environment variable name is not unique';
+      }
+    });
+    
+    return errors;
+  };
+
+  const handlePasteEnvFile = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    e.preventDefault();
+    const pastedText = e.clipboardData.getData('text');
+    const parsedVars = parseEnvFile(pastedText);
+    
+    if (parsedVars.length > 0) {
+      const newVarsWithIds = parsedVars
+        .filter(v => v.name) // Only keep variables with names
+        .map(v => ({
+          ...v,
+          id: `${Date.now()}-${Math.random()}`
+        }));
+      
+      if (newVarsWithIds.length > 0) {
+        setNewVars(prev => {
+          const combined = [...prev, ...newVarsWithIds];
+          const errors = validateDuplicateNames(combined);
+          setValidationErrors(prevErrors => ({ ...prevErrors, ...errors }));
+          return combined;
+        });
+        setIsAddingNew(true);
+      }
+    }
+  };
+
   const handleAddClick = () => {
+    const newId = `${Date.now()}-${Math.random()}`;
+    setNewVars(prev => [...prev, { name: '', value: '', id: newId }]);
     setIsAddingNew(true);
-    setNewVarName('');
-    setNewVarValue('');
+  };
+
+  const handleRemoveNewVar = (id: string) => {
+    setNewVars(prev => {
+      const updated = prev.filter(v => v.id !== id);
+      // Re-validate remaining variables
+      const errors = validateDuplicateNames(updated);
+      setValidationErrors(errors);
+      
+      if (updated.length === 0) {
+        setIsAddingNew(false);
+      }
+      
+      return updated;
+    });
+  };
+
+  const handleUpdateNewVar = (id: string, field: 'name' | 'value', value: string) => {
+    setNewVars(prev => {
+      const updated = prev.map(v => 
+        v.id === id ? { ...v, [field]: value } : v
+      );
+      
+      // Validate for duplicates when name changes
+      if (field === 'name') {
+        const errors = validateDuplicateNames(updated);
+        setValidationErrors(prevErrors => {
+          const newErrors = { ...prevErrors };
+          // Remove error for this id if it's now valid
+          if (!errors[id]) {
+            delete newErrors[id];
+          } else {
+            newErrors[id] = errors[id];
+          }
+          return newErrors;
+        });
+      }
+      
+      return updated;
+    });
   };
 
   const handleCancelAdd = () => {
     setIsAddingNew(false);
-    setNewVarName('');
-    setNewVarValue('');
+    setNewVars([]);
+    setValidationErrors({});
   };
 
-  const handleSaveAdd = async () => {
-    if (!newVarName || !newVarValue) return;
+  const handleSaveAll = async () => {
+    const validVars = newVars.filter(v => v.name && v.value);
+    
+    if (validVars.length === 0) return;
+
+    // Validate for duplicates before saving
+    const errors = validateDuplicateNames(newVars);
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      setError('Please fix duplicate variable names before saving');
+      return;
+    }
 
     if (!adminClient) {
       setError('Admin client not available');
@@ -251,16 +398,32 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
       return;
     }
 
+    setIsSaving(true);
+    setError(null);
     try {
-      await setEnvironmentVariable(deploymentUrl, finalAdminKey, newVarName, newVarValue);
+      // Use batch update if available, otherwise set them one by one
+      const varsToSet: Record<string, string> = {};
+      validVars.forEach(v => {
+        varsToSet[v.name] = v.value;
+      });
+      
+      await batchUpdateEnvironmentVariables(
+        deploymentUrl,
+        finalAdminKey,
+        varsToSet,
+        []
+      );
+      
       setIsAddingNew(false);
-      setNewVarName('');
-      setNewVarValue('');
+      setNewVars([]);
+      setValidationErrors({});
       // Reload after add
       await loadEnvironmentVariables();
     } catch (err: any) {
-      setError(err?.message || 'Failed to add environment variable');
-      console.error('Error adding environment variable:', err);
+      setError(err?.message || 'Failed to add environment variables');
+      console.error('Error adding environment variables:', err);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -287,7 +450,7 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 16px',
+            padding: '0 8px',
             backgroundColor: 'var(--color-panel-bg)',
           }}
         >
@@ -337,7 +500,7 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 16px',
+            padding: '0 8px',
             backgroundColor: 'var(--color-panel-bg)',
           }}
         >
@@ -406,7 +569,7 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 16px',
+          padding: '0 8px',
           backgroundColor: 'var(--color-panel-bg)',
         }}
       >
@@ -420,7 +583,7 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
         >
           Environment Variables
         </h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '12px', fontWeight: 400, color: 'var(--color-panel-text-muted)' }}>
             Total {envVars.length}
           </span>
@@ -431,7 +594,7 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
                 padding: '6px 12px',
                 backgroundColor: 'var(--color-panel-bg-secondary)',
                 border: '1px solid var(--color-panel-border)',
-                borderRadius: '6px',
+                borderRadius: '8px',
                 fontSize: '12px',
                 fontWeight: 500,
                 color: 'var(--color-panel-text-secondary)',
@@ -457,7 +620,20 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
           )}
           <button
             onClick={handleAddClick}
-            className="cp-btn"
+            style={{
+              padding: '6px 12px',
+              backgroundColor: 'var(--color-panel-accent)',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 500,
+              color: 'var(--color-panel-bg)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s',
+            }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'var(--color-panel-accent-hover)';
             }}
@@ -465,8 +641,43 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
               e.currentTarget.style.backgroundColor = 'var(--color-panel-accent)';
             }}
           >
-            <Plus size={14} /> Add Variable
+            <Plus size={12} /> Add Variable
           </button>
+          {isAddingNew && (
+            <button
+              type="button"
+              onClick={handleSaveAll}
+              disabled={isSaving || newVars.filter(v => v.name && v.value).length === 0 || Object.keys(validationErrors).length > 0}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: 'var(--color-panel-accent)',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 500,
+                color: 'var(--color-panel-bg)',
+                cursor: (isSaving || newVars.filter(v => v.name && v.value).length === 0 || Object.keys(validationErrors).length > 0) ? 'not-allowed' : 'pointer',
+                opacity: (isSaving || newVars.filter(v => v.name && v.value).length === 0 || Object.keys(validationErrors).length > 0) ? 0.5 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={(e) => {
+                if (!isSaving && newVars.filter(v => v.name && v.value).length > 0 && Object.keys(validationErrors).length === 0) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-accent-hover)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isSaving && newVars.filter(v => v.name && v.value).length > 0 && Object.keys(validationErrors).length === 0) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-accent)';
+                }
+              }}
+            >
+              <Check size={12} />
+              {isSaving ? 'Saving...' : 'Save'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -502,7 +713,7 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
             }}>
               Loading environment variables...
             </div>
-          ) : envVars.length === 0 && !isAddingNew ? (
+          ) : envVars.length === 0 && newVars.length === 0 ? (
             <div style={{
               flex: 1,
               display: 'flex',
@@ -831,116 +1042,199 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
               );
             })}
 
-              {/* New Variable Row */}
-              {isAddingNew && (
+              {/* Paste .env File Area */}
+              {isAddingNew && newVars.length === 0 && (
                 <div
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '8px',
+                    padding: '16px',
                     borderBottom: '1px solid var(--color-panel-border)',
-                    fontSize: '12px',
-                    fontFamily: 'monospace',
-                    color: 'var(--color-panel-text-secondary)',
-                    backgroundColor: 'transparent',
+                    backgroundColor: 'var(--color-panel-bg-secondary)',
                   }}
                 >
-                  <div style={{ width: '40%', paddingRight: '8px' }}>
-                    <input
-                      type="text"
-                      placeholder="Name"
-                      value={newVarName}
-                      onChange={(e) => setNewVarName(e.target.value)}
-                      autoFocus
-                      style={{
-                        width: '100%',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        border: '1px solid var(--color-panel-border)',
-                        backgroundColor: 'var(--color-panel-bg)',
-                        color: 'var(--color-panel-text)',
-                        fontSize: '12px',
-                        fontFamily: 'monospace',
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleSaveAdd();
-                        } else if (e.key === 'Escape') {
-                          handleCancelAdd();
-                        }
-                      }}
-                    />
+                  <div style={{
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: 'var(--color-panel-text)',
+                    marginBottom: '8px',
+                  }}>
+                    Tip: Paste your .env file directly into here!
                   </div>
-                  <div style={{ flex: 1, paddingRight: '8px' }}>
-                    <input
-                      type="text"
-                      placeholder="Value"
-                      value={newVarValue}
-                      onChange={(e) => setNewVarValue(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        border: '1px solid var(--color-panel-border)',
-                        backgroundColor: 'var(--color-panel-bg)',
-                        color: 'var(--color-panel-text)',
-                        fontSize: '12px',
-                        fontFamily: 'monospace',
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleSaveAdd();
-                        } else if (e.key === 'Escape') {
-                          handleCancelAdd();
-                        }
-                      }}
-                    />
-                  </div>
-                  <div style={{ width: '120px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
-                    <button
-                      type="button"
-                      onClick={handleSaveAdd}
-                      disabled={!newVarName || !newVarValue}
-                      style={{
-                        cursor: newVarName && newVarValue ? 'pointer' : 'not-allowed',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: newVarName && newVarValue ? 'var(--color-panel-text)' : 'var(--color-panel-text-muted)',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        padding: '4px',
-                      }}
-                      title="Save"
-                    >
-                      <Check size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCancelAdd}
-                      style={{
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'var(--color-panel-text-muted)',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        padding: '4px',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.color = 'var(--color-panel-error)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.color = 'var(--color-panel-text-muted)';
-                      }}
-                      title="Cancel"
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
+                  <textarea
+                    placeholder="Paste .env file content here (KEY=VALUE format)..."
+                    onPaste={handlePasteEnvFile}
+                    style={{
+                      width: '100%',
+                      minHeight: '100px',
+                      padding: '8px 12px',
+                      borderRadius: '4px',
+                      border: '1px solid var(--color-panel-border)',
+                      backgroundColor: 'var(--color-panel-bg)',
+                      color: 'var(--color-panel-text)',
+                      fontSize: '12px',
+                      fontFamily: 'monospace',
+                      resize: 'vertical',
+                      boxSizing: 'border-box',
+                    }}
+                  />
                 </div>
               )}
+
+              {/* New Variable Rows */}
+              {newVars.map((newVar, index) => {
+                const hasError = validationErrors[newVar.id];
+                return (
+                  <div
+                    key={newVar.id}
+                    style={{
+                      padding: '8px',
+                      borderBottom: '1px solid var(--color-panel-border)',
+                      fontSize: '12px',
+                      fontFamily: 'monospace',
+                      color: 'var(--color-panel-text-secondary)',
+                      backgroundColor: 'transparent',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ flex: '0 0 40%', paddingRight: '8px', position: 'relative' }}>
+                        <input
+                          type="text"
+                          placeholder="Name"
+                          value={newVar.name}
+                          onChange={(e) => handleUpdateNewVar(newVar.id, 'name', e.target.value)}
+                          onPaste={(e) => {
+                            const pastedText = e.clipboardData.getData('text');
+                            const parsedVars = parseEnvFile(pastedText);
+                            
+                            if (parsedVars.length > 0) {
+                              e.preventDefault();
+                              
+                              const newVarsWithIds = parsedVars
+                                .filter(v => v.name) // Only keep variables with names
+                                .map(v => ({
+                                  ...v,
+                                  id: `${Date.now()}-${Math.random()}`
+                                }));
+                              
+                              if (newVarsWithIds.length > 0) {
+                                setNewVars(prev => {
+                                  const combined = [...prev, ...newVarsWithIds];
+                                  const errors = validateDuplicateNames(combined);
+                                  setValidationErrors(prevErrors => ({ ...prevErrors, ...errors }));
+                                  return combined;
+                                });
+                                setIsAddingNew(true);
+                              }
+                            }
+                          }}
+                          autoFocus={index === newVars.length - 1}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            paddingRight: hasError ? '32px' : '12px',
+                            borderRadius: '4px',
+                            border: (hasError && focusedInputId === newVar.id) 
+                              ? '1px solid var(--color-background-errorSecondary)' 
+                              : hasError 
+                                ? '1px solid var(--color-background-error)' 
+                                : '1px solid var(--color-panel-border)',
+                            backgroundColor: 'var(--color-panel-bg)',
+                            color: 'var(--color-panel-text)',
+                            fontSize: '12px',
+                            fontFamily: 'monospace',
+                            boxSizing: 'border-box',
+                            outline: 'none',
+                          }}
+                          onFocus={() => setFocusedInputId(newVar.id)}
+                          onBlur={() => setFocusedInputId(null)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              handleCancelAdd();
+                            }
+                          }}
+                        />
+                        {hasError && (
+                          <span
+                            title={hasError}
+                            style={{
+                              position: 'absolute',
+                              right: '16px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              pointerEvents: 'none',
+                            }}
+                          >
+                            <X
+                              size={16}
+                              style={{
+                                color: 'var(--color-panel-error)',
+                                flexShrink: 0,
+                              }}
+                            />
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ flex: '0 0 40%', paddingRight: '8px' }}>
+                        <input
+                          type="text"
+                          placeholder="Value"
+                          value={newVar.value}
+                          onChange={(e) => handleUpdateNewVar(newVar.id, 'value', e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            borderRadius: '4px',
+                            border: '1px solid var(--color-panel-border)',
+                            backgroundColor: 'var(--color-panel-bg)',
+                            color: 'var(--color-panel-text)',
+                            fontSize: '12px',
+                            fontFamily: 'monospace',
+                            boxSizing: 'border-box',
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              handleCancelAdd();
+                            }
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleRemoveNewVar(newVar.id);
+                            setValidationErrors(prev => {
+                              const updated = { ...prev };
+                              delete updated[newVar.id];
+                              return updated;
+                            });
+                          }}
+                          style={{
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--color-panel-text-muted)',
+                            backgroundColor: 'transparent',
+                            border: 'none',
+                            padding: '4px',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = 'var(--color-panel-error)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                          }}
+                          title="Remove"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </>
           )}
         </div>

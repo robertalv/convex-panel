@@ -2354,7 +2354,6 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 8px;
   gap: 8px;
 }
 

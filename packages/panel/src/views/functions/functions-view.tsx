@@ -826,9 +826,9 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                             key={func.identifier}
                             onClick={() => handleFunctionClick(func)}
                             style={{
-                              padding: '4px 8px',
+                              padding: '6px 12px',
                               marginLeft: '16px',
-                              borderRadius: '4px',
+                              borderRadius: '8px',
                               fontSize: '12px',
                               cursor: 'pointer',
                               display: 'flex',
@@ -883,7 +883,7 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <h2 style={{ fontSize: '14px', fontWeight: 700, color: selectedFunction ? 'var(--color-panel-text)' : 'var(--color-panel-text-muted)' }}>
-              {selectedFunction ? selectedFunction.name : 'select a function'}
+              {selectedFunction ? selectedFunction.name : 'Select a function'}
             </h2>
             {selectedFunction && (
               <>
@@ -914,7 +914,12 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
         {/* Tabs */}
         <div style={{ borderBottom: '1px solid var(--color-panel-border)', display: 'flex', alignItems: 'center', paddingLeft: '' }}>
           <button
-            onClick={() => setActiveTab('statistics')}
+            onClick={() => {
+              if (selectedFunction) {
+                setActiveTab('statistics');
+              }
+            }}
+            disabled={!selectedFunction}
             style={{
               padding: '12px 16px',
               fontSize: '12px',
@@ -926,15 +931,16 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
               borderTop: 'none',
               borderLeft: 'none',
               borderRight: 'none',
-              cursor: 'pointer',
+              cursor: selectedFunction ? 'pointer' : 'default',
+              opacity: selectedFunction ? 1 : 0.5,
             }}
             onMouseEnter={(e) => {
-              if (activeTab !== 'statistics') {
+              if (selectedFunction && activeTab !== 'statistics') {
                 e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
               }
             }}
             onMouseLeave={(e) => {
-              if (activeTab !== 'statistics') {
+              if (selectedFunction && activeTab !== 'statistics') {
                 e.currentTarget.style.color = 'var(--color-panel-text-muted)';
               }
             }}
@@ -942,7 +948,12 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
             Statistics
           </button>
           <button
-            onClick={() => setActiveTab('code')}
+            onClick={() => {
+              if (selectedFunction) {
+                setActiveTab('code');
+              }
+            }}
+            disabled={!selectedFunction}
             style={{
               padding: '12px 16px',
               fontSize: '12px',
@@ -954,15 +965,16 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
               borderTop: 'none',
               borderLeft: 'none',
               borderRight: 'none',
-              cursor: 'pointer',
+              cursor: selectedFunction ? 'pointer' : 'default',
+              opacity: selectedFunction ? 1 : 0.5,
             }}
             onMouseEnter={(e) => {
-              if (activeTab !== 'code') {
+              if (selectedFunction && activeTab !== 'code') {
                 e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
               }
             }}
             onMouseLeave={(e) => {
-              if (activeTab !== 'code') {
+              if (selectedFunction && activeTab !== 'code') {
                 e.currentTarget.style.color = 'var(--color-panel-text-muted)';
               }
             }}
@@ -970,7 +982,12 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
             Code
           </button>
           <button
-            onClick={() => setActiveTab('logs')}
+            onClick={() => {
+              if (selectedFunction) {
+                setActiveTab('logs');
+              }
+            }}
+            disabled={!selectedFunction}
             style={{
               padding: '12px 16px',
               fontSize: '12px',
@@ -982,15 +999,16 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
               borderTop: 'none',
               borderLeft: 'none',
               borderRight: 'none',
-              cursor: 'pointer',
+              cursor: selectedFunction ? 'pointer' : 'default',
+              opacity: selectedFunction ? 1 : 0.5,
             }}
             onMouseEnter={(e) => {
-              if (activeTab !== 'logs') {
+              if (selectedFunction && activeTab !== 'logs') {
                 e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
               }
             }}
             onMouseLeave={(e) => {
-              if (activeTab !== 'logs') {
+              if (selectedFunction && activeTab !== 'logs') {
                 e.currentTarget.style.color = 'var(--color-panel-text-muted)';
               }
             }}

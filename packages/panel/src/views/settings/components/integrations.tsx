@@ -203,7 +203,7 @@ export const Integrations: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 24px',
+          padding: '0 8px',
           backgroundColor: 'var(--color-panel-bg)',
         }}
       >
@@ -224,7 +224,7 @@ export const Integrations: React.FC = () => {
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '32px 24px',
+          padding: '16px',
           position: 'relative',
         }}
       >

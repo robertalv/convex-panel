@@ -2229,7 +2229,6 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 8px;
   gap: 8px;
 }
 .cp-components-main {

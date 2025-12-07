@@ -141,7 +141,7 @@ export const UrlDeployKey: React.FC<UrlDeployKeyProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 16px',
+            padding: '0 8px',
             backgroundColor: 'var(--color-panel-bg)',
           }}
         >
@@ -191,7 +191,7 @@ export const UrlDeployKey: React.FC<UrlDeployKeyProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 16px',
+            padding: '0 8px',
             backgroundColor: 'var(--color-panel-bg)',
           }}
         >
@@ -264,7 +264,7 @@ export const UrlDeployKey: React.FC<UrlDeployKeyProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 16px',
+          padding: '0 8px',
           backgroundColor: 'var(--color-panel-bg)',
         }}
       >

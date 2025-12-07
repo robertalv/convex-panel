@@ -7,6 +7,8 @@ import {
 } from '../../../utils/api/components';
 import { getAdminClientInfo, validateAdminClientInfo } from '../../../utils/adminClient';
 import type { Component } from '../../../utils/api/types';
+import { usePortalTarget } from '../../../contexts/portal-context';
+import { useThemeSafe } from '../../../hooks/useTheme';
 
 const DeleteButtonWithTooltip: React.FC<{
   isActive: boolean;
@@ -19,39 +21,50 @@ const DeleteButtonWithTooltip: React.FC<{
   } | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const portalTarget = usePortalTarget();
+  const { theme } = useThemeSafe();
 
   useEffect(() => {
     if (showTooltip && triggerRef.current && isActive) {
-      // Set initial position immediately so tooltip can render
-      const rect = triggerRef.current.getBoundingClientRect();
-      const estimatedWidth = 280;
-      const estimatedHeight = 60;
-      const margin = 8;
-
-      const initialLeft = rect.left + rect.width / 2 - estimatedWidth / 2;
-      const initialTop = rect.top - estimatedHeight - margin - 4;
-
-      setTooltipPosition({
-        top: Math.max(margin, initialTop),
-        left: Math.max(margin, Math.min(initialLeft, window.innerWidth - estimatedWidth - margin)),
-      });
-
       const updatePosition = () => {
         if (!triggerRef.current) return;
         const rect = triggerRef.current.getBoundingClientRect();
         const tooltipRect = tooltipRef.current?.getBoundingClientRect();
-        const tooltipHeight = tooltipRect?.height || estimatedHeight;
-        const tooltipWidth = tooltipRect?.width || estimatedWidth;
+        const tooltipHeight = tooltipRect?.height || 60;
+        const tooltipWidth = tooltipRect?.width || 280;
+        const margin = 8;
 
         // Position tooltip above the button, centered
-        const left = rect.left + rect.width / 2 - tooltipWidth / 2;
-        const top = rect.top - tooltipHeight - margin - 4; // 4px for arrow
+        let left = rect.left + rect.width / 2 - tooltipWidth / 2;
+        let top = rect.top - tooltipHeight - margin - 4; // 4px for arrow
+
+        // Ensure tooltip doesn't go off screen horizontally
+        if (left < margin) {
+          left = margin;
+        }
+        if (left + tooltipWidth > window.innerWidth - margin) {
+          left = window.innerWidth - tooltipWidth - margin;
+        }
+
+        // Ensure tooltip doesn't go off top edge
+        if (top < margin) {
+          top = margin;
+        }
 
         setTooltipPosition({
-          top: Math.max(margin, top), // Ensure it doesn't go off top edge
-          left: Math.max(margin, Math.min(left, window.innerWidth - tooltipWidth - margin)),
+          top,
+          left,
         });
       };
+
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          updatePosition();
+          // Update again after tooltip renders to get accurate dimensions
+          setTimeout(updatePosition, 10);
+        });
+      });
 
       window.addEventListener('scroll', updatePosition, true);
       window.addEventListener('resize', updatePosition);
@@ -103,52 +116,33 @@ const DeleteButtonWithTooltip: React.FC<{
           <span>Delete</span>
         </button>
       </div>
-      {showTooltip && isActive && typeof document !== 'undefined' && (
+      {showTooltip && isActive && tooltipPosition && portalTarget && (
         createPortal(
           <div
             ref={tooltipRef}
+            className={`cp-theme-${theme} cp-tooltip-action-tooltip`}
+            data-placement="top"
             style={{
               position: 'fixed',
-              top: tooltipPosition ? `${tooltipPosition.top}px` : '-9999px',
-              left: tooltipPosition ? `${tooltipPosition.left}px` : '-9999px',
-              opacity: tooltipPosition ? 1 : 0,
-              padding: '8px 12px',
-              backgroundColor: 'var(--color-panel-bg-tertiary)',
-              border: '1px solid var(--color-panel-border)',
-              color: 'var(--color-panel-text)',
-              fontSize: '12px',
-              borderRadius: '4px',
-              transition: 'opacity 0.2s',
-              pointerEvents: 'none',
-              zIndex: 99999,
-              boxShadow: '0 10px 15px -3px var(--color-panel-shadow)',
+              top: `${tooltipPosition.top}px`,
+              left: `${tooltipPosition.left}px`,
+              opacity: showTooltip ? 1 : 0,
               minWidth: '192px',
-              maxWidth: '300px',
-              textAlign: 'center',
-              lineHeight: '1.5',
-              whiteSpace: 'normal',
-              wordWrap: 'break-word',
-              overflowWrap: 'break-word',
             }}
             onMouseEnter={() => setShowTooltip(true)}
             onMouseLeave={() => setShowTooltip(false)}
           >
             You must unmount your component before it can be deleted.
             <div
+              className="cp-tooltip-action-arrow"
               style={{
-                position: 'absolute',
-                bottom: '-4px',
+                right: 'auto',
                 left: '50%',
                 transform: 'translateX(-50%) rotate(45deg)',
-                width: '8px',
-                height: '8px',
-                backgroundColor: 'var(--color-panel-bg-tertiary)',
-                borderBottom: '1px solid var(--color-panel-border)',
-                borderRight: '1px solid var(--color-panel-border)',
               }}
             />
           </div>,
-          document.body
+          portalTarget
         )
       )}
     </>
@@ -288,7 +282,7 @@ export const Components: React.FC<ComponentsProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 16px',
+            padding: '0 8px',
             backgroundColor: 'var(--color-panel-bg)',
           }}
         >
@@ -338,7 +332,7 @@ export const Components: React.FC<ComponentsProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 16px',
+            padding: '0 8px',
             backgroundColor: 'var(--color-panel-bg)',
           }}
         >
@@ -407,7 +401,7 @@ export const Components: React.FC<ComponentsProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 16px',
+          padding: '0 8px',
           backgroundColor: 'var(--color-panel-bg)',
         }}
       >
@@ -428,7 +422,7 @@ export const Components: React.FC<ComponentsProps> = ({
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '24px',
+          padding: '16px',
         }}
       >
         <div
