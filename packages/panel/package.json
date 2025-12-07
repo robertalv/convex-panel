@@ -1,6 +1,6 @@
 {
   "name": "convex-panel",
-  "version": "0.2.29",
+  "version": "0.2.31",
   "description": "A React component for monitoring and debugging Convex applications",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -124,7 +124,6 @@
     "debounce": "^1.2.1",
     "lodash": "^4.17.21",
     "react-ace": "^14.0.1",
-    "react-helmet": "^6.1.0",
     "react-hotkeys-hook": "^4.6.1",
     "react-virtualized-auto-sizer": "^1.0.26",
     "react-window-infinite-loader": "^2.0.0",

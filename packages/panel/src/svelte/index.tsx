@@ -25,6 +25,10 @@
  * ```
  */
 
+// Export the Svelte component
+export { default as ConvexPanel } from './ConvexPanelSvelte.svelte';
+export { default } from './ConvexPanelSvelte.svelte';
+
 // Re-export types
 export type { ConvexPanelProps } from '../ConvexPanel';
 

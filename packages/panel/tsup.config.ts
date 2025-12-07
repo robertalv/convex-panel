@@ -16,7 +16,6 @@ const sharedExternal = [
   'framer-motion',
   'sonner',
   'react-window',
-  'react-helmet',
   'react-hotkeys-hook',
   
   // Utilities

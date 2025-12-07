@@ -91,7 +91,7 @@ function selectOption(options, promptText) {
       });
       
       // Print instructions
-      process.stdout.write('\n' + colorize("Use ↑↓ arrows or numbers (1-4) to select, Enter/Space to confirm", "dim") + '\n');
+      process.stdout.write('\n' + colorize(`Use ↑↓ arrows or numbers (1-${options.length}) to select, Enter/Space to confirm`, "dim") + '\n');
       
       // Calculate lines to clear next time (prompt + options + blank + instructions)
       linesToClear = 1 + options.length + 2;
@@ -205,7 +205,7 @@ function selectOption(options, promptText) {
         selectedIndex = (selectedIndex + 1) % options.length;
         render();
       } else if (str >= '1' && str <= String(options.length)) {
-        // Number key selection (1-4)
+        // Number key selection
         const num = parseInt(str) - 1;
         if (num >= 0 && num < options.length) {
           // Restore terminal state
@@ -269,8 +269,8 @@ function selectOption(options, promptText) {
           
           resolve(selectedIndex);
           return;
-        } else if (key.name && key.name.match(/^[1-4]$/)) {
-          // Number key selection (1-4)
+        } else if (key.name && key.name.match(/^\d+$/) && parseInt(key.name) >= 1 && parseInt(key.name) <= options.length) {
+          // Number key selection
           const num = parseInt(key.name) - 1;
           if (num >= 0 && num < options.length) {
             // Restore terminal state
@@ -388,6 +388,7 @@ async function main() {
   let prefix = "VITE_";
   const frameworks = [
     { name: "Vite", value: "vite", prefix: "VITE_" },
+    { name: "Svelte", value: "svelte", prefix: "VITE_" },
     { name: "Next.js", value: "nextjs", prefix: "NEXT_PUBLIC_" },
     { name: "React (Create React App)", value: "react", prefix: "REACT_APP_" },
     { name: "Other", value: "other", prefix: "VITE_" }
