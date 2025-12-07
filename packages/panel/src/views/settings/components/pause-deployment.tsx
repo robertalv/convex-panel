@@ -5,7 +5,7 @@ import {
   pauseConvexDeployment,
   resumeConvexDeployment,
 } from '../../../utils/api/deployments';
-import { getAdminClientInfo, validateAdminClientInfo } from '../../../utils/adminClient';
+import { getAdminClientInfo } from '../../../utils/adminClient';
 import { setStorageItem } from '../../../utils/storage';
 import { STORAGE_KEYS } from '../../../utils/constants';
 
@@ -44,14 +44,6 @@ export const PauseDeployment: React.FC<PauseDeploymentProps> = ({
 
     try {
       const clientInfo = getAdminClientInfo(adminClient, providedDeploymentUrl);
-      const validationError = validateAdminClientInfo(clientInfo);
-
-      if (validationError) {
-        setError(validationError);
-        setIsLoading(false);
-        return;
-      }
-
       const { deploymentUrl, adminKey } = clientInfo;
       const finalAdminKey = accessToken || adminKey;
 
@@ -87,13 +79,6 @@ export const PauseDeployment: React.FC<PauseDeploymentProps> = ({
     if (!adminClient || isToggling) return;
 
     const clientInfo = getAdminClientInfo(adminClient, providedDeploymentUrl);
-    const validationError = validateAdminClientInfo(clientInfo);
-
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
     const { deploymentUrl, adminKey } = clientInfo;
     const finalAdminKey = accessToken || adminKey;
 

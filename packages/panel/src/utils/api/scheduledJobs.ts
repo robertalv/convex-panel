@@ -3,7 +3,7 @@
  * Handles canceling scheduled jobs (individual and bulk)
  */
 
-import { getAdminClientInfo, validateAdminClientInfo } from '../adminClient';
+import { getAdminClientInfo } from '../adminClient';
 import { toast } from '../toast';
 
 /**
@@ -23,12 +23,6 @@ export async function cancelScheduledJob(
   }
 
   const clientInfo = getAdminClientInfo(adminClient);
-  const validationError = validateAdminClientInfo(clientInfo);
-
-  if (validationError) {
-    throw new Error(validationError);
-  }
-
   const { deploymentUrl, adminKey } = clientInfo;
 
   try {
@@ -74,12 +68,6 @@ export async function cancelAllScheduledJobs(
   }
 
   const clientInfo = getAdminClientInfo(adminClient);
-  const validationError = validateAdminClientInfo(clientInfo);
-
-  if (validationError) {
-    throw new Error(validationError);
-  }
-
   const { deploymentUrl, adminKey } = clientInfo;
 
   try {

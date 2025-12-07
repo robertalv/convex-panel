@@ -12,14 +12,7 @@ const sharedExternal = [
   // Heavy UI libraries - DON'T bundle these!
   'monaco-editor',
   '@monaco-editor/react',
-  'ace-builds',
-  'ace-builds/**',
-  'ace-builds/src-noconflict/**',
-  'ace-builds/src-noconflict/mode-*',
-  'ace-builds/src-noconflict/theme-*',
-  'ace-builds/src-noconflict/worker-*',
-  'ace-builds/src-noconflict/ext-*',
-  'react-ace',
+  // ace-builds and react-ace are now bundled (removed from externals)
   'lucide-react',
   'framer-motion',
   'recharts',

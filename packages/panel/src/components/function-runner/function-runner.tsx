@@ -92,6 +92,7 @@ export interface FunctionRunnerProps {
   setIsVertical?: (vertical: boolean) => void;
   isExpanded?: boolean;
   setIsExpanded?: (expanded: boolean) => void;
+  accessToken?: string;
 }
 
 export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
@@ -110,6 +111,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
   setIsVertical,
   isExpanded,
   setIsExpanded,
+  accessToken,
 }) => {
   const [selectedComponent, setSelectedComponent] = useState<string | null>(propComponentId || 'app');
   const [selectedFunction, setSelectedFunction] = useState<ModuleFunction | CustomQuery | null>(propSelectedFunction || null);

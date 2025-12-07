@@ -5,7 +5,7 @@ import {
   getComponents,
   deleteComponent,
 } from '../../../utils/api/components';
-import { getAdminClientInfo, validateAdminClientInfo } from '../../../utils/adminClient';
+import { getAdminClientInfo } from '../../../utils/adminClient';
 import type { Component } from '../../../utils/api/types';
 import { usePortalTarget } from '../../../contexts/portal-context';
 import { useThemeSafe } from '../../../hooks/useTheme';
@@ -204,13 +204,6 @@ export const Components: React.FC<ComponentsProps> = ({
     }
 
     const clientInfo = getAdminClientInfo(adminClient, providedDeploymentUrl);
-    const validationError = validateAdminClientInfo(clientInfo);
-
-    if (validationError) {
-      setError(validationError);
-      setComponentToDelete(null);
-      return;
-    }
 
     const { deploymentUrl, adminKey } = clientInfo;
     const finalAdminKey = accessToken || adminKey;

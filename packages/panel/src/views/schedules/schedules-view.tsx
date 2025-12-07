@@ -12,7 +12,7 @@ import {
   Pause,
   Play,
 } from 'lucide-react';
-import React, { Activity, useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { FixedSizeList } from 'react-window';
 import { MultiSelectComponentSelector } from '../../components/function-runner/multi-select-component-selector';
 import { MultiSelectFunctionSelector } from '../../components/function-runner/multi-select-function-selector';
@@ -714,7 +714,7 @@ const ScheduledFunctionView = ({
     }
   });
 
-  return (<Activity mode={selectedTab === "scheduled" ? "visible" : "hidden"}>
+  return (<div style={{ display: selectedTab === "scheduled" ? "flex" : "none", flexDirection: "column", flex: 1, overflow: "hidden" }}>
     {/* Table */}
     <div ref={containerRef} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Header Row */}
@@ -821,7 +821,7 @@ const ScheduledFunctionView = ({
       container={containerRef.current}
       disableCancel={isCanceling}
     />
-  </Activity>
+  </div>
   )
 }
 
@@ -1042,7 +1042,7 @@ const CronsJobsFunctionView = ({ adminClient, selectedComponentId, selectedTab, 
 
   return (
     <>
-      <Activity mode={selectedTab === "cron" ? "visible" : "hidden"}>
+      <div style={{ display: selectedTab === "cron" ? "flex" : "none", flexDirection: "column", flex: 1, overflow: "hidden" }}>
         {/* Table */}
         <div ref={containerRef} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Header Row */}
@@ -1093,7 +1093,7 @@ const CronsJobsFunctionView = ({ adminClient, selectedComponentId, selectedTab, 
         )}
       </div>
     </div>
-      </Activity>
+      </div>
       
       {/* Arguments Sheet */}
       <CronArgumentsSheet

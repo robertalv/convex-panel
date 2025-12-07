@@ -33,7 +33,7 @@ const POLLING_INTERVAL = 2000;
 //   return metadata;
 // };
 
-export function usePaginatedScheduledJobs(udfPath: string | undefined, adminClient: ConvexReactClient, isPausedUser: boolean = false) {
+export function usePaginatedScheduledJobs(udfPath: string | undefined, adminClient: ConvexReactClient | null, isPausedUser: boolean = false) {
   // const { deployment, error: errorDeployment, loading: loadingDeployment } = useCurrentDeployment(adminClient, deploymentUrl)
   const isDeploymentPaused = useIsDeploymentPaused(adminClient)
   const [results, setResults] = useState<any | null>(null);
@@ -190,7 +190,7 @@ type BackendStateTableDoc = {
   state: "paused" | "running" | "disabled"
 }
 
-export function useIsDeploymentPaused(adminClient: ConvexReactClient) {
+export function useIsDeploymentPaused(adminClient: ConvexReactClient | null) {
   const [deploymentState, setDeploymentState] = useState<BackendStateTableDoc | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
@@ -198,6 +198,13 @@ export function useIsDeploymentPaused(adminClient: ConvexReactClient) {
     let cancelled = false;
 
     const fetchState = async () => {
+      if (!adminClient) {
+        if (!cancelled) {
+          setLoading(false);
+        }
+        return;
+      }
+
       try {
         const state = await adminClient.query(
           "_system/frontend/deploymentState:deploymentState" as any
@@ -229,18 +236,23 @@ export function useIsDeploymentPaused(adminClient: ConvexReactClient) {
   return deploymentState.state === "paused";
 }
 
-export const useCronsJobsHistory =(adminClient: ConvexReactClient)=>{
+export const useCronsJobsHistory =(adminClient: ConvexReactClient | null)=>{
   if(!adminClient) return [];
   const data = pullDataQuery(adminClient, "_system/frontend/listCronJobRuns:default")
   return data;
 }
 
-export const pullDataQuery = async (adminClient: ConvexReactClient, fnPath:string) => {
+export const pullDataQuery = async (adminClient: ConvexReactClient | null, fnPath:string) => {
+  if (!adminClient) {
+    console.error("adminClient is null, cannot execute query:", fnPath);
+    return null;
+  }
   try{
     // if this returns an error, you need to check the path
     const queryResult = await adminClient.query(fnPath as any);
     return queryResult;
   } catch(e){
     console.error(e, "at" + fnPath)
+    return null;
   }
 }

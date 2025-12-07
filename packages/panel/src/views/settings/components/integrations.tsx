@@ -2,13 +2,6 @@ import React from 'react';
 import { ExternalLink, Link2 } from 'lucide-react';
 import { ProBadge } from '../../../components/shared/pro-badge';
 
-// Import integration logos
-import sentryLogo from '../../../../../shared/assets/integrations/sentry-dark.webp';
-import axiomLogo from '../../../../../shared/assets/integrations/axiom.webp';
-import datadogLogo from '../../../../../shared/assets/integrations/dd_icon_rgb.webp';
-import fivetranLogo from '../../../../../shared/assets/integrations/fivetran-blue.svg';
-import airbyteLogo from '../../../../../shared/assets/integrations/airbyte.svg';
-
 interface Integration {
   id: string;
   name: string;
@@ -24,7 +17,7 @@ const INTEGRATIONS: Integration[] = [
     id: 'sentry',
     name: 'Sentry',
     type: 'Exception Reporting',
-    logo: sentryLogo,
+    logo: '',
     tooltip: (
       <>
         <div style={{ fontWeight: 600, marginBottom: '8px' }}>Sentry</div>
@@ -44,7 +37,7 @@ const INTEGRATIONS: Integration[] = [
     id: 'axiom',
     name: 'Axiom',
     type: 'Log Stream',
-    logo: axiomLogo,
+    logo: '',
     tooltip: (
       <>
         <div style={{ fontWeight: 600, marginBottom: '8px' }}>Axiom</div>
@@ -64,7 +57,7 @@ const INTEGRATIONS: Integration[] = [
     id: 'datadog',
     name: 'Datadog',
     type: 'Log Stream',
-    logo: datadogLogo,
+    logo: '',
     tooltip: (
       <>
         <div style={{ fontWeight: 600, marginBottom: '8px' }}>Datadog</div>
@@ -104,7 +97,7 @@ const INTEGRATIONS: Integration[] = [
     id: 'fivetran',
     name: 'Fivetran',
     type: 'Streaming Export',
-    logo: fivetranLogo,
+    logo: '',
     tooltip: (
       <>
         <div style={{ fontWeight: 600, marginBottom: '8px' }}>Fivetran</div>
@@ -145,7 +138,7 @@ const INTEGRATIONS: Integration[] = [
     id: 'airbyte',
     name: 'Airbyte',
     type: 'Streaming Export',
-    logo: airbyteLogo,
+    logo: '',
     tooltip: (
       <>
         <div style={{ fontWeight: 600, marginBottom: '8px' }}>Airbyte</div>

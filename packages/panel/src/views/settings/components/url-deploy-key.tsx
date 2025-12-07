@@ -5,7 +5,7 @@ import {
   getDeploymentInfo
 } from '../../../utils/api/deployments';
 import type { DeploymentCredentials, DeploymentInfo } from '../../../utils/api/types';
-import { getAdminClientInfo, validateAdminClientInfo } from '../../../utils/adminClient';
+import { getAdminClientInfo } from '../../../utils/adminClient';
 
 export interface UrlDeployKeyProps {
   adminClient?: any;
@@ -43,13 +43,6 @@ export const UrlDeployKey: React.FC<UrlDeployKeyProps> = ({
 
     try {
       const clientInfo = getAdminClientInfo(adminClient, providedDeploymentUrl);
-      const validationError = validateAdminClientInfo(clientInfo);
-
-      if (validationError) {
-        setError(validationError);
-        setIsLoading(false);
-        return;
-      }
 
       const { deploymentUrl, adminKey } = clientInfo;
       const finalAdminKey = accessToken || adminKey;
@@ -60,7 +53,6 @@ export const UrlDeployKey: React.FC<UrlDeployKeyProps> = ({
         return;
       }
 
-      // Load credentials and deployment info
       const [credentialsData, infoData] = await Promise.all([
         getDeploymentCredentials(adminClient).catch(() => null),
         getDeploymentInfo(adminClient).catch(() => null),

@@ -7,7 +7,7 @@ import {
   batchUpdateEnvironmentVariables
 } from '../../../utils/api/environment';
 import type { EnvironmentVariable } from '../../../utils/api/types';
-import { getAdminClientInfo, validateAdminClientInfo } from '../../../utils/adminClient';
+import { getAdminClientInfo } from '../../../utils/adminClient';
 
 export interface EnvironmentVariablesProps {
   adminClient?: any;
@@ -124,13 +124,6 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
     }
 
     const clientInfo = getAdminClientInfo(adminClient, providedDeploymentUrl);
-    const validationError = validateAdminClientInfo(clientInfo);
-
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
     const { deploymentUrl, adminKey } = clientInfo;
     const finalAdminKey = accessToken || adminKey;
 
@@ -186,14 +179,6 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
     }
 
     const clientInfo = getAdminClientInfo(adminClient, providedDeploymentUrl);
-    const validationError = validateAdminClientInfo(clientInfo);
-
-    if (validationError) {
-      setError(validationError);
-      setVarToDelete(null);
-      return;
-    }
-
     const { deploymentUrl, adminKey } = clientInfo;
     const finalAdminKey = accessToken || adminKey;
 
@@ -222,7 +207,6 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
   const LINE_REGEX = /(?:^|^)\s*(?:export\s+)?([\w.-]+)(?:\s*=\s*?|:\s+?)(\s*'(?:\\'|[^'])*'|\s*"(?:\\"|[^"])*"|\s*`(?:\\`|[^`])*`|[^#\r\n]+)?\s*(?:#.*)?(?:$|$)/gm;
 
   const parseEnvFile = (content: string): Array<{ name: string; value: string }> => {
-    const vars: Array<{ name: string; value: string }> = [];
     const obj: Record<string, string> = {};
 
     // Convert line breaks to same format
@@ -383,13 +367,6 @@ export const EnvironmentVariables: React.FC<EnvironmentVariablesProps> = ({
     }
 
     const clientInfo = getAdminClientInfo(adminClient, providedDeploymentUrl);
-    const validationError = validateAdminClientInfo(clientInfo);
-
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
     const { deploymentUrl, adminKey } = clientInfo;
     const finalAdminKey = accessToken || adminKey;
 
