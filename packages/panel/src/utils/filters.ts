@@ -32,9 +32,9 @@ const createLogTypeFilter = (logType: LogType) => (log: LogEntry): boolean => {
       return false;
     case LogType.DEBUG:
       return log.log_level?.toLowerCase() === 'debug';
-    case LogType.LOGINFO:
-      return log.log_level?.toLowerCase() === 'loginfo' || log.log_level?.toLowerCase() === 'info';
-    case LogType.WARNING:
+    case LogType.INFO:
+      return log.log_level?.toLowerCase() === 'info' || log.log_level?.toLowerCase() === 'loginfo';
+    case LogType.WARN:
       return log.log_level?.toLowerCase() === 'warn' || log.log_level?.toLowerCase() === 'warning';
     case LogType.ERROR:
       return log.log_level?.toLowerCase() === 'error';

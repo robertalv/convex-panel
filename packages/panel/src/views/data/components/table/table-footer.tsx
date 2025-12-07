@@ -8,9 +8,17 @@ export interface TableFooterProps {
   tableName: string;
   tableSchema?: TableDefinition[string];
   documents?: any[];
+  adminClient?: any;
+  componentId?: string | null;
 }
 
-export const TableFooter: React.FC<TableFooterProps> = ({ tableName, tableSchema, documents }) => {
+export const TableFooter: React.FC<TableFooterProps> = ({ 
+  tableName, 
+  tableSchema, 
+  documents,
+  adminClient,
+  componentId,
+}) => {
   const { openSheet } = useSheetSafe();
 
   const handleOpenSchema = () => {
@@ -20,6 +28,8 @@ export const TableFooter: React.FC<TableFooterProps> = ({ tableName, tableSchema
           tableName={tableName}
           tableSchema={tableSchema}
           documents={documents}
+          adminClient={adminClient}
+          componentId={componentId}
         />
       ),
       width: '600px',

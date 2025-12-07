@@ -1,5 +1,5 @@
 /**
- * Common/shared types used across the panel
+ * Common types used across the panel
  */
 
 type EditorOptions = {
@@ -101,4 +101,6 @@ export const editorOptions: EditorOptions & DiffEditorOptions = {
   selectionHighlight: false,
   renderLineHighlight: "none",
 };
+
+export type MultiSelectValue = string[] | "all";
 

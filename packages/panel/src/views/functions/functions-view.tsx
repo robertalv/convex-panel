@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Search, Pause, CodeXml } from 'lucide-react';
+import { Play, Search, Pause, CodeXml, ArrowUp } from 'lucide-react';
 import Editor from '../../components/editor/lazy-editor';
 import type { ModuleFunction as TypedModuleFunction, FunctionExecutionLog } from '../../types';
 import type { ModuleFunction } from '../../utils/api/functionDiscovery';
@@ -16,6 +16,8 @@ import { FunctionExecutionDetailSheet } from './components/function-execution-de
 import { fetchUdfExecutionStats, aggregateFunctionStats } from '../../utils/api/metrics';
 import { fetchSourceCode } from '../../utils/api/functions';
 import { getConvexPanelTheme } from '../../components/editor/editor-theme';
+import { MultiSelectLogTypeSelector } from '../../components/function-runner/multi-select-log-type-selector';
+import type { MultiSelectValue } from '../../types/common';
 
 export interface FunctionsViewProps {
   adminClient: any;
@@ -89,11 +91,18 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
 
   const [logs, setLogs] = useState<FunctionExecutionLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
+  const [manuallyPaused, setManuallyPaused] = useState(false);
+  const [isScrolledAway, setIsScrolledAway] = useState(false);
+  const [selectedLogTypes, setSelectedLogTypes] = useState<MultiSelectValue>('all');
   const [, setLogCursor] = useState<number | string>('now');
   const [selectedExecution, setSelectedExecution] = useState<FunctionExecutionLog | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const logsScrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollStateRef = useRef<{ isScrolledAway: boolean; rafId: number | null }>({
+    isScrolledAway: false,
+    rafId: null,
+  });
 
   const deploymentUrl = deployUrl || baseUrl;
   const adminKey = getAdminKey(adminClient) || accessToken;
@@ -527,9 +536,8 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
 
   const convexPanelTheme = getConvexPanelTheme(theme);
 
-  // Live function log streaming (only when logs tab active and real data)
   const isLogsTabActive = activeTab === 'logs';
-  const effectiveIsPaused = isPaused || !isLogsTabActive;
+  const effectiveIsPaused = manuallyPaused || (isScrolledAway && !isDetailOpen) || !isLogsTabActive;
   const {
     logs: streamedLogs,
     isLoading: streamingLoading,
@@ -554,6 +562,118 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
       }
     }
   }, [activeTab, streamedLogs, streamingLoading, streamingCursor, streamingError, onError]);
+
+  const handleLogsScroll = React.useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = e.currentTarget.scrollTop;
+    const scrolledAway = scrollTop > 0;
+    
+    if (scrollStateRef.current.rafId !== null) {
+      cancelAnimationFrame(scrollStateRef.current.rafId);
+    }
+    
+    if (!manuallyPaused && !isDetailOpen && scrollStateRef.current.isScrolledAway !== scrolledAway) {
+      scrollStateRef.current.isScrolledAway = scrolledAway;
+      
+      scrollStateRef.current.rafId = requestAnimationFrame(() => {
+        setIsScrolledAway(scrolledAway);
+        scrollStateRef.current.rafId = null;
+      });
+    }
+  }, [manuallyPaused, isDetailOpen]);
+
+  useEffect(() => {
+    if (!isDetailOpen && logsScrollRef.current) {
+      const scrollTop = logsScrollRef.current.scrollTop;
+      if (scrollTop === 0 && !manuallyPaused) {
+        scrollStateRef.current.isScrolledAway = false;
+        setIsScrolledAway(false);
+      }
+    }
+  }, [isDetailOpen, manuallyPaused]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollStateRef.current.rafId !== null) {
+        cancelAnimationFrame(scrollStateRef.current.rafId);
+      }
+    };
+  }, []);
+
+  const filteredLogs = React.useMemo(() => {
+    if (selectedLogTypes === 'all') {
+      return logs;
+    }
+
+    if (selectedLogTypes.length === 0) {
+      return [];
+    }
+
+    const selectedTypes = selectedLogTypes as string[];
+
+    return logs.filter((log) => {
+      let matchesAnyType = false;
+
+      if (selectedTypes.includes('success') && log.success && !log.error) {
+        matchesAnyType = true;
+      }
+
+      if (selectedTypes.includes('failure') && (!log.success || log.error)) {
+        matchesAnyType = true;
+      }
+
+      const raw = log.raw as Record<string, any>;
+      const rawLogLevel = raw?.['log_level'] || raw?.['level'];
+      const logLevel = rawLogLevel ? String(rawLogLevel).toUpperCase() : null;
+
+      let logLevelFromLines: string | null = null;
+      if (log.logLines && log.logLines.length > 0) {
+        for (const line of log.logLines) {
+          if (typeof line === 'string') {
+            const match = line.match(/^\[(DEBUG|INFO|WARN|WARNING|ERROR|LOG)\]/i);
+            if (match) {
+              logLevelFromLines = match[1].toUpperCase();
+              break;
+            }
+          } else if (typeof line === 'object' && line !== null) {
+            const lineObj = line as Record<string, any>;
+            if (lineObj.level) {
+              logLevelFromLines = String(lineObj.level).toUpperCase();
+              break;
+            }
+          }
+        }
+      }
+
+      const effectiveLogLevel = logLevel || logLevelFromLines;
+
+      if (selectedTypes.includes('DEBUG')) {
+        if (effectiveLogLevel === 'DEBUG') {
+          matchesAnyType = true;
+        }
+      }
+
+      if (selectedTypes.includes('INFO')) {
+        if (effectiveLogLevel === 'INFO' || effectiveLogLevel === 'LOG' || 
+            (!effectiveLogLevel && !log.error && log.success)) {
+          matchesAnyType = true;
+        }
+      }
+
+      if (selectedTypes.includes('WARN')) {
+        if (effectiveLogLevel === 'WARN' || effectiveLogLevel === 'WARNING') {
+          matchesAnyType = true;
+        }
+      }
+
+      if (selectedTypes.includes('ERROR')) {
+        if (effectiveLogLevel === 'ERROR' || log.error) {
+          matchesAnyType = true;
+        }
+      }
+
+      return matchesAnyType;
+    });
+  }, [logs, selectedLogTypes]);
 
   return (
     <div style={{ display: 'flex', height: '100%' }}>
@@ -1110,7 +1230,6 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       backgroundColor: 'var(--color-panel-bg)',
-                      marginBottom: '16px',
                       gap: '8px',
                     }}
                   >
@@ -1154,56 +1273,17 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                         }}
                       />
                     </div>
-                    <button
-                      onClick={() => setIsPaused(!isPaused)}
-                      style={{
-                        height: '32px',
-                        padding: '0 12px',
-                        fontSize: '12px',
-                        borderRadius: '4px',
-                        fontWeight: 500,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        border: isPaused ? 'none' : '1px solid var(--color-panel-border)',
-                        backgroundColor: isPaused ? 'var(--color-panel-accent)' : 'var(--color-panel-bg-tertiary)',
-                        color: isPaused ? '#fff' : 'var(--color-panel-text-secondary)',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        boxSizing: 'border-box',
-                        flexShrink: 0,
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isPaused) {
-                          e.currentTarget.style.backgroundColor = 'var(--color-panel-accent)';
-                          e.currentTarget.style.color = '#fff';
-                        } else {
-                          e.currentTarget.style.backgroundColor = 'var(--color-panel-accent-hover)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isPaused) {
-                          e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
-                          e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
-                        } else {
-                          e.currentTarget.style.backgroundColor = 'var(--color-panel-accent)';
-                        }
-                      }}
-                    >
-                      {isPaused ? (
-                        <>
-                          <Play size={12} /> Resume
-                        </>
-                      ) : (
-                        <>
-                          <Pause size={12} /> Pause
-                        </>
-                      )}
-                    </button>
+                    <div style={{ flexShrink: 0 }}>
+                      <MultiSelectLogTypeSelector
+                        selectedLogTypes={selectedLogTypes}
+                        onSelect={(newValue) => setSelectedLogTypes(newValue as MultiSelectValue)}
+                      />
+                    </div>
                   </div>
 
                   <div
+                    ref={logsScrollRef}
+                    onScroll={handleLogsScroll}
                     style={{
                       flex: 1,
                       overflow: 'auto',
@@ -1217,25 +1297,84 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                         display: 'flex',
                         borderBottom: '1px solid var(--color-panel-border)',
                         color: 'var(--color-panel-text-muted)',
-                        padding: '4px 16px',
+                        padding: '4px 8px',
                         position: 'sticky',
                         top: 0,
                         backgroundColor: 'var(--color-panel-bg)',
                         zIndex: 10,
+                        alignItems: 'center',
                       }}
                     >
                       <div style={{ width: '160px' }}>Timestamp</div>
                       <div style={{ width: '80px' }}>ID</div>
                       <div style={{ width: '128px' }}>Status</div>
                       <div style={{ flex: 1 }}>Function</div>
+                      <div style={{ flexShrink: 0, marginLeft: '8px' }}>
+                        <button
+                          onClick={() => {
+                            const isCurrentlyPaused = manuallyPaused || (isScrolledAway && !isDetailOpen);
+                            if (isCurrentlyPaused) {
+                              logsScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                              setManuallyPaused(false);
+                            } else {
+                              setManuallyPaused(true);
+                            }
+                          }}
+                          style={{
+                            height: '24px',
+                            padding: '0 8px',
+                            fontSize: '11px',
+                            borderRadius: '4px',
+                            fontWeight: 500,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            border: (manuallyPaused || (isScrolledAway && !isDetailOpen)) ? 'none' : '1px solid var(--color-panel-border)',
+                            backgroundColor: (manuallyPaused || (isScrolledAway && !isDetailOpen)) ? 'var(--color-panel-accent)' : 'var(--color-panel-bg-tertiary)',
+                            color: (manuallyPaused || (isScrolledAway && !isDetailOpen)) ? '#fff' : 'var(--color-panel-text-secondary)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            boxSizing: 'border-box',
+                          }}
+                          onMouseEnter={(e) => {
+                            const isCurrentlyPaused = manuallyPaused || (isScrolledAway && !isDetailOpen);
+                            if (!isCurrentlyPaused) {
+                              e.currentTarget.style.backgroundColor = 'var(--color-panel-accent)';
+                              e.currentTarget.style.color = '#fff';
+                            } else {
+                              e.currentTarget.style.backgroundColor = 'var(--color-panel-accent-hover)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            const isCurrentlyPaused = manuallyPaused || (isScrolledAway && !isDetailOpen);
+                            if (!isCurrentlyPaused) {
+                              e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+                              e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
+                            } else {
+                              e.currentTarget.style.backgroundColor = 'var(--color-panel-accent)';
+                            }
+                          }}
+                        >
+                          {(manuallyPaused || (isScrolledAway && !isDetailOpen)) ? (
+                            <>
+                              <Play size={10} /> Go Live{isScrolledAway && !isDetailOpen ? <ArrowUp size={10} /> : ''}
+                            </>
+                          ) : (
+                            <>
+                              <Pause size={10} /> Pause
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
 
-                    {logsLoading && logs.length === 0 ? (
+                    {logsLoading && filteredLogs.length === 0 ? (
                       <div style={{ color: 'var(--color-panel-text-muted)', fontSize: '14px', padding: '32px', textAlign: 'center' }}>Loading logs...</div>
-                    ) : logs.length === 0 ? (
+                    ) : filteredLogs.length === 0 ? (
                       <div style={{ color: 'var(--color-panel-text-muted)', fontSize: '14px', padding: '32px', textAlign: 'center' }}>No logs available</div>
                     ) : (
-                      logs.map((log, i) => (
+                      filteredLogs.map((log, i) => (
                         <div
                           key={i}
                           style={{
@@ -1248,12 +1387,8 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                                 : 'transparent',
                           }}
                           onClick={() => {
-                            console.log('[FunctionsView] Log clicked:', log);
-                            console.log('[FunctionsView] Setting selectedExecution to:', log);
-                            console.log('[FunctionsView] Setting isDetailOpen to: true');
                             setSelectedExecution(log);
                             setIsDetailOpen(true);
-                            console.log('[FunctionsView] State updated');
                           }}
                           onMouseEnter={(e) => {
                             if (selectedExecution?.id !== log.id) {
@@ -1283,9 +1418,11 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                             {log.success ? (
                               <>
                                 <span style={{ color: 'var(--color-panel-success)' }}>200</span>
-                                {log.durationMs && (
+                                {log.cachedResult ? (
+                                  <span style={{ color: 'var(--color-panel-success)', fontSize: '11px', fontWeight: 500 }}>(cached)</span>
+                                ) : log.durationMs ? (
                                   <span style={{ color: 'var(--color-panel-text-muted)' }}>{log.durationMs.toFixed(0)}ms</span>
-                                )}
+                                ) : null}
                               </>
                             ) : log.error ? (
                               <span style={{ color: 'var(--color-panel-error)' }}>Error</span>
@@ -1319,6 +1456,77 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                               title={log.functionIdentifier}
                             >
                               {log.functionIdentifier}
+                              {(() => {
+                                
+                                if (!log.logLines || !Array.isArray(log.logLines) || log.logLines.length === 0) {
+                                  return null;
+                                }
+                                
+                                const nonEmptyLogLines = log.logLines.filter((line: any) => {
+                                  if (line === null || line === undefined) {
+                                    return false;
+                                  }
+                                  
+                                  if (typeof line === 'string') {
+                                    const trimmed = line.trim();
+                                    const isValid = trimmed.length > 0 && 
+                                           trimmed !== '{}' && 
+                                           trimmed !== '[]' &&
+                                           trimmed !== 'null' &&
+                                           trimmed !== 'undefined';
+                                    return isValid;
+                                  }
+                                  
+                                  try {
+                                    const stringified = JSON.stringify(line);
+                                    const trimmed = stringified.trim();
+                                    const isValid = trimmed.length > 2 && 
+                                           trimmed !== '{}' && 
+                                           trimmed !== '[]' &&
+                                           trimmed !== 'null' &&
+                                           trimmed !== 'undefined';
+                                    return isValid;
+                                  } catch (e) {
+                                    return false;
+                                  }
+                                });
+                                
+                                if (nonEmptyLogLines.length === 0) {
+                                  return null;
+                                }
+                                
+                                const firstLogLine = nonEmptyLogLines[0];
+                                let logPreview: string;
+                                
+                                if (typeof firstLogLine === 'string') {
+                                  logPreview = firstLogLine.trim();
+                                } else {
+                                  try {
+                                    logPreview = JSON.stringify(firstLogLine);
+                                  } catch (e) {
+                                    return null;
+                                  }
+                                }
+                                
+                                if (!logPreview || logPreview.length === 0 || 
+                                    logPreview === '{}' || logPreview === '[]' ||
+                                    logPreview === 'null' || logPreview === 'undefined') {
+                                  return null;
+                                }
+                                
+                                return (
+                                  <>
+                                    {' '}
+                                    <span style={{ color: 'var(--color-panel-text-secondary)' }}>log</span>
+                                    {' '}
+                                    <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                                      {logPreview.length > 50 
+                                        ? logPreview.substring(0, 50) + '...' 
+                                        : logPreview}
+                                    </span>
+                                  </>
+                                );
+                              })()}
                             </span>
                             {log.error && (
                               <span 
@@ -1347,7 +1555,6 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                     log={selectedExecution}
                     isOpen={isDetailOpen}
                     onClose={() => {
-                      console.log('[FunctionsView] Closing detail sheet');
                       setIsDetailOpen(false);
                     }}
                     container={containerRef.current}

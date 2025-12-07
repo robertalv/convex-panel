@@ -18,6 +18,7 @@ import type { LogEntry } from '../../types';
 import { MultiSelectComponentSelector } from '../../components/function-runner/multi-select-component-selector';
 import { MultiSelectFunctionSelector } from '../../components/function-runner/multi-select-function-selector';
 import { MultiSelectLogTypeSelector } from '../../components/function-runner/multi-select-log-type-selector';
+import type { MultiSelectValue } from '../../types/common';
 import { useComponents } from '../../hooks/useComponents';
 import { discoverFunctions } from '../../utils/api/functionDiscovery';
 import type { ModuleFunction } from '../../utils/api/functionDiscovery';
@@ -114,16 +115,17 @@ export const LogsView: React.FC<LogsViewProps> = ({
   });
 
   // Initialize with all components selected
-  const [selectedComponents, setSelectedComponents] = useState<string[]>([]);
+  const [selectedComponents, setSelectedComponents] = useState<MultiSelectValue>('all');
 
   // Update selected components when componentNames change (e.g., on initial load)
   // Initialize with all components selected by default
   useEffect(() => {
     if (componentNames.length > 0) {
       // Only set if we don't have any selected, or if the component list changed significantly
-      const hasAllComponents = componentNames.every(name => selectedComponents.includes(name));
-      if (selectedComponents.length === 0 || !hasAllComponents) {
-        setSelectedComponents([...componentNames]);
+      const currentSelection = selectedComponents === 'all' ? componentNames : (selectedComponents as string[]);
+      const hasAllComponents = componentNames.every(name => currentSelection.includes(name));
+      if (selectedComponents === 'all' || currentSelection.length === 0 || !hasAllComponents) {
+        setSelectedComponents('all');
       }
     }
   }, [componentNames]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -215,13 +217,15 @@ export const LogsView: React.FC<LogsViewProps> = ({
       }
 
       // Filter by component (if component selector is used)
+      const componentsArray = selectedComponents === 'all' ? componentNames : (selectedComponents as string[]);
+      
       // If no components selected, show all (shouldn't happen, but handle it)
-      if (selectedComponents.length === 0) {
+      if (componentsArray.length === 0) {
         return false; // No components selected means show nothing
       }
 
       // If all components are selected, show all logs
-      if (selectedComponents.length === componentNames.length) {
+      if (selectedComponents === 'all' || componentsArray.length === componentNames.length) {
         // Show all logs
       } else if (log.function?.path) {
         // Check if log belongs to any selected component
@@ -230,7 +234,7 @@ export const LogsView: React.FC<LogsViewProps> = ({
         
         let matchesAnySelected = false;
         
-        for (const selectedComp of selectedComponents) {
+        for (const selectedComp of componentsArray) {
           if (selectedComp === 'app') {
             // If 'app' is selected, match logs without component prefix
             if (!componentMatch) {
@@ -265,7 +269,7 @@ export const LogsView: React.FC<LogsViewProps> = ({
         }
       } else {
         // Log has no function path - only show if 'app' is selected
-        if (!selectedComponents.includes('app')) {
+        if (!componentsArray.includes('app')) {
           return false;
         }
       }
@@ -523,6 +527,9 @@ export const LogsView: React.FC<LogsViewProps> = ({
         className="cp-logs-row"
         style={{
           ...style,
+          height: style.height || 36,
+          maxHeight: style.height || 36,
+          overflow: 'hidden',
           ...(isSelected
             ? {
                 backgroundColor:
@@ -717,13 +724,14 @@ export const LogsView: React.FC<LogsViewProps> = ({
               setSelectedComponents(components);
               setSelectedFunctions([]); // Reset functions when component changes
               // Also update the single component selector for compatibility
-              if (components.length === 1) {
-                setSelectedComponent(components[0]);
-              } else if (components.length === 0) {
+              const componentsArray = components === 'all' ? componentNames : (components as string[]);
+              if (componentsArray.length === 1) {
+                setSelectedComponent(componentsArray[0]);
+              } else if (componentsArray.length === 0) {
                 setSelectedComponent(null);
               } else {
                 // Multiple selected - keep the first one for function selector
-                setSelectedComponent(components[0]);
+                setSelectedComponent(componentsArray[0]);
               }
             }}
             components={componentNames}
@@ -736,7 +744,7 @@ export const LogsView: React.FC<LogsViewProps> = ({
           />
           <MultiSelectLogTypeSelector
             selectedLogTypes={selectedLogTypes}
-            onSelect={setSelectedLogTypes}
+            onSelect={(logTypes: string[] | MultiSelectValue) => setSelectedLogTypes(logTypes as string[])}
           />
         </div>
       </div>
@@ -808,7 +816,7 @@ export const LogsView: React.FC<LogsViewProps> = ({
         ) : filteredLogs.length === 0 ? (
           <div className="cp-logs-empty">
             <div className="cp-logs-empty-text">
-              {searchQuery || (selectedComponents.length < componentNames.length) || selectedFunctions.length > 0 || selectedLogTypes.length < 6
+              {searchQuery || (selectedComponents !== 'all' && (selectedComponents as string[]).length < componentNames.length) || selectedFunctions.length > 0 || selectedLogTypes.length < 6
                 ? 'No logs match your filters'
                 : 'No logs yet'}
             </div>

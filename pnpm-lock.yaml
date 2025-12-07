@@ -447,6 +447,12 @@ importers:
       react-use:
         specifier: ^17.6.0
         version: 17.6.0(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
+      react-virtualized-auto-sizer:
+        specifier: ^1.0.26
+        version: 1.0.26(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
+      react-window-infinite-loader:
+        specifier: ^2.0.0
+        version: 2.0.0(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
       swr:
         specifier: ^2.3.3
         version: 2.3.7(react@19.2.1)
@@ -1958,7 +1964,7 @@ packages:
   '@radix-ui/react-compose-refs@1.1.2':
     resolution: {integrity: sha512-z4eqJvfiNnFMHIIvXP3CY57y2WJs5g2v3X0zm9mEJkrkNv4rDxu+sg9Jh8EkXyeqBkB7SOcboo9dMVqhyrACIg==}
     peerDependencies:
-      '@types/react': '*'
+      '@types/react': 19.0.0
       react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
     peerDependenciesMeta:
       '@types/react':
@@ -5338,6 +5344,18 @@ packages:
     peerDependencies:
       react: '*'
       react-dom: '*'
+
+  react-virtualized-auto-sizer@1.0.26:
+    resolution: {integrity: sha512-CblNyiNVw2o+hsa5/49NH2ogGxZ+t+3aweRvNSq7TVjDIlwk7ir4lencEg5HxHeSzwNarSkNkiu0qJSOXtxm5A==}
+    peerDependencies:
+      react: ^15.3.0 || ^16.0.0-alpha || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^15.3.0 || ^16.0.0-alpha || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  react-window-infinite-loader@2.0.0:
+    resolution: {integrity: sha512-dioOyvShGheEqqFHcPNKCixCOc2evwb2VEt9sitfJfTZ1hir8m6b8W0CNBvcUj+8Y8IeWu4yb88DI7k88aYTQQ==}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0
+      react-dom: ^18.0.0 || ^19.0.0
 
   react-window@1.8.11:
     resolution: {integrity: sha512-+SRbUVT2scadgFSWx+R1P754xHPEqvcfSfVX10QYg6POOz+WNgkN48pS+BtZNIMGiL1HYrSEiCkwsMS15QogEQ==}
@@ -11205,6 +11223,16 @@ snapshots:
       throttle-debounce: 3.0.1
       ts-easing: 0.2.0
       tslib: 2.8.1
+
+  react-virtualized-auto-sizer@1.0.26(react-dom@19.2.1(react@19.2.1))(react@19.2.1):
+    dependencies:
+      react: 19.2.1
+      react-dom: 19.2.1(react@19.2.1)
+
+  react-window-infinite-loader@2.0.0(react-dom@19.2.1(react@19.2.1))(react@19.2.1):
+    dependencies:
+      react: 19.2.1
+      react-dom: 19.2.1(react@19.2.1)
 
   react-window@1.8.11(react-dom@19.2.1(react@19.2.1))(react@19.2.1):
     dependencies:

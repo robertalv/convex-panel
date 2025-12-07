@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Sheet } from '../../../components/shared/sheet';
 import type { FunctionExecutionLog } from '../../../types';
 import { Card } from '../../../components/shared/card';
-import { X, Info, Copy, ChevronUp, ChevronDown, ArrowUp, AlertCircle } from 'lucide-react';
+import { X, Info, Copy, ChevronUp, ChevronDown, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 import { TooltipAction } from '../../../components/shared/tooltip-action';
 
 interface FunctionExecutionDetailSheetProps {
@@ -102,6 +102,8 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
     identityType,
     success,
     error,
+    returnBytes,
+    logLines,
   } = log;
 
   const timestampInfo = formatTimestampWithRelative(startedAt);
@@ -238,6 +240,122 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
         </div>
       )}
 
+      {logLines && logLines.length > 0 && (() => {
+        const nonEmptyLogLines = logLines.filter((line: string) => {
+          if (typeof line === 'string') {
+            return line.trim().length > 0;
+          }
+          return true;
+        });
+
+        if (nonEmptyLogLines.length === 0) return null;
+
+        const allLogContent = nonEmptyLogLines
+          .map((line: string) => {
+            const logContent = typeof line === 'string' 
+              ? line.trim()
+              : JSON.stringify(line, null, 2);
+            return logContent || '';
+          })
+          .filter(content => content.length > 0)
+          .join('\n');
+
+        return (
+          <div
+            style={{
+              margin: '16px',
+              padding: '12px',
+              backgroundColor: 'var(--color-panel-bg-tertiary)',
+              border: '1px solid var(--color-panel-border)',
+              borderRadius: '6px',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '8px',
+                position: 'relative',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: 'var(--color-panel-text)',
+                }}
+              >
+                Log Message
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(allLogContent);
+                }}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--color-panel-text-muted)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '4px',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--color-panel-text)';
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+                title="Copy log message"
+              >
+                <Copy size={14} />
+              </button>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                maxHeight: '400px',
+                overflowY: 'auto',
+              }}
+            >
+              {nonEmptyLogLines.map((line: string, index: number) => {
+                const logContent = typeof line === 'string' 
+                  ? line.trim()
+                  : JSON.stringify(line, null, 2);
+                
+                if (!logContent || logContent.length === 0) return null;
+
+                return (
+                  <div
+                    key={index}
+                    style={{
+                      padding: '8px 12px',
+                      backgroundColor: 'var(--color-panel-bg-tertiary)',
+                      borderRadius: '6px',
+                      fontFamily: 'monospace',
+                      fontSize: '11px',
+                      color: 'var(--color-panel-text-secondary)',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      position: 'relative',
+                    }}
+                  >
+                    {logContent}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       <div
         style={{
           borderBottom: '1px solid var(--color-panel-border)',
@@ -331,7 +449,7 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
                     color: 'var(--color-panel-text-secondary)',
                   }}
                 >
-                  {udfType}
+                  {udfType.charAt(0).toUpperCase() + udfType.slice(1)}
                 </span>
 
                 <span style={{ color: 'var(--color-panel-text-muted)' }}>
@@ -488,6 +606,24 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
                   </div>
                 </div>
               )}
+
+              {returnBytes != null && (
+                <div
+                  style={{
+                    marginTop: 16,
+                    display: 'grid',
+                    gridTemplateColumns: '120px 1fr',
+                    rowGap: 6,
+                  }}
+                >
+                  <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                    Return Size
+                  </span>
+                  <span style={{ color: 'var(--color-panel-text-secondary)' }}>
+                    {formatBytes(returnBytes)} returned
+                  </span>
+                </div>
+              )}
             </div>
           </Card>
         )}
@@ -547,7 +683,7 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
                   Identity
                 </span>
                 <span style={{ color: 'var(--color-panel-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {identityType || 'System'}
+                  {identityType || 'Unknown'}
                   <TooltipAction
                     icon={<Info size={12} style={{ color: 'var(--color-panel-text-muted)' }} />}
                     text="The identity that executed this function"
@@ -558,7 +694,7 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
                   Caller
                 </span>
                 <span style={{ color: 'var(--color-panel-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {caller || 'Cron Job'}
+                  {caller || 'Websocket'}
                   <TooltipAction
                     icon={<Info size={12} style={{ color: 'var(--color-panel-text-muted)' }} />}
                     text="What triggered this function execution"
@@ -591,29 +727,78 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
             >
               This is an outline of the functions called in this request.
             </div>
-            <Card
+            <div
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px',
+                fontFamily: 'monospace',
+                fontSize: '12px',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {hasError ? (
-                  <AlertCircle size={16} style={{ color: 'var(--color-panel-error)' }} />
-                ) : (
-                  <div style={{ width: 16, height: 16 }} />
-                )}
-                <span style={{ fontFamily: 'monospace', color: 'var(--color-panel-text)' }}>
-                  {functionIdentifier}
-                </span>
-                <span style={{ color: 'var(--color-panel-text-muted)' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  height: '28px',
+                  alignItems: 'center',
+                  borderRadius: '6px',
+                  border: '1px solid var(--color-panel-border)',
+                  backgroundColor: 'var(--color-panel-bg-secondary)',
+                }}
+              >
+                <div style={{ display: 'flex', height: '100%', alignItems: 'center' }}></div>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexShrink: 0,
+                    alignItems: 'center',
+                    gap: '4px',
+                    paddingLeft: '8px',
+                  }}
+                >
+                  {hasError ? (
+                    <XCircle
+                      size={16}
+                      style={{ color: 'var(--color-panel-error)' }}
+                      aria-label="Function call failed"
+                    />
+                  ) : (
+                    <CheckCircle2
+                      size={16}
+                      style={{ color: 'var(--color-panel-success)' }}
+                      aria-label="Function call succeeded"
+                    />
+                  )}
+                  <div style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '4px' }}>
+                    {(() => {
+                      const parts = functionIdentifier.split(':');
+                      if (parts.length > 1) {
+                        return (
+                          <>
+                            <span style={{ color: 'var(--color-panel-text-secondary)' }}>
+                              {parts[0]}:
+                            </span>
+                            <span style={{ color: 'var(--color-panel-text)' }}>
+                              {parts.slice(1).join(':')}
+                            </span>
+                          </>
+                        );
+                      }
+                      return (
+                        <span style={{ color: 'var(--color-panel-text)' }}>
+                          {functionIdentifier}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+                <span
+                  style={{
+                    marginLeft: '4px',
+                    color: 'var(--color-panel-text-secondary)',
+                  }}
+                >
                   ({formatDuration(durationMs)})
                 </span>
               </div>
-              <ArrowUp size={16} style={{ color: 'var(--color-panel-text-muted)' }} />
-            </Card>
+            </div>
           </div>
         )}
       </div>

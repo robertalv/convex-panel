@@ -14,7 +14,8 @@ import {
   Clock,
   FileText
 } from 'lucide-react';
-import type { FilterExpression, FilterClause, SortConfig, TableDefinition } from '../../../types';
+import type { FilterExpression, FilterClause, TableDefinition } from '../../../types';
+import type { SortConfig } from '../../../types/common';
 import { operatorOptions, typeOptions } from '../../../utils/constants';
 import { Dropdown } from '../../../components/shared';
 import { SearchableDropdown } from '../../../components/shared/searchable-dropdown';

@@ -95,6 +95,7 @@ export interface FunctionExecutionLog {
   environment?: string;
   identityType: string;
   returnBytes?: number;
+  cachedResult?: boolean;
   raw: FunctionExecutionJson;
 }
 
