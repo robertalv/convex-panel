@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Loader2, ExternalLink, Download, FileText, File } from 'lucide-react';
+import { Copy, Loader2, ExternalLink, Download, FileText, File, X } from 'lucide-react';
 import { copyToClipboard } from '../../../utils/toast';
 import type { FileMetadata } from '../../../utils/api/types';
+import { useSheetSafe } from '../../../contexts/sheet-context';
 
 const ImagePreview: React.FC<{
   url: string;
@@ -109,6 +110,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
   deploymentUrl,
   accessToken,
 }) => {
+  const { closeSheet } = useSheetSafe();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
@@ -230,73 +232,102 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
   return (
     <div
       style={{
-        padding: '20px',
-        minHeight: '100%',
         display: 'flex',
         flexDirection: 'column',
+        height: '100%',
+        backgroundColor: 'var(--color-panel-bg-secondary)',
       }}
     >
       {/* Header */}
       <div
         style={{
-          marginBottom: '16px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'flex-end',
+          justifyContent: 'space-between',
+          padding: '0px 12px',
+          borderBottom: '1px solid var(--color-panel-border)',
+          backgroundColor: 'var(--color-panel-bg-secondary)',
+          height: '50px',
         }}
       >
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: '14px',
+                fontWeight: 500,
+                color: 'var(--color-panel-text)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                lineHeight: '20px',
+              }}
+            >
+              {file.name || `${file.storageId || file._id}`}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
           {previewUrl && (
             <button
+              type="button"
               onClick={handleDownload}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                background: 'none',
+                justifyContent: 'center',
+                width: '24px',
+                height: '24px',
+                padding: 0,
+                backgroundColor: 'transparent',
                 border: 'none',
-                color: 'var(--color-panel-accent)',
+                borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '12px',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                transition: 'background 0.15s',
+                color: 'var(--color-panel-text-muted)',
+                flexShrink: 0,
+                transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+                e.currentTarget.style.color = 'var(--color-panel-text)';
+                e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
               }}
               onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--color-panel-text-muted)';
                 e.currentTarget.style.backgroundColor = 'transparent';
               }}
             >
               <Download size={14} />
-              <span>Download</span>
             </button>
           )}
           <button
+            type="button"
             onClick={() => handleCopy(fileMetadataJson)}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              background: 'none',
+              justifyContent: 'center',
+              width: '24px',
+              height: '24px',
+              padding: 0,
+              backgroundColor: 'transparent',
               border: 'none',
-              color: 'var(--color-panel-accent)',
+              borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '12px',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              transition: 'background 0.15s',
+              color: 'var(--color-panel-text-muted)',
+              flexShrink: 0,
+              transition: 'all 0.2s',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+              e.currentTarget.style.color = 'var(--color-panel-text)';
+              e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
             }}
             onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--color-panel-text-muted)';
               e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
             <Copy size={14} />
-            <span>Copy</span>
           </button>
           {previewUrl && (
             <a
@@ -306,28 +337,57 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                background: 'none',
+                justifyContent: 'center',
+                width: '24px',
+                height: '24px',
+                padding: 0,
+                backgroundColor: 'transparent',
                 border: 'none',
-                color: 'var(--color-panel-accent)',
+                borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '12px',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                transition: 'background 0.15s',
+                color: 'var(--color-panel-text-muted)',
+                flexShrink: 0,
+                transition: 'all 0.2s',
                 textDecoration: 'none',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+                e.currentTarget.style.color = 'var(--color-panel-text)';
+                e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
               }}
               onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--color-panel-text-muted)';
                 e.currentTarget.style.backgroundColor = 'transparent';
               }}
             >
               <ExternalLink size={14} />
-              <span>Open</span>
             </a>
           )}
+          <button
+            type="button"
+            onClick={closeSheet}
+            style={{
+              padding: '6px',
+              color: 'var(--color-panel-text-secondary)',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '4px',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--color-panel-text)';
+              e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <X size={18} />
+          </button>
         </div>
       </div>
 
@@ -337,14 +397,12 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
           flex: 1,
           padding: '16px',
           backgroundColor: 'var(--color-panel-bg)',
-          borderRadius: '8px',
-          border: '1px solid var(--color-panel-border)',
           overflow: 'auto',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          minHeight: '200px',
+          // borderBottom: '1px solid var(--color-panel-border)',
         }}
       >
         {previewError ? (
@@ -359,7 +417,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
             onError={() => setPreviewError('Failed to load image')}
           />
         ) : isText ? (
-          <div style={{ width: '100%', height: '100%' }}>
+          <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
             {isLoadingPreview ? (
               <div
                 style={{
@@ -385,7 +443,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
               <pre
                 style={{
                   margin: 0,
-                  padding: 0,
+                  padding: '16px',
                   color: 'var(--color-panel-text)',
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',
@@ -393,27 +451,34 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
                   fontSize: '13px',
                   lineHeight: '1.6',
                   width: '100%',
+                  backgroundColor: 'var(--color-panel-bg)',
+                  borderRadius: '6px',
+                  // border: '1px solid var(--color-panel-border)',
+                  overflow: 'auto',
+                  flex: 1,
                 }}
               >
                 {fileContent}
               </pre>
             ) : (
-              <div style={{ textAlign: 'center', padding: '20px' }}>
+              <div style={{ textAlign: 'center', padding: '40px 20px' }}>
                 <FileText size={48} style={{ color: 'var(--color-panel-text-muted)', marginBottom: '12px' }} />
-                <div style={{ color: 'var(--color-panel-text-secondary)', fontSize: '14px', marginBottom: '12px' }}>
+                <div style={{ color: 'var(--color-panel-text-secondary)', fontSize: '14px', marginBottom: '16px' }}>
                   Text file detected
                 </div>
                 <button
+                  type="button"
                   onClick={loadTextPreview}
                   style={{
                     padding: '8px 16px',
                     backgroundColor: 'var(--color-panel-accent)',
                     border: 'none',
                     borderRadius: '6px',
-                    color: 'var(--color-panel-text)',
+                    color: 'white',
                     cursor: 'pointer',
                     fontSize: '12px',
                     fontWeight: 500,
+                    transition: 'background 0.15s',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = 'var(--color-panel-accent-hover)';
@@ -428,49 +493,66 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
             )}
           </div>
         ) : (
-          <div style={{ textAlign: 'center', padding: '20px' }}>
+          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
             <File size={48} style={{ color: 'var(--color-panel-text-muted)', marginBottom: '12px' }} />
-            <div style={{ color: 'var(--color-panel-text-secondary)', fontSize: '14px' }}>
+            <div style={{ color: 'var(--color-panel-text-secondary)', fontSize: '14px', marginBottom: '8px' }}>
               Preview not available for this file type
             </div>
-            <div style={{ color: 'var(--color-panel-text-muted)', fontSize: '12px', marginTop: '8px' }}>
+            <div style={{ color: 'var(--color-panel-text-muted)', fontSize: '12px' }}>
               {file.contentType || 'Unknown content type'}
             </div>
           </div>
         )}
       </div>
 
-      {/* Metadata */}
+      {/* Metadata Footer */}
       <div
         style={{
-          marginTop: '16px',
-          paddingTop: '16px',
+          padding: '16px',
           borderTop: '1px solid var(--color-panel-border)',
-          fontSize: '12px',
-          color: 'var(--color-panel-text-muted)',
+          backgroundColor: 'var(--color-panel-bg-secondary)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
         }}
       >
-        <div style={{ marginBottom: '4px' }}>
-          <strong>Storage ID:</strong>{' '}
-          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>{file.storageId || file._id}</span>
-        </div>
-        <div style={{ marginBottom: '4px' }}>
-          <strong>Content Type:</strong> {file.contentType || '-'}
-        </div>
-        <div style={{ marginBottom: '4px' }}>
-          <strong>Size:</strong> {formatFileSize(file.size)}
-        </div>
-        {file._creationTime && (
-          <div style={{ marginBottom: '4px' }}>
-            <strong>Uploaded:</strong> {formatTimestamp(file._creationTime)}
+        <div
+          style={{
+            fontSize: '12px',
+            color: 'var(--color-panel-text-muted)',
+            display: 'grid',
+            gridTemplateColumns: 'auto 1fr',
+            gap: '8px 12px',
+            alignItems: 'baseline',
+          }}
+        >
+          <div style={{ fontWeight: 500, color: 'var(--color-panel-text-secondary)' }}>Storage ID:</div>
+          <div style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--color-panel-text)', wordBreak: 'break-all' }}>
+            {file.storageId || file._id}
           </div>
-        )}
-        {file.sha256 && (
-          <div style={{ marginBottom: '4px' }}>
-            <strong>SHA256:</strong>{' '}
-            <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>{file.sha256}</span>
-          </div>
-        )}
+          
+          <div style={{ fontWeight: 500, color: 'var(--color-panel-text-secondary)' }}>Content Type:</div>
+          <div style={{ color: 'var(--color-panel-text)' }}>{file.contentType || '-'}</div>
+          
+          <div style={{ fontWeight: 500, color: 'var(--color-panel-text-secondary)' }}>Size:</div>
+          <div style={{ color: 'var(--color-panel-text)' }}>{formatFileSize(file.size)}</div>
+          
+          {file._creationTime && (
+            <>
+              <div style={{ fontWeight: 500, color: 'var(--color-panel-text-secondary)' }}>Uploaded:</div>
+              <div style={{ color: 'var(--color-panel-text)' }}>{formatTimestamp(file._creationTime)}</div>
+            </>
+          )}
+          
+          {file.sha256 && (
+            <>
+              <div style={{ fontWeight: 500, color: 'var(--color-panel-text-secondary)' }}>SHA256:</div>
+              <div style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--color-panel-text)', wordBreak: 'break-all' }}>
+                {file.sha256}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

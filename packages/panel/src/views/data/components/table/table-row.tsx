@@ -76,11 +76,6 @@ export const TableRow: React.FC<TableRowProps> = ({
   projectSlug,
 }) => {
   const isSelected = selectedDocumentIds.includes(document._id);
-  const baseRowBackground = 'var(--color-panel-bg-secondary)';
-
-  const rowBackgroundColor = isSelected
-    ? 'var(--cp-data-row-selected-bg)'
-    : baseRowBackground;
 
   const rowBoxShadow = isNewRow
     ? '0 0 0 0 var(--color-panel-highlight-border)'
@@ -95,9 +90,9 @@ export const TableRow: React.FC<TableRowProps> = ({
       style={{
         borderBottom: '1px solid var(--cp-data-row-border)',
         transition: 'background-color 0.35s ease, box-shadow 0.35s ease',
-        backgroundColor: rowBackgroundColor,
         boxShadow: rowBoxShadow,
         animation: rowAnimation,
+        backgroundColor: isSelected ? 'var(--cp-data-row-selected-bg)' : 'var(--color-panel-bg)',
       }}
     >
       <td
@@ -109,7 +104,6 @@ export const TableRow: React.FC<TableRowProps> = ({
           maxWidth: 40,
           position: 'sticky',
           left: 0,
-          backgroundColor: rowBackgroundColor,
           zIndex: 11,
         }}
       >

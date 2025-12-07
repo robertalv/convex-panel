@@ -14,6 +14,7 @@ export interface ConfirmDialogProps {
   cancelLabel?: string;
   variant?: 'danger' | 'warning' | 'info';
   disableCancel?: boolean;
+  container?: HTMLElement | null;
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -26,13 +27,16 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   cancelLabel = 'Cancel',
   variant = 'danger',
   disableCancel = false,
+  container: providedContainer,
 }) => {
-  const { container, ownerDocument } = usePortalEnvironment();
+  const { container: portalContainer, ownerDocument } = usePortalEnvironment();
+  const container = providedContainer ?? portalContainer ?? null;
   const portalTarget = container ?? ownerDocument?.body ?? null;
   const { theme } = useThemeSafe();
-  // Prevent body scroll when dialog is open
+  const isInContainer = Boolean(container);
+  // Prevent body scroll when dialog is open (only if not in container)
   useEffect(() => {
-    if (!portalTarget || !ownerDocument?.body) return;
+    if (!portalTarget || !ownerDocument?.body || isInContainer) return;
     if (isOpen) {
       ownerDocument.body.style.overflow = 'hidden';
     } else {
@@ -41,7 +45,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     return () => {
       ownerDocument.body.style.overflow = '';
     };
-  }, [isOpen, ownerDocument, portalTarget]);
+  }, [isOpen, ownerDocument, portalTarget, isInContainer]);
 
   // Handle escape key
   useEffect(() => {
@@ -76,19 +80,23 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   const colors = variantColors[variant];
 
+  const positionType = isInContainer ? 'absolute' : 'fixed';
+  const zIndexBackdrop = isInContainer ? 1000 : 100000;
+  const zIndexDialog = isInContainer ? 1001 : 100001;
+
   return createPortal(
     <>
       {/* Backdrop */}
       <div
         onClick={onClose}
         style={{
-          position: 'fixed',
+          position: positionType,
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 100000,
+          zIndex: zIndexBackdrop,
           animation: 'fadeIn 0.2s ease-out',
           pointerEvents: 'auto',
         }}
@@ -98,7 +106,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       <div
         className={`cp-theme-${theme}`}
         style={{
-          position: 'fixed',
+          position: positionType,
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
@@ -107,9 +115,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           backgroundColor: 'var(--color-panel-bg-secondary)',
           border: '1px solid var(--color-panel-border)',
           borderRadius: '12px',
-          zIndex: 100001,
+          zIndex: zIndexDialog,
           boxShadow: '0 8px 32px var(--color-panel-shadow)',
-          animation: 'popupSlideIn 0.3s ease-out',
+          animation: isInContainer ? 'popupSlideInContainer 0.3s ease-out' : 'popupSlideIn 0.3s ease-out',
           display: 'flex',
           flexDirection: 'column',
           pointerEvents: 'auto',
@@ -252,6 +260,17 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         }
 
         @keyframes popupSlideIn {
+          from {
+            opacity: 0;
+            transform: translate(-50%, -48%);
+          }
+          to {
+            opacity: 1;
+            transform: translate(-50%, -50%);
+          }
+        }
+
+        @keyframes popupSlideInContainer {
           from {
             opacity: 0;
             transform: translate(-50%, -48%);
