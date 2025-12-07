@@ -18,7 +18,6 @@ const sharedExternal = [
   'react-window',
   'react-helmet',
   'react-hotkeys-hook',
-  'react-use',
   
   // Utilities
   'date-fns',

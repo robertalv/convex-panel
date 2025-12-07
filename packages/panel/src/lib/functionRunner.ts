@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { createGlobalState } from "react-use";
+import { createGlobalState } from "../hooks/createGlobalState";
 import type { ModuleFunction } from "../utils/api/functionDiscovery";
 import type { CustomQuery } from "../types/functions";
 

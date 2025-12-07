@@ -126,7 +126,6 @@
     "react-ace": "^14.0.1",
     "react-helmet": "^6.1.0",
     "react-hotkeys-hook": "^4.6.1",
-    "react-use": "^17.6.0",
     "react-virtualized-auto-sizer": "^1.0.26",
     "react-window-infinite-loader": "^2.0.0",
     "recharts": "^2.15.1",
