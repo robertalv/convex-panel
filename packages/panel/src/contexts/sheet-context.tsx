@@ -26,15 +26,9 @@ export function SheetProvider({ children }: SheetProviderProps) {
   const [sheetContent, setSheetContent] = useState<SheetContent | null>(null);
 
   const openSheet = useCallback((content: SheetContent) => {
-    // If a sheet is already open, close it first before opening the new one
+    // If a sheet is already open, just update the content without closing/reopening
     if (isOpen) {
-      setIsOpen(false);
-      setSheetContent(null);
-      // Small delay to allow close animation to start, then open new sheet
-      setTimeout(() => {
-        setSheetContent(content);
-        setIsOpen(true);
-      }, 100);
+      setSheetContent(content);
     } else {
       // No sheet is open, just open the new one
       setSheetContent(content);

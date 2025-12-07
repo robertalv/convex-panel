@@ -204,7 +204,7 @@ export const TableSidebar: React.FC<TableSidebarProps> = ({
               style={{
                 padding: '6px 12px',
                 margin: '0 8px',
-                borderRadius: '4px',
+                borderRadius: '8px',
                 fontSize: '12px',
                 cursor: 'pointer',
                 display: 'flex',
