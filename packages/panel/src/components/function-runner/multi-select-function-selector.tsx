@@ -1,9 +1,8 @@
 import React, { useMemo, useState, useRef } from 'react';
-import { Code as CodeIcon } from 'lucide-react';
+import { Code as CodeIcon, Check } from 'lucide-react';
 import { isCustomQueryValue } from '../../utils/api/functionDiscovery';
 import type { ModuleFunction } from '../../utils/api/functionDiscovery';
 import type { CustomQuery } from '../../types/functions';
-import { Checkbox } from '../shared/checkbox';
 import {
   DropdownShell,
   DropdownTrigger,
@@ -15,6 +14,7 @@ import {
   useDropdownWidth,
   useFilteredOptions,
 } from '../../hooks/dropdowns';
+import { useThemeSafe } from '../../hooks/useTheme';
 
 interface MultiSelectFunctionSelectorProps {
   selectedFunctions: (ModuleFunction | CustomQuery)[];
@@ -43,6 +43,7 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLDivElement>(null);
+  const { theme } = useThemeSafe();
 
   const filteredFunctions = useMemo(() => {
     const normalizedComponentId = componentId === 'app' ? null : componentId;
@@ -199,22 +200,41 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
 
   return (
     <DropdownShell isOpen={isOpen} onOpenChange={setIsOpen}>
-      <DropdownTrigger
-        ref={triggerRef}
-        isOpen={isOpen}
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        <CodeIcon
-          style={{
-            width: '14px',
-            height: '14px',
-            color: 'var(--color-panel-text-muted)',
-          }}
-        />
-        <span>{displayText}</span>
-      </DropdownTrigger>
+      <div style={{ position: 'relative' }}>
+        <div ref={triggerRef} style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+          <DropdownTrigger
+            isOpen={isOpen}
+            onClick={() => setIsOpen(!isOpen)}
+          >
+            <CodeIcon
+              style={{
+                width: '14px',
+                height: '14px',
+                color: 'var(--color-panel-text-muted)',
+              }}
+            />
+            <span
+              style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {displayText}
+            </span>
+          </DropdownTrigger>
+        </div>
 
-      <DropdownPanel isOpen={isOpen} width={dropdownWidth} maxHeight={350} triggerRef={triggerRef as React.RefObject<HTMLElement>}>
+        <DropdownPanel 
+        isOpen={isOpen} 
+        width={dropdownWidth} 
+        maxHeight={350} 
+        triggerRef={triggerRef as React.RefObject<HTMLElement>}
+        className={`cp-theme-${theme}`}
+        style={{
+          backgroundColor: 'var(--color-panel-bg)',
+        }}
+      >
         <DropdownSearch
           value={searchQuery}
           onChange={setSearchQuery}
@@ -229,11 +249,12 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
             padding: '8px 12px',
             fontSize: '12px',
             color: allSelected || someSelected ? 'var(--color-panel-text)' : 'var(--color-panel-text-secondary)',
-            backgroundColor: allSelected || someSelected ? 'var(--color-panel-active)' : 'transparent',
+            backgroundColor: allSelected || someSelected ? 'var(--color-panel-bg)' : 'transparent',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
+            borderBottom: '1px solid var(--color-panel-border)',
           }}
           onMouseEnter={(e) => {
             if (!allSelected && !someSelected) {
@@ -246,13 +267,18 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
             }
           }}
         >
-          <Checkbox
-            checked={allSelected}
-            indeterminate={someSelected}
-            onChange={handleSelectAll}
-            size={16}
-          />
-          <span style={{ fontWeight: allSelected || someSelected ? 500 : 400 }}>
+          {allSelected ? (
+            <Check
+              size={16}
+              style={{
+                color: 'var(--color-panel-accent)',
+                flexShrink: 0,
+              }}
+            />
+          ) : (
+            <div style={{ width: '16px', flexShrink: 0 }} />
+          )}
+          <span>
             {allSelected ? 'Deselect all' : 'Select all'}
           </span>
         </div>
@@ -273,7 +299,7 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
                     ? 'var(--color-panel-text)'
                     : 'var(--color-panel-text-secondary)',
                   backgroundColor: isSelected
-                    ? 'var(--color-panel-active)'
+                    ? 'var(--color-panel-bg)'
                     : 'transparent',
                   cursor: 'pointer',
                   display: 'flex',
@@ -286,30 +312,54 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
                   if (!isSelected) {
                     e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
                   }
-                  const onlyButton = e.currentTarget.querySelector(
-                    '.only-button'
+                  const onlyButtonWrapper = e.currentTarget.querySelector(
+                    '.only-button-wrapper'
                   ) as HTMLElement;
-                  if (onlyButton) {
-                    onlyButton.style.opacity = '1';
+                  const onlyButtonBackdrop = e.currentTarget.querySelector(
+                    '.only-button-backdrop'
+                  ) as HTMLElement;
+                  if (onlyButtonWrapper) {
+                    onlyButtonWrapper.style.opacity = '1';
+                    onlyButtonWrapper.style.transform = 'translateX(0)';
+                  }
+                  if (onlyButtonBackdrop) {
+                    onlyButtonBackdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, ${
+                      isSelected ? 'var(--color-panel-bg)' : 'var(--color-panel-hover)'
+                    } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`;
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isSelected) {
                     e.currentTarget.style.backgroundColor = 'transparent';
                   }
-                  const onlyButton = e.currentTarget.querySelector(
-                    '.only-button'
+                  const onlyButtonWrapper = e.currentTarget.querySelector(
+                    '.only-button-wrapper'
                   ) as HTMLElement;
-                  if (onlyButton) {
-                    onlyButton.style.opacity = '0';
+                  const onlyButtonBackdrop = e.currentTarget.querySelector(
+                    '.only-button-backdrop'
+                  ) as HTMLElement;
+                  if (onlyButtonWrapper) {
+                    onlyButtonWrapper.style.opacity = '0';
+                    onlyButtonWrapper.style.transform = 'translateX(100%)';
+                  }
+                  if (onlyButtonBackdrop) {
+                    onlyButtonBackdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, ${
+                      isSelected ? 'var(--color-panel-bg)' : 'transparent'
+                    } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`;
                   }
                 }}
               >
-                <Checkbox
-                  checked={isSelected}
-                  onChange={() => handleToggleFunction(option)}
-                  size={16}
-                />
+                {isSelected ? (
+                  <Check
+                    size={16}
+                    style={{
+                      color: 'var(--color-panel-accent)',
+                      flexShrink: 0,
+                    }}
+                  />
+                ) : (
+                  <div style={{ width: '16px', flexShrink: 0 }} />
+                )}
                 <CodeIcon
                   style={{
                     width: '14px',
@@ -355,30 +405,87 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
                     </span>
                   )}
                 </span>
-                <span
-                  onClick={(e) => handleSelectOnly(option, e)}
-                  className="only-button"
+                <div
+                  className="only-button-wrapper"
                   style={{
-                    fontSize: '11px',
-                    color: 'var(--color-panel-text-muted)',
-                    cursor: 'pointer',
-                    padding: '2px 4px',
                     marginLeft: 'auto',
                     flexShrink: 0,
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
                     opacity: 0,
-                    transition: 'opacity 0.15s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = 'var(--color-panel-text)';
-                    e.currentTarget.style.textDecoration = 'underline';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = 'var(--color-panel-text-muted)';
-                    e.currentTarget.style.textDecoration = 'none';
+                    transform: 'translateX(100%)',
+                    transition: 'opacity 0.15s ease, transform 0.15s ease',
+                    pointerEvents: 'none',
                   }}
                 >
-                  only
-                </span>
+                  <div
+                    className="only-button-backdrop"
+                    style={{
+                      position: 'absolute',
+                      right: '-50px',
+                      top: 0,
+                      bottom: 0,
+                      left: '-20px',
+                      background: `linear-gradient(to right, transparent, transparent 10px, ${
+                        isSelected
+                          ? 'var(--color-panel-bg)'
+                          : 'transparent'
+                      } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`,
+                      pointerEvents: 'none',
+                      transition: 'background 0.15s ease',
+                      zIndex: 0,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => handleSelectOnly(option, e)}
+                    className="only-button"
+                    style={{
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--color-panel-text-secondary)',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontFamily: 'inherit',
+                      padding: 0,
+                      lineHeight: 1,
+                      position: 'relative',
+                      zIndex: 1,
+                      pointerEvents: 'auto',
+                      textDecoration: 'none',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = 'var(--color-panel-text)';
+                      e.currentTarget.style.textDecoration = 'underline';
+                      const backdrop = e.currentTarget.parentElement?.querySelector(
+                        '.only-button-backdrop'
+                      ) as HTMLElement;
+                      if (backdrop) {
+                        backdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, ${
+                          isSelected ? 'var(--color-panel-bg)' : 'var(--color-panel-hover)'
+                        } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`;
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
+                      e.currentTarget.style.textDecoration = 'none';
+                      const backdrop = e.currentTarget.parentElement?.querySelector(
+                        '.only-button-backdrop'
+                      ) as HTMLElement;
+                      if (backdrop) {
+                        backdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, ${
+                          isSelected ? 'var(--color-panel-bg)' : 'transparent'
+                        } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`;
+                      }
+                    }}
+                  >
+                    only
+                  </button>
+                </div>
               </div>
             );
           }}
@@ -387,7 +494,8 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
           virtualized={true}
           emptyStateText="No functions found"
         />
-      </DropdownPanel>
+        </DropdownPanel>
+      </div>
     </DropdownShell>
   );
 };

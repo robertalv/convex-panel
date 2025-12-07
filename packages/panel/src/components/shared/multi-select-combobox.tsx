@@ -175,9 +175,9 @@ export function MultiSelectCombobox({
           maxHeight={240}
           triggerRef={triggerRef as React.RefObject<HTMLElement>}
           className={`cp-theme-${theme}`}
-          style={{
-            backgroundColor: 'var(--color-panel-bg)',
-          }}
+          // style={{
+          //   backgroundColor: 'var(--color-panel-bg)',
+          // }}
         >
           {!disableSearch && (
             <DropdownSearch
@@ -201,7 +201,7 @@ export function MultiSelectCombobox({
                   : 'var(--color-panel-text-secondary)',
               backgroundColor:
                 allSelected || someSelected
-                  ? 'var(--color-panel-bg-tertiary)'
+                  ? 'var(--color-panel-bg)'
                   : 'transparent',
               cursor: 'pointer',
               display: 'flex',
@@ -231,11 +231,7 @@ export function MultiSelectCombobox({
             ) : (
               <div style={{ width: '16px', flexShrink: 0 }} />
             )}
-            <span
-              style={{
-                fontWeight: allSelected || someSelected ? 600 : 400,
-              }}
-            >
+            <span>
               {allSelected ? 'Deselect all' : 'Select all'}
             </span>
           </div>
@@ -279,7 +275,7 @@ export function MultiSelectCombobox({
                         ? 'var(--color-panel-text)'
                         : 'var(--color-panel-text-secondary)',
                       backgroundColor: isSelected
-                        ? 'var(--color-panel-bg-tertiary)'
+                        ? 'var(--color-panel-bg)'
                         : 'transparent',
                       cursor: 'pointer',
                       display: 'flex',
@@ -291,22 +287,40 @@ export function MultiSelectCombobox({
                       if (!isSelected) {
                         e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
                       }
-                      const onlyButton = e.currentTarget.querySelector(
-                        '.only-button'
+                      const onlyButtonWrapper = e.currentTarget.querySelector(
+                        '.only-button-wrapper'
                       ) as HTMLElement;
-                      if (onlyButton) {
-                        onlyButton.style.opacity = '1';
+                      const onlyButtonBackdrop = e.currentTarget.querySelector(
+                        '.only-button-backdrop'
+                      ) as HTMLElement;
+                      if (onlyButtonWrapper) {
+                        onlyButtonWrapper.style.opacity = '1';
+                        onlyButtonWrapper.style.transform = 'translateX(0)';
+                      }
+                      if (onlyButtonBackdrop) {
+                        onlyButtonBackdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, ${
+                          isSelected ? 'var(--color-panel-bg)' : 'var(--color-panel-hover)'
+                        } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`;
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isSelected) {
                         e.currentTarget.style.backgroundColor = 'transparent';
                       }
-                      const onlyButton = e.currentTarget.querySelector(
-                        '.only-button'
+                      const onlyButtonWrapper = e.currentTarget.querySelector(
+                        '.only-button-wrapper'
                       ) as HTMLElement;
-                      if (onlyButton) {
-                        onlyButton.style.opacity = '0';
+                      const onlyButtonBackdrop = e.currentTarget.querySelector(
+                        '.only-button-backdrop'
+                      ) as HTMLElement;
+                      if (onlyButtonWrapper) {
+                        onlyButtonWrapper.style.opacity = '0';
+                        onlyButtonWrapper.style.transform = 'translateX(100%)';
+                      }
+                      if (onlyButtonBackdrop) {
+                        onlyButtonBackdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, ${
+                          isSelected ? 'var(--color-panel-bg)' : 'transparent'
+                        } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`;
                       }
                     }}
                   >
@@ -332,30 +346,87 @@ export function MultiSelectCombobox({
                     >
                       {optionLabel}
                     </span>
-                    <span
-                      onClick={(e) => handleSelectOnly(option, e)}
-                      className="only-button"
+                    <div
+                      className="only-button-wrapper"
                       style={{
-                        fontSize: '11px',
-                        color: 'var(--color-panel-text-muted)',
-                        cursor: 'pointer',
-                        padding: '2px 4px',
                         marginLeft: 'auto',
                         flexShrink: 0,
+                        position: 'relative',
+                        display: 'flex',
+                        alignItems: 'center',
                         opacity: 0,
-                        transition: 'opacity 0.15s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.color = 'var(--color-panel-text)';
-                        e.currentTarget.style.textDecoration = 'underline';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.color = 'var(--color-panel-text-muted)';
-                        e.currentTarget.style.textDecoration = 'none';
+                        transform: 'translateX(100%)',
+                        transition: 'opacity 0.15s ease, transform 0.15s ease',
+                        pointerEvents: 'none',
                       }}
                     >
-                      only
-                    </span>
+                      <div
+                        className="only-button-backdrop"
+                        style={{
+                          position: 'absolute',
+                          right: '-50px',
+                          top: 0,
+                          bottom: 0,
+                          left: '-20px',
+                          background: `linear-gradient(to right, transparent, transparent 10px, ${
+                            isSelected
+                              ? 'var(--color-panel-bg)'
+                              : 'transparent'
+                          } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`,
+                          pointerEvents: 'none',
+                          transition: 'background 0.15s ease',
+                          zIndex: 0,
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => handleSelectOnly(option, e)}
+                        className="only-button"
+                        style={{
+                          border: 'none',
+                          backgroundColor: 'transparent',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'var(--color-panel-text-secondary)',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontFamily: 'inherit',
+                          padding: 0,
+                          lineHeight: 1,
+                          position: 'relative',
+                          zIndex: 1,
+                          pointerEvents: 'auto',
+                          textDecoration: 'none',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = 'var(--color-panel-text)';
+                          e.currentTarget.style.textDecoration = 'underline';
+                          const backdrop = e.currentTarget.parentElement?.querySelector(
+                            '.only-button-backdrop'
+                          ) as HTMLElement;
+                          if (backdrop) {
+                            backdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, ${
+                              isSelected ? 'var(--color-panel-bg)' : 'var(--color-panel-hover)'
+                            } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`;
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
+                          e.currentTarget.style.textDecoration = 'none';
+                          const backdrop = e.currentTarget.parentElement?.querySelector(
+                            '.only-button-backdrop'
+                          ) as HTMLElement;
+                          if (backdrop) {
+                            backdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, ${
+                              isSelected ? 'var(--color-panel-bg)' : 'transparent'
+                            } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`;
+                          }
+                        }}
+                      >
+                        only
+                      </button>
+                    </div>
                   </div>
                 );
               })

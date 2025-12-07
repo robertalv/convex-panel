@@ -650,7 +650,7 @@ export const FunctionRunner: React.FC<FunctionRunnerProps> = ({
             {/* Function Selector */}
             <FunctionSelector
               selectedFunction={selectedFunction}
-              onSelect={handleFunctionSelect}
+              onSelect={handleFunctionSelect as (fn: ModuleFunction | CustomQuery | null) => void}
               functions={filteredFunctions}
               componentId={selectedComponent}
             />

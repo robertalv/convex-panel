@@ -22,13 +22,13 @@ export const DropdownTrigger = forwardRef<HTMLDivElement, DropdownTriggerProps>(
         alignItems: 'center',
         justifyContent: 'space-between',
         width: '-webkit-fill-available',
-        height: '32px',
+        height: '30px',
         padding: '0 12px',
         backgroundColor: 'var(--color-panel-bg-tertiary)',
         border: isOpen
           ? '1px solid var(--color-panel-accent)'
           : '1px solid var(--color-panel-border)',
-        borderRadius: '6px',
+        borderRadius: '8px',
         cursor: 'pointer',
         transition: 'color 0.15s',
         color: 'var(--color-panel-text-secondary)',

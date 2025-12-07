@@ -202,7 +202,7 @@ export const TableMenuDropdown: React.FC<TableMenuDropdownProps> = ({
         position: 'fixed',
         left: `${Math.max(0, adjustedPosition.x)}px`,
         top: `${Math.max(0, adjustedPosition.y)}px`,
-        backgroundColor: 'var(--color-panel-bg-tertiary)',
+        backgroundColor: 'var(--color-panel-bg)',
         border: '1px solid var(--color-panel-border)',
         borderRadius: '8px',
         boxShadow: '0 4px 16px var(--color-panel-shadow)',
@@ -227,7 +227,7 @@ export const TableMenuDropdown: React.FC<TableMenuDropdownProps> = ({
             padding: '8px 12px',
             backgroundColor: 'transparent',
             border: 'none',
-            borderRadius: '4px',
+            borderRadius: '8px',
             color: item.destructive
               ? 'var(--color-panel-error)'
               : 'var(--color-panel-text)',

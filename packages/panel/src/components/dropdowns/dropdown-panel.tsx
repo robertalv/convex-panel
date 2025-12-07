@@ -109,7 +109,7 @@ export const DropdownPanel: React.FC<DropdownPanelProps> = ({
         minWidth: '200px',
         backgroundColor: 'var(--color-panel-bg)',
         border: '1px solid var(--color-panel-border)',
-        borderRadius: '6px',
+        borderRadius: '8px',
         boxShadow: '0 4px 16px var(--color-panel-shadow)',
         zIndex: 100000,
         maxHeight: `${maxHeight}px`,

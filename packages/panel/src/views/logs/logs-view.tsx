@@ -97,7 +97,6 @@ export const LogsView: React.FC<LogsViewProps> = ({
   const [selectedLogTypes, setSelectedLogTypes] = useState<string[]>(['success', 'failure', 'debug', 'log / info', 'warn', 'error']);
   const [hoveredLogIndex, setHoveredLogIndex] = useState<number | null>(null);
   const [functions, setFunctions] = useState<ModuleFunction[]>([]);
-  const [isLoadingFunctions, setIsLoadingFunctions] = useState(false);
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const logsContainerRef = React.useRef<HTMLDivElement>(null);
@@ -159,8 +158,6 @@ export const LogsView: React.FC<LogsViewProps> = ({
   useEffect(() => {
     if (!adminClient || useMockData) return;
 
-    setIsLoadingFunctions(true);
-    console.log("Loading functions...", isLoadingFunctions);
     discoverFunctions(adminClient, useMockData)
       .then((funcs) => {
         setFunctions(funcs);
@@ -169,9 +166,6 @@ export const LogsView: React.FC<LogsViewProps> = ({
         console.error('Error fetching functions:', error);
         setFunctions([]);
       })
-      .finally(() => {
-        setIsLoadingFunctions(false);
-      });
   }, [adminClient, useMockData]);
 
   // Auto-select all functions when functions are loaded or component changes
@@ -789,6 +783,7 @@ export const LogsView: React.FC<LogsViewProps> = ({
           <button
             onClick={() => setIsPaused(!isPaused)}
             className={`cp-logs-pause-btn${isPaused ? ' cp-logs-pause-btn-paused' : ''}`}
+            style={{ padding: '8px 16px', borderRadius: '8px' }}
           >
             {isPaused ? (
               <>

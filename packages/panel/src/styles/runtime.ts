@@ -1710,7 +1710,7 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
 .cp-logs-pause-btn {
   padding: 4px 12px;
   font-size: 12px;
-  border-radius: 4px;
+  border-radius: 8px;
   font-weight: 500;
   display: flex;
   align-items: center;

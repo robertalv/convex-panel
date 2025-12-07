@@ -179,20 +179,6 @@ export async function streamUdfExecution(
   let entries = (data.entries || []) as FunctionExecutionJson[];
 
   let newCursor: number | string = cursor;
-  let cursorFromApi = false;
-  
-  if (data.new_cursor !== undefined && data.new_cursor !== null) {
-    newCursor = data.new_cursor;
-    cursorFromApi = true;
-  } else if (data.newCursor !== undefined && data.newCursor !== null) {
-    newCursor = data.newCursor;
-    cursorFromApi = true;
-  } else if (data.cursor !== undefined && data.cursor !== null) {
-    newCursor = data.cursor;
-    cursorFromApi = true;
-  }
-
-  console.log("Is cursor from API?", cursorFromApi);
 
   return {
     entries,

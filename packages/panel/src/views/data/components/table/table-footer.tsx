@@ -58,7 +58,7 @@ export const TableFooter: React.FC<TableFooterProps> = ({
           color: 'var(--color-panel-text-muted)',
           fontSize: '12px',
           border: '1px solid var(--color-panel-border)',
-          borderRadius: '4px',
+          borderRadius: '8px',
           padding: '6px 12px',
           backgroundColor: 'transparent',
           cursor: 'pointer',

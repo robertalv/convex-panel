@@ -609,7 +609,7 @@ export const SchemaSheet: React.FC<SchemaSheetProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              borderRadius: '4px',
+              borderRadius: '8px',
               transition: 'all 0.2s',
             }}
             onMouseEnter={(e) => {

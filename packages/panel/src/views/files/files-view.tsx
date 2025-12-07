@@ -537,7 +537,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
           padding: '6px 12px',
           backgroundColor: 'var(--color-panel-bg-secondary)',
           border: '1px solid var(--color-panel-border)',
-          borderRadius: '6px',
+          borderRadius: '8px',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
@@ -604,6 +604,10 @@ export const FilesView: React.FC<FilesViewProps> = ({
           <button
             onClick={handleUploadClick}
             className="cp-btn"
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+            }}
             onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = 'var(--color-panel-accent-hover)';
             }}

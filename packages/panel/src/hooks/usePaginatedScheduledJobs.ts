@@ -1,8 +1,9 @@
 import { ConvexReactClient } from "convex/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 // import { extractDeploymentName, extractProjectName, fetchDeploymentMetadata } from "../utils/api";
 
 export const SCHEDULED_JOBS_PAGE_SIZE = 50;
+const POLLING_INTERVAL = 2000;
 
 // Current Deployment info 
 // type CurrentDeployment = {
@@ -32,53 +33,89 @@ export const SCHEDULED_JOBS_PAGE_SIZE = 50;
 //   return metadata;
 // };
 
-export function usePaginatedScheduledJobs(udfPath: string | undefined, adminClient: ConvexReactClient) {
+export function usePaginatedScheduledJobs(udfPath: string | undefined, adminClient: ConvexReactClient, isPausedUser: boolean = false) {
   // const { deployment, error: errorDeployment, loading: loadingDeployment } = useCurrentDeployment(adminClient, deploymentUrl)
-  const isPaused = useIsDeploymentPaused(adminClient)
+  const isDeploymentPaused = useIsDeploymentPaused(adminClient)
   const [results, setResults] = useState<any | null>(null);
-  const [, setLoading] = useState(true);
-  const [, setError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const [status, ] = useState<"LoadingFirstPage" | "LoadingMore" | "Exhausted" | "CanLoadMore">("LoadingFirstPage")
+  const [, setRefreshTrigger] = useState(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isStreamingRef = useRef(false);
 
-  // I do not like this method by one bit, I'm thinking of creating a useAsync hook, or focusing on doing this with pure javascript
-  // maybe this https://react.dev/reference/react/useEffectEvent
-  // or realistically https://developer.mozilla.org/en-US/docs/Glossary/IIFE
-  useEffect(() => {
-    let cancelled = false;
-    const fetchResults = async () => {
-      try {
-        setLoading(true);
-        const data = await adminClient.query(
-          "_system/frontend/paginatedScheduledJobs:default" as any,
-          {
-            paginationOpts: {
-              numItems: SCHEDULED_JOBS_PAGE_SIZE,
-              cursor: null,
-            },
-            udfPath: udfPath ?? undefined,
-          }
-        );
-        // if(data)
-        if (!cancelled) {
-          setResults(data);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err as Error);
-          setLoading(false);
-        }
-      }
-    };
-    // we only want to fetch these results when isPaused is false; 
-    if (!isPaused) {
-      fetchResults();
+  const fetchResults = useCallback(async () => {
+    if (!adminClient || isDeploymentPaused || isPausedUser) {
+      return;
     }
 
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await adminClient.query(
+        "_system/frontend/paginatedScheduledJobs:default" as any,
+        {
+          paginationOpts: {
+            numItems: SCHEDULED_JOBS_PAGE_SIZE,
+            cursor: null,
+          },
+          udfPath: udfPath ?? undefined,
+        }
+      );
+      
+      if (signal.aborted) return;
+      
+      setResults(data);
+      setLoading(false);
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        return;
+      }
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error);
+      setLoading(false);
+    }
+  }, [adminClient, isDeploymentPaused, isPausedUser, udfPath]);
+
+  useEffect(() => {
+    if (isPausedUser || isDeploymentPaused || !adminClient) {
+      isStreamingRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      return;
+    }
+
+    isStreamingRef.current = true;
+
+    fetchResults();
+
+    const intervalId = setInterval(() => {
+      if (isStreamingRef.current && !isPausedUser && !isDeploymentPaused) {
+        fetchResults();
+      }
+    }, POLLING_INTERVAL);
+
     return () => {
-      cancelled = true;
+      clearInterval(intervalId);
+      isStreamingRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
-  }, [adminClient, isPaused]);
+  }, [fetchResults, isPausedUser, isDeploymentPaused, adminClient]);
+
+  const refetch = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1);
+    fetchResults();
+  }, [fetchResults]);
 
   // TODO: Grab paused data results
   // const {
@@ -111,10 +148,12 @@ export function usePaginatedScheduledJobs(udfPath: string | undefined, adminClie
   // };
 
   return {
-    jobs: isPaused ? null : results, // this is null for now, gonna switch it soon
+    jobs: isDeploymentPaused ? null : results, // this is null for now, gonna switch it soon
     status: status,
-    isPaused
-
+    isPaused: isDeploymentPaused,
+    isLoading: loading,
+    error: error,
+    refetch,
   }
 }
 

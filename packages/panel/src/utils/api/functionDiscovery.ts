@@ -73,13 +73,10 @@ export async function discoverFunctions(
     
     // Try to fetch functions for each component
     const allApiSpecs: any[] = [...rootApiSpec];
-    let componentQuerySupported = false;
-    let componentQueryAttempts = 0;
 
     // Fetch component functions sequentially to avoid overwhelming the API
     for (const component of componentsList) {
       if (component.id && component.state === 'active' && component.name) {
-        componentQueryAttempts++;
         try {
           const componentFunctions = await fetchFunctionSpec(adminClient, useMockData, component.id);
           
@@ -90,21 +87,18 @@ export async function discoverFunctions(
               fn._fetchedComponentName = component.name;
             });
             allApiSpecs.push(...componentFunctions);
-            componentQuerySupported = true;
           }
         } catch (err: any) {
           const errorMsg = err?.message || String(err);
           
           // If we get an error about unknown argument, the API doesn't support componentId
           if (errorMsg.includes('componentId') || errorMsg.includes('Unknown argument') || errorMsg.includes('Invalid argument')) {
-            componentQuerySupported = false;
             break; // No need to try other components
           }
         }
       }
     }
     
-    console.log("Component query supported:", componentQuerySupported);
     const apiSpec = allApiSpecs;
     const functions: ModuleFunction[] = [];
     

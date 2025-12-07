@@ -3,6 +3,7 @@ import { Copy, Loader2, ExternalLink, Download, FileText, File, X } from 'lucide
 import { copyToClipboard } from '../../../utils/toast';
 import type { FileMetadata } from '../../../utils/api/types';
 import { useSheetSafe } from '../../../contexts/sheet-context';
+import { IconButton } from '../../../components/shared';
 
 const ImagePreview: React.FC<{
   url: string;
@@ -282,7 +283,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
                 padding: 0,
                 backgroundColor: 'transparent',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius: '8px',
                 cursor: 'pointer',
                 color: 'var(--color-panel-text-muted)',
                 flexShrink: 0,
@@ -300,35 +301,11 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
               <Download size={14} />
             </button>
           )}
-          <button
-            type="button"
+          <IconButton
+            icon={Copy}
             onClick={() => handleCopy(fileMetadataJson)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '24px',
-              height: '24px',
-              padding: 0,
-              backgroundColor: 'transparent',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              color: 'var(--color-panel-text-muted)',
-              flexShrink: 0,
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = 'var(--color-panel-text)';
-              e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'var(--color-panel-text-muted)';
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <Copy size={14} />
-          </button>
+            aria-label="Copy file metadata"
+          />
           {previewUrl && (
             <a
               href={previewUrl}
@@ -343,7 +320,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
                 padding: 0,
                 backgroundColor: 'transparent',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius: '8px',
                 cursor: 'pointer',
                 color: 'var(--color-panel-text-muted)',
                 flexShrink: 0,
@@ -366,16 +343,20 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
             type="button"
             onClick={closeSheet}
             style={{
-              padding: '6px',
-              color: 'var(--color-panel-text-secondary)',
-              backgroundColor: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              borderRadius: '4px',
+              width: '24px',
+              height: '24px',
+              padding: 0,
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              color: 'var(--color-panel-text-muted)',
+              flexShrink: 0,
               transition: 'all 0.2s',
+              textDecoration: 'none',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.color = 'var(--color-panel-text)';

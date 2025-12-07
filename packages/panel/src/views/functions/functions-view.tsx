@@ -88,6 +88,7 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
   const editorRef = useRef<any>(null);
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isHighlightingRef = useRef<boolean>(false);
+  const pendingNavigationRef = useRef<string | null>(null);
 
   const [logs, setLogs] = useState<FunctionExecutionLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -107,7 +108,6 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
   const deploymentUrl = deployUrl || baseUrl;
   const adminKey = getAdminKey(adminClient) || accessToken;
 
-  // Save search query to localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if (searchQuery) {
@@ -118,34 +118,70 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
     }
   }, [searchQuery]);
 
-  // Save selected function identifier to localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if (selectedFunction) {
         localStorage.setItem(STORAGE_KEYS.SELECTED_FUNCTION, selectedFunction.identifier);
       } else {
-        localStorage.removeItem(STORAGE_KEYS.SELECTED_FUNCTION);
+        const shouldSwitchToCode = localStorage.getItem('convex-panel-functions-view-code-tab');
+        if (shouldSwitchToCode !== 'true') {
+          localStorage.removeItem(STORAGE_KEYS.SELECTED_FUNCTION);
+        }
       }
     }
   }, [selectedFunction]);
 
-  // Restore selected function from localStorage when functions are loaded
   useEffect(() => {
-    if (groupedFunctions.length > 0 && !selectedFunction && typeof window !== 'undefined') {
+    if (typeof window !== 'undefined') {
       const savedFunctionId = localStorage.getItem(STORAGE_KEYS.SELECTED_FUNCTION);
-      if (savedFunctionId) {
-        // Find the function in the grouped functions
+      const shouldSwitchToCode = localStorage.getItem('convex-panel-functions-view-code-tab');
+      
+      if (savedFunctionId && shouldSwitchToCode === 'true') {
+        pendingNavigationRef.current = savedFunctionId;
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (groupedFunctions.length > 0 && typeof window !== 'undefined') {
+      const pendingIdentifier = pendingNavigationRef.current;
+      if (pendingIdentifier) {
+        let found = false;
         for (const group of groupedFunctions) {
-          const func = group.functions.find(f => f.identifier === savedFunctionId);
-          if (func) {
-            setSelectedFunction(func);
-            const shouldSwitchToCode = localStorage.getItem('convex-panel-functions-view-code-tab');
-            if (shouldSwitchToCode === 'true') {
+          for (const func of group.functions) {
+            if (func.identifier === pendingIdentifier) {
+              setSelectedFunction(func);
               setActiveTab('code');
               setShouldHighlightFunction(true);
               localStorage.removeItem('convex-panel-functions-view-code-tab');
+              pendingNavigationRef.current = null;
+              found = true;
+              break;
             }
-            break;
+          }
+          if (found) break;
+        }
+        if (!found) {
+          pendingNavigationRef.current = null;
+        }
+        return;
+      }
+      
+      const shouldSwitchToCode = localStorage.getItem('convex-panel-functions-view-code-tab');
+      if (!selectedFunction || shouldSwitchToCode === 'true') {
+        const savedFunctionId = localStorage.getItem(STORAGE_KEYS.SELECTED_FUNCTION);
+        if (savedFunctionId) {
+          for (const group of groupedFunctions) {
+            const func = group.functions.find(f => f.identifier === savedFunctionId);
+            if (func) {
+              setSelectedFunction(func);
+              if (shouldSwitchToCode === 'true') {
+                setActiveTab('code');
+                setShouldHighlightFunction(true);
+                localStorage.removeItem('convex-panel-functions-view-code-tab');
+              }
+              break;
+            }
           }
         }
       }
@@ -220,16 +256,13 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
   useEffect(() => {
     const handleNavigateToCode = (event: CustomEvent) => {
       const { functionIdentifier } = event.detail;
-      if (functionIdentifier && groupedFunctions.length > 0) {
-        for (const group of groupedFunctions) {
-          const func = group.functions.find(f => f.identifier === functionIdentifier);
-          if (func) {
-            setSelectedFunction(func);
-            setActiveTab('code');
-            setShouldHighlightFunction(true);
-            localStorage.removeItem('convex-panel-functions-view-code-tab');
-            break;
-          }
+      
+      if (functionIdentifier) {
+        pendingNavigationRef.current = functionIdentifier;
+        
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(STORAGE_KEYS.SELECTED_FUNCTION, functionIdentifier);
+          localStorage.setItem('convex-panel-functions-view-code-tab', 'true');
         }
       }
     };
@@ -238,7 +271,7 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
     return () => {
       window.removeEventListener('convex-panel-navigate-to-functions-code', handleNavigateToCode as EventListener);
     };
-  }, [groupedFunctions]);
+  }, []);
 
   // Expand all paths when grouped functions change
   useEffect(() => {
@@ -839,7 +872,7 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
         {/* Header */}
         <div
           style={{
-            height: '49px',
+            height: '48px',
             borderBottom: '1px solid var(--color-panel-border)',
             display: 'flex',
             alignItems: 'center',
@@ -868,6 +901,8 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
             disabled={!selectedFunction}
             className="cp-run-function-btn"
             style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
               opacity: selectedFunction ? 1 : 0.5,
               cursor: selectedFunction ? 'pointer' : 'not-allowed',
             }}
@@ -1321,10 +1356,10 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                             }
                           }}
                           style={{
-                            height: '24px',
-                            padding: '0 8px',
+                            height: '30px',
+                            padding: '8px 16px',
                             fontSize: '11px',
-                            borderRadius: '4px',
+                            borderRadius: '8px',
                             fontWeight: 500,
                             display: 'flex',
                             alignItems: 'center',

@@ -20,13 +20,16 @@ export const ComponentSelector: React.FC<ComponentSelectorProps> = ({
   components = ['app'],
 }) => {
   const options = useMemo<SearchableDropdownOption<string>[]>(() => {
-    return components
+    // Deduplicate components to avoid duplicate keys
+    const uniqueComponents = Array.from(new Set(components));
+    
+    return uniqueComponents
       .filter(component => {
         const trimmed = component?.trim();
         return trimmed && trimmed !== '' && !isComponentId(trimmed);
       })
       .map(component => ({
-        key: component,
+        key: `component-${component}`,
         label: component,
         value: component,
         icon: <CodeIcon style={{ width: '14px', height: '14px', color: 'var(--color-panel-text-muted)' }} />,
