@@ -254,6 +254,7 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   --color-panel-info: var(--info);
   --color-panel-httpaction: var(--purple-500);
   --color-background-error: #6b211f;
+  --color-background-errorSecondary: #a81515;
   --color-content-error: #ffcac1;
   --color-border-error: #8b3a37;
   --color-panel-hover: rgba(255, 255, 255, 0.06);
@@ -295,6 +296,7 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   --color-panel-info: rgb(7, 191, 232);
   --color-panel-httpaction: rgb(141, 38, 118);
   --color-background-error: #6b211f;
+  --color-background-errorSecondary: #a81515;
   --color-content-error: #ffcac1;
   --color-border-error: #8b3a37;
   --color-panel-hover: rgba(30, 28, 25, 0.06);

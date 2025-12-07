@@ -5,14 +5,14 @@ import {
   Play,
   X,
   Copy,
-  HelpCircle,
   ChevronUp,
   ChevronDown,
-  Clock,
   CheckCircle2,
+  Info,
+  AlertCircle,
+  XCircle,
   ArrowUp,
 } from 'lucide-react';
-import { FixedSizeList } from 'react-window';
 import { useLogs } from '../../hooks/useLogs';
 import type { LogEntry } from '../../types';
 import { MultiSelectComponentSelector } from '../../components/function-runner/multi-select-component-selector';
@@ -25,7 +25,7 @@ import type { ModuleFunction } from '../../utils/api/functionDiscovery';
 import type { CustomQuery } from '../../types/functions';
 import { Sheet } from '../../components/shared/sheet';
 import { TooltipAction } from '../../components/shared/tooltip-action';
-import { copyToClipboard } from '../../utils/toast';
+import { Card } from '../../components/shared/card';
 
 export interface LogsViewProps {
   convexUrl?: string;
@@ -47,19 +47,6 @@ const formatTimestamp = (timestamp: number): string => {
   return `${month} ${day}, ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
 };
 
-const formatRelativeTime = (timestamp: number): string => {
-  const now = Date.now();
-  const diff = now - timestamp;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-  
-  if (days > 0) return `${days} ${days === 1 ? 'day' : 'days'} ago`;
-  if (hours > 0) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
-  if (minutes > 0) return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
-  return 'Just now';
-};
-
 const formatDateTime = (timestamp: number): string => {
   const date = new Date(timestamp);
   return date.toLocaleString([], {
@@ -74,7 +61,7 @@ const formatDateTime = (timestamp: number): string => {
 
 const formatBytes = (bytes?: number): string => {
   if (!bytes || bytes <= 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let value = bytes;
   let unitIndex = 0;
   while (value >= 1024 && unitIndex < units.length - 1) {
@@ -82,6 +69,41 @@ const formatBytes = (bytes?: number): string => {
     unitIndex++;
   }
   return `${value.toFixed(1)} ${units[unitIndex]}`;
+};
+
+const formatDuration = (ms: number) => {
+  if (!ms || ms <= 0) return '0ms';
+  if (ms < 1000) return `${ms.toFixed(0)}ms`;
+  const seconds = ms / 1000;
+  return `${seconds.toFixed(2)}s`;
+};
+
+const formatCompute = (memoryMb?: number, durationMs?: number) => {
+  if (!memoryMb || !durationMs) return '0.0000000 GB-hr (0 MB for 0s)';
+  const memoryGb = memoryMb / 1024;
+  const durationHours = durationMs / (1000 * 60 * 60);
+  const gbHours = memoryGb * durationHours;
+  const durationSeconds = durationMs / 1000;
+  return `${gbHours.toFixed(7)} GB-hr (${memoryMb} MB for ${durationSeconds.toFixed(2)}s)`;
+};
+
+const formatTimestampWithRelative = (timestamp: number) => {
+  if (!timestamp) return { absolute: 'N/A', relative: '' };
+  const date = new Date(timestamp);
+  const month = date.toLocaleString('en-US', { month: 'short' });
+  const day = date.getDate().toString().padStart(2, '0');
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const seconds = date.getSeconds().toString().padStart(2, '0');
+  const milliseconds = date.getMilliseconds().toString().padStart(3, '0');
+  const absolute = `${month} ${day}, ${hours}:${minutes}:${seconds}.${milliseconds}`;
+  
+  const now = Date.now();
+  const diffMs = now - timestamp;
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const relative = diffMinutes === 1 ? '1 minute ago' : `${diffMinutes} minutes ago`;
+  
+  return { absolute, relative };
 };
 
 export const LogsView: React.FC<LogsViewProps> = ({
@@ -95,13 +117,17 @@ export const LogsView: React.FC<LogsViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFunctions, setSelectedFunctions] = useState<(ModuleFunction | CustomQuery)[]>([]);
   const [selectedLogTypes, setSelectedLogTypes] = useState<string[]>(['success', 'failure', 'debug', 'log / info', 'warn', 'error']);
-  const [hoveredLogIndex, setHoveredLogIndex] = useState<number | null>(null);
   const [functions, setFunctions] = useState<ModuleFunction[]>([]);
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [manuallyPaused, setManuallyPaused] = useState(false);
+  const [isScrolledAway, setIsScrolledAway] = useState(false);
   const logsContainerRef = React.useRef<HTMLDivElement>(null);
   const logsListRef = React.useRef<HTMLDivElement>(null);
-  const [listHeight, setListHeight] = useState(600);
+  const scrollStateRef = React.useRef<{ isScrolledAway: boolean; rafId: number | null }>({
+    isScrolledAway: false,
+    rafId: null,
+  });
 
   const {
     componentNames,
@@ -143,7 +169,6 @@ export const LogsView: React.FC<LogsViewProps> = ({
     logs,
     isLoading,
     error,
-    isPaused,
     setIsPaused,
     clearLogs,
   } = useLogs({
@@ -153,6 +178,14 @@ export const LogsView: React.FC<LogsViewProps> = ({
     onError,
     functionId: functionIdForApi,
   });
+
+  // Compute effective pause state
+  const effectiveIsPaused = manuallyPaused || (isScrolledAway && !isSheetOpen);
+
+  // Sync effective pause state to useLogs hook
+  useEffect(() => {
+    setIsPaused(effectiveIsPaused);
+  }, [effectiveIsPaused, setIsPaused]);
 
   // Fetch functions
   useEffect(() => {
@@ -392,52 +425,47 @@ export const LogsView: React.FC<LogsViewProps> = ({
     }
   }, [error, onError]);
 
-  // Calculate list height based on container
-  React.useEffect(() => {
-    const updateHeight = () => {
-      // Calculate available height: container height minus header and search
-      if (logsContainerRef.current) {
-        const containerRect = logsContainerRef.current.getBoundingClientRect();
-        // Approximate header + search + table header heights
-        const headerHeight = 40; // logsViewStyles.header height
-        const searchHeight = 60; // approximate search container height
-        const tableHeaderHeight = 40; // approximate table header height
-        const availableHeight = containerRect.height - headerHeight - searchHeight - tableHeaderHeight;
-        if (availableHeight > 0) {
-          setListHeight(availableHeight);
-        }
-      }
-    };
-
-    // Use a small delay to ensure the DOM is ready
-    const timeoutId = setTimeout(updateHeight, 0);
-    const resizeObserver = new ResizeObserver(updateHeight);
+  // Handle scroll detection for auto-pause
+  const handleLogsScroll = React.useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = e.currentTarget.scrollTop;
+    const scrolledAway = scrollTop > 0;
     
-    // Observe the parent container
-    if (logsContainerRef.current) {
-      resizeObserver.observe(logsContainerRef.current);
+    if (scrollStateRef.current.rafId !== null) {
+      cancelAnimationFrame(scrollStateRef.current.rafId);
     }
+    
+    if (!manuallyPaused && !isSheetOpen && scrollStateRef.current.isScrolledAway !== scrolledAway) {
+      scrollStateRef.current.isScrolledAway = scrolledAway;
+      
+      scrollStateRef.current.rafId = requestAnimationFrame(() => {
+        setIsScrolledAway(scrolledAway);
+        scrollStateRef.current.rafId = null;
+      });
+    }
+  }, [manuallyPaused, isSheetOpen]);
 
-    // Also update when window resizes
-    window.addEventListener('resize', updateHeight);
+  // Reset scroll state when sheet closes and user is at top
+  useEffect(() => {
+    if (!isSheetOpen && logsListRef.current) {
+      const scrollTop = logsListRef.current.scrollTop;
+      if (scrollTop === 0 && !manuallyPaused) {
+        scrollStateRef.current.isScrolledAway = false;
+        setIsScrolledAway(false);
+      }
+    }
+  }, [isSheetOpen, manuallyPaused]);
 
+  // Cleanup RAF on unmount
+  useEffect(() => {
     return () => {
-      clearTimeout(timeoutId);
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', updateHeight);
+      if (scrollStateRef.current.rafId !== null) {
+        cancelAnimationFrame(scrollStateRef.current.rafId);
+      }
     };
   }, []);
 
-  // Memoized log row renderer
-  const LogRow = React.memo(({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
-    const log = data.logs[index];
-    const functions = data.functions;
-    const hoveredLogIndex = data.hoveredLogIndex;
-    const selectedLog = data.selectedLog;
-    const setHoveredLogIndex = data.setHoveredLogIndex;
-    const setSelectedLog = data.setSelectedLog;
-    const setIsSheetOpen = data.setIsSheetOpen;
-
+  // Helper function to process log data for display
+  const processLogData = (log: LogEntry) => {
     const requestId = log.function?.request_id || '';
     const shortId = requestId ? requestId.slice(0, 4) : '-';
     const status = log.status || (log.function?.cached ? 'cached' : undefined);
@@ -445,12 +473,11 @@ export const LogsView: React.FC<LogsViewProps> = ({
       ? `${Math.round(log.execution_time_ms)}ms`
       : undefined;
 
-    // Determine status display - show status code for success, status text for others
-    const statusDisplay = status === 'success' 
-      ? (log.raw?.statusCode || '200')
-      : status === 'error' || status === 'failure'
-      ? 'failure'
-      : status || '';
+    // Check for cached result - check multiple sources
+    const isCached = log.function?.cached || log.raw?.cachedResult || log.raw?.cached || false;
+    
+    // Determine if success (not error/failure)
+    const isSuccess = status === 'success' || (status !== 'error' && status !== 'failure' && !log.error_message);
 
     // Parse function path to get identifier and name
     const functionPath = log.function?.path || log.topic || '';
@@ -487,21 +514,6 @@ export const LogsView: React.FC<LogsViewProps> = ({
       : normalizedType === 'httpaction' || normalizedType === 'http_action'
       ? 'action'
       : undefined;
-
-    // Determine log type color for badge
-    let logTypeBadgeStyle: React.CSSProperties = {
-      backgroundColor: 'var(--color-panel-bg-tertiary)',
-      color: 'var(--color-panel-text-secondary)',
-    };
-    if (functionType === 'query') {
-      logTypeBadgeStyle = { backgroundColor: '#1e3a5f', color: '#60a5fa' };
-    } else if (functionType === 'mutation') {
-      logTypeBadgeStyle = { backgroundColor: '#2d1b4e', color: '#a78bfa' };
-    } else if (functionType === 'action') {
-      logTypeBadgeStyle = { backgroundColor: '#4a2c1a', color: '#fb923c' };
-    } else if (log.topic === 'http') {
-      logTypeBadgeStyle = { backgroundColor: '#3d2f0f', color: '#fbbf24' };
-    }
     
     // Get the icon based on function type
     const logTypeIcon = functionType === 'query' ? 'Q' 
@@ -510,194 +522,24 @@ export const LogsView: React.FC<LogsViewProps> = ({
       : log.topic === 'http' ? 'H'
       : 'L';
 
-    const isHovered = hoveredLogIndex === index;
     const isError = status === 'error' || status === 'failure' || !!log.error_message;
-    const isSelected = selectedLog && 
-      selectedLog.timestamp === log.timestamp && 
-      selectedLog.function?.request_id === log.function?.request_id;
 
-    return (
-      <div
-        className="cp-logs-row"
-        style={{
-          ...style,
-          height: style.height || 36,
-          maxHeight: style.height || 36,
-          overflow: 'hidden',
-          ...(isSelected
-            ? {
-                backgroundColor:
-                  'color-mix(in srgb, var(--color-panel-accent) 15%, transparent)',
-                borderLeft: '3px solid var(--color-panel-accent)',
-              }
-            : isHovered && isError && !isSelected
-            ? {
-                backgroundColor:
-                  'color-mix(in srgb, var(--color-panel-error) 25%, transparent)',
-                color: 'var(--color-panel-error)',
-              }
-            : isHovered && !isError && !isSelected
-            ? {
-                backgroundColor: 'var(--color-panel-hover)',
-              }
-            : {}),
-          ...(isError && !isSelected && !isHovered
-            ? {
-                backgroundColor:
-                  'color-mix(in srgb, var(--color-panel-error) 15%, transparent)',
-                color: 'var(--color-panel-error)',
-              }
-            : {}),
-          cursor: 'pointer',
-        }}
-        onMouseEnter={() => setHoveredLogIndex(index)}
-        onMouseLeave={() => setHoveredLogIndex(null)}
-        onClick={() => {
-          setSelectedLog(log);
-          setIsSheetOpen(true);
-        }}
-      >
-        <div
-          className="cp-logs-timestamp"
-          style={isError ? { color: 'var(--color-panel-error)' } : undefined}
-        >
-          {formatTimestamp(log.timestamp)}
-        </div>
-        <div
-          className="cp-logs-id"
-          style={isError ? { color: 'var(--color-panel-error)' } : undefined}
-        >
-          {shortId !== '-' && (
-            <span
-              className="cp-logs-id-badge"
-              style={
-                isError
-                  ? {
-                      border:
-                        '1px solid color-mix(in srgb, var(--color-panel-error) 50%, transparent)',
-                      backgroundColor:
-                        'color-mix(in srgb, var(--color-panel-error) 10%, transparent)',
-                      color: 'var(--color-panel-error)',
-                    }
-                  : undefined
-              }
-            >
-              {shortId}
-            </span>
-          )}
-        </div>
-        <div className="cp-logs-status">
-          {statusDisplay && (
-            <span style={isError ? { color: 'var(--color-panel-error)' } : status === 'success' ? { color: 'var(--color-panel-success)' } : { color: 'var(--color-panel-text-secondary)' }}>
-              {statusDisplay}
-            </span>
-          )}
-          {executionTime && (
-            <span
-              className="cp-logs-execution-time"
-              style={{
-                ...(isError ? { color: 'var(--color-panel-error)' } : {}),
-                marginLeft: '8px',
-              }}
-            >
-              {executionTime}
-            </span>
-          )}
-        </div>
-        <div
-          className="cp-logs-function"
-          style={isError ? { color: 'var(--color-panel-error)' } : undefined}
-        >
-          <span
-            className="cp-logs-logtype"
-            style={{
-              ...logTypeBadgeStyle,
-              ...(isError
-                ? {
-                    backgroundColor:
-                      'color-mix(in srgb, var(--color-panel-error) 20%, transparent)',
-                    color: 'var(--color-panel-error)',
-                  }
-                : {}),
-              borderRadius: '4px',
-              padding: '2px 6px',
-              fontSize: '11px',
-              fontWeight: 500,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minWidth: '20px',
-            }}
-          >
-            {logTypeIcon}
-          </span>
-          {functionIdentifier && (
-            <span
-              className="cp-logs-function-path"
-              style={{
-                color: isError
-                  ? 'var(--color-panel-error)'
-                  : 'var(--color-panel-text-muted)',
-                marginRight: '4px',
-                fontFamily: 'monospace',
-              }}
-            >
-              {functionIdentifier}:
-            </span>
-          )}
-          <span
-            className="cp-logs-function-path"
-            style={{
-              ...(isError ? { color: 'var(--color-panel-error)' } : {}),
-              fontFamily: 'monospace',
-            }}
-          >
-            {displayFunctionName}
-          </span>
-          {isError && log.error_message && (
-            <span
-              className="cp-logs-message"
-              style={{
-                marginLeft: '8px',
-                color: 'var(--color-panel-error)',
-                fontSize: '11px',
-                opacity: 0.9,
-                fontFamily: 'monospace',
-                flex: 1,
-                minWidth: 0,
-              }}
-            >
-              • {log.error_message}
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  }, (prevProps, nextProps) => {
-    // Custom comparison function for better performance
-    const prevLog = prevProps.data.logs[prevProps.index];
-    const nextLog = nextProps.data.logs[nextProps.index];
-    const prevHovered = prevProps.data.hoveredLogIndex === prevProps.index;
-    const nextHovered = nextProps.data.hoveredLogIndex === nextProps.index;
-    const prevSelected = prevProps.data.selectedLog && 
-      prevProps.data.selectedLog.timestamp === prevLog.timestamp && 
-      prevProps.data.selectedLog.function?.request_id === prevLog.function?.request_id;
-    const nextSelected = nextProps.data.selectedLog && 
-      nextProps.data.selectedLog.timestamp === nextLog.timestamp && 
-      nextProps.data.selectedLog.function?.request_id === nextLog.function?.request_id;
-    
-    return (
-      prevProps.index === nextProps.index &&
-      prevLog.timestamp === nextLog.timestamp &&
-      prevLog.function?.request_id === nextLog.function?.request_id &&
-      prevLog.error_message === nextLog.error_message &&
-      prevHovered === nextHovered &&
-      prevSelected === nextSelected &&
-      prevProps.style === nextProps.style
-    );
-  });
+    // Get log lines from raw data
+    const logLines = log.raw?.logLines || log.raw?.log_lines || log.raw?.log || [];
 
-  LogRow.displayName = 'LogRow';
+    return {
+      shortId,
+      executionTime,
+      functionIdentifier,
+      displayFunctionName,
+      logTypeIcon,
+      isError,
+      status,
+      isSuccess,
+      isCached,
+      logLines,
+    };
+  };
 
   return (
     <div
@@ -705,140 +547,487 @@ export const LogsView: React.FC<LogsViewProps> = ({
       className="cp-logs-container"
       style={{ position: 'relative', overflow: 'hidden' }}
     >
-      {/* Header */}
-      <div className="cp-logs-header">
-        <h2 className="cp-logs-header-title">Logs</h2>
-        <div
-          className="cp-logs-header-buttons"
-          style={{ position: 'relative', zIndex: 1, gap: '8px', marginRight: '-8px' }}
-        >
-          <MultiSelectComponentSelector
-            selectedComponents={selectedComponents}
-            onSelect={(components) => {
-              setSelectedComponents(components);
-              setSelectedFunctions([]); // Reset functions when component changes
-              // Also update the single component selector for compatibility
-              const componentsArray = components === 'all' ? componentNames : (components as string[]);
-              if (componentsArray.length === 1) {
-                setSelectedComponent(componentsArray[0]);
-              } else if (componentsArray.length === 0) {
-                setSelectedComponent(null);
-              } else {
-                // Multiple selected - keep the first one for function selector
-                setSelectedComponent(componentsArray[0]);
-              }
-            }}
-            components={componentNames}
-          />
+      {/* Toolbar */}
+      <div style={{
+        padding: '8px',
+        borderBottom: '1px solid var(--color-panel-border)',
+        display: 'flex',
+        gap: '8px',
+        alignItems: 'center',
+        backgroundColor: 'var(--color-panel-bg)',
+      }}>
+        {componentNames && componentNames.length > 0 && (
+          <div style={{ width: '192px' }}>
+            <MultiSelectComponentSelector
+              selectedComponents={selectedComponents}
+              onSelect={(components) => {
+                setSelectedComponents(components);
+                setSelectedFunctions([]); // Reset functions when component changes
+                // Also update the single component selector for compatibility
+                const componentsArray = components === 'all' ? componentNames : (components as string[]);
+                if (componentsArray.length === 1) {
+                  setSelectedComponent(componentsArray[0]);
+                } else if (componentsArray.length === 0) {
+                  setSelectedComponent(null);
+                } else {
+                  // Multiple selected - keep the first one for function selector
+                  setSelectedComponent(componentsArray[0]);
+                }
+              }}
+              components={componentNames}
+            />
+          </div>
+        )}
+        <div style={{ width: '240px' }}>
           <MultiSelectFunctionSelector
             selectedFunctions={selectedFunctions}
             onSelect={(fns) => setSelectedFunctions(fns)}
             functions={functions}
             componentId={selectedComponent}
           />
+        </div>
+        <div style={{ width: '192px' }}>
           <MultiSelectLogTypeSelector
             selectedLogTypes={selectedLogTypes}
             onSelect={(logTypes: string[] | MultiSelectValue) => setSelectedLogTypes(logTypes as string[])}
           />
         </div>
-      </div>
-
-      {/* Search */}
-      <div className="cp-logs-search">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
-          <div style={{ flex: 1 }}>
-            <div className="cp-search-wrapper">
-              <Search className="cp-search-icon" />
+        <div style={{ flex: 1, maxWidth: '384px' }}>
+          <div style={{ position: 'relative' }}>
+            <Search 
+              size={14} 
+              style={{ 
+                position: 'absolute', 
+                left: '10px', 
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--color-panel-text-muted)',
+                pointerEvents: 'none',
+                zIndex: 1
+              }} 
+            />
             <input
               type="text"
               placeholder="Filter logs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="cp-search-input"
+              style={{
+                width: '100%',
+                backgroundColor: 'var(--color-panel-bg-secondary)',
+                border: '1px solid var(--color-panel-border)',
+                borderRadius: '8px',
+                height: '32px',
+                paddingLeft: '32px',
+                paddingRight: '12px',
+                fontSize: '12px',
+                color: 'var(--color-panel-text)',
+                outline: 'none',
+                transition: 'border-color 0.2s ease, background-color 0.2s ease',
+                boxSizing: 'border-box',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = 'var(--color-panel-accent)';
+                e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'var(--color-panel-border)';
+                e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
+              }}
             />
-            </div>
           </div>
-          <button
-            onClick={clearLogs}
-            className="cp-logs-header-button"
-          >
-            Clear Logs
-          </button>
         </div>
       </div>
 
       {/* Logs Table */}
-      <div className="cp-logs-table" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {/* Header */}
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', overflow: 'visible' }}>
         <div
-          className="cp-logs-table-header"
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginRight: '8px' }}
+          ref={logsListRef}
+          onScroll={handleLogsScroll}
+          style={{
+            flex: 1,
+            overflow: 'auto',
+            backgroundColor: 'var(--color-panel-bg)',
+            fontFamily: 'monospace',
+            fontSize: '12px',
+          }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-            <div className="cp-logs-table-header-cell" style={{ width: '160px' }}>Timestamp</div>
-            <div className="cp-logs-table-header-cell" style={{ width: '80px' }}>ID</div>
-            <div className="cp-logs-table-header-cell" style={{ width: '128px' }}>Status</div>
-            <div className="cp-logs-table-header-cell" style={{ flex: 1 }}>Function</div>
-          </div>
-          <button
-            onClick={() => setIsPaused(!isPaused)}
-            className={`cp-logs-pause-btn${isPaused ? ' cp-logs-pause-btn-paused' : ''}`}
-            style={{ padding: '8px 16px', borderRadius: '8px' }}
+          <div
+            style={{
+              display: 'flex',
+              borderBottom: '1px solid var(--color-panel-border)',
+              color: 'var(--color-panel-text-muted)',
+              padding: '4px 8px',
+              position: 'sticky',
+              top: 0,
+              backgroundColor: 'var(--color-panel-bg)',
+              zIndex: 10,
+              alignItems: 'center',
+            }}
           >
-            {isPaused ? (
-              <>
-                <Play style={{ width: '12px', height: '12px' }} /> Resume
-              </>
-            ) : (
-              <>
-                <Pause style={{ width: '12px', height: '12px' }} /> Pause
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Logs */}
-        {isLoading && logs.length === 0 ? (
-          <div className="cp-logs-loading">
-            <div className="cp-logs-loading-text">Loading logs...</div>
-          </div>
-        ) : error && logs.length === 0 ? (
-          <div className="cp-logs-error">
-            <div className="cp-logs-error-text">
-              Error loading logs: {error instanceof Error ? error.message : String(error)}
+            <div style={{ width: '160px' }}>Timestamp</div>
+            <div style={{ width: '80px' }}>ID</div>
+            <div style={{ width: '128px' }}>Status</div>
+            <div style={{ flex: 1 }}>Function</div>
+            <div style={{ flexShrink: 0, marginLeft: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={clearLogs}
+                style={{
+                  height: '30px',
+                  padding: '8px 16px',
+                  fontSize: '11px',
+                  borderRadius: '8px',
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  border: '1px solid var(--color-panel-border)',
+                  backgroundColor: 'var(--color-panel-bg-tertiary)',
+                  color: 'var(--color-panel-text-secondary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxSizing: 'border-box',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-accent)';
+                  e.currentTarget.style.color = '#fff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+                  e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
+                }}
+              >
+                Clear Logs
+              </button>
+              <button
+                onClick={() => {
+                  const isCurrentlyPaused = manuallyPaused || (isScrolledAway && !isSheetOpen);
+                  if (isCurrentlyPaused) {
+                    logsListRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                    setManuallyPaused(false);
+                  } else {
+                    setManuallyPaused(true);
+                  }
+                }}
+                style={{
+                  height: '30px',
+                  padding: '8px 16px',
+                  fontSize: '11px',
+                  borderRadius: '8px',
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  border: (manuallyPaused || (isScrolledAway && !isSheetOpen)) ? 'none' : '1px solid var(--color-panel-border)',
+                  backgroundColor: (manuallyPaused || (isScrolledAway && !isSheetOpen)) ? 'var(--color-panel-accent)' : 'var(--color-panel-bg-tertiary)',
+                  color: (manuallyPaused || (isScrolledAway && !isSheetOpen)) ? '#fff' : 'var(--color-panel-text-secondary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxSizing: 'border-box',
+                }}
+                onMouseEnter={(e) => {
+                  const isCurrentlyPaused = manuallyPaused || (isScrolledAway && !isSheetOpen);
+                  if (!isCurrentlyPaused) {
+                    e.currentTarget.style.backgroundColor = 'var(--color-panel-accent)';
+                    e.currentTarget.style.color = '#fff';
+                  } else {
+                    e.currentTarget.style.backgroundColor = 'var(--color-panel-accent-hover)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  const isCurrentlyPaused = manuallyPaused || (isScrolledAway && !isSheetOpen);
+                  if (!isCurrentlyPaused) {
+                    e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+                    e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
+                  } else {
+                    e.currentTarget.style.backgroundColor = 'var(--color-panel-accent)';
+                  }
+                }}
+              >
+                {(manuallyPaused || (isScrolledAway && !isSheetOpen)) ? (
+                  <>
+                    <Play size={10} /> Go Live{isScrolledAway && !isSheetOpen ? <ArrowUp size={10} /> : ''}
+                  </>
+                ) : (
+                  <>
+                    <Pause size={10} /> Pause
+                  </>
+                )}
+              </button>
             </div>
           </div>
-        ) : filteredLogs.length === 0 ? (
-          <div className="cp-logs-empty">
-            <div className="cp-logs-empty-text">
+
+          {isLoading && logs.length === 0 ? (
+            <div style={{ color: 'var(--color-panel-text-muted)', fontSize: '14px', padding: '32px', textAlign: 'center' }}>Loading logs...</div>
+          ) : error && logs.length === 0 ? (
+            <div style={{ color: 'var(--color-panel-error)', fontSize: '14px', padding: '32px', textAlign: 'center' }}>
+              Error loading logs: {error instanceof Error ? error.message : String(error)}
+            </div>
+          ) : filteredLogs.length === 0 ? (
+            <div style={{ color: 'var(--color-panel-text-muted)', fontSize: '14px', padding: '32px', textAlign: 'center' }}>
               {searchQuery || (selectedComponents !== 'all' && (selectedComponents as string[]).length < componentNames.length) || selectedFunctions.length > 0 || selectedLogTypes.length < 6
                 ? 'No logs match your filters'
                 : 'No logs yet'}
             </div>
-          </div>
-        ) : (
-          <div ref={logsListRef} style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
-            {listHeight > 0 && (
-              <FixedSizeList
-                height={listHeight}
-                itemCount={filteredLogs.length}
-                itemSize={36}
-                width="100%"
-                itemData={{
-                  logs: filteredLogs,
-                  functions,
-                  hoveredLogIndex,
-                  selectedLog,
-                  setHoveredLogIndex,
-                  setSelectedLog,
-                  setIsSheetOpen,
-                }}
-              >
-                {LogRow}
-              </FixedSizeList>
-            )}
-          </div>
-        )}
+          ) : (
+            filteredLogs.map((log, i) => {
+              const logData = processLogData(log);
+              const isRowSelected = selectedLog && 
+                selectedLog.timestamp === log.timestamp && 
+                selectedLog.function?.request_id === log.function?.request_id;
+
+              return (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    padding: '4px 16px',
+                    cursor: 'pointer',
+                    backgroundColor: logData.isError
+                      ? 'color-mix(in srgb, var(--color-background-error) 50%, transparent)'
+                      : isRowSelected
+                      ? 'var(--color-panel-bg-tertiary)'
+                      : 'transparent',
+                  }}
+                  onClick={() => {
+                    setSelectedLog(log);
+                    setIsSheetOpen(true);
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isRowSelected) {
+                      e.currentTarget.style.backgroundColor = logData.isError
+                        ? 'color-mix(in srgb, var(--color-background-error) 60%, transparent)'
+                        : 'var(--color-panel-hover)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isRowSelected) {
+                      e.currentTarget.style.backgroundColor = logData.isError
+                        ? 'color-mix(in srgb, var(--color-background-error) 50%, transparent)'
+                        : 'transparent';
+                    }
+                  }}
+                >
+                  <div style={{ width: '160px', color: logData.isError ? 'var(--color-panel-error)' : 'var(--color-panel-text-secondary)' }}>
+                    {formatTimestamp(log.timestamp)}
+                  </div>
+                  <div style={{ width: '80px', color: logData.isError ? 'var(--color-panel-error)' : 'var(--color-panel-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {logData.shortId !== '-' && (
+                      <span
+                        style={{
+                          border: logData.isError
+                            ? '1px solid var(--color-background-errorSecondary)'
+                            : '1px solid var(--color-panel-border)',
+                          borderRadius: '6px',
+                          padding: '0 4px',
+                          fontSize: '10px',
+                          backgroundColor: logData.isError
+                            ? 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)'
+                            : 'transparent',
+                          color: logData.isError ? 'var(--color-panel-error)' : 'var(--color-panel-text-muted)',
+                          transition: 'border-color 0.2s ease',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {logData.shortId}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ width: '128px', color: logData.isError ? 'var(--color-panel-error)' : 'var(--color-panel-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {logData.isSuccess ? (
+                      <>
+                        <span style={{ color: 'var(--color-panel-success)' }}>200</span>
+                        {logData.isCached ? (
+                          <span style={{ color: 'var(--color-panel-success)', fontSize: '11px', fontWeight: 500 }}>(cached)</span>
+                        ) : logData.executionTime ? (
+                          <span style={{ color: 'var(--color-panel-text-muted)' }}>{logData.executionTime}</span>
+                        ) : null}
+                      </>
+                    ) : logData.isError ? (
+                      <>
+                        <XCircle size={14} style={{ color: 'var(--color-panel-error)', flexShrink: 0 }} />
+                        <span style={{ color: 'var(--color-panel-error)' }}>failure</span>
+                        {logData.executionTime && (
+                          <span style={{ color: 'var(--color-panel-text-muted)' }}>{logData.executionTime}</span>
+                        )}
+                      </>
+                    ) : (
+                      <span style={{ color: 'var(--color-panel-text-muted)' }}>-</span>
+                    )}
+                  </div>
+                  <div style={{ flex: 1, color: logData.isError ? 'var(--color-panel-error)' : 'var(--color-panel-text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, overflow: 'hidden' }}>
+                    <span
+                      style={{
+                        borderRadius: '6px',
+                        padding: '0px',
+                        fontSize: '10px',
+                        backgroundColor: logData.isError
+                          ? 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)'
+                          : 'var(--color-panel-bg-tertiary)',
+                        fontWeight: 700,
+                        textAlign: 'center',
+                        minWidth: '16px',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {logData.logTypeIcon}
+                    </span>
+                    {logData.functionIdentifier && (
+                      <span
+                        style={{
+                          color: logData.isError
+                            ? 'var(--color-panel-error)'
+                            : 'var(--color-panel-text-muted)',
+                          marginRight: '4px',
+                          fontFamily: 'monospace',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {logData.functionIdentifier}:
+                      </span>
+                    )}
+                    <span
+                      style={{
+                        color: 'var(--color-panel-text-muted)',
+                        flexShrink: 0,
+                        marginRight: '8px',
+                      }}
+                      title={logData.functionIdentifier ? `${logData.functionIdentifier}:${logData.displayFunctionName}` : logData.displayFunctionName}
+                    >
+                      {logData.displayFunctionName}
+                    </span>
+                    {(() => {
+                      if (!logData.logLines || !Array.isArray(logData.logLines) || logData.logLines.length === 0) {
+                        return null;
+                      }
+                      
+                      const nonEmptyLogLines = logData.logLines.filter((line: any) => {
+                        if (line === null || line === undefined) {
+                          return false;
+                        }
+                        
+                        if (typeof line === 'string') {
+                          const trimmed = line.trim();
+                          const isValid = trimmed.length > 0 && 
+                                 trimmed !== '{}' && 
+                                 trimmed !== '[]' &&
+                                 trimmed !== 'null' &&
+                                 trimmed !== 'undefined';
+                          return isValid;
+                        }
+                        
+                        try {
+                          const stringified = JSON.stringify(line);
+                          const trimmed = stringified.trim();
+                          const isValid = trimmed.length > 2 && 
+                                 trimmed !== '{}' && 
+                                 trimmed !== '[]' &&
+                                 trimmed !== 'null' &&
+                                 trimmed !== 'undefined';
+                          return isValid;
+                        } catch (e) {
+                          return false;
+                        }
+                      });
+                      
+                      if (nonEmptyLogLines.length === 0) {
+                        return null;
+                      }
+                      
+                      const firstLogLine = nonEmptyLogLines[0];
+                      let logPreview: string;
+                      
+                      if (firstLogLine && typeof firstLogLine === 'object' && !Array.isArray(firstLogLine) && firstLogLine.messages && Array.isArray(firstLogLine.messages) && firstLogLine.messages.length > 0) {
+                        const firstMessage = firstLogLine.messages[0];
+                        if (typeof firstMessage === 'string') {
+                          try {
+                            const parsed = JSON.parse(firstMessage);
+                            logPreview = JSON.stringify(parsed);
+                          } catch {
+                            logPreview = firstMessage.trim();
+                          }
+                        } else {
+                          logPreview = typeof firstMessage === 'string' ? firstMessage.trim() : JSON.stringify(firstMessage);
+                        }
+                      } else if (typeof firstLogLine === 'string') {
+                        logPreview = firstLogLine.trim();
+                      } else {
+                        try {
+                          logPreview = JSON.stringify(firstLogLine);
+                        } catch (e) {
+                          return null;
+                        }
+                      }
+                      
+                      if (!logPreview || logPreview.length === 0 || 
+                          logPreview === '{}' || logPreview === '[]' ||
+                          logPreview === 'null' || logPreview === 'undefined') {
+                        return null;
+                      }
+                      
+                      return (
+                        <span
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            flex: 1,
+                            minWidth: 0,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <span
+                            style={{
+                              borderRadius: '4px',
+                              padding: '2px 4px',
+                              fontSize: '10px',
+                              backgroundColor: 'var(--color-panel-bg-secondary)',
+                              color: 'var(--color-panel-text-secondary)',
+                              fontFamily: 'monospace',
+                              flexShrink: 0,
+                            }}
+                          >
+                            log
+                          </span>
+                          <span
+                            style={{
+                              color: 'var(--color-panel-text-muted)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              flex: 1,
+                              minWidth: 0,
+                            }}
+                            title={logPreview}
+                          >
+                            {logPreview}
+                          </span>
+                        </span>
+                      );
+                    })()}
+                    {log.error_message && (
+                      <span
+                        style={{
+                          color: 'var(--color-panel-error)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                          minWidth: 0,
+                          marginLeft: '8px',
+                        }}
+                        title={log.error_message}
+                      >
+                        {log.error_message}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* Log Detail Sheet */}
@@ -851,7 +1040,10 @@ export const LogsView: React.FC<LogsViewProps> = ({
         width="480px"
         container={logsContainerRef.current}
       >
-        {selectedLog && <LogDetailContent log={selectedLog} />}
+        {selectedLog && <LogDetailContent log={selectedLog} onClose={() => {
+          setIsSheetOpen(false);
+          setSelectedLog(null);
+        }} />}
       </Sheet>
     </div>
   );
@@ -859,383 +1051,763 @@ export const LogsView: React.FC<LogsViewProps> = ({
 
 type DetailTab = 'execution' | 'request' | 'functions';
 
-const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
+// Helper function to extract and format log content
+const formatLogLine = (line: any): string => {
+  // If line is an object with a messages array, extract and parse the messages
+  if (line && typeof line === 'object' && !Array.isArray(line) && line.messages && Array.isArray(line.messages)) {
+    const formattedMessages = line.messages
+      .map((msg: any) => {
+        if (typeof msg === 'string') {
+          try {
+            // Try to parse the message as JSON
+            const parsed = JSON.parse(msg);
+            return JSON.stringify(parsed, null, 2);
+          } catch {
+            // If parsing fails, return the original string trimmed
+            return msg.trim();
+          }
+        }
+        return typeof msg === 'string' ? msg.trim() : JSON.stringify(msg, null, 2);
+      })
+      .filter((content: string) => content.length > 0);
+    
+    return formattedMessages.join('\n\n');
+  }
+  
+  // Default behavior: string or JSON.stringify
+  if (typeof line === 'string') {
+    return line.trim();
+  }
+  return JSON.stringify(line, null, 2);
+};
+
+const LogDetailContent: React.FC<{ log: LogEntry; onClose: () => void }> = ({ log, onClose }) => {
   const [activeTab, setActiveTab] = useState<DetailTab>('execution');
-  const [isResourcesExpanded, setIsResourcesExpanded] = useState(true);
-  const status = log.status || (log.function?.cached ? 'cached' : undefined);
-  const isError = status === 'error' || status === 'failure' || !!log.error_message;
-  const executionId = log.function?.request_id || log.raw?.execution_id || 'N/A';
-  const functionPath = log.function?.path || log.topic || 'Unknown';
-  const functionType = log.function?.type || 'Unknown';
-  const startedAt = log.timestamp;
-  const completedAt = log.timestamp + (log.execution_time_ms || 0);
-  const duration = log.execution_time_ms || 0;
-  const usage = log.usage || log.raw?.usage_stats;
+  const [resourcesExpanded, setResourcesExpanded] = useState(true);
+
+  // Extract all fields matching FunctionExecutionLog interface
+  const executionId = log.function?.request_id || log.raw?.execution_id || log.raw?.request_id || 'N/A';
+  const functionIdentifier = log.function?.path || log.topic || log.raw?.identifier || 'Unknown';
+  const udfType = (log.function?.type || log.raw?.udf_type || log.raw?.udfType || 'Unknown').toLowerCase();
+  const startedAt = log.timestamp || log.raw?.timestamp || Date.now();
+  const completedAt = log.timestamp + (log.execution_time_ms || log.raw?.execution_time || 0);
+  const durationMs = log.execution_time_ms || log.raw?.execution_time || 0;
   const environment = log.raw?.environment || 'Convex';
-  const returnBytes = log.raw?.return_bytes || log.raw?.returnBytes;
-  const identity = log.raw?.identity || 'Admin';
+  
+  // Extract usage stats - check multiple sources
+  const usageStats = log.usage || log.raw?.usage_stats || {
+    database_read_bytes: log.raw?.database_read_bytes || 0,
+    database_write_bytes: log.raw?.database_write_bytes || 0,
+    database_read_documents: log.raw?.database_read_documents || 0,
+    storage_read_bytes: log.raw?.storage_read_bytes || log.raw?.file_storage_read_bytes || 0,
+    storage_write_bytes: log.raw?.storage_write_bytes || log.raw?.file_storage_write_bytes || 0,
+    vector_index_read_bytes: log.raw?.vector_index_read_bytes || log.raw?.vector_storage_read_bytes || 0,
+    vector_index_write_bytes: log.raw?.vector_index_write_bytes || log.raw?.vector_storage_write_bytes || 0,
+    memory_used_mb: log.raw?.memory_used_mb || log.raw?.action_memory_used_mb || 0,
+  };
+  
+  const requestId = log.function?.request_id || log.raw?.request_id || 'N/A';
   const caller = log.raw?.caller || 'HTTP API';
-  
-  // Calculate compute (GB-hr and MB for duration)
-  const computeMemoryMB = usage?.action_memory_used_mb || log.raw?.usage_stats?.memory_used_mb || 0;
-  const durationSeconds = duration / 1000;
-  const computeGBHr = (computeMemoryMB * durationSeconds) / (1024 * 3600);
-  const computeDisplay = `${computeGBHr.toFixed(7)} GB-hr (${computeMemoryMB} MB for ${durationSeconds.toFixed(2)}s)`;
-  
-  // Get document count
-  const documentCount = usage?.database_read_documents || log.raw?.usage_stats?.database_read_documents || 0;
-  
-  // Get functions called (nested function calls)
-  // If no nested functions, show the current function itself
-  const functionsCalled = log.raw?.functions_called || log.raw?.functionsCalled || 
-    (log.function?.path ? [{
-      path: log.function.path,
-      execution_time_ms: duration,
-      success: status === 'success' || status !== 'error',
-      error: log.error_message
-    }] : []);
+  const identityType = log.raw?.identity || log.raw?.identity_type || 'Admin';
+  const success = (log.status === 'success' || (log.status !== 'error' && log.status !== 'failure' && !log.error_message));
+  const error = log.error_message || log.raw?.error || undefined;
+  const returnBytes = log.raw?.return_bytes || log.raw?.returnBytes || log.raw?.return_bytes;
+  const logLines = log.raw?.log_lines || log.raw?.logLines || log.raw?.log || [];
+
+  const timestampInfo = formatTimestampWithRelative(startedAt);
+  const hasError = !success || error;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header with timestamp and status */}
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-panel-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <div>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-panel-text)' }}>
-              {formatTimestamp(log.timestamp)} ({formatRelativeTime(log.timestamp)})
-            </div>
-            <div style={{ fontSize: '12px', color: isError ? 'var(--color-panel-error)' : 'var(--color-panel-success)', marginTop: '4px' }}>
-              {status || 'unknown'}
-            </div>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0px 12px',
+          borderBottom: '1px solid var(--color-panel-border)',
+          backgroundColor: 'var(--color-panel-bg-secondary)',
+          height: '40px',
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+            <span style={{ fontSize: '12px', color: 'var(--color-panel-text-secondary)' }}>
+              {timestampInfo.absolute}
+            </span>
+            <span style={{ fontSize: '12px', color: 'var(--color-panel-text-muted)' }}>
+              ({timestampInfo.relative})
+            </span>
+            {hasError && (
+              <span
+                style={{
+                  fontSize: '12px',
+                  color: 'var(--color-panel-error)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <AlertCircle size={14} />
+                failure
+              </span>
+            )}
           </div>
         </div>
+
+        {/* Close Button */}
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            padding: '6px',
+            color: 'var(--color-panel-text-secondary)',
+            backgroundColor: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '4px',
+            transition: 'all 0.2s',
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--color-panel-text)';
+            e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+        >
+          <X size={18} />
+        </button>
       </div>
 
-      {/* Error Message Section */}
-      {isError && log.error_message && (
-        <div style={{
-          margin: '16px 20px',
-          padding: '12px',
-          backgroundColor: 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)',
-          border: '1px solid color-mix(in srgb, var(--color-panel-error) 30%, transparent)',
-          borderRadius: '4px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-panel-error)' }}>Error</div>
-            <button
-              onClick={() => copyToClipboard(log.error_message || '')}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '4px',
-                color: 'var(--color-panel-error)',
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              <Copy size={14} />
-            </button>
+      {hasError && error && (
+        <div
+          style={{
+            margin: '16px',
+            padding: '12px',
+            backgroundColor: 'var(--color-background-error)',
+            border: '1px solid var(--color-border-error)',
+            borderRadius: '6px',
+            position: 'relative',
+            maxHeight: '200px',
+            overflowY: 'auto',
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'var(--color-content-error)',
+              marginBottom: '8px',
+            }}
+          >
+            Error
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-panel-error)', fontFamily: 'monospace' }}>
-            {log.error_message}
+          <div
+            style={{
+              fontSize: '12px',
+              color: 'var(--color-content-error)',
+              fontFamily: 'monospace',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}
+          >
+            {error}
           </div>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(error);
+            }}
+            style={{
+              position: 'absolute',
+              top: '8px',
+              right: '8px',
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--color-content-error)',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            title="Copy error"
+          >
+            <Copy size={14} />
+          </button>
         </div>
       )}
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--color-panel-border)' }}>
+      {logLines && logLines.length > 0 && (() => {
+        const nonEmptyLogLines = logLines.filter((line: any) => {
+          if (typeof line === 'string') {
+            return line.trim().length > 0;
+          }
+          return true;
+        });
+
+        if (nonEmptyLogLines.length === 0) return null;
+
+        const allLogContent = nonEmptyLogLines
+          .map((line: any): string => {
+            const logContent = formatLogLine(line);
+            return logContent || '';
+          })
+          .filter((content: string) => content.length > 0)
+          .join('\n\n');
+
+        return (
+          <div
+            style={{
+              margin: '16px',
+              padding: '12px',
+              backgroundColor: 'var(--color-panel-bg-tertiary)',
+              border: '1px solid var(--color-panel-border)',
+              borderRadius: '6px',
+              flexShrink: 0,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '8px',
+                position: 'relative',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: 'var(--color-panel-text)',
+                }}
+              >
+                Log Message
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(allLogContent);
+                }}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--color-panel-text-muted)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '4px',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--color-panel-text)';
+                  e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+                title="Copy log message"
+              >
+                <Copy size={14} />
+              </button>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                maxHeight: '200px',
+                overflowY: 'auto',
+              }}
+            >
+              {nonEmptyLogLines.map((line: any, index: number) => {
+                const logContent = formatLogLine(line);
+                
+                if (!logContent || logContent.length === 0) return null;
+
+                return (
+                  <div
+                    key={index}
+                    style={{
+                      padding: '8px 12px',
+                      backgroundColor: 'var(--color-panel-bg-tertiary)',
+                      borderRadius: '6px',
+                      fontFamily: 'monospace',
+                      fontSize: '11px',
+                      color: 'var(--color-panel-text-secondary)',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      position: 'relative',
+                    }}
+                  >
+                    {logContent}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      <div
+        style={{
+          borderBottom: '1px solid var(--color-panel-border)',
+          display: 'flex',
+          flexShrink: 0,
+        }}
+      >
         {(['execution', 'request', 'functions'] as DetailTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             style={{
               padding: '10px 16px',
-              fontSize: '12px',
-              fontWeight: activeTab === tab ? 600 : 500,
+              fontSize: 12,
+              fontWeight: 500,
               border: 'none',
-              borderBottom: activeTab === tab ? '2px solid var(--color-panel-accent)' : '2px solid transparent',
-              backgroundColor: activeTab === tab 
-                ? 'linear-gradient(to bottom, rgba(255, 255, 255, 0.05), transparent)' 
-                : 'transparent',
-              color: activeTab === tab ? 'var(--color-panel-text)' : 'var(--color-panel-text-muted)',
+              borderBottom:
+                activeTab === tab
+                  ? '2px solid var(--color-panel-accent)'
+                  : '2px solid transparent',
+              backgroundColor: 'transparent',
+              color:
+                activeTab === tab
+                  ? 'var(--color-panel-text)'
+                  : 'var(--color-panel-text-muted)',
               cursor: 'pointer',
-              textTransform: 'capitalize',
-              position: 'relative',
             }}
           >
-            {tab === 'functions' ? 'Functions Called' : tab}
+            {tab === 'execution'
+              ? 'Execution'
+              : tab === 'request'
+              ? 'Request'
+              : 'Functions Called'}
           </button>
         ))}
       </div>
 
-      {/* Tab Content */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
+      <div
+        style={{
+          flex: 1,
+          overflow: 'auto',
+          padding: 16,
+        }}
+      >
         {activeTab === 'execution' && (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <DetailRow label="Execution ID" value={executionId} />
-            <DetailRow label="Function" value={functionPath} />
-            <DetailRow label="Type" value={functionType} />
-            <DetailRow label="Started at" value={formatDateTime(startedAt)} />
-            <DetailRow label="Completed at" value={formatDateTime(completedAt)} />
-            <DetailRow label="Duration" value={`${duration}ms`} />
-            <DetailRow 
-              label="Environment" 
-              value={environment} 
-              withHelp 
-              helpText="This function was executed in Convex's isolated environment."
-            />
-            
-            {/* Resources Used */}
-            <div style={{ borderTop: '1px solid var(--color-panel-border)', marginTop: '8px' }}>
-              <button
-                onClick={() => setIsResourcesExpanded(!isResourcesExpanded)}
+          <Card>
+            <div style={{ fontSize: 12 }}>
+              <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '12px 20px',
-                  marginBottom: isResourcesExpanded ? '0' : '0',
-                  color: 'var(--color-panel-text)',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  width: '100%',
-                  textAlign: 'left',
+                  marginBottom: 12,
+                  display: 'grid',
+                  gridTemplateColumns: '120px 1fr',
+                  rowGap: 6,
                 }}
               >
-                <Clock size={14} style={{ color: 'var(--color-panel-text-muted)' }} />
-                Resources Used
-                {isResourcesExpanded ? (
-                  <ChevronUp size={14} style={{ color: 'var(--color-panel-text-muted)', marginLeft: 'auto' }} />
-                ) : (
-                  <ChevronDown size={14} style={{ color: 'var(--color-panel-text-muted)', marginLeft: 'auto' }} />
-                )}
-              </button>
-              {isResourcesExpanded && (
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <DetailRow 
-                    label="Compute" 
-                    value={computeDisplay} 
-                    withHelp 
-                    small 
-                    helpText="Only compute from Actions incur additional cost. Query/Mutation compute are included."
+                <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                  Execution ID
+                </span>
+                <span
+                  style={{
+                    fontFamily: 'monospace',
+                    color: 'var(--color-panel-text-secondary)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: 200,
+                    display: 'inline-block',
+                  }}
+                  title={executionId}
+                >
+                  {executionId}
+                </span>
+
+                <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                  Function
+                </span>
+                <span
+                  style={{
+                    fontFamily: 'monospace',
+                    color: 'var(--color-panel-text-secondary)',
+                  }}
+                >
+                  {functionIdentifier}
+                </span>
+
+                <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                  Type
+                </span>
+                <span
+                  style={{
+                    textTransform: 'capitalize',
+                    color: 'var(--color-panel-text-secondary)',
+                  }}
+                >
+                  {udfType.charAt(0).toUpperCase() + udfType.slice(1)}
+                </span>
+
+                <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                  Started at
+                </span>
+                <span style={{ color: 'var(--color-panel-text-secondary)' }}>
+                  {formatDateTime(startedAt)}
+                </span>
+
+                <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                  Completed at
+                </span>
+                <span style={{ color: 'var(--color-panel-text-secondary)' }}>
+                  {formatDateTime(completedAt)}
+                </span>
+
+                <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                  Duration
+                </span>
+                <span style={{ color: 'var(--color-panel-text-secondary)' }}>
+                  {formatDuration(durationMs)}
+                </span>
+
+                <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                  Environment
+                </span>
+                <span style={{ color: 'var(--color-panel-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {environment || 'Convex'}
+                  <TooltipAction
+                    icon={<Info size={12} style={{ color: 'var(--color-panel-text-muted)' }} />}
+                    text="The runtime environment where this function executed"
                   />
-                  <DetailRow 
-                    label="DB Bandwidth" 
-                    value={
-                      <span>
-                        Accessed <strong>{documentCount}</strong> {documentCount === 1 ? 'document' : 'documents'}, <strong>{formatBytes(usage?.database_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.database_write_bytes || 0)}</strong> written
-                      </span>
-                    }
-                    small
-                  />
-                  <DetailRow 
-                    label="File Bandwidth" 
-                    value={
-                      <span>
-                        <strong>{formatBytes(usage?.file_storage_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.file_storage_write_bytes || 0)}</strong> written
-                      </span>
-                    }
-                    small
-                  />
-                  <DetailRow 
-                    label="Vector Bandwidth" 
-                    value={
-                      <span>
-                        <strong>{formatBytes(usage?.vector_storage_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.vector_storage_write_bytes || 0)}</strong> written
-                      </span>
-                    }
-                    small
-                    noBorder={returnBytes === undefined}
-                  />
-                  <DetailRow 
-                    label="Return Size" 
-                    value={<span><strong>{formatBytes(returnBytes || 0)}</strong> returned</span>} 
-                    withHelp 
-                    small 
-                    noBorder 
-                    helpText="Bandwidth from sending the return value of a function call to the user does not incur costs."
-                  />
+                </span>
+              </div>
+
+              <div
+                style={{
+                  marginTop: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 8,
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 600,
+                    color: 'var(--color-panel-text)',
+                  }}
+                >
+                  Resources Used
+                </div>
+                <button
+                  onClick={() => setResourcesExpanded(!resourcesExpanded)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--color-panel-text-muted)',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  {resourcesExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+              </div>
+
+              {resourcesExpanded && (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    fontSize: 12,
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        color: 'var(--color-panel-text-muted)',
+                        marginBottom: 2,
+                      }}
+                    >
+                      Compute
+                    </div>
+                    <div
+                      style={{
+                        color: 'var(--color-panel-text-secondary)',
+                      }}
+                    >
+                      {formatCompute(usageStats?.memory_used_mb, durationMs)}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div
+                      style={{
+                        color: 'var(--color-panel-text-muted)',
+                        marginBottom: 2,
+                      }}
+                    >
+                      DB Bandwidth
+                    </div>
+                    <div
+                      style={{
+                        color: 'var(--color-panel-text-secondary)',
+                      }}
+                    >
+                      {`Accessed ${usageStats?.database_read_documents || 0} documents, ${formatBytes(
+                        usageStats?.database_read_bytes,
+                      )} read, ${formatBytes(usageStats?.database_write_bytes)} written`}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div
+                      style={{
+                        color: 'var(--color-panel-text-muted)',
+                        marginBottom: 2,
+                      }}
+                    >
+                      File Bandwidth
+                    </div>
+                    <div
+                      style={{
+                        color: 'var(--color-panel-text-secondary)',
+                      }}
+                    >
+                      {`${formatBytes(usageStats?.storage_read_bytes || usageStats?.file_storage_read_bytes)} read, ${formatBytes(
+                        usageStats?.storage_write_bytes || usageStats?.file_storage_write_bytes,
+                      )} written`}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div
+                      style={{
+                        color: 'var(--color-panel-text-muted)',
+                        marginBottom: 2,
+                      }}
+                    >
+                      Vector Bandwidth
+                    </div>
+                    <div
+                      style={{
+                        color: 'var(--color-panel-text-secondary)',
+                      }}
+                    >
+                      {`${formatBytes(usageStats?.vector_index_read_bytes || usageStats?.vector_storage_read_bytes)} read, ${formatBytes(
+                        usageStats?.vector_index_write_bytes || usageStats?.vector_storage_write_bytes,
+                      )} written`}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {returnBytes != null && (
+                <div
+                  style={{
+                    marginTop: 16,
+                    display: 'grid',
+                    gridTemplateColumns: '120px 1fr',
+                    rowGap: 6,
+                  }}
+                >
+                  <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                    Return Size
+                  </span>
+                  <span style={{ color: 'var(--color-panel-text-secondary)' }}>
+                    {formatBytes(returnBytes)} returned
+                  </span>
                 </div>
               )}
             </div>
-          </div>
+          </Card>
         )}
 
         {activeTab === 'request' && (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <DetailRow label="Request ID" value={log.function?.request_id || 'N/A'} />
-            <DetailRow label="Started at" value={formatDateTime(startedAt)} />
-            <DetailRow label="Completed at" value={formatDateTime(completedAt)} />
-            <DetailRow label="Duration" value={`${duration}ms`} />
-            <DetailRow 
-              label="Identity" 
-              value={identity} 
-              withHelp 
-              helpText="This request was initiated by a Convex Developer with access to this deployment."
-            />
-            <DetailRow 
-              label="Caller" 
-              value={caller} 
-              withHelp={caller === 'WebSocket'}
-              helpText={caller === 'WebSocket' ? "This function was called through a websocket connection." : undefined}
-            />
-            <DetailRow 
-              label="Environment" 
-              value={environment} 
-              withHelp 
-              helpText="This function was executed in Convex's isolated environment."
-            />
-            
-            {/* Resources Used */}
-            <div style={{ borderTop: '1px solid var(--color-panel-border)', marginTop: '8px' }}>
-              <button
-                onClick={() => setIsResourcesExpanded(!isResourcesExpanded)}
+          <Card>
+            <div style={{ fontSize: 12 }}>
+              <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '12px 20px',
-                  marginBottom: isResourcesExpanded ? '0' : '0',
-                  color: 'var(--color-panel-text)',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  width: '100%',
-                  textAlign: 'left',
+                  display: 'grid',
+                  gridTemplateColumns: '120px 1fr',
+                  rowGap: 6,
+                  marginBottom: 12,
                 }}
               >
-                <Clock size={14} style={{ color: 'var(--color-panel-text-muted)' }} />
-                Resources Used
-                {isResourcesExpanded ? (
-                  <ChevronUp size={14} style={{ color: 'var(--color-panel-text-muted)', marginLeft: 'auto' }} />
-                ) : (
-                  <ChevronDown size={14} style={{ color: 'var(--color-panel-text-muted)', marginLeft: 'auto' }} />
-                )}
-              </button>
-              {isResourcesExpanded && (
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <DetailRow 
-                    label="Compute" 
-                    value={computeDisplay} 
-                    withHelp 
-                    small 
-                    helpText="Only compute from Actions incur additional cost. Query/Mutation compute are included."
+                <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                  Request ID
+                </span>
+                <span
+                  style={{
+                    fontFamily: 'monospace',
+                    color: 'var(--color-panel-text-secondary)',
+                    // Truncate the requestId with ellipsis if too long
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: 200,
+                    display: 'inline-block',
+                  }}
+                  title={requestId}
+                >
+                  {requestId}
+                </span>
+
+                <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                  Started at
+                </span>
+                <span style={{ color: 'var(--color-panel-text-secondary)' }}>
+                  {formatDateTime(startedAt)}
+                </span>
+
+                <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                  Completed at
+                </span>
+                <span style={{ color: 'var(--color-panel-text-secondary)' }}>
+                  {formatDateTime(completedAt)}
+                </span>
+
+                <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                  Duration
+                </span>
+                <span style={{ color: 'var(--color-panel-text-secondary)' }}>
+                  {formatDuration(durationMs)}
+                </span>
+
+                <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                  Identity
+                </span>
+                <span style={{ color: 'var(--color-panel-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {identityType || 'Unknown'}
+                  <TooltipAction
+                    icon={<Info size={12} style={{ color: 'var(--color-panel-text-muted)' }} />}
+                    text="The identity that executed this function"
                   />
-                  <DetailRow 
-                    label="DB Bandwidth" 
-                    value={
-                      <span>
-                        Accessed <strong>{documentCount}</strong> {documentCount === 1 ? 'document' : 'documents'}, <strong>{formatBytes(usage?.database_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.database_write_bytes || 0)}</strong> written
-                      </span>
-                    }
-                    small
+                </span>
+
+                <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                  Caller
+                </span>
+                <span style={{ color: 'var(--color-panel-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {caller || 'Websocket'}
+                  <TooltipAction
+                    icon={<Info size={12} style={{ color: 'var(--color-panel-text-muted)' }} />}
+                    text="What triggered this function execution"
                   />
-                  <DetailRow 
-                    label="File Bandwidth" 
-                    value={
-                      <span>
-                        <strong>{formatBytes(usage?.file_storage_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.file_storage_write_bytes || 0)}</strong> written
-                      </span>
-                    }
-                    small
+                </span>
+
+                <span style={{ color: 'var(--color-panel-text-muted)' }}>
+                  Environment
+                </span>
+                <span style={{ color: 'var(--color-panel-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {environment || 'Convex'}
+                  <TooltipAction
+                    icon={<Info size={12} style={{ color: 'var(--color-panel-text-muted)' }} />}
+                    text="The runtime environment where this function executed"
                   />
-                  <DetailRow 
-                    label="Vector Bandwidth" 
-                    value={
-                      <span>
-                        <strong>{formatBytes(usage?.vector_storage_read_bytes || 0)}</strong> read, <strong>{formatBytes(usage?.vector_storage_write_bytes || 0)}</strong> written
-                      </span>
-                    }
-                    small
-                    noBorder={returnBytes === undefined}
-                  />
-                  <DetailRow 
-                    label="Return Size" 
-                    value={<span><strong>{formatBytes(returnBytes || 0)}</strong> returned</span>} 
-                    withHelp 
-                    small 
-                    noBorder 
-                    helpText="Bandwidth from sending the return value of a function call to the user does not incur costs."
-                  />
-                </div>
-              )}
+                </span>
+              </div>
             </div>
-          </div>
+          </Card>
         )}
 
         {activeTab === 'functions' && (
-          <div style={{ padding: '20px' }}>
-            <div style={{ 
-              color: 'var(--color-panel-text-muted)', 
-              fontSize: '12px', 
-              marginBottom: '16px' 
-            }}>
+          <div style={{ fontSize: 12 }}>
+            <div
+              style={{
+                marginBottom: 12,
+                color: 'var(--color-panel-text-secondary)',
+                fontSize: 12,
+              }}
+            >
               This is an outline of the functions called in this request.
             </div>
-            {functionsCalled.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {functionsCalled.map((func: any, index: number) => {
-                  const funcPath = func.path || func.identifier || func.function || 'Unknown';
-                  const pathParts = funcPath.split(':');
-                  const component = pathParts.length > 1 ? pathParts[0] : '';
-                  const functionName = pathParts.length > 1 ? pathParts[1] : funcPath;
-                  const execTime = func.execution_time_ms || func.executionTimeMs || func.duration || 0;
-                  const isSuccess = func.success !== false && !func.error;
-                  
-                  return (
-                    <div
-                      key={index}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '12px 16px',
-                        backgroundColor: 'color-mix(in srgb, var(--color-panel-warning) 10%, transparent)',
-                        border: '1px solid color-mix(in srgb, var(--color-panel-warning) 20%, transparent)',
-                        borderRadius: '8px',
-                        fontFamily: 'monospace',
-                        fontSize: '12px',
-                      }}
-                    >
-                      {isSuccess ? (
-                        <CheckCircle2 size={16} style={{ color: 'var(--color-panel-success)', flexShrink: 0 }} />
-                      ) : (
-                        <X size={16} style={{ color: 'var(--color-panel-error)', flexShrink: 0 }} />
-                      )}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
-                        {component && (
-                          <span style={{ color: 'var(--color-panel-text-muted)' }}>
-                            {component}:
-                          </span>
-                        )}
-                        <span style={{ color: 'var(--color-panel-text)', fontWeight: 500 }}>
-                          {functionName}
+            <div
+              style={{
+                fontFamily: 'monospace',
+                fontSize: '12px',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  height: '28px',
+                  alignItems: 'center',
+                  borderRadius: '6px',
+                  border: '1px solid var(--color-panel-border)',
+                  backgroundColor: 'var(--color-panel-bg-secondary)',
+                }}
+              >
+                <div style={{ display: 'flex', height: '100%', alignItems: 'center' }}></div>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexShrink: 0,
+                    alignItems: 'center',
+                    gap: '4px',
+                    paddingLeft: '8px',
+                  }}
+                >
+                  {hasError ? (
+                    <XCircle
+                      size={16}
+                      style={{ color: 'var(--color-panel-error)' }}
+                      aria-label="Function call failed"
+                    />
+                  ) : (
+                    <CheckCircle2
+                      size={16}
+                      style={{ color: 'var(--color-panel-success)' }}
+                      aria-label="Function call succeeded"
+                    />
+                  )}
+                  <div style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '4px' }}>
+                    {(() => {
+                      const parts = functionIdentifier.split(':');
+                      if (parts.length > 1) {
+                        return (
+                          <>
+                            <span style={{ color: 'var(--color-panel-text-secondary)' }}>
+                              {parts[0]}:
+                            </span>
+                            <span style={{ color: 'var(--color-panel-text)' }}>
+                              {parts.slice(1).join(':')}
+                            </span>
+                          </>
+                        );
+                      }
+                      return (
+                        <span style={{ color: 'var(--color-panel-text)' }}>
+                          {functionIdentifier}
                         </span>
-                        {execTime > 0 && (
-                          <span style={{ color: 'var(--color-panel-text-muted)', marginLeft: '4px' }}>
-                            ({execTime}ms)
-                          </span>
-                        )}
-                      </div>
-                      <ArrowUp size={14} style={{ color: 'var(--color-panel-text-muted)', flexShrink: 0 }} />
-                    </div>
-                  );
-                })}
+                      );
+                    })()}
+                  </div>
+                </div>
+                <span
+                  style={{
+                    marginLeft: '4px',
+                    color: 'var(--color-panel-text-secondary)',
+                  }}
+                >
+                  ({formatDuration(durationMs)})
+                </span>
               </div>
-            ) : (
-              <div style={{ 
-                color: 'var(--color-panel-text-muted)', 
-                fontSize: '12px' 
-              }}>
-                No functions called
-              </div>
-            )}
+            </div>
           </div>
         )}
       </div>
@@ -1243,48 +1815,3 @@ const LogDetailContent: React.FC<{ log: LogEntry }> = ({ log }) => {
   );
 };
 
-const DetailRow: React.FC<{ 
-  label: string; 
-  value: string | React.ReactNode; 
-  withHelp?: boolean;
-  small?: boolean;
-  noBorder?: boolean;
-  helpText?: string;
-}> = ({ label, value, withHelp, small, noBorder, helpText }) => (
-  <div style={{ 
-    display: 'flex', 
-    alignItems: 'flex-start', 
-    gap: '8px',
-    padding: '12px 20px',
-    borderBottom: noBorder ? 'none' : '1px solid var(--color-panel-border)',
-  }}>
-    <div style={{ 
-      fontSize: small ? '11px' : '12px', 
-      color: 'var(--color-panel-text-muted)', 
-      minWidth: '120px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '4px',
-    }}>
-      {label}
-      {withHelp && helpText && (
-        <TooltipAction 
-          icon={<HelpCircle size={12} style={{ opacity: 0.6, color: 'var(--color-panel-text-muted)' }} />} 
-          text={helpText} 
-        />
-      )}
-      {withHelp && !helpText && (
-        <HelpCircle size={12} style={{ opacity: 0.6, color: 'var(--color-panel-text-muted)' }} />
-      )}
-    </div>
-    <div style={{ 
-      fontSize: small ? '11px' : '12px', 
-      color: 'var(--color-panel-text)', 
-      fontFamily: 'monospace',
-      flex: 1,
-      wordBreak: 'break-word',
-    }}>
-      {value}
-    </div>
-  </div>
-);

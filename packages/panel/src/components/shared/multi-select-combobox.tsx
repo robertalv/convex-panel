@@ -56,10 +56,11 @@ export function MultiSelectCombobox({
   }, [isOpen]);
 
   const filteredOptions = useMemo(() => {
+    const uniqueOptions = Array.from(new Set(options));
     if (query === '') {
-      return options;
+      return uniqueOptions;
     }
-    return options.filter((option) => {
+    return uniqueOptions.filter((option) => {
       const processedOption = processFilterOption(option);
       return fuzzyMatch(query, processedOption);
     });

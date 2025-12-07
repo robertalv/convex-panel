@@ -63,13 +63,13 @@ export function useComponents({
   }, [selectedComponent, componentNameToId]);
 
   const componentNames = useMemo(() => {
-    const names = ['app'];
+    const names = new Set<string>(['app']);
     components.forEach((comp) => {
       if (comp.name && comp.name.trim() !== '') {
-        names.push(comp.name);
+        names.add(comp.name);
       }
     });
-    return names;
+    return Array.from(names);
   }, [components]);
 
   return {
