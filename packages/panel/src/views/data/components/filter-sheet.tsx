@@ -16,11 +16,7 @@ export interface FilterSheetProps {
   visibleFields?: string[];
   onVisibleFieldsChange?: (fields: string[]) => void;
   openColumnVisibility?: boolean;
-  /** Optional admin client for filter history persistence */
-  adminClient?: any;
-  /** Optional user ID for scoping filter history */
   userId?: string;
-  /** Optional container element to render the sheet inside */
   container?: HTMLElement | null;
 }
 
@@ -36,75 +32,12 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
   visibleFields,
   onVisibleFieldsChange,
   openColumnVisibility,
-  adminClient,
   userId = 'default',
   container,
 }) => {
   const filterHistoryApi = useMemo(() => {
-    if (adminClient) {
-      const sessionStorageApi = createSessionStorageFilterHistoryApi();
-      
-      return {
-        push: async (scope: string, state: { filters: FilterExpression; sortConfig: SortConfig | null }) => {
-          try {
-            await adminClient.mutation('convexPanel:push' as any, {
-              scope,
-              state,
-            });
-          } catch (error) {
-            // Fallback to sessionStorage if component is not installed
-            await sessionStorageApi.push(scope, state);
-          }
-        },
-        undo: async (scope: string, count?: number) => {
-          try {
-            return await adminClient.mutation('convexPanel:undo' as any, {
-              scope,
-              count,
-            });
-          } catch (error) {
-            // Fallback to sessionStorage if component is not installed
-            return await sessionStorageApi.undo(scope, count);
-          }
-        },
-        redo: async (scope: string, count?: number) => {
-          try {
-            return await adminClient.mutation('convexPanel:redo' as any, {
-              scope,
-              count,
-            });
-          } catch (error) {
-            // Fallback to sessionStorage if component is not installed
-            return await sessionStorageApi.redo(scope, count);
-          }
-        },
-        getStatus: async (scope: string) => {
-          try {
-            const result = await adminClient.query('convexPanel:getStatus' as any, {
-              scope,
-            });
-            return result || { canUndo: false, canRedo: false, position: null, length: 0 };
-          } catch (error) {
-            // Fallback to sessionStorage if component is not installed
-            return await sessionStorageApi.getStatus(scope);
-          }
-        },
-        getCurrentState: async (scope: string) => {
-          try {
-            return await adminClient.query('convexPanel:getCurrentState' as any, {
-              scope,
-            });
-          } catch (error) {
-            // Fallback to sessionStorage if component is not installed
-            return await sessionStorageApi.getCurrentState(scope);
-          }
-        },
-      };
-    }
-    
-    // if no adminClient available, use sessionStorage fallback
     return createSessionStorageFilterHistoryApi();
-  }, [adminClient]);
+  }, []);
   // if the sheet is open, prevent the body from scrolling
   useEffect(() => {
     if (!container && isOpen) {
