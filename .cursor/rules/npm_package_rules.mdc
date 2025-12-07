@@ -1,0 +1,111 @@
+---
+description: Guidelines for developing NPM packages that integrate cleanly into parent apps, remain lightweight, and avoid bundler or dependency conflicts
+globs: **/package.json,**/tsconfig.json,**/tsup.config.*,**/vite.config.*,**/rollup.config.*,**/webpack.config.*
+---
+
+# Cursor Rules for NPM Package Development
+
+These rules ensure packages integrate cleanly into parent apps, remain lightweight, and avoid bundler or dependency conflicts.
+
+---
+
+## 1. Dependencies
+
+- Do NOT bundle dependencies the parent app already provides.
+- React, React DOM, and similar framework-level libraries MUST be `peerDependencies`.
+- Also include these in `devDependencies` for local development.
+- Keep dependencies minimal and avoid large editors/libraries unless required.
+
+---
+
+## 2. Build Output
+
+- Always build TypeScript → JavaScript before publishing.
+- Output must include:
+  - `dist/index.js` (ESM)
+  - `dist/index.d.ts` (types)
+  - `dist/style.css` if styles exist
+- Do NOT publish raw `/src` unless explicitly intended.
+- Avoid combining multiple builds; prefer a clean ESM-only output unless CJS is needed.
+
+---
+
+## 3. Package Entrypoints
+
+- Configure `package.json` correctly:
+  - `"main"`, `"module"`, `"types"`
+  - `"exports"` map for clean import paths
+- Ensure consumers can import like:
+  ```js
+  import { Component } from "your-package";
+  ```
+
+---
+
+## 4. Environment Compatibility
+
+- Do NOT assume the parent app uses Vite, Webpack, Next, etc.
+- No Node APIs in browser code: fs, path, process, etc.
+- No browser-only globals in SSR environments: window, document (wrap in guards).
+- Package must work immediately inside a vanilla Vite + React app.
+
+---
+
+## 5. CSS & Styling
+
+- Never override global styling in the parent app.
+- Namespace all CSS: `.cp-*`, `.df-*`, etc.
+- If using Tailwind internally:
+  - Compile Tailwind BEFORE publishing.
+  - Do NOT require the parent app to modify their Tailwind config.
+  - Do NOT inject global Tailwind resets into the parent app.
+
+---
+
+## 6. Tree Shaking & Side Effects
+
+- Must use ES modules everywhere.
+- Avoid side-effect imports.
+- Add to package.json:
+  ```json
+  "sideEffects": false
+  ```
+  or list CSS explicitly:
+  ```json
+  "sideEffects": ["**/*.css"]
+  ```
+
+---
+
+## 7. Asset Handling
+
+- Always import assets (images, fonts, wasm, workers) so bundlers can resolve them.
+- Never reference assets with hardcoded file-system paths.
+- If shipping assets, expose them through the exports map.
+
+---
+
+## 8. Versioning
+
+- Follow semantic versioning strictly:
+  - Breaking changes → major.
+  - Features → minor.
+  - Fixes → patch.
+- Never introduce breaking API changes in a patch release.
+- Maintain a clear CHANGELOG.
+
+---
+
+## 9. Local Linking
+
+- Package must work with npm link, pnpm link, or workspaces.
+- Peer deps prevent duplicate React installs during linking.
+- No absolute paths in build output.
+
+---
+
+## 10. Install Scripts
+
+- Avoid expensive or blocking postinstall scripts.
+- Never run builds, downloads, or external processes during install.
+- Only acceptable postinstall use: warn about missing peer dependencies.

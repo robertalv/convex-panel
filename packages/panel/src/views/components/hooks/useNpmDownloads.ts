@@ -1,27 +1,27 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { ComponentInfo } from '../../../types/components';
-import { fetchMultipleNpmDownloads } from '../utils/npm';
+import { fetchMultipleNpmPackagesComplete, type NpmPackageExtendedInfo } from '../utils/npm';
 
-interface UseNpmDownloadsOptions {
+interface UseNpmPackageDataOptions {
   components: ComponentInfo[];
   enabled?: boolean;
 }
 
-interface UseNpmDownloadsResult {
-  downloads: Map<string, number>;
+interface UseNpmPackageDataResult {
+  packageData: Map<string, NpmPackageExtendedInfo>;
   isLoading: boolean;
   error: Error | null;
 }
 
 /**
- * Hook to fetch npm package downloads for components
+ * Hook to fetch npm package data (downloads and extended info) for components
  * Caches results to avoid unnecessary API calls
  */
-export function useNpmDownloads({
+export function useNpmPackageData({
   components,
   enabled = true,
-}: UseNpmDownloadsOptions): UseNpmDownloadsResult {
-  const [downloads, setDownloads] = useState<Map<string, number>>(new Map());
+}: UseNpmPackageDataOptions): UseNpmPackageDataResult {
+  const [packageData, setPackageData] = useState<Map<string, NpmPackageExtendedInfo>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -41,10 +41,10 @@ export function useNpmDownloads({
       return;
     }
 
-    // Check if we already have downloads cached (in sessionStorage)
-    const cachedDownloads = new Map<string, number>();
-    const cacheKey = 'npm-downloads-cache';
-    const cacheTimeKey = 'npm-downloads-cache-time';
+    // Check if we already have package data cached (in sessionStorage)
+    const cachedPackageData = new Map<string, NpmPackageExtendedInfo>();
+    const cacheKey = 'npm-package-data-cache';
+    const cacheTimeKey = 'npm-package-data-cache-time';
     const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 
     try {
@@ -55,70 +55,84 @@ export function useNpmDownloads({
         const age = Date.now() - parseInt(cacheTime, 10);
         if (age < CACHE_DURATION) {
           const parsed = JSON.parse(cached);
-          Object.entries(parsed).forEach(([pkg, downloads]) => {
-            cachedDownloads.set(pkg, downloads as number);
+          Object.entries(parsed).forEach(([pkg, data]) => {
+            cachedPackageData.set(pkg, data as NpmPackageExtendedInfo);
           });
           
           // Check if we have all packages cached
-          const allCached = npmPackages.every((pkg) => cachedDownloads.has(pkg));
+          const allCached = npmPackages.every((pkg) => cachedPackageData.has(pkg));
           if (allCached) {
-            setDownloads(cachedDownloads);
+            setPackageData(cachedPackageData);
             return; // Use cached data
           }
         }
       }
     } catch (err) {
-      console.warn('Failed to read npm downloads cache:', err);
+      console.warn('Failed to read npm package data cache:', err);
     }
 
-    // Fetch downloads for packages not in cache
-    const packagesToFetch = npmPackages.filter((pkg) => !cachedDownloads.has(pkg));
+    // Fetch data for packages not in cache
+    const packagesToFetch = npmPackages.filter((pkg) => !cachedPackageData.has(pkg));
     
     if (packagesToFetch.length === 0) {
-      setDownloads(cachedDownloads);
+      setPackageData(cachedPackageData);
       return;
     }
 
     setIsLoading(true);
     setError(null);
 
-    fetchMultipleNpmDownloads(packagesToFetch)
+    fetchMultipleNpmPackagesComplete(packagesToFetch)
       .then((results) => {
-        // Merge cached and new downloads
-        const merged = new Map(cachedDownloads);
+        // Merge cached and new data
+        const merged = new Map(cachedPackageData);
         
         results.forEach((info, pkg) => {
-          if (info.weeklyDownloads !== undefined) {
-            merged.set(pkg, info.weeklyDownloads);
-          }
+          merged.set(pkg, info);
         });
 
         // Update cache
         try {
-          const cacheObject: Record<string, number> = {};
-          merged.forEach((downloads, pkg) => {
-            cacheObject[pkg] = downloads;
+          const cacheObject: Record<string, NpmPackageExtendedInfo> = {};
+          merged.forEach((data, pkg) => {
+            cacheObject[pkg] = data;
           });
           sessionStorage.setItem(cacheKey, JSON.stringify(cacheObject));
           sessionStorage.setItem(cacheTimeKey, Date.now().toString());
         } catch (err) {
-          console.warn('Failed to cache npm downloads:', err);
+          console.warn('Failed to cache npm package data:', err);
         }
 
-        setDownloads(merged);
+        setPackageData(merged);
         setIsLoading(false);
       })
       .catch((err) => {
-        console.error('Failed to fetch npm downloads:', err);
+        console.error('Failed to fetch npm package data:', err);
         setError(err instanceof Error ? err : new Error('Unknown error'));
         setIsLoading(false);
         
         // Use cached data even if fresh fetch failed
-        if (cachedDownloads.size > 0) {
-          setDownloads(cachedDownloads);
+        if (cachedPackageData.size > 0) {
+          setPackageData(cachedPackageData);
         }
       });
   }, [npmPackages, enabled]);
 
+  return { packageData, isLoading, error };
+}
+
+// Legacy export for backward compatibility
+export function useNpmDownloads({
+  components,
+  enabled = true,
+}: UseNpmPackageDataOptions) {
+  const { packageData, isLoading, error } = useNpmPackageData({ components, enabled });
+  
+  // Convert to old format for backward compatibility
+  const downloads = new Map<string, number>();
+  packageData.forEach((data, pkg) => {
+    downloads.set(pkg, data.weeklyDownloads || data.downloads || 0);
+  });
+  
   return { downloads, isLoading, error };
 }

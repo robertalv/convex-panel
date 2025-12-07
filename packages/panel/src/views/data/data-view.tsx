@@ -273,69 +273,15 @@ export const DataView: React.FC<DataViewProps> = ({
               newClauses.splice(index, 1);
               const newFilters = { clauses: newClauses };
               tableData.setFilters(newFilters);
-              
-              // Save to filterHistory when filter is removed
-              if (adminClient && !useMockData && tableData.selectedTable) {
-                const scope = `user:default:table:${tableData.selectedTable}`;
-                adminClient.mutation('convexPanel:push' as any, {
-                  scope,
-                  state: {
-                    filters: newFilters,
-                    sortConfig: tableData.sortConfig,
-                  },
-                }, { componentId: 'convexPanel' }).catch((error: any) => {
-                  console.warn('Failed to save filter removal to filterHistory:', error);
-                });
-              }
             }}
             onClearFilters={async () => {
               const newFilters = { clauses: [] };
-              const newSortConfig = null;
-              
-              // Check if current state is already empty before pushing
-              if (adminClient && !useMockData && tableData.selectedTable) {
-                const scope = `user:default:table:${tableData.selectedTable}`;
-                try {
-                  const currentState = await adminClient.query('convexPanel:getCurrentState' as any, { scope });
-                  
-                  const isAlreadyEmpty = 
-                    (!currentState || 
-                     (currentState.filters?.clauses?.length === 0 && !currentState.sortConfig));
-                  
-                  if (!isAlreadyEmpty) {
-                    // Only push if not already empty
-                    await adminClient.mutation('convexPanel:push' as any, {
-                      scope,
-                      state: {
-                        filters: newFilters,
-                        sortConfig: newSortConfig,
-                      },
-                    }, { componentId: 'convexPanel' });
-                  }
-                } catch (error: any) {
-                  console.warn('Failed to check/save filter clear to filterHistory:', error);
-                }
-              }
               
               tableData.setFilters(newFilters);
               tableData.setSortConfig(null);
             }}
             onRemoveSort={() => {
               tableData.setSortConfig(null);
-              
-              // Save to filterHistory when sort is removed
-              if (adminClient && !useMockData && tableData.selectedTable) {
-                const scope = `user:default:table:${tableData.selectedTable}`;
-                adminClient.mutation('convexPanel:push' as any, {
-                  scope,
-                  state: {
-                    filters: tableData.filters,
-                    sortConfig: null,
-                  },
-                }, { componentId: 'convexPanel' }).catch((error: any) => {
-                  console.warn('Failed to save sort removal to filterHistory:', error);
-                });
-              }
             }}
             onCustomQuery={() => {
               const customQuery: CustomQuery = {
@@ -464,7 +410,6 @@ export const DataView: React.FC<DataViewProps> = ({
         visibleFields={visibleFields}
         onVisibleFieldsChange={setVisibleFields}
         openColumnVisibility={isColumnVisibilityOpen}
-        adminClient={adminClient}
         container={containerRef}
       />
 

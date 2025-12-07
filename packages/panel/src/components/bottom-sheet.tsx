@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ChevronDown,
   ChevronUp,
@@ -11,8 +11,7 @@ import {
 } from 'lucide-react';
 import { ConvexLogo } from './icons';
 import { AskAI } from './ask-ai';
-import { getAdminClientInfo, validateAdminClientInfo } from '../utils/adminClient';
-import { setStorageItem, getStorageItem } from '../utils/storage';
+import { setStorageItem } from '../utils/storage';
 import { STORAGE_KEYS } from '../utils/constants';
 import { DeploymentDisplay } from './shared/deployment-display';
 import { ProjectSelector } from './shared/project-selector';
@@ -33,7 +32,7 @@ import { UserMenu } from './user-menu';
 import { fetchDeploymentMetadata } from '../utils/api/deployments';
 import { extractDeploymentName, extractProjectName } from '../utils/api/utils';
 import { fetchProjectInfo } from '../utils/api/teams';
-import { getConvexDeploymentState } from '../utils/api/deployments';
+import { useIsDeploymentPaused } from '../hooks/usePaginatedScheduledJobs';
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -135,9 +134,13 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   } | null>(null);
   const [isLoadingProjectInfo, setIsLoadingProjectInfo] = useState(false);
 
-  const [deploymentState, setDeploymentState] = useState<'running' | 'paused' | null>(null);
-  const deploymentStateFetchRef = useRef<{ lastFetch: number; isFetching: boolean }>({ lastFetch: 0, isFetching: false });
-  const prevDepsRef = useRef<{ deploymentUrl?: string; accessToken?: string }>({});
+  console.log('deploymentUrl', deploymentUrl);
+  console.log('adminClient', adminClient);
+  console.log('accessToken', accessToken);
+
+  // Check if deployment is paused using the hook
+  const isDeploymentPaused = useIsDeploymentPaused(adminClient);
+  const deploymentState = isDeploymentPaused === true ? 'paused' : isDeploymentPaused === false ? 'running' : null;
 
   useEffect(() => {
     if (!isAuthenticated || !deploymentUrl) {
@@ -192,124 +195,118 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     fetchInfo();
   }, [isAuthenticated, deploymentUrl, adminClient, accessToken, teamSlug, projectSlug, team, project]);
 
-  useEffect(() => {
-    if (!isAuthenticated || !deploymentUrl || !adminClient) {
-      setDeploymentState(null);
-      return;
-    }
+  // useEffect(() => {
+  //   if (!isAuthenticated || !deploymentUrl || !adminClient) {
+  //     setDeploymentState(null);
+  //     return;
+  //   }
 
-    // Check if dependencies actually changed
-    const currentDeps = { deploymentUrl, accessToken: accessToken?.substring(0, 20) };
-    const prevDeps = prevDepsRef.current;
-    const depsChanged = prevDeps.deploymentUrl !== currentDeps.deploymentUrl || 
-                        prevDeps.accessToken !== currentDeps.accessToken;
+  //   // Check if dependencies actually changed
+  //   const currentDeps = { deploymentUrl, accessToken: accessToken?.substring(0, 20) };
+  //   const prevDeps = prevDepsRef.current;
+  //   const depsChanged = prevDeps.deploymentUrl !== currentDeps.deploymentUrl || 
+  //                       prevDeps.accessToken !== currentDeps.accessToken;
     
-    // Update ref with current deps
-    prevDepsRef.current = currentDeps;
+  //   // Update ref with current deps
+  //   prevDepsRef.current = currentDeps;
 
-    let isMounted = true;
-    let intervalId: NodeJS.Timeout | null = null;
+  //   let isMounted = true;
+  //   let intervalId: NodeJS.Timeout | null = null;
 
-    const fetchDeploymentState = async () => {
-      if (!isMounted || deploymentStateFetchRef.current.isFetching) return;
+  //   const fetchDeploymentState = async () => {
+  //     if (!isMounted || deploymentStateFetchRef.current.isFetching) return;
       
-      // Throttle: don't fetch if we fetched less than 1 second ago (unless forced)
-      const now = Date.now();
-      const timeSinceLastFetch = now - deploymentStateFetchRef.current.lastFetch;
-      if (timeSinceLastFetch < 1000) {
-        return;
-      }
+  //     // Throttle: don't fetch if we fetched less than 1 second ago (unless forced)
+  //     const now = Date.now();
+  //     const timeSinceLastFetch = now - deploymentStateFetchRef.current.lastFetch;
+  //     if (timeSinceLastFetch < 1000) {
+  //       return;
+  //     }
 
-      deploymentStateFetchRef.current.isFetching = true;
-      deploymentStateFetchRef.current.lastFetch = now;
+  //     deploymentStateFetchRef.current.isFetching = true;
+  //     deploymentStateFetchRef.current.lastFetch = now;
 
-      try {
-        const clientInfo = getAdminClientInfo(adminClient, deploymentUrl);
-        const validationError = validateAdminClientInfo(clientInfo);
+  //     try {
+  //       const clientInfo = getAdminClientInfo(adminClient, deploymentUrl);
 
-        if (!isMounted) {
-          deploymentStateFetchRef.current.isFetching = false;
-          return;
-        }
+  //       if (!isMounted) {
+  //         deploymentStateFetchRef.current.isFetching = false;
+  //         return;
+  //       }
 
-        if (validationError) {
-          deploymentStateFetchRef.current.isFetching = false;
-          return;
-        }
+  //       const { deploymentUrl: finalDeploymentUrl, adminKey } = clientInfo;
+  //       const finalAdminKey = accessToken || adminKey;
 
-        const { deploymentUrl: finalDeploymentUrl, adminKey } = clientInfo;
-        const finalAdminKey = accessToken || adminKey;
+  //       if (!finalDeploymentUrl || !finalAdminKey) {
+  //         deploymentStateFetchRef.current.isFetching = false;
+  //         return;
+  //       }
 
-        if (!finalDeploymentUrl || !finalAdminKey) {
-          deploymentStateFetchRef.current.isFetching = false;
-          return;
-        }
-
-        const state = await getConvexDeploymentState(finalDeploymentUrl, finalAdminKey);
+  //       const state = await getConvexDeploymentState(finalDeploymentUrl, finalAdminKey);
         
-        if (!isMounted) {
-          deploymentStateFetchRef.current.isFetching = false;
-          return;
-        }
+  //       if (!isMounted) {
+  //         deploymentStateFetchRef.current.isFetching = false;
+  //         return;
+  //       }
         
-        setDeploymentState(state.state);
-        deploymentStateFetchRef.current.isFetching = false;
-      } catch (error) {
-        if (!isMounted) {
-          deploymentStateFetchRef.current.isFetching = false;
-          return;
-        }
-        setDeploymentState(null);
-        deploymentStateFetchRef.current.isFetching = false;
-      }
-    };
+  //       setDeploymentState(state.state);
+  //       deploymentStateFetchRef.current.isFetching = false;
+  //     } catch (error) {
+  //       if (!isMounted) {
+  //         deploymentStateFetchRef.current.isFetching = false;
+  //         return;
+  //       }
+  //       setDeploymentState(null);
+  //       deploymentStateFetchRef.current.isFetching = false;
+  //     }
+  //   };
 
-    // Check for immediate state changes (triggered by pause-deployment component)
-    const checkForStateChange = () => {
-      if (!isMounted) return;
-      const lastChange = getStorageItem<number>(STORAGE_KEYS.DEPLOYMENT_STATE_CHANGED, 0);
-      const now = Date.now();
-      // If state was changed within the last 10 seconds, refresh immediately
-      if (lastChange > 0 && (now - lastChange) < 10000) {
-        deploymentStateFetchRef.current.lastFetch = 0; // Force fetch
-        fetchDeploymentState();
-      }
-    };
+  //   // Check for immediate state changes (triggered by pause-deployment component)
+  //   const checkForStateChange = () => {
+  //     if (!isMounted) return;
+  //     const lastChange = getStorageItem<number>(STORAGE_KEYS.DEPLOYMENT_STATE_CHANGED, 0);
+  //     const now = Date.now();
+  //     // If state was changed within the last 10 seconds, refresh immediately
+  //     if (lastChange > 0 && (now - lastChange) < 10000) {
+  //       deploymentStateFetchRef.current.lastFetch = 0; // Force fetch
+  //       fetchDeploymentState();
+  //     }
+  //   };
 
-    // Listen for custom deployment state change events for immediate updates
-    const handleDeploymentStateChange = () => {
-      if (!isMounted) return;
-      deploymentStateFetchRef.current.lastFetch = 0; // Force fetch
-      fetchDeploymentState();
-    };
+  //   // Listen for custom deployment state change events for immediate updates
+  //   const handleDeploymentStateChange = () => {
+  //     if (!isMounted) return;
+  //     deploymentStateFetchRef.current.lastFetch = 0; // Force fetch
+  //     fetchDeploymentState();
+  //   };
 
-    // Only fetch on initial mount or when deps actually change
-    if (depsChanged || deploymentStateFetchRef.current.lastFetch === 0) {
-      fetchDeploymentState();
-    }
+  //   // Only fetch on initial mount or when deps actually change
+  //   if (depsChanged || deploymentStateFetchRef.current.lastFetch === 0) {
+  //     fetchDeploymentState();
+  //   }
     
-    // Check for immediate state changes
-    checkForStateChange();
+  //   // Check for immediate state changes
+  //   checkForStateChange();
     
-    // Listen for custom events
-    window.addEventListener('deploymentStateChanged', handleDeploymentStateChange);
+  //   // Listen for custom events
+  //   window.addEventListener('deploymentStateChanged', handleDeploymentStateChange);
     
-    // Poll every 5 seconds (reduced from 2 seconds to reduce load)
-    intervalId = setInterval(() => {
-      if (!isMounted) return;
-      checkForStateChange();
-      fetchDeploymentState();
-    }, 5000);
+  //   // Poll every 5 seconds (reduced from 2 seconds to reduce load)
+  //   intervalId = setInterval(() => {
+  //     if (!isMounted) return;
+  //     checkForStateChange();
+  //     fetchDeploymentState();
+  //   }, 5000);
     
-    return () => {
-      isMounted = false;
-      deploymentStateFetchRef.current.isFetching = false;
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-      window.removeEventListener('deploymentStateChanged', handleDeploymentStateChange);
-    };
-  }, [isAuthenticated, deploymentUrl, adminClient, accessToken]);
+  //   return () => {
+  //     isMounted = false;
+  //     deploymentStateFetchRef.current.isFetching = false;
+  //     if (intervalId) {
+  //       clearInterval(intervalId);
+  //     }
+  //     window.removeEventListener('deploymentStateChanged', handleDeploymentStateChange);
+  //   };
+  // }, [isAuthenticated, deploymentUrl, adminClient, accessToken]);
 
   const handleSettingsClick = () => {
     if (onTabChange) {

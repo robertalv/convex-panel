@@ -141,18 +141,3 @@ export function getAdminClientInfo(adminClient: any, providedDeploymentUrl?: str
     adminKey: getAdminKey(adminClient),
   };
 }
-
-/**
- * Validate that we have both deployment URL and admin key
- * Returns an error message if either is missing, null if both are present
- */
-export function validateAdminClientInfo(info: AdminClientInfo): string | null {
-  if (!info.deploymentUrl) {
-    return 'Missing deployment URL';
-  }
-  if (!info.adminKey) {
-    return 'Missing admin key';
-  }
-  return null;
-}
-

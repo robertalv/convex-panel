@@ -71,7 +71,7 @@ export const Authentication: React.FC<AuthenticationProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 16px',
+            padding: '0 8px',
             backgroundColor: 'var(--color-panel-bg)',
           }}
         >
@@ -121,7 +121,7 @@ export const Authentication: React.FC<AuthenticationProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 16px',
+            padding: '0 8px',
             backgroundColor: 'var(--color-panel-bg)',
           }}
         >
@@ -190,7 +190,7 @@ export const Authentication: React.FC<AuthenticationProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 16px',
+          padding: '0 8px',
           backgroundColor: 'var(--color-panel-bg)',
         }}
       >
@@ -211,7 +211,7 @@ export const Authentication: React.FC<AuthenticationProps> = ({
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '24px',
+          padding: '16px',
         }}
       >
         <div

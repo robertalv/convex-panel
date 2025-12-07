@@ -5,7 +5,7 @@ import {
   pauseConvexDeployment,
   resumeConvexDeployment,
 } from '../../../utils/api/deployments';
-import { getAdminClientInfo, validateAdminClientInfo } from '../../../utils/adminClient';
+import { getAdminClientInfo } from '../../../utils/adminClient';
 import { setStorageItem } from '../../../utils/storage';
 import { STORAGE_KEYS } from '../../../utils/constants';
 
@@ -44,14 +44,6 @@ export const PauseDeployment: React.FC<PauseDeploymentProps> = ({
 
     try {
       const clientInfo = getAdminClientInfo(adminClient, providedDeploymentUrl);
-      const validationError = validateAdminClientInfo(clientInfo);
-
-      if (validationError) {
-        setError(validationError);
-        setIsLoading(false);
-        return;
-      }
-
       const { deploymentUrl, adminKey } = clientInfo;
       const finalAdminKey = accessToken || adminKey;
 
@@ -87,13 +79,6 @@ export const PauseDeployment: React.FC<PauseDeploymentProps> = ({
     if (!adminClient || isToggling) return;
 
     const clientInfo = getAdminClientInfo(adminClient, providedDeploymentUrl);
-    const validationError = validateAdminClientInfo(clientInfo);
-
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
     const { deploymentUrl, adminKey } = clientInfo;
     const finalAdminKey = accessToken || adminKey;
 
@@ -149,7 +134,7 @@ export const PauseDeployment: React.FC<PauseDeploymentProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 24px',
+            padding: '0 8px',
             backgroundColor: 'var(--color-panel-bg)',
           }}
         >
@@ -200,7 +185,7 @@ export const PauseDeployment: React.FC<PauseDeploymentProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 24px',
+            padding: '0 8px',
             backgroundColor: 'var(--color-panel-bg)',
           }}
         >
@@ -284,7 +269,7 @@ export const PauseDeployment: React.FC<PauseDeploymentProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 16px',
+          padding: '0 8px',
           backgroundColor: 'var(--color-panel-bg)',
         }}
       >
@@ -303,47 +288,60 @@ export const PauseDeployment: React.FC<PauseDeploymentProps> = ({
           onClick={handleToggle}
           disabled={isToggling}
           style={{
-            padding: '6px 16px',
-            borderRadius: '6px',
-            backgroundColor: isPaused ? 'var(--color-panel-success)' : 'var(--color-panel-error)',
-            color: 'white',
-            border: 'none',
-            cursor: isToggling ? 'not-allowed' : 'pointer',
-            fontSize: '12px',
+            height: '30px',
+            padding: '8px 16px',
+            fontSize: '11px',
+            borderRadius: '8px',
             fontWeight: 500,
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
-            opacity: isToggling ? 0.6 : 1,
-            transition: 'all 0.2s ease',
+            justifyContent: 'center',
+            gap: '4px',
+            border: isPaused ? 'none' : '1px solid var(--color-panel-border)',
+            backgroundColor: isPaused ? 'var(--color-panel-accent)' : 'var(--color-panel-bg-tertiary)',
+            color: isPaused ? '#fff' : 'var(--color-panel-text-secondary)',
+            cursor: isToggling ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s',
+            boxSizing: 'border-box',
             whiteSpace: 'nowrap',
+            opacity: isToggling ? 0.6 : 1,
           }}
           onMouseEnter={(e) => {
             if (!isToggling) {
-              e.currentTarget.style.opacity = '0.9';
+              if (!isPaused) {
+                e.currentTarget.style.backgroundColor = 'var(--color-panel-accent)';
+                e.currentTarget.style.color = '#fff';
+              } else {
+                e.currentTarget.style.backgroundColor = 'var(--color-panel-accent-hover)';
+              }
             }
           }}
           onMouseLeave={(e) => {
             if (!isToggling) {
-              e.currentTarget.style.opacity = '1';
+              if (!isPaused) {
+                e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+                e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
+              } else {
+                e.currentTarget.style.backgroundColor = 'var(--color-panel-accent)';
+              }
             }
           }}
         >
           {isToggling ? (
             <>
-              <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+              <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} />
               {isPaused ? 'Resuming...' : 'Pausing...'}
             </>
           ) : (
             <>
               {isPaused ? (
                 <>
-                  <PlayCircle size={14} />
+                  <PlayCircle size={10} />
                   Resume
                 </>
               ) : (
                 <>
-                  <PauseCircle size={14} />
+                  <PauseCircle size={10} />
                   Pause
                 </>
               )}
@@ -357,7 +355,7 @@ export const PauseDeployment: React.FC<PauseDeploymentProps> = ({
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '24px',
+          padding: '16px',
         }}
       >
         {/* Status Card */}
@@ -522,7 +520,7 @@ export const PauseDeployment: React.FC<PauseDeploymentProps> = ({
               backgroundColor: 'var(--color-panel-bg)',
               border: '1px solid var(--color-panel-border)',
               borderRadius: '8px',
-              padding: '24px',
+              padding: '16px',
               maxWidth: '400px',
               width: '90%',
               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',

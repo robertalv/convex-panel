@@ -33,6 +33,20 @@ export function formatCronSchedule(schedule: CronSchedule): string {
   }
 }
 
+export function formatTimestamp(timestamp: number | bigint): string {
+  try {
+    const ms = typeof timestamp === 'bigint'
+      ? Number(timestamp) / 1000000
+      : timestamp;
+
+    const date = new Date(ms);
+    return date.toLocaleString();
+  } catch (e) {
+    console.error('Error formatting timestamp:', e);
+    return '-';
+  }
+}
+
 export function formatRelativeTime(timestamp: bigint | number): string {
   if (!timestamp) return "-";
 

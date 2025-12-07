@@ -45,6 +45,9 @@ export function useFunctionLogStream({
     // notion of the beginning; it will immediately advance us.
     setCursor(0);
     setError(null);
+
+    abortRef.current?.abort();
+    isStreamingRef.current = false;
   };
 
   useEffect(() => {
@@ -60,9 +63,11 @@ export function useFunctionLogStream({
       // When paused, stop any in-flight request
       abortRef.current?.abort();
       isStreamingRef.current = false;
+      setIsLoading(false);
       return;
     }
 
+    abortRef.current?.abort();
     isStreamingRef.current = true;
     abortRef.current = new AbortController();
 
@@ -105,7 +110,9 @@ export function useFunctionLogStream({
           await new Promise((resolve) => setTimeout(resolve, INTERVALS.RETRY_DELAY));
         }
       }
-      setIsLoading(false);
+      if (!cancelled) {
+        setIsLoading(false);
+      }
     };
 
     loop();

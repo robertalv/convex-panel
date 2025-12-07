@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { useThemeSafe } from '../../../hooks/useTheme';
+import { usePortalTarget } from '../../../contexts/portal-context';
 
 export interface DateFilter {
   type: 'any' | 'last24h' | 'last7d' | 'last30d' | 'last90d' | 'custom';
@@ -80,6 +82,8 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
   const now = new Date();
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());
   const [currentYear, setCurrentYear] = useState(now.getFullYear());
+  const { theme } = useThemeSafe();
+  const portalTarget = usePortalTarget();
   
   // Sync state when value changes
   useEffect(() => {
@@ -117,6 +121,8 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       if (
@@ -129,24 +135,24 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
       }
     };
 
-    if (isOpen) {
-      const timeoutId = setTimeout(() => {
-        document.addEventListener('mousedown', handleClickOutside);
-      }, 10);
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
 
-      const handleEscape = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') {
-          setIsOpen(false);
-        }
-      };
-      document.addEventListener('keydown', handleEscape);
+    // Use a small delay to avoid immediate closure when opening
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 0);
 
-      return () => {
-        clearTimeout(timeoutId);
-        document.removeEventListener('mousedown', handleClickOutside);
-        document.removeEventListener('keydown', handleEscape);
-      };
-    }
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside, true);
+      document.removeEventListener('keydown', handleEscape);
+    };
   }, [isOpen]);
 
   const normalizeDate = (date: Date): Date => {
@@ -370,7 +376,11 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
             return (
               <button
                 key={index}
-                onClick={() => handleCustomDateSelect(date)}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCustomDateSelect(date);
+                }}
                 style={{
                   aspectRatio: '1',
                   border: 'none',
@@ -390,6 +400,7 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
                   fontWeight: selected || today ? 600 : 400,
                   position: 'relative',
                   transition: 'all 0.15s',
+                  pointerEvents: 'auto',
                 }}
                 onMouseEnter={(e) => {
                   if (!selected) {
@@ -421,25 +432,28 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
         {triggerButton}
       </div>
 
-      {isOpen && position && createPortal(
+      {isOpen && position && portalTarget && createPortal(
         <div
           ref={dropdownRef}
+          className={`cp-theme-${theme}`}
           style={{
             position: 'fixed',
             top: `${position.top}px`,
             left: `${position.left}px`,
             width: `${position.width}px`,
-            backgroundColor: 'var(--color-panel-bg-secondary)',
+            backgroundColor: 'var(--color-panel-bg)',
             border: '1px solid var(--color-panel-border)',
             borderRadius: '8px',
-            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
+            boxShadow: '0 4px 16px var(--color-panel-shadow)',
             zIndex: 100000,
             padding: '8px',
             display: 'flex',
             flexDirection: 'column',
             gap: '16px',
+            pointerEvents: 'auto',
           }}
           onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           {/* Main Content Row */}
           <div style={{
@@ -462,7 +476,11 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
               return (
                 <button
                   key={option.type}
-                  onClick={() => handlePresetSelect(option.type)}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePresetSelect(option.type);
+                  }}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
@@ -475,6 +493,7 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
                     textAlign: 'left',
                     width: '100%',
                     transition: 'background-color 0.15s',
+                    pointerEvents: 'auto',
                   }}
                   onMouseEnter={(e) => {
                     if (!isSelected) {
@@ -566,7 +585,11 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
                 </div>
               )}
               <button
-                onClick={applyCustomRange}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  applyCustomRange();
+                }}
                 disabled={!selectedStartDate || !selectedEndDate}
                 style={{
                   padding: '8px 16px',
@@ -578,6 +601,7 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
                   fontWeight: 500,
                   cursor: (!selectedStartDate || !selectedEndDate) ? 'not-allowed' : 'pointer',
                   opacity: (!selectedStartDate || !selectedEndDate) ? 0.5 : 1,
+                  pointerEvents: 'auto',
                 }}
                 onMouseEnter={(e) => {
                   if (selectedStartDate && selectedEndDate) {
@@ -595,7 +619,7 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
             </div>
           )}
         </div>,
-        document.body
+        portalTarget
       )}
     </>
   );

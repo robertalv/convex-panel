@@ -5,6 +5,7 @@ import { formatValue, formatTimestamp, buildColumnMeta } from './table/data-tabl
 import { patchDocumentFields } from '../../../utils/api/documents';
 import { toast } from '../../../utils/toast';
 import { Sheet } from '../../../components/shared/sheet';
+import { IconButton } from '../../../components/shared';
 
 export interface EditDocumentSheetProps {
   isOpen: boolean;
@@ -375,7 +376,7 @@ export const EditDocumentSheet: React.FC<EditDocumentSheetProps> = ({
                       padding: 0,
                       backgroundColor: 'transparent',
                       border: 'none',
-                      borderRadius: '4px',
+                      borderRadius: '8px',
                       cursor: canNavigatePrevious ? 'pointer' : 'not-allowed',
                       color: 'var(--color-panel-text-muted)',
                       opacity: canNavigatePrevious ? 1 : 0.5,
@@ -412,7 +413,7 @@ export const EditDocumentSheet: React.FC<EditDocumentSheetProps> = ({
                       padding: 0,
                       backgroundColor: 'transparent',
                       border: 'none',
-                      borderRadius: '4px',
+                      borderRadius: '8px',
                       cursor: canNavigateNext ? 'pointer' : 'not-allowed',
                       color: 'var(--color-panel-text-muted)',
                       opacity: canNavigateNext ? 1 : 0.5,
@@ -469,32 +470,10 @@ export const EditDocumentSheet: React.FC<EditDocumentSheetProps> = ({
             </div>
 
             {/* Close Button */}
-            <button
-              type="button"
+            <IconButton
+              icon={X}
               onClick={onClose}
-              style={{
-                padding: '6px',
-                color: 'var(--color-panel-text-secondary)',
-                backgroundColor: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '4px',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = 'var(--color-panel-text)';
-                e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              <X size={18} />
-            </button>
+            />
           </div>
 
         {/* Content */}
@@ -635,8 +614,8 @@ export const EditDocumentSheet: React.FC<EditDocumentSheetProps> = ({
                             }}
                             style={{
                               width: '100%',
-                              height: '32px',
-                              padding: '0 12px',
+                              minHeight: '28px',
+                              padding: '12px',
                               fontSize: '12px',
                               fontFamily: 'monospace',
                               backgroundColor: editError
@@ -649,7 +628,7 @@ export const EditDocumentSheet: React.FC<EditDocumentSheetProps> = ({
                               color: 'var(--color-panel-text)',
                               outline: 'none',
                               boxSizing: 'border-box',
-                              transition: 'border-color 0.2s ease, background-color 0.2s ease',
+                              // transition: 'border-color 0.2s ease, background-color 0.2s ease',
                             }}
                             onFocus={(e) => {
                               if (!editError) {
@@ -685,7 +664,7 @@ export const EditDocumentSheet: React.FC<EditDocumentSheetProps> = ({
                                 fontWeight: 500,
                                 backgroundColor: 'transparent',
                                 border: '1px solid var(--color-panel-border)',
-                                borderRadius: '6px',
+                                borderRadius: '8px',
                                 color: 'var(--color-panel-text-secondary)',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s ease',
@@ -712,10 +691,10 @@ export const EditDocumentSheet: React.FC<EditDocumentSheetProps> = ({
                                 fontSize: '12px',
                                 fontWeight: 500,
                                 backgroundColor: isSaving
-                                  ? 'var(--color-panel-bg-tertiary)'
+                                  ? 'var(--color-panel-bg-accent)'
                                   : 'var(--color-panel-primary)',
                                 border: 'none',
-                                borderRadius: '6px',
+                                borderRadius: '8px',
                                 color: isSaving
                                   ? 'var(--color-panel-text-secondary)'
                                   : 'var(--color-panel-text-on-primary)',
@@ -739,73 +718,55 @@ export const EditDocumentSheet: React.FC<EditDocumentSheetProps> = ({
                         </div>
                       ) : (
                         <div
+                          onClick={() => !isSystemField && handleFieldClick(fieldName, value)}
                           style={{
+                            position: 'relative',
+                            padding: '4px 28px 4px 12px',
+                            backgroundColor: 'var(--color-panel-bg-secondary)',
+                            border: '1px solid var(--color-panel-border)',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            color: 'var(--color-panel-text)',
+                            fontFamily: typeof value === 'string' && value.length > 50 ? 'monospace' : 'inherit',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            cursor: isSystemField ? 'default' : 'pointer',
+                            minHeight: '28px',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSystemField) {
+                              e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+                              e.currentTarget.style.borderColor = 'var(--color-panel-border-hover)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSystemField) {
+                              e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
+                              e.currentTarget.style.borderColor = 'var(--color-panel-border)';
+                            }
                           }}
                         >
+                          {displayValue}
                           <div
-                            onClick={() => !isSystemField && handleFieldClick(fieldName, value)}
                             style={{
-                              flex: 1,
-                              padding: '4px 6px',
-                              backgroundColor: 'var(--color-panel-bg-secondary)',
-                              border: '1px solid var(--color-panel-border)',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              color: 'var(--color-panel-text)',
-                              fontFamily: typeof value === 'string' && value.length > 50 ? 'monospace' : 'inherit',
-                              whiteSpace: 'pre-wrap',
-                              wordBreak: 'break-word',
-                              cursor: isSystemField ? 'default' : 'pointer',
-                              transition: 'all 0.2s',
-                              minHeight: '28px',
-                              display: 'flex',
-                              alignItems: 'center',
+                              position: 'absolute',
+                              right: '4px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
                             }}
-                            onMouseEnter={(e) => {
-                              if (!isSystemField) {
-                                e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
-                                e.currentTarget.style.borderColor = 'var(--color-panel-border-hover)';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!isSystemField) {
-                                e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
-                                e.currentTarget.style.borderColor = 'var(--color-panel-border)';
-                              }
-                            }}
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            {displayValue}
+                            <IconButton
+                              icon={Copy}
+                              onClick={() => handleCopy(value)}
+                              size={14}
+                              aria-label="Copy value"
+                              defaultColor="var(--color-panel-text-secondary)"
+                              hoverBackgroundColor="var(--color-panel-bg-tertiary)"
+                            />
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(value)}
-                            style={{
-                              padding: '6px',
-                              borderRadius: '6px',
-                              border: 'none',
-                              background: 'transparent',
-                              color: 'var(--color-panel-text-secondary)',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'all 0.2s',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color = 'var(--color-panel-text)';
-                              e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
-                              e.currentTarget.style.backgroundColor = 'transparent';
-                            }}
-                            title="Copy value"
-                          >
-                            <Copy size={14} />
-                          </button>
                         </div>
                       )}
                     </div>

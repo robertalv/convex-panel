@@ -1,2 +1,2 @@
-export { useNpmDownloads } from './useNpmDownloads';
+export { useNpmDownloads, useNpmPackageData } from './useNpmDownloads';
 

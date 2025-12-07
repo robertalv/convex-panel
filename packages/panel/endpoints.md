@@ -47,7 +47,7 @@
 
 ### Scheduled Jobs
 - `POST /api/v1/cancel_all_jobs` - Cancel all scheduled jobs
-- `POST /api/v1/cancel_job` - Cancel specific job
+- `POST /api/cancel_job` - Cancel specific job
 
 ## Action Callback Endpoints (`/api/actions`)
 

@@ -40,6 +40,7 @@ export const STORAGE_KEYS: Record<string, string> = {
   BOTTOM_SHEET_EXPANDED: `${STORAGE_PREFIX}:bottom-sheet-expanded`,
   DEPLOYMENT_STATE_CHANGED: `${STORAGE_PREFIX}:deployment-state-changed`,
   FILTER_HISTORY_RETENTION_MS: `${STORAGE_PREFIX}:filter-history-retention-ms`,
+  FILTER_HISTORY_SESSION_PREFIX: `${STORAGE_PREFIX}:filter-history-session`,
 }
 
 export const PANEL_MIN_HEIGHT = 40;
@@ -104,10 +105,10 @@ export const LogType = {
 	ALL: "All log types",
 	SUCCESS: "success",
 	FAILURE: "failure",
-	DEBUG: "debug",
-	LOGINFO: "loginfo",
-	WARNING: "warn",
-	ERROR: "error",
+	DEBUG: "DEBUG",
+	INFO: "INFO",
+	WARN: "WARN",
+	ERROR: "ERROR",
 	HTTP: "HTTP",
 } as const;
 
@@ -116,10 +117,10 @@ export type LogType = typeof LogType[keyof typeof LogType];
 export const LOG_TYPES = [
   { value: 'success', label: 'success' },
   { value: 'failure', label: 'failure' },
-  { value: 'debug', label: 'debug' },
-  { value: 'log / info', label: 'log / info' },
-  { value: 'warn', label: 'warn' },
-  { value: 'error', label: 'error' },
+  { value: 'DEBUG', label: 'DEBUG' },
+  { value: 'INFO', label: 'INFO' },
+  { value: 'WARN', label: 'WARN' },
+  { value: 'ERROR', label: 'ERROR' },
 ];
 
 // Default settings

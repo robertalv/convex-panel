@@ -14,7 +14,8 @@ import {
   Clock,
   FileText
 } from 'lucide-react';
-import type { FilterExpression, FilterClause, SortConfig, TableDefinition } from '../../../types';
+import type { FilterExpression, FilterClause, TableDefinition } from '../../../types';
+import type { SortConfig } from '../../../types/common';
 import { operatorOptions, typeOptions } from '../../../utils/constants';
 import { Dropdown } from '../../../components/shared';
 import { SearchableDropdown } from '../../../components/shared/searchable-dropdown';
@@ -31,8 +32,7 @@ export interface DataFilterPanelProps {
   onVisibleFieldsChange?: (fields: string[]) => void;
   onClose?: () => void;
   openColumnVisibility?: boolean;
-  /** Optional filter history API. If provided, filter history will be persisted. */
-  filterHistoryApi?: {
+  filterHistoryApi: {
     push: (scope: string, state: { filters: FilterExpression; sortConfig: SortConfig | null }) => Promise<void>;
     undo: (scope: string, count?: number) => Promise<{ filters: FilterExpression; sortConfig: SortConfig | null } | null>;
     redo: (scope: string, count?: number) => Promise<{ filters: FilterExpression; sortConfig: SortConfig | null } | null>;
@@ -41,12 +41,6 @@ export interface DataFilterPanelProps {
   };
   /** Optional user ID for scoping filter history. Defaults to 'default' */
   userId?: string;
-}
-
-// Filter history for navigation (fallback when API not provided)
-interface FilterHistoryEntry {
-  filters: FilterExpression;
-  sortConfig: SortConfig | null;
 }
 
 export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
@@ -69,63 +63,32 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
   
   // Scope for filter history: user:userId:table:tableName
   const filterHistoryScope = `user:${userId}:table:${selectedTable}`;
-  
-  // Filter history status (fetched when API is available)
   const [historyStatus, setHistoryStatus] = useState<{ canUndo: boolean; canRedo: boolean; position: number | null; length: number } | null>(null);
   
-  // Fetch history status when API is available
   useEffect(() => {
-    if (filterHistoryApi) {
-      filterHistoryApi.getStatus(filterHistoryScope)
-        .then(setHistoryStatus)
-        .catch(() => {
-          // Silently fail if API is not available
-        });
-    } else {
-      setHistoryStatus(null);
-    }
+    filterHistoryApi.getStatus(filterHistoryScope)
+      .then(setHistoryStatus)
+      .catch(() => {
+        // Just fail and do nothing
+      });
   }, [filterHistoryScope, filterHistoryApi]);
-  
-  // Fallback: Filter history for back/forward navigation (when API not provided)
-  const [filterHistory, setFilterHistory] = useState<FilterHistoryEntry[]>([
-    { filters, sortConfig }
-  ]);
-  const [historyIndex, setHistoryIndex] = useState(0);
-  
-  // Sync local history when filters change externally (only if not using API)
-  useEffect(() => {
-    if (!filterHistoryApi) {
-      const currentEntry = filterHistory[historyIndex];
-      const isDifferent = JSON.stringify(currentEntry?.filters) !== JSON.stringify(filters) ||
-        JSON.stringify(currentEntry?.sortConfig) !== JSON.stringify(sortConfig);
-      
-      if (isDifferent && currentEntry) {
-        // Filters changed externally, update current history entry
-        const updatedHistory = [...filterHistory];
-        updatedHistory[historyIndex] = { filters, sortConfig };
-        setFilterHistory(updatedHistory);
-      }
-    }
-  }, [filters, sortConfig, filterHistoryApi]);
   
   // Load current state from API on mount and when scope changes
   useEffect(() => {
-    if (filterHistoryApi) {
-      filterHistoryApi.getCurrentState(filterHistoryScope).then((state) => {
-        if (state) {
-          setDraftFilters(state.filters.clauses || []);
-          setDraftSortConfig(state.sortConfig);
-          setFilters(state.filters);
-          if (state.sortConfig) {
-            setSortConfig(state.sortConfig);
-          } else {
-            setSortConfig(null);
-          }
+    filterHistoryApi.getCurrentState(filterHistoryScope).then((state) => {
+      if (state) {
+        setDraftFilters(state.filters.clauses || []);
+        setDraftSortConfig(state.sortConfig);
+        setFilters(state.filters);
+        if (state.sortConfig) {
+          setSortConfig(state.sortConfig);
+        } else {
+          setSortConfig(null);
         }
-      }).catch(() => {
-        // Silently fail if API is not available
-      });
-    }
+      }
+    }).catch(() => {
+      // Just fail and do nothing
+    });
   }, [filterHistoryScope, filterHistoryApi, setFilters, setSortConfig]);
   
   // Field visibility state
@@ -298,149 +261,87 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
     } else {
       setSortConfig(null);
     }
-    
-    // Push to filter history API if available
-    if (filterHistoryApi) {
-      try {
-        await filterHistoryApi.push(filterHistoryScope, {
-          filters: newFilters,
-          sortConfig: draftSortConfig,
+    try {
+      await filterHistoryApi.push(filterHistoryScope, {
+        filters: newFilters,
+        sortConfig: draftSortConfig,
+      });
+      filterHistoryApi.getStatus(filterHistoryScope)
+        .then(setHistoryStatus)
+        .catch(() => {
+          // Just fail and do nothing
         });
-        // Refresh status after pushing
-        filterHistoryApi.getStatus(filterHistoryScope)
-          .then(setHistoryStatus)
-          .catch(() => {
-            // Silently fail if status refresh fails
-          });
-      } catch (error) {
-        // Silently fail if API is not available
-      }
-    } else {
-      // Fallback: Add to local history (only if different from current)
-      const currentEntry = filterHistory[historyIndex];
-      const isDifferent = JSON.stringify(currentEntry?.filters) !== JSON.stringify(newFilters) ||
-        JSON.stringify(currentEntry?.sortConfig) !== JSON.stringify(draftSortConfig);
-      
-      if (isDifferent) {
-        const newHistory = filterHistory.slice(0, historyIndex + 1);
-        newHistory.push({ filters: newFilters, sortConfig: draftSortConfig });
-        setFilterHistory(newHistory);
-        setHistoryIndex(newHistory.length - 1);
-      }
+    } catch (error) {
+      // Just fail and do nothing
     }
     
     // Close the filter panel after applying
     onClose?.();
-  }, [draftFilters, draftSortConfig, setFilters, setSortConfig, filterHistory, historyIndex, onClose, filterHistoryApi, filterHistoryScope]);
+  }, [draftFilters, draftSortConfig, setFilters, setSortConfig, onClose, filterHistoryApi, filterHistoryScope]);
 
-  // Navigation handlers - use status from API or local state
-  const canGoBack = filterHistoryApi 
-    ? (historyStatus?.canUndo ?? false)
-    : historyIndex > 0;
-  const canGoForward = filterHistoryApi
-    ? (historyStatus?.canRedo ?? false)
-    : historyIndex < filterHistory.length - 1;
+  const canGoBack = historyStatus?.canUndo ?? false;
+  const canGoForward = historyStatus?.canRedo ?? false;
 
   const handleGoBack = useCallback(async () => {
     if (!canGoBack) return;
     
-    if (filterHistoryApi) {
-      try {
-        const prevState = await filterHistoryApi.undo(filterHistoryScope, 1);
-        
-        // Small delay to ensure backend has processed
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
-        // Refresh status to get updated navigation state
-        const newStatus = await filterHistoryApi.getStatus(filterHistoryScope);
-        setHistoryStatus(newStatus);
-        
-        if (prevState) {
-          // We have a previous state, apply it
-          setDraftFilters(prevState.filters.clauses || []);
-          setDraftSortConfig(prevState.sortConfig);
-          setFilters(prevState.filters);
-          if (prevState.sortConfig) {
-            setSortConfig(prevState.sortConfig);
-          } else {
-            setSortConfig(null);
-          }
-        } else {
-          // null means we moved to position null (before any states)
-          // Clear filters to show we're at the beginning
-          setDraftFilters([]);
-          setDraftSortConfig(null);
-          setFilters({ clauses: [] });
-          setSortConfig(null);
-        }
-      } catch (error) {
-        // Silently fail if API is not available
-      }
-    } else {
-      // Fallback: local history
-      const prevIndex = historyIndex - 1;
-      const entry = filterHistory[prevIndex];
-      if (entry) {
-        setDraftFilters(entry.filters.clauses || []);
-        setDraftSortConfig(entry.sortConfig);
-        setHistoryIndex(prevIndex);
-        // Apply immediately when navigating
-        setFilters(entry.filters);
-        if (entry.sortConfig) {
-          setSortConfig(entry.sortConfig);
+    try {
+      const prevState = await filterHistoryApi.undo(filterHistoryScope, 1);
+      
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      const newStatus = await filterHistoryApi.getStatus(filterHistoryScope);
+      setHistoryStatus(newStatus);
+      
+      if (prevState) {
+        // if we have a previous state, apply it
+        setDraftFilters(prevState.filters.clauses || []);
+        setDraftSortConfig(prevState.sortConfig);
+        setFilters(prevState.filters);
+        if (prevState.sortConfig) {
+          setSortConfig(prevState.sortConfig);
         } else {
           setSortConfig(null);
         }
+      } else {
+        // if we moved to position null (before any states)
+        // clear filters to show we're at the beginning
+        setDraftFilters([]);
+        setDraftSortConfig(null);
+        setFilters({ clauses: [] });
+        setSortConfig(null);
       }
+    } catch (error) {
+      // Just fail and do nothing
     }
-  }, [canGoBack, historyIndex, filterHistory, setFilters, setSortConfig, filterHistoryApi, filterHistoryScope]);
+  }, [canGoBack, setFilters, setSortConfig, filterHistoryApi, filterHistoryScope]);
 
   const handleGoForward = useCallback(async () => {
     if (!canGoForward) return;
     
-    if (filterHistoryApi) {
-      try {
-        const nextState = await filterHistoryApi.redo(filterHistoryScope, 1);
-        
-        // Small delay to ensure backend has processed
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
-        // Refresh status to get updated navigation state
-        const newStatus = await filterHistoryApi.getStatus(filterHistoryScope);
-        setHistoryStatus(newStatus);
-        
-        if (nextState) {
-          // We have a next state, apply it
-          setDraftFilters(nextState.filters.clauses || []);
-          setDraftSortConfig(nextState.sortConfig);
-          setFilters(nextState.filters);
-          if (nextState.sortConfig) {
-            setSortConfig(nextState.sortConfig);
-          } else {
-            setSortConfig(null);
-          }
-        }
-      } catch (error) {
-        // Silently fail if API is not available
-      }
-    } else {
-      // Fallback: local history
-      const nextIndex = historyIndex + 1;
-      const entry = filterHistory[nextIndex];
-      if (entry) {
-        setDraftFilters(entry.filters.clauses || []);
-        setDraftSortConfig(entry.sortConfig);
-        setHistoryIndex(nextIndex);
-        // Apply immediately when navigating
-        setFilters(entry.filters);
-        if (entry.sortConfig) {
-          setSortConfig(entry.sortConfig);
+    try {
+      const nextState = await filterHistoryApi.redo(filterHistoryScope, 1);
+      
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      const newStatus = await filterHistoryApi.getStatus(filterHistoryScope);
+      setHistoryStatus(newStatus);
+      
+      if (nextState) {
+        // if we have a next state, apply it
+        setDraftFilters(nextState.filters.clauses || []);
+        setDraftSortConfig(nextState.sortConfig);
+        setFilters(nextState.filters);
+        if (nextState.sortConfig) {
+          setSortConfig(nextState.sortConfig);
         } else {
           setSortConfig(null);
         }
       }
+    } catch (error) {
+      // Just fail and do nothing
     }
-  }, [canGoForward, historyIndex, filterHistory, setFilters, setSortConfig, filterHistoryApi, filterHistoryScope]);
+  }, [canGoForward, setFilters, setSortConfig, filterHistoryApi, filterHistoryScope]);
 
   const handleRemoveFilter = (index: number) => {
     setDraftFilters(draftFilters.filter((_, i) => i !== index));

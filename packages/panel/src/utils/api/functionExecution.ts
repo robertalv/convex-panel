@@ -1,5 +1,5 @@
 import type { Value } from 'convex/values';
-import { getAdminClientInfo, validateAdminClientInfo } from '../adminClient';
+import { getAdminClientInfo } from '../adminClient';
 import type { UdfType } from '../../types/convex';
 import { ROUTES } from '../constants';
 
@@ -170,21 +170,6 @@ export async function executeCustomQuery(
   try {
     // Get deployment URL and admin key using centralized utility
     const clientInfo = getAdminClientInfo(adminClient, providedDeploymentUrl);
-    const validationError = validateAdminClientInfo(clientInfo);
-    
-    if (validationError) {
-      console.error('executeCustomQuery: Missing required values', {
-        deploymentUrl: clientInfo.deploymentUrl,
-        adminKey: clientInfo.adminKey ? 'found' : 'missing',
-        adminClientKeys: adminClient ? Object.keys(adminClient) : 'no client',
-      });
-      return {
-        success: false,
-        errorMessage: validationError,
-        logLines: [],
-      };
-    }
-
     const { deploymentUrl, adminKey } = clientInfo;
 
     // Make HTTP POST request to /api/run_test_function

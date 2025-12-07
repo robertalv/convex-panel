@@ -46,7 +46,7 @@ export const DropdownSearch: React.FC<DropdownSearchProps> = ({
             boxSizing: 'border-box',
             backgroundColor: 'var(--color-panel-bg-secondary)',
             border: '1px solid var(--color-panel-border)',
-            borderRadius: '4px',
+            borderRadius: '8px',
             height: '28px',
             paddingLeft: '28px',
             paddingRight: '8px',

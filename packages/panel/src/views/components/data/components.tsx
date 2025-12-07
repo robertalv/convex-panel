@@ -23,9 +23,11 @@ import {
   Gauge,
   Zap,
   Type,
+  Image,
+  Sparkles,
+  History,
 } from 'lucide-react';
 import type { ComponentInfo, ComponentCategory } from '../../../types/components';
-import { getComponentImageUrl } from '../utils/images';
 
 const getGradient = (index: number, category: string): { gradientFrom: string; gradientTo: string } => {
   const gradients: Record<string, string[][]> = {
@@ -67,11 +69,6 @@ const getGradient = (index: number, category: string): { gradientFrom: string; g
   const categoryGradients = gradients[category] || [['#e5e7eb', '#d1d5db']];
   const gradient = categoryGradients[index % categoryGradients.length];
   return { gradientFrom: gradient[0], gradientTo: gradient[1] };
-};
-
-const addImageUrl = (component: Omit<ComponentInfo, 'imageUrl'>): ComponentInfo => {
-  const imageUrl = getComponentImageUrl(component.id);
-  return imageUrl ? { ...component, imageUrl } : component;
 };
 
 const componentsData: Array<Omit<ComponentInfo, 'imageUrl'>> = [
@@ -8640,6 +8637,87 @@ const { text, status } = useStream(
       },
     ],
   },
+  {
+    id: 'cloudinary-convex',
+    title: 'Cloudinary Convex',
+    description: 'A Convex component for Cloudinary integration providing image upload, transformation, and management capabilities.',
+    icon: <Image size={48} />,
+    ...getGradient(9, 'Integrations'),
+    weeklyDownloads: 0,
+    developer: 'imaxis',
+    category: 'Integrations' as ComponentCategory,
+    npmPackage: '@imaxis/cloudinary-convex',
+    repoUrl: 'https://github.com/imaxisXD/cloudinary-convex',
+    packageUrl: 'https://www.npmjs.com/package/@imaxis/cloudinary-convex',
+    docsUrl: 'https://github.com/imaxisXD/cloudinary-convex#readme',
+    longDescription: 'A Convex Component for Cloudinary integration that provides image upload, transformation, and management capabilities using direct Cloudinary REST APIs with full TypeScript support. Features direct API integration, two upload methods (base64 and direct upload for large files), asset management, dynamic transformations, and secure server-side signature generation.',
+    features: [
+      '**Direct API Integration**: Uses Cloudinary REST APIs directly instead of SDKs for better control and reduced dependencies.',
+      '**Two Upload Methods**: Base64 upload for small files (<10MB) and direct upload to bypass Convex 16MB limit for large files (100MB+) with real-time progress.',
+      '**Asset Management**: Automatic asset tracking in Convex with optimized indexes.',
+      '**Dynamic Transformations**: Generate transformed URLs on-the-fly with full type safety and IntelliSense support.',
+      '**Type Safety**: Full TypeScript support with exported validators and inferred types.',
+      '**Secure**: Server-side signature generation and environment-based credentials.',
+      '**React Hooks**: Pre-built hooks for upload, image transformation, and asset operations.',
+      '**Upload Status Tracking**: Reactive upload status tracking across browser tabs and devices.',
+      '**Checkpoint Support**: Named snapshots that persist independently of the timeline.',
+    ],
+    exampleCommands: [
+      'npm install @imaxis/cloudinary-convex',
+    ],
+    bugReportUrl: 'https://github.com/imaxisXD/cloudinary-convex/issues',
+  },
+  {
+    id: 'replicate',
+    title: 'Replicate',
+    description: 'Integrate Replicate AI models into your Convex application with ease.',
+    icon: <Sparkles size={48} />,
+    ...getGradient(10, 'Integrations'),
+    weeklyDownloads: 0,
+    developer: 'trestleinc',
+    category: 'Integrations' as ComponentCategory,
+    npmPackage: '@trestleinc/replicate',
+    packageUrl: 'https://www.npmjs.com/package/@trestleinc/replicate',
+    longDescription: 'A Convex component for integrating Replicate AI models into your application. Replicate provides access to thousands of AI models for image generation, text processing, audio, and more.',
+    features: [
+      '**AI Model Integration**: Access thousands of AI models from Replicate.',
+      '**Type Safety**: Full TypeScript support for model inputs and outputs.',
+      '**Async Processing**: Handle long-running AI model predictions with proper async handling.',
+      '**Webhook Support**: Receive notifications when predictions complete.',
+      '**Error Handling**: Robust error handling for failed predictions and API errors.',
+    ],
+    exampleCommands: [
+      'npm install @trestleinc/replicate',
+    ],
+  },
+  {
+    id: 'timeline',
+    title: 'Timeline',
+    description: 'A Convex component for undo/redo state management with named checkpoints.',
+    icon: <History size={48} />,
+    ...getGradient(3, 'Backend'),
+    weeklyDownloads: 0,
+    developer: 'MeshanKhosla',
+    category: 'Backend' as ComponentCategory,
+    npmPackage: 'convex-timeline',
+    repoUrl: 'https://github.com/MeshanKhosla/convex-timeline',
+    packageUrl: 'https://www.npmjs.com/package/convex-timeline',
+    docsUrl: 'https://github.com/MeshanKhosla/convex-timeline#readme',
+    longDescription: 'Timeline maintains a linear history of state snapshots organized by scope. It provides undo/redo functionality, named checkpoints that persist independently of the timeline, and automatic pruning with configurable limits to prevent unbounded growth.',
+    features: [
+      '**Undo/Redo**: Navigate backward and forward through state history.',
+      '**Checkpoints**: Named snapshots that persist independently of the timeline.',
+      '**Automatic Pruning**: Configurable limits to prevent unbounded growth.',
+      '**Scope-based Organization**: Organize state history by scope for different entities.',
+      '**Status Queries**: Check undo/redo availability and current position.',
+      '**Inspection Tools**: Get state at specific positions and list all nodes.',
+      '**Clear and Delete**: Remove timeline data or entire scopes.',
+    ],
+    exampleCommands: [
+      'npm install convex-timeline',
+    ],
+    bugReportUrl: 'https://github.com/MeshanKhosla/convex-timeline/issues',
+  },
 ];
 
-export const ALL_COMPONENTS: ComponentInfo[] = componentsData.map(addImageUrl);
+export const ALL_COMPONENTS: ComponentInfo[] = componentsData;

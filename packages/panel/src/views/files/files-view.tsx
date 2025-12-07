@@ -11,6 +11,7 @@ import { DateFilterDropdown } from './components/date-filter-dropdown';
 import type { DateFilter } from './components/date-filter-dropdown';
 import { Checkbox } from '../../components/shared/checkbox';
 import { ROUTES } from '../../utils/constants';
+import { ConfirmDialog } from '../../components/shared/confirm-dialog';
 
 export interface FilesViewProps {
   convexUrl?: string;
@@ -31,7 +32,10 @@ export const FilesView: React.FC<FilesViewProps> = ({
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
   const [dateFilter, setDateFilter] = useState<DateFilter>({ type: 'any' });
   const [fileToDelete, setFileToDelete] = useState<FileMetadata | null>(null);
+  const [filesToDelete, setFilesToDelete] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSingleDeleteDialogOpen, setIsSingleDeleteDialogOpen] = useState(false);
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<Array<{
     id: string;
@@ -42,6 +46,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
     storageId?: string;
   }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const { openSheet } = useSheetSafe();
 
   const {
@@ -357,6 +362,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
   const handleFileDelete = async (e: React.MouseEvent, file: FileMetadata) => {
     e.stopPropagation();
     setFileToDelete(file);
+    setIsSingleDeleteDialogOpen(true);
   };
 
   const confirmDelete = async () => {
@@ -388,12 +394,52 @@ export const FilesView: React.FC<FilesViewProps> = ({
     }
   };
 
-  const cancelDelete = () => {
-    setFileToDelete(null);
+  const handleBulkDelete = () => {
+    if (selectedFileIds.length === 0) return;
+    setFilesToDelete([...selectedFileIds]);
+    setIsBulkDeleteDialogOpen(true);
   };
+
+  const confirmBulkDelete = async () => {
+    if (filesToDelete.length === 0 || !adminClient) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      // Get storageIds for the selected files
+      const storageIds = filesToDelete.map(id => {
+        const file = files.find(f => f._id === id);
+        return file?.storageId || file?._id || id;
+      });
+
+      const result = await deleteFile(
+        adminClient,
+        storageIds,
+        selectedComponentId || undefined
+      );
+
+      if (result.success) {
+        // Clear selection
+        setSelectedFileIds([]);
+        // Refresh the file list
+        refetch();
+        setFilesToDelete([]);
+        setIsBulkDeleteDialogOpen(false);
+      } else {
+        onError?.(result.error || 'Failed to delete files');
+      }
+    } catch (err: any) {
+      onError?.(err?.message || 'Failed to delete files');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
 
   return (
     <div
+      ref={containerRef}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -491,7 +537,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
           padding: '6px 12px',
           backgroundColor: 'var(--color-panel-bg-secondary)',
           border: '1px solid var(--color-panel-border)',
-          borderRadius: '6px',
+          borderRadius: '8px',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
@@ -525,9 +571,43 @@ export const FilesView: React.FC<FilesViewProps> = ({
         Total Files {files.length}
         </span>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {selectedFileIds.length > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              style={{
+                height: '28px',
+                padding: '0 12px',
+                backgroundColor: 'color-mix(in srgb, var(--color-panel-error) 20%, var(--color-panel-bg-tertiary))',
+                border: '1px solid var(--color-panel-error)',
+                borderRadius: '4px',
+                fontSize: '12px',
+                color: 'var(--color-panel-text)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'background-color 0.2s, border-color 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--color-panel-error) 30%, var(--color-panel-bg-tertiary))';
+                e.currentTarget.style.borderColor = 'var(--color-panel-error)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--color-panel-error) 20%, var(--color-panel-bg-tertiary))';
+                e.currentTarget.style.borderColor = 'var(--color-panel-error)';
+              }}
+            >
+              <Trash2 size={12} />
+              Delete {selectedFileIds.length} {selectedFileIds.length === 1 ? 'file' : 'files'}
+            </button>
+          )}
           <button
             onClick={handleUploadClick}
             className="cp-btn"
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+            }}
             onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = 'var(--color-panel-accent-hover)';
             }}
@@ -548,7 +628,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
           display: 'flex',
           alignItems: 'center',
           padding: '8px',
-          borderBottom: '1px solid var(--color-panel-border)',
+          borderBottom: '1px solid var(--cp-data-row-border)',
           fontSize: '12px',
           fontWeight: 500,
           color: 'var(--color-panel-text-muted)',
@@ -658,6 +738,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
                 const isUploading = uploadingFile.status === 'uploading';
                 const isError = uploadingFile.status === 'error';
                 const isSuccess = uploadingFile.status === 'success';
+                const baseRowBackground = 'var(--color-panel-bg-secondary)';
 
                 return (
                   <div
@@ -666,13 +747,14 @@ export const FilesView: React.FC<FilesViewProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       padding: '8px',
-                      borderBottom: '1px solid var(--color-panel-border)',
+                      borderBottom: '1px solid var(--cp-data-row-border)',
                       fontSize: '12px',
                       fontFamily: 'monospace',
                       color: 'var(--color-panel-text-secondary)',
-                      backgroundColor: isError ? 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)' : 'transparent',
+                      backgroundColor: isError ? 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)' : '',
                       opacity: isSuccess ? 0.6 : 1,
                       cursor: isUploading ? 'default' : 'pointer',
+                      transition: 'background-color 0.35s ease',
                     }}
                     onClick={!isUploading ? () => {
                       // If uploaded successfully, try to find and click the file
@@ -687,7 +769,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
                       e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
                     } : undefined}
                     onMouseLeave={!isUploading ? (e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.backgroundColor = baseRowBackground;
                     } : undefined}
                   >
                     <div style={{ width: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -902,6 +984,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
               {/* Regular file rows */}
               {filteredFiles.map((file) => {
               const isSelected = selectedFileIds.includes(file._id);
+              
               return (
                 <div
                   key={file._id}
@@ -909,12 +992,13 @@ export const FilesView: React.FC<FilesViewProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     padding: '8px',
-                    borderBottom: '1px solid var(--color-panel-border)',
+                    borderBottom: '1px solid var(--cp-data-row-border)',
                     fontSize: '12px',
                     fontFamily: 'monospace',
                     color: 'var(--color-panel-text-secondary)',
-                    backgroundColor: isSelected ? 'var(--color-panel-bg-tertiary)' : 'transparent',
+                    backgroundColor: isSelected ? 'var(--cp-data-row-selected-bg)' : '',
                     cursor: 'pointer',
+                    transition: 'background-color 0.35s ease',
                   }}
                   onClick={() => handleFileClick(file)}
                   onMouseEnter={(e) => {
@@ -923,9 +1007,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }
+                    e.currentTarget.style.backgroundColor = isSelected ? 'var(--cp-data-row-selected-bg)' : '';
                   }}
                 >
                   <div style={{ width: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1011,133 +1093,59 @@ export const FilesView: React.FC<FilesViewProps> = ({
         </div>
       </div>
 
-      {/* Delete Confirmation Dialog */}
-      {fileToDelete && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-          onClick={cancelDelete}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: 'var(--color-panel-bg)',
-              border: '1px solid var(--color-panel-border)',
-              borderRadius: '8px',
-              padding: '24px',
-              maxWidth: '400px',
-              width: '90%',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            }}
-          >
-            <h3
-              style={{
-                fontSize: '16px',
-                fontWeight: 600,
-                color: 'var(--color-panel-text)',
-                marginBottom: '12px',
-              }}
-            >
-              Delete File
-            </h3>
-            <p
-              style={{
-                fontSize: '14px',
-                color: 'var(--color-panel-text-secondary)',
-                marginBottom: '8px',
-              }}
-            >
+      {/* Single File Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={isSingleDeleteDialogOpen}
+        onClose={() => {
+          setIsSingleDeleteDialogOpen(false);
+          setFileToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        title="Delete File"
+        message={
+          <>
+            <p style={{ marginBottom: '8px' }}>
               Are you sure you want to delete this file?
             </p>
-            <div
-              style={{
-                fontSize: '12px',
-                fontFamily: 'monospace',
-                color: 'var(--color-panel-text-muted)',
-                backgroundColor: 'var(--color-panel-bg-secondary)',
-                padding: '8px',
-                borderRadius: '4px',
-                marginBottom: '20px',
-                wordBreak: 'break-all',
-              }}
-            >
-              {fileToDelete.name || fileToDelete.storageId || fileToDelete._id}
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                gap: '8px',
-                justifyContent: 'flex-end',
-              }}
-            >
-              <button
-                onClick={cancelDelete}
-                disabled={isDeleting}
+            {fileToDelete && (
+              <div
                 style={{
-                  padding: '6px 16px',
+                  fontSize: '12px',
+                  fontFamily: 'monospace',
+                  color: 'var(--color-panel-text-muted)',
                   backgroundColor: 'var(--color-panel-bg-secondary)',
-                  border: '1px solid var(--color-panel-border)',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  color: 'var(--color-panel-text)',
-                  cursor: isDeleting ? 'not-allowed' : 'pointer',
-                  opacity: isDeleting ? 0.5 : 1,
-                }}
-                onMouseEnter={(e) => {
-                  if (!isDeleting) {
-                    e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isDeleting) {
-                    e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
-                  }
+                  padding: '8px',
+                  borderRadius: '4px',
+                  wordBreak: 'break-all',
                 }}
               >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                disabled={isDeleting}
-                style={{
-                  padding: '6px 16px',
-                  backgroundColor: 'var(--color-panel-error)',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  color: 'white',
-                  cursor: isDeleting ? 'not-allowed' : 'pointer',
-                  opacity: isDeleting ? 0.5 : 1,
-                }}
-                onMouseEnter={(e) => {
-                  if (!isDeleting) {
-                    e.currentTarget.style.backgroundColor = 'var(--color-panel-error-hover, color-mix(in srgb, var(--color-panel-error) 90%, black))';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isDeleting) {
-                    e.currentTarget.style.backgroundColor = 'var(--color-panel-error)';
-                  }
-                }}
-              >
-                {isDeleting ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                {fileToDelete.name || fileToDelete.storageId || fileToDelete._id}
+              </div>
+            )}
+          </>
+        }
+        confirmLabel={isDeleting ? 'Deleting...' : 'Delete'}
+        cancelLabel="Cancel"
+        variant="danger"
+        container={containerRef.current}
+        disableCancel={isDeleting}
+      />
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={isBulkDeleteDialogOpen}
+        onClose={() => {
+          setIsBulkDeleteDialogOpen(false);
+          setFilesToDelete([]);
+        }}
+        onConfirm={confirmBulkDelete}
+        title={`Delete ${filesToDelete.length.toLocaleString()} selected file${filesToDelete.length > 1 ? 's' : ''}`}
+        message="Are you sure you want to permanently delete these files? Deleted files cannot be recovered."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        container={containerRef.current}
+      />
     </div>
   );
 };

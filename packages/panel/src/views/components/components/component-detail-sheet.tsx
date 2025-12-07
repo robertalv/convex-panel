@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { ExternalLink, Copy, Check, Github, Package, BookOpen, Bug } from 'lucide-react';
+import { ExternalLink, Copy, Check, Github, Package, BookOpen, Bug, X } from 'lucide-react';
 import type { ComponentInfo } from '../../../types/components';
+import { IconButton } from '../../../components/shared';
+import { useSheetSafe } from '../../../contexts/sheet-context';
 
 export interface ComponentDetailSheetProps {
   component: ComponentInfo;
@@ -60,6 +62,7 @@ const parseMarkdownLinks = (text: string): React.ReactNode[] => {
 export const ComponentDetailSheet: React.FC<ComponentDetailSheetProps> = ({ component }) => {
   const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
   const [copiedExample, setCopiedExample] = useState<string | null>(null);
+  const { closeSheet } = useSheetSafe();
 
   const handleCopy = async (text: string, type: 'command' | 'example') => {
     try {
@@ -88,8 +91,56 @@ export const ComponentDetailSheet: React.FC<ComponentDetailSheetProps> = ({ comp
       display: 'flex',
       flexDirection: 'column',
       color: 'var(--color-panel-text)',
+      height: '100%',
     }}>
-      {/* Icon/Illustration Section */}
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0px 12px',
+          borderBottom: '1px solid var(--color-panel-border)',
+          backgroundColor: 'var(--color-panel-bg-secondary)',
+          height: '40px',
+        }}
+      >
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '12px', 
+          flex: 1,
+          overflow: 'hidden',
+        }}>
+          <h1 style={{ 
+            fontSize: '14px', 
+            fontWeight: 600, 
+            margin: 0,
+            color: 'var(--color-panel-text)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
+            {component.title}
+          </h1>
+        </div>
+
+        {/* Close Button */}
+        <IconButton
+          icon={X}
+          onClick={closeSheet}
+          aria-label="Close sheet"
+        />
+      </div>
+
+      {/* Content */}
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+      {/* Icon Section */}
       <div
         style={{
           height: '200px',
@@ -98,38 +149,14 @@ export const ComponentDetailSheet: React.FC<ComponentDetailSheetProps> = ({ comp
           justifyContent: 'center',
           background: `linear-gradient(135deg, ${component.gradientFrom} 0%, ${component.gradientTo} 100%)`,
           marginBottom: '24px',
-          position: 'relative',
-          overflow: 'hidden',
         }}
       >
-        {component.imageUrl ? (
-          <img
-            src={component.imageUrl}
-            alt={component.title}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: 'center',
-            }}
-            onError={(e) => {
-              // Fallback to icon if image fails to load
-              const target = e.currentTarget;
-              target.style.display = 'none';
-              const iconFallback = target.nextElementSibling as HTMLElement;
-              if (iconFallback) {
-                iconFallback.style.display = 'flex';
-              }
-            }}
-          />
-        ) : null}
         <div
           style={{
-            display: component.imageUrl ? 'none' : 'flex',
+            display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'rgba(0, 0, 0, 0.7)',
-            position: component.imageUrl ? 'absolute' : 'relative',
             width: '100%',
             height: '100%',
           }}
@@ -146,17 +173,17 @@ export const ComponentDetailSheet: React.FC<ComponentDetailSheetProps> = ({ comp
         flexDirection: 'column',
         gap: '24px',
       }}>
-      {/* Header Section */}
+      {/* Title Section */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <h1 style={{ 
+          <h2 style={{ 
             fontSize: '24px', 
             fontWeight: 600, 
             margin: 0,
             color: 'var(--color-panel-text)',
           }}>
             {component.title}
-          </h1>
+          </h2>
           {repoUrl && (
             <a
               href={repoUrl}
@@ -886,6 +913,8 @@ export const ComponentDetailSheet: React.FC<ComponentDetailSheetProps> = ({ comp
       )}
       </div>
       {/* End Content Section */}
-    </div>
+      </div>
+      {/* End Content */}
+      </div>
   );
 };

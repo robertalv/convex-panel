@@ -16,6 +16,7 @@ import { createBackup, listBackups, getPeriodicBackupConfig, getLatestRestore, c
 import { getDeploymentIdFromUrl } from '../../../utils/api/deployments';
 import { extractDeploymentName, getTeamTokenFromEnv } from '../../../utils/api/utils';
 import { fetchProjectInfo, fetchTeams, getTokenDetails } from '../../../utils/api/teams';
+import { IconButton } from '../../../components/shared';
 
 
 const BackupButtonWithTooltip: React.FC<{
@@ -98,27 +99,15 @@ const BackupButtonWithTooltip: React.FC<{
             onClick();
           }}
           disabled={isDisabled}
-          className="cp-btn"
+          className="cp-run-function-btn"
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            opacity: isDisabled ? 0.5 : 1,
             cursor: isDisabled ? 'not-allowed' : 'pointer',
-            opacity: isDisabled ? 0.6 : 1,
-          }}
-          onMouseEnter={(e) => {
-            if (!isDisabled) {
-              e.currentTarget.style.backgroundColor = 'var(--color-panel-accent-hover)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!isDisabled) {
-              e.currentTarget.style.backgroundColor = 'var(--color-panel-accent)';
-            }
           }}
         >
-          <HardDrive size={14} />
+          <HardDrive size={14} style={{ fill: 'currentColor' }} />
           {isCreating ? 'Creating Backup...' : 'Backup Now'}
         </button>
       </div>
@@ -241,13 +230,12 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
   // Dropdown menu state
   const [dropdownState, setDropdownState] = useState<{
     isOpen: boolean;
-    position: { x: number; y: number };
     backup: CloudBackupResponse | null;
   }>({
     isOpen: false,
-    position: { x: 0, y: 0 },
     backup: null,
   });
+  const dropdownTriggerRef = useRef<HTMLElement>(null);
   
   const { openSheet, closeSheet } = useSheetSafe();
 
@@ -1074,10 +1062,13 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
 
   const handleDropdownToggle = (e: React.MouseEvent, backup: CloudBackupResponse) => {
     e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
+    // Set the trigger ref to the parent div that wraps the IconButton
+    const triggerElement = e.currentTarget.closest('div[data-dropdown-trigger]') as HTMLElement;
+    if (triggerElement) {
+      dropdownTriggerRef.current = triggerElement;
+    }
     setDropdownState({
       isOpen: true,
-      position: { x: rect.right - 150, y: rect.bottom + 4 },
       backup,
     });
   };
@@ -1085,7 +1076,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
   const handleDownload = () => {
     if (!dropdownState.backup || !token || !providedDeploymentUrl) {
       setError('Missing backup, access token, or deployment URL');
-      setDropdownState({ isOpen: false, position: { x: 0, y: 0 }, backup: null });
+      setDropdownState({ isOpen: false, backup: null });
       return;
     }
     
@@ -1103,10 +1094,10 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
       link.click();
       document.body.removeChild(link);
       
-      setDropdownState({ isOpen: false, position: { x: 0, y: 0 }, backup: null });
+      setDropdownState({ isOpen: false, backup: null });
     } catch (err: any) {
       setError(err?.message || 'Failed to get download URL');
-      setDropdownState({ isOpen: false, position: { x: 0, y: 0 }, backup: null });
+      setDropdownState({ isOpen: false, backup: null });
     }
   };
 
@@ -1224,7 +1215,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
       ),
     });
     
-    setDropdownState({ isOpen: false, position: { x: 0, y: 0 }, backup: null });
+    setDropdownState({ isOpen: false, backup: null });
   };
 
   const handleDelete = () => {
@@ -1269,7 +1260,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
       ),
     });
     
-    setDropdownState({ isOpen: false, position: { x: 0, y: 0 }, backup: null });
+    setDropdownState({ isOpen: false, backup: null });
   };
 
   if (isLoading) {
@@ -1290,7 +1281,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 16px',
+            padding: '0 8px',
             backgroundColor: 'var(--color-panel-bg)',
           }}
         >
@@ -1340,7 +1331,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 16px',
+          padding: '0 8px',
           backgroundColor: 'var(--color-panel-bg)',
         }}
       >
@@ -1429,7 +1420,7 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
         {/* Description */}
         <div
           style={{
-            padding: '16px 24px',
+            padding: '8px',
             borderBottom: '1px solid var(--color-panel-border)',
             fontSize: '14px',
             color: 'var(--color-panel-text-secondary)',
@@ -1988,28 +1979,13 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
                         gap: '8px',
                       }}
                     >
-                      <button
-                        onClick={(e) => handleDropdownToggle(e, backup)}
-                        style={{
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'var(--color-panel-text-muted)',
-                          backgroundColor: 'transparent',
-                          border: 'none',
-                          padding: '4px',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.color = 'var(--color-panel-text)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.color = 'var(--color-panel-text-muted)';
-                        }}
-                        title="Actions"
-                      >
-                        <MoreVertical size={12} />
-                      </button>
+                      <div data-dropdown-trigger>
+                        <IconButton
+                          icon={MoreVertical}
+                          onClick={(e) => handleDropdownToggle(e, backup)}
+                          aria-label="Actions"
+                        />
+                      </div>
                     </div>
                   </div>
                 );
@@ -2024,8 +2000,8 @@ export const BackupRestore: React.FC<BackupRestoreProps> = ({
       {dropdownState.backup && (
         <BackupActionsDropdown
           isOpen={dropdownState.isOpen}
-          onClose={() => setDropdownState({ isOpen: false, position: { x: 0, y: 0 }, backup: null })}
-          position={dropdownState.position}
+          onClose={() => setDropdownState({ isOpen: false, backup: null })}
+          triggerRef={dropdownTriggerRef as React.RefObject<HTMLElement>}
           onDownload={handleDownload}
           onRestore={handleRestore}
           onDelete={handleDelete}

@@ -133,29 +133,56 @@ export async function streamUdfExecution(
   deploymentUrl: string,
   authToken: string,
   cursor: number | string = 0,
+  limit?: number,
 ): Promise<{ entries: FunctionExecutionJson[]; newCursor: number | string }> {
-  const url = `${deploymentUrl}${ROUTES.STREAM_UDF_EXECUTION}?cursor=${cursor}`;
+  const urlObj = new URL(`${deploymentUrl}${ROUTES.STREAM_UDF_EXECUTION}`);
+  urlObj.searchParams.set('cursor', String(cursor));
+  if (limit) {
+    urlObj.searchParams.set('limit', String(limit));
+  }
+  const url = urlObj.toString();
 
   const normalizedToken = normalizeToken(authToken);
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: normalizedToken,
-      'Content-Type': 'application/json',
-      'Convex-Client': 'dashboard-1.0.0',
-    },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Failed to stream UDF executions: HTTP ${response.status} - ${text}`);
+  let response: Response;
+  let data: any;
+  
+  try {
+    response = await fetch(url, {
+      headers: {
+        Authorization: normalizedToken,
+        'Content-Type': 'application/json',
+        'Convex-Client': 'dashboard-1.0.0',
+      },
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Failed to stream UDF executions: HTTP ${response.status} - ${text}`);
+    }
+
+    data = await response.json();
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout: The API took too long to respond');
+    }
+    throw error;
   }
 
-  const data = await response.json();
+  let entries = (data.entries || []) as FunctionExecutionJson[];
+
+  let newCursor: number | string = cursor;
 
   return {
-    entries: (data.entries || []) as FunctionExecutionJson[],
-    newCursor: data.new_cursor ?? cursor,
+    entries,
+    newCursor,
   };
 }
 
@@ -174,6 +201,7 @@ export async function streamFunctionLogs(
   cursor: number | string = 0,
   sessionId?: string,
   clientRequestCounter?: number,
+  limit?: number,
 ): Promise<{ entries: FunctionExecutionJson[]; newCursor: number | string }> {
   const params = new URLSearchParams({
     cursor: String(cursor),
@@ -182,6 +210,10 @@ export async function streamFunctionLogs(
   if (sessionId && clientRequestCounter !== undefined) {
     params.set('session_id', sessionId);
     params.set('client_request_counter', String(clientRequestCounter));
+  }
+  
+  if (limit) {
+    params.set('limit', String(limit));
   }
 
   const url = `${deploymentUrl}${ROUTES.STREAM_FUNCTION_LOGS}?${params.toString()}`;
@@ -203,8 +235,10 @@ export async function streamFunctionLogs(
 
   const data = await response.json();
 
+  let entries = (data.entries || []) as FunctionExecutionJson[];
+
   return {
-    entries: (data.entries || []) as FunctionExecutionJson[],
+    entries,
     newCursor: data.new_cursor ?? cursor,
   };
 }
@@ -263,20 +297,27 @@ export function processFunctionLogs(
       const startedAtMs =
         timestampSec > 1e12 ? timestampSec : timestampSec * 1000;
 
-      const executionTimeSeconds =
-        raw.execution_time ??
-        (raw.execution_time_ms != null
-          ? raw.execution_time_ms / 1000
-          : raw.executionTimeMs != null
-          ? raw.executionTimeMs / 1000
-          : 0);
+      let executionTimeSeconds = 0;
+      if (raw.executionTime != null) {
+        executionTimeSeconds = raw.executionTime;
+      } else if (raw.execution_time != null) {
+        executionTimeSeconds = raw.execution_time;
+      } else if (raw.executionTimeMs != null) {
+        executionTimeSeconds = raw.executionTimeMs / 1000;
+      } else if (raw.execution_time_ms != null) {
+        executionTimeSeconds = raw.execution_time_ms / 1000;
+      }
       const durationMs = executionTimeSeconds * 1000;
       const completedAtMs = startedAtMs + durationMs;
 
-      const logLines = (raw.log_lines || raw.logLines || []).map((line: any) =>
-        typeof line === 'string' ? line : JSON.stringify(line),
-      );
-
+      const rawLogLines = raw.log_lines || raw.logLines;
+      
+      const logLines = rawLogLines && Array.isArray(rawLogLines) && rawLogLines.length > 0
+        ? rawLogLines.map((line: any) =>
+            typeof line === 'string' ? line : JSON.stringify(line),
+          )
+        : [];
+      
       const success =
         raw.error == null &&
         (raw.success === undefined ||
@@ -307,22 +348,42 @@ export function processFunctionLogs(
         success,
         error: raw.error || raw.error_message,
         logLines,
-        usageStats: raw.usage_stats || raw.usageStats || {
-          database_read_bytes: 0,
-          database_write_bytes: 0,
-          database_read_documents: 0,
-          storage_read_bytes: 0,
-          storage_write_bytes: 0,
-          vector_index_read_bytes: 0,
-          vector_index_write_bytes: 0,
-          memory_used_mb: 0,
-        },
+        usageStats: (() => {
+          const stats = raw.usage_stats || raw.usageStats;
+          if (stats) {
+            return {
+              database_read_bytes: stats.database_read_bytes ?? stats.databaseReadBytes ?? 0,
+              database_write_bytes: stats.database_write_bytes ?? stats.databaseWriteBytes ?? 0,
+              database_read_documents: stats.database_read_documents ?? stats.databaseReadDocuments ?? 0,
+              storage_read_bytes: stats.storage_read_bytes ?? stats.storageReadBytes ?? 0,
+              storage_write_bytes: stats.storage_write_bytes ?? stats.storageWriteBytes ?? 0,
+              vector_index_read_bytes: stats.vector_index_read_bytes ?? stats.vectorIndexReadBytes ?? 0,
+              vector_index_write_bytes: stats.vector_index_write_bytes ?? stats.vectorIndexWriteBytes ?? 0,
+              memory_used_mb: stats.memory_used_mb ?? stats.memoryUsedMb ?? 0,
+            };
+          }
+          return {
+            database_read_bytes: 0,
+            database_write_bytes: 0,
+            database_read_documents: 0,
+            storage_read_bytes: 0,
+            storage_write_bytes: 0,
+            vector_index_read_bytes: 0,
+            vector_index_write_bytes: 0,
+            memory_used_mb: 0,
+          };
+        })(),
         requestId: raw.request_id || raw.requestId || '',
         executionId: raw.execution_id || raw.executionId || '',
         caller: raw.caller,
-        environment: raw.environment,
-        identityType: raw.identity_type || raw.identityType || '',
+        environment: raw.environment === 'isolate' ? 'Convex' : (raw.environment || 'Convex'),
+        identityType: (() => {
+          const identity = raw.identity_type || raw.identityType || '';
+          if (!identity) return '';
+          return identity.charAt(0).toUpperCase() + identity.slice(1).toLowerCase();
+        })(),
         returnBytes: raw.return_bytes || raw.returnBytes,
+        cachedResult: raw.cached_result || raw.cachedResult || false,
         raw: raw,
       } as FunctionExecutionLog;
     });

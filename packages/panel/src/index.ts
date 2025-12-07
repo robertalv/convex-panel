@@ -65,7 +65,7 @@ export type {
   FileOrFolder,
   ProjectEnvVarConfig,
 } from './types';
-export { LogType } from './utils/constants';
+export { LogType, LOG_TYPES } from './utils/constants';
 
 // OAuth exports
 export { useOAuth } from './hooks/useOAuth';

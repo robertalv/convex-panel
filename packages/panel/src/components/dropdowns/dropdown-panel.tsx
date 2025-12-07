@@ -29,16 +29,39 @@ export const DropdownPanel: React.FC<DropdownPanelProps> = ({
   useEffect(() => {
     if (isOpen && triggerRef?.current) {
       const updatePosition = () => {
-        if (triggerRef.current) {
+        if (triggerRef.current && panelRef.current) {
           const rect = triggerRef.current.getBoundingClientRect();
           const calculatedWidth = width 
             ? (typeof width === 'number' ? width : parseFloat(width)) 
             : rect.width;
+          
+          const finalWidth = Math.max(calculatedWidth, rect.width, 200);
+          const viewportWidth = window.innerWidth;
+          const viewportPadding = 16;
+          
+          const rightEdge = rect.left + finalWidth;
+          const wouldOverflowRight = rightEdge > viewportWidth - viewportPadding;
+          
+          const leftEdgeIfFlipped = rect.right - finalWidth;
+          const wouldOverflowLeft = leftEdgeIfFlipped < viewportPadding;
+          
+          let leftPosition: number;
+          
+          if (wouldOverflowRight && !wouldOverflowLeft) {
+            leftPosition = rect.right - finalWidth;
+          } else {
+            leftPosition = rect.left;
+          }
+          
+          leftPosition = Math.max(viewportPadding, leftPosition);
+          
+          const maxLeft = viewportWidth - finalWidth - viewportPadding;
+          leftPosition = Math.min(leftPosition, maxLeft);
 
           setPosition({
             top: rect.bottom + 4,
-            left: rect.left,
-            width: Math.max(calculatedWidth, rect.width),
+            left: leftPosition,
+            width: finalWidth,
           });
         }
       };
@@ -75,17 +98,18 @@ export const DropdownPanel: React.FC<DropdownPanelProps> = ({
           ? {
               top: `${position.top}px`,
               left: `${position.left}px`,
-              width: `${position.width}px`,
+              width: `${Math.max(position.width, 200)}px`,
             }
           : {
               top: 'calc(100% + 4px)',
               left: 0,
-              width: width ? (typeof width === 'number' ? `${width}px` : width) : '100%',
+              width: width ? (typeof width === 'number' ? `${Math.max(width, 200)}px` : width) : '100%',
             }),
         maxWidth: 'calc(100vw - 16px)',
+        minWidth: '200px',
         backgroundColor: 'var(--color-panel-bg)',
         border: '1px solid var(--color-panel-border)',
-        borderRadius: '6px',
+        borderRadius: '8px',
         boxShadow: '0 4px 16px var(--color-panel-shadow)',
         zIndex: 100000,
         maxHeight: `${maxHeight}px`,

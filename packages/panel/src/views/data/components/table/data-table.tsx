@@ -886,6 +886,8 @@ export const DataTable: React.FC<DataTableProps> = ({
         tableName={selectedTable}
         tableSchema={tableSchema}
         documents={documents}
+        adminClient={adminClient}
+        componentId={componentId}
       />
 
       {cellMenuState && (

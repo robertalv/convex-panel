@@ -618,51 +618,20 @@ export const useTableData = ({
         
         // Load filters from storage if we haven't already loaded them for this table
         if (!filtersLoadedRef.current[selectedTable]) {
-          // Priority 1: Load from filterHistory if adminClient is available
-          if (adminClient && !useMockData) {
-            // Load from filterHistory backend
-            // Scope format: user:userId:table:tableName (using 'default' as userId for now)
-            const scope = `user:default:table:${selectedTable}`;
-            
-            adminClient.query('convexPanel:getCurrentState' as any, { scope })
-              .then((state: { filters: FilterExpression; sortConfig: SortConfig | null } | null) => {
-                if (state) {
-                  setFilters(state.filters);
-                  if (state.sortConfig) {
-                    setSortConfig(state.sortConfig);
-                  } else {
-                    setSortConfig(null);
-                  }
-                }
-                filtersLoadedRef.current[selectedTable] = true;
-              })
-              .catch((error: any) => {
-                // If filterHistory fails, fall back to localStorage
-                console.warn('Failed to load from filterHistory, falling back to localStorage:', error);
-                const savedFilters = getTableFilters(selectedTable);
-                const currentFiltersJson = JSON.stringify(filtersRef.current);
-                const savedFiltersJson = JSON.stringify(savedFilters);
-                
-                if (currentFiltersJson !== savedFiltersJson) {
-                  setFilters(() => savedFilters);
-                }
-                filtersLoadedRef.current[selectedTable] = true;
-              });
-          } else {
-            // Priority 2: Load from localStorage (fallback when adminClient not available)
-            const savedFilters = getTableFilters(selectedTable);
-            
-            // Only update filters if they're different from current filters
-            const currentFiltersJson = JSON.stringify(filtersRef.current);
-            const savedFiltersJson = JSON.stringify(savedFilters);
-            
-            if (currentFiltersJson !== savedFiltersJson) {
-              // Use functional update to avoid dependency on setFilters
-              setFilters(() => savedFilters);
-            }
-            
-            filtersLoadedRef.current[selectedTable] = true;
+          // Load from localStorage
+          // Note: Component functions are internal and can't be called directly from the client.
+          // TODO: Create a wrapper function in the panel package that calls the component function server-side
+          const savedFilters = getTableFilters(selectedTable);
+          
+          // Only update filters if they're different from current filters
+          const currentFiltersJson = JSON.stringify(filtersRef.current);
+          const savedFiltersJson = JSON.stringify(savedFilters);
+          
+          if (currentFiltersJson !== savedFiltersJson) {
+            setFilters(() => savedFilters);
           }
+          
+          filtersLoadedRef.current[selectedTable] = true;
         }
       }
     }

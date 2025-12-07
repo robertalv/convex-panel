@@ -13,3 +13,5 @@ export type { SheetProps } from './sheet';
 export { GlobalSheet } from './global-sheet';
 export { ContextMenu } from './context-menu';
 export type { ContextMenuItemDescriptor, ContextMenuEntry, ContextMenuProps, ViewingAction } from './context-menu';
+export { IconButton } from './icon-button';
+export type { IconButtonProps } from './icon-button';

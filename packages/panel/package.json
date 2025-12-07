@@ -1,6 +1,6 @@
 {
   "name": "convex-panel",
-  "version": "0.2.23",
+  "version": "0.2.27",
   "description": "A React component for monitoring and debugging Convex applications",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -94,17 +94,14 @@
   "author": "Robert Alvarez",
   "license": "MIT",
   "peerDependencies": {
-    "ace-builds": "^1.43.5",
     "classnames": "^2.5.1",
     "convex": ">=0.9.0",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.5.0",
     "lucide-react": "^0.479.0",
     "react": ">=16.8.0",
-    "react-ace": "^14.0.1",
     "react-dom": ">=16.8.0",
     "react-window": "^1.8.11",
-    "recharts": "^2.15.1",
     "sonner": "^2.0.7"
   },
   "peerDependenciesMeta": {
@@ -117,28 +114,24 @@
     "vue": {
       "optional": true
     },
-    "recharts": {
-      "optional": true
-    },
     "framer-motion": {
-      "optional": true
-    },
-    "ace-builds": {
-      "optional": true
-    },
-    "react-ace": {
       "optional": true
     }
   },
   "dependencies": {
     "@emotion/is-prop-valid": "^1.3.1",
+    "ace-builds": "^1.43.5",
     "debounce": "^1.2.1",
     "lodash": "^4.17.21",
-    "typescript": "^5.9.3",
+    "react-ace": "^14.0.1",
     "react-helmet": "^6.1.0",
     "react-hotkeys-hook": "^4.6.1",
     "react-use": "^17.6.0",
-    "swr": "^2.3.3"
+    "react-virtualized-auto-sizer": "^1.0.26",
+    "react-window-infinite-loader": "^2.0.0",
+    "recharts": "^2.15.1",
+    "swr": "^2.3.3",
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.17",

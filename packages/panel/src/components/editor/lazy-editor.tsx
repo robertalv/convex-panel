@@ -87,7 +87,20 @@ const resolveAceTheme = (theme?: string) => {
   return themeLoaders[theme] ? theme : 'monokai';
 };
 
-const ensureLanguageTools = () => import('ace-builds/src-noconflict/ext-language_tools');
+let languageToolsImport: Promise<unknown> | null = null;
+
+const ensureLanguageTools = (): Promise<unknown> => {
+  if (languageToolsImport) {
+    return languageToolsImport;
+  }
+  
+  languageToolsImport = import('ace-builds/src-noconflict/ext-language_tools').catch(() => {
+    // Silently fail - editor will work without autocomplete
+    return null;
+  });
+  
+  return languageToolsImport;
+};
 
 const EditorLoading: React.FC<{ height?: string | number }> = ({ height = '200px' }) => (
   <div
