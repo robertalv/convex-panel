@@ -1,5 +1,4 @@
 import React from 'react';
-import { getDeveloperLogoUrl } from '../utils/developer-logos';
 import type { ComponentInfo } from '../../../types/components';
 import type { NpmPackageExtendedInfo } from '../utils/npm';
 import { AvatarGroup } from './avatar-group';
@@ -144,30 +143,12 @@ export const ComponentTable: React.FC<ComponentTableProps> = ({
                     maxVisible={3}
                   />
                 ) : component.developer ? (
-                  <>
-                    {getDeveloperLogoUrl(component.developer) && (
-                      <img
-                        src={getDeveloperLogoUrl(component.developer)}
-                        alt={component.developer}
-                        style={{
-                          width: '16px',
-                          height: '16px',
-                          borderRadius: '50%',
-                          objectFit: 'contain',
-                          flexShrink: 0,
-                        }}
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    )}
-                    <span style={{
-                      color: 'var(--color-panel-text-secondary)',
-                      fontSize: '12px',
-                    }}>
-                      {component.developer}
-                    </span>
-                  </>
+                  <span style={{
+                    color: 'var(--color-panel-text-secondary)',
+                    fontSize: '12px',
+                  }}>
+                    {component.developer}
+                  </span>
                 ) : null}
               </div>
 

@@ -227,6 +227,8 @@ const ConvexPanel = ({
     const authToken = providedDeployKey || effectiveAccessToken || envTeamAccessToken;
     if (authToken) {
       (adminClient as any).setAdminAuth(authToken);
+      (adminClient as any)._adminKey = authToken;
+      (adminClient as any)._adminAuth = authToken;
     }
   }, [adminClient, providedDeployKey, effectiveAccessToken, envTeamAccessToken, isMounted]);
 

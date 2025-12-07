@@ -100,6 +100,8 @@ export function DeploymentProvider({
       // Set admin auth
       if (client && typeof (client as any).setAdminAuth === 'function') {
         (client as any).setAdminAuth(deployment.adminKey);
+        (client as any)._adminKey = deployment.adminKey;
+        (client as any)._adminAuth = deployment.adminKey;
       }
     } catch (err) {
       // Fallback to ConvexClient
@@ -107,6 +109,8 @@ export function DeploymentProvider({
         client = new ConvexClient(deployment.deploymentUrl);
         if (client && typeof (client as any).setAdminAuth === 'function') {
           (client as any).setAdminAuth(deployment.adminKey);
+          (client as any)._adminKey = deployment.adminKey;
+          (client as any)._adminAuth = deployment.adminKey;
         }
       } catch (fallbackErr) {
         console.error('Error creating Convex client:', fallbackErr);

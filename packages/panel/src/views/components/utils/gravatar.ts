@@ -171,19 +171,7 @@ export function getGravatarUrl(
   try {
     const normalizedEmail = email.toLowerCase().trim();
     const hash = md5Hash(normalizedEmail);
-    // Use s.gravatar.com (same as NPM) and default=retro (same as NPM)
     const url = `https://s.gravatar.com/avatar/${hash}?size=${size}&default=${defaultImage}`;
-    
-    // Log full email for debugging (can be removed in production)
-    console.log('[Gravatar] Generated URL:', {
-      email: email, // Full email for debugging
-      normalizedEmail: normalizedEmail, // Full normalized email
-      hash,
-      url,
-      size,
-      defaultImage,
-      note: 'This matches NPM\'s internal Gravatar URLs (NPM JWT avatars just wrap these)',
-    });
     
     return url;
   } catch (error) {
