@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
   // Load all env variables from .env files (Vite loads them automatically)
   const env = loadEnv(mode, process.cwd(), '');
-  const convexAccessToken = env.CONVEX_ACCESS_TOKEN || process.env.CONVEX_ACCESS_TOKEN || '';
+  const convexAccessToken = env.CONVEX_ACCESS_TOKEN || '';
   
   // Expose CONVEX_ACCESS_TOKEN as VITE_CONVEX_ACCESS_TOKEN so it's available in import.meta.env
   // Vite only exposes env vars starting with VITE_ to the client

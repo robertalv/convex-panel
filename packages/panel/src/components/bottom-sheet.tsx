@@ -502,14 +502,17 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       >
         {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
       </button>
-      {isAuthenticated && isOAuthToken && (
+      {/* TODO: Add user menu back in later, will have configuration
+        for menu bar, floating button, etc.
+      */}
+      {/* {isAuthenticated && isOAuthToken && (
         <UserMenu
           accessToken={accessToken}
           teamSlug={teamSlug}
           projectSlug={projectSlug}
           onLogout={onLogout}
         />
-      )}
+      )} */}
       
       {isAuthenticated && (
         <>
