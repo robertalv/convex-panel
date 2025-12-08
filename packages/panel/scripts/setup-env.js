@@ -388,7 +388,6 @@ async function main() {
   let prefix = "VITE_";
   const frameworks = [
     { name: "Vite", value: "vite", prefix: "VITE_" },
-    { name: "Svelte", value: "svelte", prefix: "VITE_" },
     { name: "Next.js", value: "nextjs", prefix: "NEXT_PUBLIC_" },
     { name: "React (Create React App)", value: "react", prefix: "REACT_APP_" },
     { name: "Other", value: "other", prefix: "VITE_" }
@@ -525,16 +524,28 @@ async function main() {
     }
   }
 
-  // 5) Add blank line and CONVEX_ACCESS_TOKEN with comment
+  // 5) CONVEX_ACCESS_TOKEN
   if (map.has("CONVEX_ACCESS_TOKEN")) {
     printSuccess(`CONVEX_ACCESS_TOKEN ${colorize("already set", "dim")}; leaving existing value unchanged.`);
   } else {
     console.log();
     printInfo(colorize("Get your access token from:", "dim") + " " + colorize("https://dashboard.convex.dev/t/{team_name}/settings/access-tokens", "cyan"));
-    updates.push("");
-    updates.push("# Please get your access token from https://dashboard.convex.dev/t/{team_name}/settings/access-tokens");
-    updates.push("# Replace team name with your own or just go to https://dashboard.convex.dev -> Team Settings -> Access Tokens -> Create Token")
-    updates.push("CONVEX_ACCESS_TOKEN=");
+    printInfo(colorize("(Or go to https://dashboard.convex.dev -> Team Settings -> Access Tokens -> Create Token)", "dim"));
+    const accessToken = await ask(
+      colorize("→ ", "cyan") + colorize("Convex Access Token", "bright") + 
+      colorize(" (from Convex dashboard)", "dim") + 
+      colorize(" for CONVEX_ACCESS_TOKEN", "reset") + 
+      colorize(" (optional, press Enter to skip): ", "dim")
+    );
+    if (accessToken) {
+      updates.push(`CONVEX_ACCESS_TOKEN=${accessToken}`);
+    } else {
+      // Add comment and empty value if user skipped
+      updates.push("");
+      updates.push("# Please get your access token from https://dashboard.convex.dev/t/{team_name}/settings/access-tokens");
+      updates.push("# Replace team name with your own or just go to https://dashboard.convex.dev -> Team Settings -> Access Tokens -> Create Token");
+      updates.push("CONVEX_ACCESS_TOKEN=");
+    }
   }
 
   if (updates.length === 0) {

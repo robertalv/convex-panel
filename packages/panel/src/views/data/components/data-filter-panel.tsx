@@ -37,7 +37,7 @@ export interface DataFilterPanelProps {
     undo: (scope: string, count?: number) => Promise<{ filters: FilterExpression; sortConfig: SortConfig | null } | null>;
     redo: (scope: string, count?: number) => Promise<{ filters: FilterExpression; sortConfig: SortConfig | null } | null>;
     getStatus: (scope: string) => Promise<{ canUndo: boolean; canRedo: boolean; position: number | null; length: number }>;
-    getCurrentState: (scope: string) => Promise<{ filters: FilterExpression; sortConfig: SortConfig | null } | null>;
+    // getCurrentState: (scope: string) => Promise<{ filters: FilterExpression; sortConfig: SortConfig | null } | null>;
   };
   /** Optional user ID for scoping filter history. Defaults to 'default' */
   userId?: string;
@@ -74,22 +74,22 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
   }, [filterHistoryScope, filterHistoryApi]);
   
   // Load current state from API on mount and when scope changes
-  useEffect(() => {
-    filterHistoryApi.getCurrentState(filterHistoryScope).then((state) => {
-      if (state) {
-        setDraftFilters(state.filters.clauses || []);
-        setDraftSortConfig(state.sortConfig);
-        setFilters(state.filters);
-        if (state.sortConfig) {
-          setSortConfig(state.sortConfig);
-        } else {
-          setSortConfig(null);
-        }
-      }
-    }).catch(() => {
-      // Just fail and do nothing
-    });
-  }, [filterHistoryScope, filterHistoryApi, setFilters, setSortConfig]);
+  // useEffect(() => {
+  //   filterHistoryApi.getCurrentState(filterHistoryScope).then((state) => {
+  //     if (state) {
+  //       setDraftFilters(state.filters.clauses || []);
+  //       setDraftSortConfig(state.sortConfig);
+  //       setFilters(state.filters);
+  //       if (state.sortConfig) {
+  //         setSortConfig(state.sortConfig);
+  //       } else {
+  //         setSortConfig(null);
+  //       }
+  //     }
+  //   }).catch(() => {
+  //     // Just fail and do nothing
+  //   });
+  // }, [filterHistoryScope, filterHistoryApi, setFilters, setSortConfig]);
   
   // Field visibility state
   const [visibleFields, setVisibleFields] = useState<string[]>(

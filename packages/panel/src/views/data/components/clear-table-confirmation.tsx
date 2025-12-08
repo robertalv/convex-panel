@@ -143,3 +143,4 @@ export const ClearTableConfirmation: React.FC<ClearTableConfirmationProps> = ({
     />
   );
 };
+

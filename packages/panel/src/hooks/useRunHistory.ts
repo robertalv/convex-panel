@@ -1,6 +1,5 @@
 import { useCallback } from 'react';
 import { useLocalStorage } from './useLocalStorage';
-import type { Dispatch, SetStateAction } from 'react';
 import type { Value } from 'convex/values';
 
 export interface UserIdentityAttributes {

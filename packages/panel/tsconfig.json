@@ -8,7 +8,7 @@
         "../shared/src"
       ]
     },
-    "types": ["vite/client", "node", "svelte", "vue"]
+    "types": ["vite/client", "node"]
   },
   "include": [
     "./src/**/*"

@@ -254,3 +254,4 @@ export function testDecodeNpmAvatarUrl(jwtUrl: string): void {
   }
   console.log('[NPM Avatar Test] ========================================');
 }
+

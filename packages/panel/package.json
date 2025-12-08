@@ -1,6 +1,6 @@
 {
   "name": "convex-panel",
-  "version": "0.2.31",
+  "version": "0.2.34",
   "description": "A React component for monitoring and debugging Convex applications",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -45,19 +45,6 @@
       "import": "./dist/react/index.esm.js",
       "require": "./dist/react/index.js",
       "default": "./dist/react/index.js"
-    },
-    "./svelte": {
-      "types": "./dist/svelte/index.d.ts",
-      "svelte": "./dist/svelte/ConvexPanelSvelte.svelte",
-      "import": "./dist/svelte/index.esm.js",
-      "require": "./dist/svelte/index.js",
-      "default": "./dist/svelte/index.js"
-    },
-    "./vue": {
-      "types": "./dist/vue/index.d.ts",
-      "vue": "./dist/vue/ConvexPanelVue.vue",
-      "import": "./dist/vue/index.esm.js",
-      "require": "./dist/vue/index.js"
     }
   },
   "files": [
@@ -108,12 +95,6 @@
     "next": {
       "optional": true
     },
-    "svelte": {
-      "optional": true
-    },
-    "vue": {
-      "optional": true
-    },
     "framer-motion": {
       "optional": true
     }
@@ -162,13 +143,11 @@
     "recharts": "^2.15.1",
     "rimraf": "^5.0.1",
     "sonner": "^2.0.7",
-    "svelte": "^5.45.4",
     "tailwindcss": "^4.1.17",
     "tslib": "^2.8.1",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "vite": "^5.4.0",
-    "vue": "^3.5.25"
+    "vite": "^5.4.0"
   },
   "repository": {
     "type": "git",

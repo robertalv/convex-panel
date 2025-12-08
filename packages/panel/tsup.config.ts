@@ -29,9 +29,6 @@ const sharedExternal = [
   'vite',
   'next',
   'next/*',
-  'svelte',
-  'vue',
-  '@nuxt/*',
 ];
 
 // Shared esbuild options
@@ -129,51 +126,5 @@ export default defineConfig([
     },
     esbuildOptions: getEsbuildOptions(false),
   },
-  
-  // Svelte adapter
-  {
-    entry: ['src/svelte/index.tsx'],
-    format: ['cjs', 'esm'],
-    dts: true,
-    splitting: true,
-    treeshake: true,
-    sourcemap: true,
-    minify: true,
-    external: [...sharedExternal, 'svelte', '**/*.svelte', '*.svelte'],
-    injectStyle: false,
-    target: 'es2020',
-    outDir: 'dist/svelte',
-    outExtension({ format }) {
-      return {
-        js: format === 'esm' ? '.esm.js' : '.js',
-      };
-    },
-    esbuildOptions: getEsbuildOptions(false),
-  },
-  
-  // Vue adapter
-  {
-    entry: ['src/vue/index.ts'],
-    format: ['cjs', 'esm'],
-    dts: true,
-    splitting: true,
-    treeshake: true,
-    sourcemap: true,
-    minify: true,
-    external: [...sharedExternal, 'vue', '**/*.vue', '*.vue'],
-    injectStyle: false,
-    target: 'es2020',
-    outDir: 'dist/vue',
-    outExtension({ format }) {
-      return {
-        js: format === 'esm' ? '.esm.js' : '.js',
-      };
-    },
-    esbuildOptions(options) {
-      const existingExternal = Array.isArray(options.external) ? options.external : [];
-      options.external = [...existingExternal, '*.css', '*.vue'];
-      options.treeShaking = true;
-      options.legalComments = 'none';
-    },
-  },
+
 ]);

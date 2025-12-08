@@ -14,7 +14,7 @@ export * from './types';
 export { isDevelopment, isNextJSEnv } from './platform';
 
 // Export core environment utilities
-export { getEnvVar, unwrapVueValue } from './core';
+export { getEnvVar } from './core';
 
 // Export Convex-specific configuration
 export { getConvexUrl } from './convex-config';

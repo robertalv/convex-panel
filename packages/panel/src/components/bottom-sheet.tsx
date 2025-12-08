@@ -28,7 +28,7 @@ import { useThemeSafe } from '../hooks/useTheme';
 import { useHasSubscription } from '../hooks/useTeamOrbSubscription';
 import { SupportPopup } from './support-popup';
 import { SetupInstructions } from './setup-instructions';
-import { UserMenu } from './user-menu';
+// import { UserMenu } from './user-menu';
 import { fetchDeploymentMetadata } from '../utils/api/deployments';
 import { extractDeploymentName, extractProjectName } from '../utils/api/utils';
 import { fetchProjectInfo } from '../utils/api/teams';
@@ -71,14 +71,16 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   environment: providedEnvironment = 'development',
   isAuthenticated,
   onConnect,
-  onLogout,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onLogout: _onLogout,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   oauthConfig: _oauthConfig,
   activeTab: externalActiveTab,
   onTabChange,
   adminClient,
   accessToken,
-  isOAuthToken = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  isOAuthToken: _isOAuthToken,
   teamSlug,
   projectSlug,
   team,

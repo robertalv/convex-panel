@@ -185,7 +185,6 @@ export function EnvironmentContent({ framework }: { framework: Framework }) {
 }
 
 export function QuickStartContent({ framework }: { framework: Framework }) {
-  const isReactBased = ["react", "vite", "nextjs"].includes(framework);
 
   return (
     <div className="flex gap-10 animate-fade-in">
@@ -237,20 +236,6 @@ function App() {
 }`}
             />
           </section>
-        )}
-
-        {!isReactBased && (
-          <div className="p-8 bg-background-secondary/30 border border-border rounded-xl text-center">
-            <Terminal className="w-10 h-10 text-content-tertiary mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-content-primary mb-2">
-              Experimental Support
-            </h3>
-            <p className="text-content-secondary text-sm max-w-sm mx-auto">
-              Official support for{" "}
-              {framework === "vue" ? "Vue" : "Svelte"} is currently in
-              development.
-            </p>
-          </div>
         )}
       </div>
 

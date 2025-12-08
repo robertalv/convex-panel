@@ -172,6 +172,23 @@ export async function executeCustomQuery(
     const clientInfo = getAdminClientInfo(adminClient, providedDeploymentUrl);
     const { deploymentUrl, adminKey } = clientInfo;
 
+    // Validate that we have both deploymentUrl and adminKey
+    if (!deploymentUrl) {
+      return {
+        success: false,
+        errorMessage: 'Deployment URL not available. Please ensure the admin client is properly configured.',
+        logLines: [],
+      };
+    }
+
+    if (!adminKey) {
+      return {
+        success: false,
+        errorMessage: 'Admin key not available. Please ensure authentication is properly configured.',
+        logLines: [],
+      };
+    }
+
     // Make HTTP POST request to /api/run_test_function
     const response = await fetch(`${deploymentUrl}${ROUTES.RUN_TEST_FUNCTION}`, {
       method: 'POST',
