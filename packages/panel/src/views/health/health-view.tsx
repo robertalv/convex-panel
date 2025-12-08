@@ -9,6 +9,9 @@ import { CacheHitRateCard } from './components/cache-hit-rate-card';
 import { SchedulerStatusCard } from './scheduler-status-card';
 import { LastDeployedCard } from './components/last-deployed-card';
 import { InsightsSummary } from './components/insights-summary';
+import { LatencyPercentilesCard } from './components/latency-percentiles-card';
+import { FunctionInvocationRateCard } from './components/function-invocation-rate-card';
+import { RecentErrorsSummary } from './components/recent-errors-summary';
 
 export const HealthView: React.FC<{ 
   deploymentUrl?: string; 
@@ -41,12 +44,17 @@ export const HealthView: React.FC<{
           <SkeletonCard title="Failure Rate" height="140px" showTooltip variant="chart" />
           <SkeletonCard title="Cache Hit Rate" height="140px" showTooltip variant="chart" />
           <SkeletonCard title="Scheduler Status" height="140px" showTooltip variant="chart" />
+          <SkeletonCard title="Latency Percentiles" height="140px" showTooltip variant="chart" />
+          <SkeletonCard title="Function Invocation Rate" height="140px" showTooltip variant="chart" />
         </div>
         <div className="cp-health-grid">
           <SkeletonCard title="Last Deployed" height="100px" showTooltip variant="simple" />
           <SkeletonCard title="Exception Reporting" height="100px" showAction showTooltip variant="simple" />
         </div>
-        <SkeletonCard title="Insights" height="200px" showTooltip={false} variant="insights" />
+        <SkeletonCard title="Recent Errors" height="200px" showTooltip={false} variant="insights" />
+        <div style={{ marginTop: '24px' }}>
+          <SkeletonCard title="Insights" height="200px" showTooltip={false} variant="insights" />
+        </div>
       </div>
     );
   }
@@ -71,6 +79,18 @@ export const HealthView: React.FC<{
           authToken={authToken}
           useMockData={useMockData}
         />
+
+        <LatencyPercentilesCard
+          deploymentUrl={deploymentUrl}
+          authToken={authToken}
+          useMockData={useMockData}
+        />
+
+        <FunctionInvocationRateCard
+          deploymentUrl={deploymentUrl}
+          authToken={authToken}
+          useMockData={useMockData}
+        />
       </div>
 
       <div className="cp-health-grid">
@@ -90,11 +110,19 @@ export const HealthView: React.FC<{
         </div>
       </div>
 
-      <InsightsSummary
+      <RecentErrorsSummary
         deploymentUrl={deploymentUrl}
         authToken={authToken}
         useMockData={useMockData}
       />
+
+      <div style={{ marginTop: '12px' }}>
+        <InsightsSummary
+          deploymentUrl={deploymentUrl}
+          authToken={authToken}
+          useMockData={useMockData}
+        />
+      </div>
     </div>
   );
 };

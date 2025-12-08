@@ -18,12 +18,10 @@ export async function getNpmUserAvatar(username: string): Promise<string | null>
     // Try NPM's user API endpoint
     const response = await fetch(`https://registry.npmjs.org/-/user/org.couchdb.user:${username}`);
     if (!response.ok) {
-      console.log(`[NPM Avatar] User API returned ${response.status} for ${username}`);
       return null;
     }
     
     const data = await response.json();
-    console.log(`[NPM Avatar] User API response for ${username}:`, data);
     
     // NPM might return the avatar URL directly, or we need to construct it
     if (data.avatar) {
@@ -90,14 +88,12 @@ export function extractGravatarHashFromNpmUrl(npmAvatarUrl: string): string | nu
     }
     
     if (!jwt) {
-      console.log('[NPM Avatar] No JWT token found in URL:', npmAvatarUrl);
       return null;
     }
     
     // Decode the JWT payload (middle part between dots)
     const parts = jwt.split('.');
     if (parts.length !== 3) {
-      console.log('[NPM Avatar] Invalid JWT format, expected 3 parts, got:', parts.length);
       return null;
     }
     
@@ -108,31 +104,22 @@ export function extractGravatarHashFromNpmUrl(npmAvatarUrl: string): string | nu
     try {
       // Base64 decode and parse JSON
       decoded = JSON.parse(atob(payload));
-      console.log('[NPM Avatar] Decoded JWT payload:', decoded);
     } catch (e) {
       console.error('[NPM Avatar] Failed to decode JWT payload:', e);
       return null;
     }
     
-    // Extract hash from the Gravatar URL in the payload
     const gravatarUrl = decoded.avatarURL;
     if (!gravatarUrl) {
-      console.log('[NPM Avatar] No avatarURL in JWT payload:', decoded);
       return null;
     }
     
-    console.log('[NPM Avatar] Gravatar URL from JWT:', gravatarUrl);
-    
-    // Extract hash from URL like: https://s.gravatar.com/avatar/HASH?...
-    // or: https://www.gravatar.com/avatar/HASH?...
     const match = gravatarUrl.match(/avatar\/([a-f0-9]{32})/i);
     if (match) {
       const hash = match[1];
-      console.log('[NPM Avatar] Extracted Gravatar hash:', hash);
       return hash;
     }
     
-    console.log('[NPM Avatar] Could not extract hash from Gravatar URL:', gravatarUrl);
     return null;
   } catch (error) {
     console.error('[NPM Avatar] Failed to extract Gravatar hash from NPM URL:', error, { npmAvatarUrl });
@@ -223,35 +210,3 @@ export async function batchGetNpmUserAvatars(
   
   return avatarMap;
 }
-
-/**
- * Test function to decode an NPM JWT avatar URL
- * Useful for debugging and verifying the extraction works
- * 
- * Example usage:
- * testDecodeNpmAvatarUrl('https://www.npmjs.com/npm-avatar/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
- */
-export function testDecodeNpmAvatarUrl(jwtUrl: string): void {
-  console.log('[NPM Avatar Test] ========================================');
-  console.log('[NPM Avatar Test] Input URL:', jwtUrl);
-  console.log('[NPM Avatar Test] ========================================');
-  
-  const decoded = decodeNpmAvatarUrl(jwtUrl);
-  if (decoded) {
-    console.log('[NPM Avatar Test] ✓ Decoded successfully!');
-    console.log('[NPM Avatar Test] Gravatar URL from JWT:', decoded.gravatarUrl);
-    console.log('[NPM Avatar Test] Extracted hash:', decoded.hash);
-    console.log('[NPM Avatar Test] Generated Gravatar URL:', `https://s.gravatar.com/avatar/${decoded.hash}?size=100&default=retro`);
-    console.log('[NPM Avatar Test] URLs match:', decoded.gravatarUrl.includes(decoded.hash));
-  } else {
-    console.log('[NPM Avatar Test] ✗ Failed to decode');
-  }
-  
-  // Also test the hash extraction directly
-  const hash = extractGravatarHashFromNpmUrl(jwtUrl);
-  if (hash) {
-    console.log('[NPM Avatar Test] Direct hash extraction:', hash);
-  }
-  console.log('[NPM Avatar Test] ========================================');
-}
-

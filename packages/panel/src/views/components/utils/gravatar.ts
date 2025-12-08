@@ -164,7 +164,6 @@ export function getGravatarUrl(
   defaultImage: 'identicon' | 'mp' | 'robohash' | 'retro' | 'blank' | 'wavatar' = 'retro'
 ): string | null {
   if (!email || !email.includes('@')) {
-    console.log('[Gravatar] Invalid email:', email);
     return null;
   }
 

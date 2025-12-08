@@ -13,6 +13,7 @@ import { mockFetchCacheHitRate, mockFetchFailureRate, mockFetchSchedulerLag } fr
 import { normalizeToken, serializeDate, parseDate } from './helpers';
 import type { TimeseriesBucket, TableMetric } from './types';
 import { CONVEX_DASHBOARD_DOMAIN } from '../constants';
+import { fetchLogsFromApi } from './logs';
 
 /**
  * Fetch the failure rate from the Convex API
@@ -391,5 +392,250 @@ export function aggregateFunctionStats(
     executionTimes,
     cacheHits: cacheHitRates,
   };
+}
+
+/**
+ * Fetch latency percentiles from the Convex API
+ * Note: The latency_percentiles endpoint requires a specific UDF identifier.
+ * For aggregate metrics, we calculate percentiles from execution stats.
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param authToken - The authentication token for the Convex deployment
+ * @param useMockData - Whether to use mock data instead of making API calls
+ * @returns The latency percentiles (p50, p95, p99) as array of [percentile, timeseries]
+ */
+export async function fetchLatencyPercentiles(
+  deploymentUrl: string,
+  authToken: string,
+  useMockData = false
+): Promise<any> {
+  if (useMockData) {
+    return [];
+  }
+
+  if (!deploymentUrl || !deploymentUrl.trim()) {
+    throw new Error('Deployment URL is required');
+  }
+  if (!authToken || !authToken.trim()) {
+    throw new Error('Auth token is required');
+  }
+
+  // Since latency_percentiles requires a specific function path,
+  // we'll calculate aggregate latency from execution stats
+  const oneHourAgo = Date.now() - (60 * 60 * 1000);
+  const cursor = Math.floor(oneHourAgo / 1000) * 1000; // Convert to milliseconds
+
+  try {
+    const executionResponse = await fetchUdfExecutionStats(
+      deploymentUrl,
+      authToken,
+      cursor
+    );
+
+    if (!executionResponse || !executionResponse.entries || executionResponse.entries.length === 0) {
+      return [];
+    }
+
+    // Get execution times from entries
+    const executionTimes: number[] = [];
+    executionResponse.entries.forEach((entry: any) => {
+      let execTime = entry.execution_time_ms || entry.executionTimeMs || entry.execution_time || entry.executionTime;
+      if (execTime) {
+        // Convert to milliseconds if needed
+        if (execTime < 1000 && execTime > 0) {
+          execTime = execTime * 1000;
+        }
+        if (execTime > 0) {
+          executionTimes.push(execTime);
+        }
+      }
+    });
+
+    if (executionTimes.length === 0) {
+      return [];
+    }
+
+    // Calculate percentiles
+    const sorted = executionTimes.sort((a, b) => a - b);
+    const p50 = sorted[Math.floor(sorted.length * 0.5)];
+    const p95 = sorted[Math.floor(sorted.length * 0.95)];
+    const p99 = sorted[Math.floor(sorted.length * 0.99)];
+
+    // Return in the format expected by the component: [percentile, timeseries]
+    // For now, return current values (not time series)
+    const now = Math.floor(Date.now() / 1000);
+    const timestamp = {
+      secs_since_epoch: now,
+      nanos_since_epoch: 0
+    };
+
+    return [
+      [50, [[timestamp, p50]]],
+      [95, [[timestamp, p95]]],
+      [99, [[timestamp, p99]]],
+    ];
+  } catch (error) {
+    // Return empty array on error
+    return [];
+  }
+}
+
+/**
+ * Fetch aggregate UDF invocation rate from the Convex API
+ * Since udf_rate requires a specific function path, we'll use stream_udf_execution
+ * to get aggregate invocation data and calculate rates ourselves.
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param authToken - The authentication token for the Convex deployment
+ * @param useMockData - Whether to use mock data instead of making API calls
+ * @returns The UDF invocation rate time series data
+ */
+export async function fetchUdfRate(
+  deploymentUrl: string,
+  authToken: string,
+  useMockData = false
+): Promise<any> {
+  if (useMockData) {
+    return [];
+  }
+
+  if (!deploymentUrl || !deploymentUrl.trim()) {
+    throw new Error('Deployment URL is required');
+  }
+  if (!authToken || !authToken.trim()) {
+    throw new Error('Auth token is required');
+  }
+
+  // Since udf_rate requires a specific function path, we'll aggregate
+  // from stream_udf_execution instead
+  const oneHourAgo = Date.now() - (60 * 60 * 1000);
+  const cursor = Math.floor(oneHourAgo / 1000) * 1000; // Convert to milliseconds
+
+  try {
+    const executionResponse = await fetchUdfExecutionStats(
+      deploymentUrl,
+      authToken,
+      cursor
+    );
+
+    if (!executionResponse || !executionResponse.entries) {
+      return [];
+    }
+
+    // Aggregate invocations by minute
+    const now = Math.floor(Date.now() / 1000);
+    const twentySixMinutesAgo = now - (26 * 60);
+    const numBuckets = 26;
+    const bucketSizeSeconds = (26 * 60) / numBuckets;
+
+    // Initialize buckets
+    const buckets: number[] = Array(numBuckets).fill(0);
+    const timestamps: Array<{ secs_since_epoch: number; nanos_since_epoch: number }> = [];
+
+    // Generate timestamps for each bucket
+    for (let i = 0; i < numBuckets; i++) {
+      const bucketTime = twentySixMinutesAgo + (i * bucketSizeSeconds);
+      timestamps.push({
+        secs_since_epoch: bucketTime,
+        nanos_since_epoch: 0
+      });
+    }
+
+    // Count invocations per bucket
+    executionResponse.entries.forEach((entry: any) => {
+      let entryTime = entry.timestamp || entry.execution_timestamp || entry.unix_timestamp;
+      if (entryTime > 1e12) {
+        entryTime = Math.floor(entryTime / 1000);
+      }
+
+      if (entryTime >= twentySixMinutesAgo && entryTime <= now) {
+        const bucketIndex = Math.floor((entryTime - twentySixMinutesAgo) / bucketSizeSeconds);
+        const clampedIndex = Math.max(0, Math.min(numBuckets - 1, bucketIndex));
+        buckets[clampedIndex]++;
+      }
+    });
+
+    // Convert to expected format: Array<[timestamp, value]>
+    const timeSeriesData = timestamps.map((timestamp, i) => [timestamp, buckets[i]]);
+
+    return [['total', timeSeriesData]];
+  } catch (error) {
+    // Return empty array on error
+    return [];
+  }
+}
+
+/**
+ * Fetch recent errors from logs
+ * @param deploymentUrl - The URL of the Convex deployment
+ * @param authToken - The authentication token for the Convex deployment
+ * @param useMockData - Whether to use mock data instead of making API calls
+ * @param hoursBack - Number of hours to look back (default: 1)
+ * @returns Object with error count and top error messages
+ */
+export async function fetchRecentErrors(
+  deploymentUrl: string,
+  authToken: string,
+  useMockData = false,
+  hoursBack: number = 1
+): Promise<{ count: number; topErrors: Array<{ message: string; count: number }> }> {
+  if (useMockData) {
+    return {
+      count: 0,
+      topErrors: []
+    };
+  }
+
+  if (!deploymentUrl || !deploymentUrl.trim()) {
+    throw new Error('Deployment URL is required');
+  }
+  if (!authToken || !authToken.trim()) {
+    throw new Error('Auth token is required');
+  }
+
+  try {
+    // Calculate cursor for last hour (approximate)
+    const oneHourAgo = Date.now() - (hoursBack * 60 * 60 * 1000);
+    const cursor = Math.floor(oneHourAgo / 1000);
+
+    // Fetch logs with a limit to avoid too much data
+    const logsResponse = await fetchLogsFromApi({
+      cursor: String(cursor),
+      convexUrl: deploymentUrl,
+      accessToken: authToken,
+      limit: 1000, // Limit to last 1000 log entries
+      useMockData: false
+    });
+
+    // Filter for errors
+    const errorLogs = logsResponse.logs.filter(log => 
+      log.status === 'error' || 
+      log.status === 'failure' ||
+      log.log_level === 'ERROR' ||
+      log.error_message
+    );
+
+    // Count errors by message
+    const errorCounts = new Map<string, number>();
+    errorLogs.forEach(log => {
+      const message = log.error_message || log.message || 'Unknown error';
+      errorCounts.set(message, (errorCounts.get(message) || 0) + 1);
+    });
+
+    // Get top 5 errors
+    const topErrors = Array.from(errorCounts.entries())
+      .map(([message, count]) => ({ message, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    return {
+      count: errorLogs.length,
+      topErrors
+    };
+  } catch (error) {
+    // Return empty result on error rather than throwing
+    return {
+      count: 0,
+      topErrors: []
+    };
+  }
 }
 

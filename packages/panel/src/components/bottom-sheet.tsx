@@ -136,11 +136,6 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   } | null>(null);
   const [isLoadingProjectInfo, setIsLoadingProjectInfo] = useState(false);
 
-  console.log('deploymentUrl', deploymentUrl);
-  console.log('adminClient', adminClient);
-  console.log('accessToken', accessToken);
-
-  // Check if deployment is paused using the hook
   const isDeploymentPaused = useIsDeploymentPaused(adminClient);
   const deploymentState = isDeploymentPaused === true ? 'paused' : isDeploymentPaused === false ? 'running' : null;
 

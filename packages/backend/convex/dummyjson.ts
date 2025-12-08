@@ -28,8 +28,6 @@ export const getFirstFewTodos = internalAction({
       `https://dummyjson.com/todos?limit=${opts.limit}&skip=${opts.skip}`
     ).then((res) => res.json());
 
-    console.log(data)
-    // Call the mutation to insert the todos
     await ctx.runMutation(internal.todos.addRandomTodosAfter5Min);
   },
 });

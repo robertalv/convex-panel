@@ -11,5 +11,8 @@ export { InsightsSummary } from './components/insights-summary';
 export { InsightsSummaryListItem } from './components/insights-summary-list-item';
 export { ProblemForInsight } from './components/problem-for-insight';
 export { SparklineForInsight } from './components/sparkline-for-insight';
+export { LatencyPercentilesCard } from './components/latency-percentiles-card';
+export { FunctionInvocationRateCard } from './components/function-invocation-rate-card';
+export { RecentErrorsSummary } from './components/recent-errors-summary';
 export * from './types';
 export * from './utils';
