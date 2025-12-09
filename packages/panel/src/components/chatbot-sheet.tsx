@@ -9,7 +9,7 @@ import { generateResponseStream, listAgentTools, getAIConfig, listChatStreams, t
 import type { TableDefinition } from '../types';
 import { IconButton } from './shared';
 import { isAIAvailable } from '../utils/api/aiAnalysis';
-import { listChats, getChat, createChat, saveMessage, updateChatTitle, deleteChat, isAIChatAvailable, type AIChat, type AIChatMessage } from '../utils/api/aiChats';
+import { listChats, getChat, createChat, saveMessage, updateChatTitle, deleteChat, type AIChat } from '../utils/api/aiChats';
 import { useThemeSafe } from '../hooks/useTheme';
 import { saveActiveTable, saveTableFilters, saveTableSortConfig } from '../utils/storage';
 import { useDataViewContext } from '../contexts/data-view-context';
@@ -2402,7 +2402,7 @@ export const ChatbotSheet = React.memo<ChatbotSheetProps>((props) => {
   // Chat storage state
   const [aiAvailable, setAiAvailable] = useState(false);
   const [checkingAi, setCheckingAi] = useState(true);
-  const [aiConfig, setAiConfig] = useState<AIConfig | null>(null);
+  const [, setAiConfig] = useState<AIConfig | null>(null);
   const [chats, setChats] = useState<AIChat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isLoadingChats, setIsLoadingChats] = useState(false);
@@ -2442,7 +2442,7 @@ export const ChatbotSheet = React.memo<ChatbotSheetProps>((props) => {
   const [isFunctionRunnerOpen, setIsFunctionRunnerOpen] = useState(false);
   const [selectedQuery, setSelectedQuery] = useState<CustomQuery | null>(null);
   const [applyingFilterTarget, setApplyingFilterTarget] = useState<string | null>(null);
-  const [messageMeta, setMessageMeta] = useState<Record<string, { model?: string; durationMs?: number }>>({});
+  const [messageMeta,] = useState<Record<string, { model?: string; durationMs?: number }>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -2999,15 +2999,10 @@ export const ChatbotSheet = React.memo<ChatbotSheetProps>((props) => {
     setIsLoading(true);
 
     try {
-      // Use Agent component to generate response with AI-powered query understanding (streaming)
       if (chatIdToUse) {
         try {
-          const runStarted = performance.now();
-
-          // Clear any previous pollers before starting a new stream
           stopStreamPolling();
 
-          // Add placeholder for AI response
           const placeholderId = `ai-${Date.now()}`;
           streamingMessageIdRef.current = placeholderId;
           setMessages((prev) => [
@@ -3015,21 +3010,18 @@ export const ChatbotSheet = React.memo<ChatbotSheetProps>((props) => {
             {
               id: placeholderId,
               role: 'assistant',
-              content: '', // Start with empty content, will be updated by stream
+              content: '',
               timestamp: Date.now(),
               isStreaming: true,
             },
           ]);
 
-          // First call generateResponseStream to schedule the background action
-          // The new stream won't exist until this returns
           const result = await generateResponseStream(adminClient, {
             chatId: chatIdToUse,
             prompt: query,
             convexUrl,
             accessToken,
             componentId,
-            // Pass current table to guide filterData to the visible table
             tableName: currentTable || undefined,
           });
 
@@ -3040,10 +3032,7 @@ export const ChatbotSheet = React.memo<ChatbotSheetProps>((props) => {
             );
             setIsLoading(false);
           } else {
-            // NOW start polling - the new stream should exist after generateResponseStream returns
-            // generateResponseStream schedules the background action that creates the stream
             startStreamPolling(chatIdToUse, () => setIsLoading(false));
-            // startStreamPolling will handle updating the UI and reloading the chat when the stream finishes
           }
         } catch (error: any) {
           console.error('Error generating response:', error);
@@ -3060,7 +3049,6 @@ export const ChatbotSheet = React.memo<ChatbotSheetProps>((props) => {
         );
       }
 
-      // isLoading will be set to false by startStreamPolling callback when streaming completes
       return;
     } catch (error: any) {
       console.error('Error processing query:', error);
@@ -3074,7 +3062,6 @@ export const ChatbotSheet = React.memo<ChatbotSheetProps>((props) => {
 
   const handleSuggestionClick = useCallback((suggestion: string | { text: string; icon: any }) => {
     const text = typeof suggestion === 'string' ? suggestion : suggestion.text;
-    // Submit the suggestion directly
     handleSubmit(text);
   }, [handleSubmit]);
 
@@ -3085,7 +3072,6 @@ export const ChatbotSheet = React.memo<ChatbotSheetProps>((props) => {
     setTableSelectorArtifact(null);
 
     try {
-      // Get available fields for the selected table
       const tableSchema = tables[tableName];
       const tableFields = tableSchema?.fields?.map(field => field.fieldName) || [];
       const allTableFields = ['_id', '_creationTime', ...tableFields];
@@ -3100,15 +3086,12 @@ export const ChatbotSheet = React.memo<ChatbotSheetProps>((props) => {
       );
 
       if (result.success) {
-        // Add assistant success message
         await addAssistantMessage(result.message, false);
 
-        // Navigate to data view
         if (onTabChange) {
           onTabChange('data');
         }
       } else {
-        // Add assistant error message
         await addAssistantMessage(result.message, true);
       }
     } catch (error: any) {
@@ -3131,7 +3114,6 @@ export const ChatbotSheet = React.memo<ChatbotSheetProps>((props) => {
     try {
       const result = await navigateToLogsWithFilters(filters);
       if (result.success) {
-        // Navigate to logs tab
         if (onTabChange) {
           onTabChange('logs');
         }
@@ -3763,9 +3745,6 @@ export const ChatbotSheet = React.memo<ChatbotSheetProps>((props) => {
                     </div>
                   );
                 }
-
-                // Assistant message - split by code blocks
-                const parts = message.content.split('```');
 
                 return (
                   <div
