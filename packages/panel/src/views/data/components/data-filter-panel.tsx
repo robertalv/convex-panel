@@ -17,7 +17,7 @@ import {
 import type { FilterExpression, FilterClause, TableDefinition } from '../../../types';
 import type { SortConfig } from '../../../types/common';
 import { operatorOptions, typeOptions } from '../../../utils/constants';
-import { Dropdown } from '../../../components/shared';
+import { Dropdown, IconButton } from '../../../components/shared';
 import { SearchableDropdown } from '../../../components/shared/searchable-dropdown';
 import type { SearchableDropdownOption } from '../../../components/shared/searchable-dropdown';
 
@@ -623,32 +623,11 @@ export const DataFilterPanel: React.FC<DataFilterPanelProps> = ({
 
         {/* Close Button */}
         {onClose && (
-          <button
-            type="button"
+          <IconButton
+            icon={X}
             onClick={onClose}
-            style={{
-              padding: '6px',
-              color: 'var(--color-panel-text-secondary)',
-              backgroundColor: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '4px',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = 'var(--color-panel-text)';
-              e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <X size={18} />
-          </button>
+            aria-label="Close filter panel"
+          />
         )}
       </div>
 

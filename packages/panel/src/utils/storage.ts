@@ -111,6 +111,26 @@ export function saveTableFilters(tableName: string, filters: any) {
 }
 
 /**
+ * Get sort config for a specific table
+ */
+export function getTableSortConfig(tableName: string): any {
+  const sortConfigKey = `${STORAGE_KEYS.TABLE_FILTERS}:sort-${tableName}`;
+  return getStorageItem<any>(sortConfigKey, null);
+}
+
+/**
+ * Save sort config for a specific table
+ */
+export function saveTableSortConfig(tableName: string, sortConfig: any): void {
+  const sortConfigKey = `${STORAGE_KEYS.TABLE_FILTERS}:sort-${tableName}`;
+  if (sortConfig) {
+    setStorageItem(sortConfigKey, sortConfig);
+  } else {
+    removeStorageItem(sortConfigKey);
+  }
+}
+
+/**
  * Get the active table from storage
  */
 export function getActiveTable(): string {
@@ -228,4 +248,35 @@ export function getFilterHistoryRetentionHours(): number {
 export function setFilterHistoryRetentionHours(retentionHours: number): void {
   const retentionMs = retentionHours * 60 * 60 * 1000;
   setFilterHistoryRetentionMs(retentionMs);
+}
+
+/**
+ * Logs filter storage interface
+ */
+export interface LogsFilters {
+  searchQuery?: string;
+  logTypes?: string[];
+  functionIds?: string[];
+  componentIds?: string[];
+}
+
+/**
+ * Get stored logs filters
+ */
+export function getLogsFilters(): LogsFilters | null {
+  return getStorageItem<LogsFilters | null>(STORAGE_KEYS.LOGS_FILTERS, null);
+}
+
+/**
+ * Save logs filters to storage
+ */
+export function saveLogsFilters(filters: LogsFilters): void {
+  setStorageItem(STORAGE_KEYS.LOGS_FILTERS, filters);
+}
+
+/**
+ * Clear logs filters from storage
+ */
+export function clearLogsFilters(): void {
+  removeStorageItem(STORAGE_KEYS.LOGS_FILTERS);
 } 

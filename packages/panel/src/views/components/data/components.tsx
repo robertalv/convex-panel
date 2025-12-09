@@ -2722,11 +2722,13 @@ export default app;`,
 import { components } from "./_generated/api";
 import { RAG } from "@convex-dev/rag";
 // Any AI SDK model that supports embeddings will work.
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
+
+const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const rag = new RAG(components.rag, {
-  textEmbeddingModel: openai.embedding("text-embedding-3-small"),
-  embeddingDimension: 1536, // Needs to match your embedding model
+  textEmbeddingModel: openai.textEmbeddingModel("text-embedding-3-large"),
+  embeddingDimension: 3072, // text-embedding-3-large default dimension (supports v2 spec in AI SDK 5)
 });`,
       },
       {
@@ -2783,7 +2785,11 @@ const rag = new RAG(components.rag, {
           'This will automatically search for relevant entries and use them as context for the LLM, using default formatting.',
           'The arguments to `generateText` are compatible with all arguments to `generateText` from the AI SDK.',
         ],
-        code: `export const askQuestion = action({
+        code: `import { createOpenAI } from "@ai-sdk/openai";
+
+const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+export const askQuestion = action({
   args: {
     prompt: v.string(),
   },
@@ -2813,7 +2819,9 @@ const rag = new RAG(components.rag, {
 import { components } from "./_generated/api";
 import { RAG } from "@convex-dev/rag";
 // Any AI SDK model that supports embeddings will work.
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
+
+const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Optional: Add type safety to your filters.
 type FilterTypes = {
@@ -2823,8 +2831,8 @@ type FilterTypes = {
 };
 
 const rag = new RAG<FilterTypes>(components.rag, {
-  textEmbeddingModel: openai.embedding("text-embedding-3-small"),
-  embeddingDimension: 1536, // Needs to match your embedding model
+  textEmbeddingModel: openai.textEmbeddingModel("text-embedding-3-large"),
+  embeddingDimension: 3072, // text-embedding-3-large default dimension (supports v2 spec in AI SDK 5)
   filterNames: ["category", "contentType", "categoryAndType"],
 });`,
       },

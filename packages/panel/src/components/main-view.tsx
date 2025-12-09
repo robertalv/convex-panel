@@ -39,6 +39,7 @@ interface MainViewsProps {
     theme?: any;
     mergedTheme?: any;
     settings?: any;
+    container?: HTMLElement | null;
     [key: string]: any;
   };
 }
@@ -53,8 +54,8 @@ type ContainerProps = MainViewsProps['containerProps'];
 type TabRenderer = (props: ContainerProps) => React.ReactElement;
 
 const tabRenderers: Record<TabId, TabRenderer> = {
-  health: ({ deployUrl, accessToken, useMockData }) => (
-    <HealthView deploymentUrl={deployUrl} authToken={accessToken} useMockData={useMockData} />
+  health: ({ deployUrl, accessToken, teamAccessToken, useMockData, adminClient }) => (
+    <HealthView deploymentUrl={deployUrl} authToken={accessToken} teamAccessToken={teamAccessToken} useMockData={useMockData} adminClient={adminClient} />
   ),
   data: ({ deployUrl, baseUrl, accessToken, adminClient, useMockData, onError, teamSlug, projectSlug }) => (
     <DataView

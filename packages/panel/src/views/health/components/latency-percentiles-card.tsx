@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { HealthCard } from './health-card';
-import { BigMetric } from './big-metric';
 import type { MetricHealth } from './big-metric';
 import { fetchLatencyPercentiles } from '../../../utils/api/metrics';
 import type { APIResponse } from '../types';
-import { transformToChartData } from '../utils';
 
 interface LatencyPercentilesCardProps {
   deploymentUrl?: string;

@@ -7,6 +7,7 @@ import { Components } from './components/components';
 import { BackupRestore } from './components/backup-restore';
 import { Integrations } from './components/integrations';
 import { PauseDeployment } from './components/pause-deployment';
+import { AIAnalysisSettings } from './components/ai-analysis-settings';
 import { getStorageItem, setStorageItem } from '../../utils/storage';
 import { STORAGE_KEYS } from '../../utils/constants';
 
@@ -85,6 +86,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       case 'pause-deployment':
         return (
           <PauseDeployment
+            adminClient={adminClient}
+            accessToken={accessToken}
+            deploymentUrl={deploymentUrl}
+          />
+        );
+      case 'ai-analysis':
+        return (
+          <AIAnalysisSettings
             adminClient={adminClient}
             accessToken={accessToken}
             deploymentUrl={deploymentUrl}

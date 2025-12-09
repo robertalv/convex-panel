@@ -108,7 +108,7 @@ export const InsightsSummaryListItem: React.FC<{ insight: Insight }> = ({ insigh
         <ProblemForInsight insight={insight} />
       </div>
       <div style={{ height: '100%', width: '240px', minWidth: '240px', display: 'flex', alignItems: 'center' }}>
-        <SparklineForInsight />
+        <SparklineForInsight insight={insight} />
       </div>
     </button>
   );

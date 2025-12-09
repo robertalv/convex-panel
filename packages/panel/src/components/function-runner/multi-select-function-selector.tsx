@@ -249,22 +249,12 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
             padding: '8px 12px',
             fontSize: '12px',
             color: allSelected || someSelected ? 'var(--color-panel-text)' : 'var(--color-panel-text-secondary)',
-            backgroundColor: allSelected || someSelected ? 'var(--color-panel-bg)' : 'transparent',
+            backgroundColor: 'transparent',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
             borderBottom: '1px solid var(--color-panel-border)',
-          }}
-          onMouseEnter={(e) => {
-            if (!allSelected && !someSelected) {
-              e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!allSelected && !someSelected) {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }
           }}
         >
           {allSelected ? (
@@ -298,9 +288,7 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
                   color: isSelected
                     ? 'var(--color-panel-text)'
                     : 'var(--color-panel-text-secondary)',
-                  backgroundColor: isSelected
-                    ? 'var(--color-panel-bg)'
-                    : 'transparent',
+                  backgroundColor: 'transparent',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -309,9 +297,6 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
                   position: 'relative',
                 }}
                 onMouseEnter={(e) => {
-                  if (!isSelected) {
-                    e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
-                  }
                   const onlyButtonWrapper = e.currentTarget.querySelector(
                     '.only-button-wrapper'
                   ) as HTMLElement;
@@ -323,15 +308,10 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
                     onlyButtonWrapper.style.transform = 'translateX(0)';
                   }
                   if (onlyButtonBackdrop) {
-                    onlyButtonBackdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, ${
-                      isSelected ? 'var(--color-panel-bg)' : 'var(--color-panel-hover)'
-                    } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`;
+                    onlyButtonBackdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, transparent 15px, transparent 20px, transparent calc(100% - 30px), transparent)`;
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isSelected) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }
                   const onlyButtonWrapper = e.currentTarget.querySelector(
                     '.only-button-wrapper'
                   ) as HTMLElement;
@@ -343,9 +323,7 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
                     onlyButtonWrapper.style.transform = 'translateX(100%)';
                   }
                   if (onlyButtonBackdrop) {
-                    onlyButtonBackdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, ${
-                      isSelected ? 'var(--color-panel-bg)' : 'transparent'
-                    } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`;
+                    onlyButtonBackdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, transparent 15px, transparent 20px, transparent calc(100% - 30px), transparent)`;
                   }
                 }}
               >
@@ -375,9 +353,11 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
                     alignItems: 'center',
                     gap: 0,
                     whiteSpace: 'nowrap',
-                    overflow: 'visible',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                     minWidth: 0,
                     flex: 1,
+                    transition: 'flex 0.15s ease',
                   }}
                 >
                   {option.componentPart && (
@@ -427,11 +407,7 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
                       top: 0,
                       bottom: 0,
                       left: '-20px',
-                      background: `linear-gradient(to right, transparent, transparent 10px, ${
-                        isSelected
-                          ? 'var(--color-panel-bg)'
-                          : 'transparent'
-                      } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`,
+                      background: `linear-gradient(to right, transparent, transparent 10px, transparent 15px, transparent 20px, transparent calc(100% - 30px), transparent)`,
                       pointerEvents: 'none',
                       transition: 'background 0.15s ease',
                       zIndex: 0,
@@ -465,9 +441,7 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
                         '.only-button-backdrop'
                       ) as HTMLElement;
                       if (backdrop) {
-                        backdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, ${
-                          isSelected ? 'var(--color-panel-bg)' : 'var(--color-panel-hover)'
-                        } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`;
+                        backdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, transparent 15px, transparent 20px, transparent calc(100% - 30px), transparent)`;
                       }
                     }}
                     onMouseLeave={(e) => {
@@ -477,9 +451,7 @@ export const MultiSelectFunctionSelector: React.FC<MultiSelectFunctionSelectorPr
                         '.only-button-backdrop'
                       ) as HTMLElement;
                       if (backdrop) {
-                        backdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, ${
-                          isSelected ? 'var(--color-panel-bg)' : 'transparent'
-                        } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`;
+                        backdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, transparent 15px, transparent 20px, transparent calc(100% - 30px), transparent)`;
                       }
                     }}
                   >

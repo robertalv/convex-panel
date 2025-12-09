@@ -6,6 +6,10 @@
 import type { Insight } from './types';
 import { callConvexQuery } from './helpers';
 import { SYSTEM_QUERIES } from '../constants';
+import { transformInsightsData, useInsightsPeriod } from './insights';
+import { queryBigBrainUsage } from './bigBrain';
+import { getTeamFromDeployment, getTokenDetails } from './teams';
+import { extractDeploymentName } from './utils';
 
 /**
  * Fetch the last push event timestamp from the Convex deployment
@@ -132,9 +136,9 @@ export async function fetchServerVersion(
 }
 
 /**
- * Fetch insights from Convex
+ * Fetch insights from Big Brain API
  * @param deploymentUrl - The URL of the Convex deployment
- * @param authToken - The authentication token for the Convex deployment
+ * @param authToken - The authentication token (prefer team access token for Big Brain API)
  * @param useMockData - Whether to use mock data instead of making API calls
  * @returns Array of insights, or empty array if none found
  */
@@ -148,32 +152,126 @@ export async function fetchInsights(
   }
 
   try {
-    const data = await callConvexQuery(
-      deploymentUrl,
-      authToken,
-      SYSTEM_QUERIES.INSIGHTS_LIST,
-      {}
-    );
+    // Extract deployment name from URL
+    const deploymentName = extractDeploymentName(deploymentUrl);
 
-    if (data === null || data === undefined) {
+    if (!deploymentName) {
       return [];
     }
 
-    let insightsData = data;
-    if (data && typeof data === 'object' && 'value' in data) {
-      insightsData = data.value;
+    // Big Brain API uses Bearer token, so strip "Convex " prefix if present
+    const bearerToken = authToken.startsWith('Convex ') ? authToken.substring(7) : authToken;
+    
+    // Try multiple methods to get teamId
+    let teamId: number | null = null;
+    let projectId: number | null = null;
+    let tokenDetails: { teamId?: number | string; type?: string; [key: string]: any } | null = null;
+
+    // Method 1: Try to get teamId from token details (this endpoint might work)
+    try {
+      tokenDetails = await getTokenDetails(bearerToken);
+      if (tokenDetails?.teamId) {
+        teamId = typeof tokenDetails.teamId === 'string' 
+          ? parseInt(tokenDetails.teamId, 10) 
+          : tokenDetails.teamId;
+      }
+    } catch (error) {
+      // Continue anyway
     }
 
-    if (Array.isArray(insightsData)) {
-      return insightsData;
+    // Method 2: Try to get team ID from deployment name (may fail due to CORS)
+    if (!teamId) {
+      try {
+        const teamInfo = await getTeamFromDeployment(deploymentName, bearerToken, true);
+        if (teamInfo?.teamId) {
+          teamId = teamInfo.teamId;
+          projectId = teamInfo.projectId || null;
+        }
+      } catch (error) {
+        // Try without Bearer prefix in case token format is different
+        try {
+          const teamInfo = await getTeamFromDeployment(deploymentName, authToken, false);
+          if (teamInfo?.teamId) {
+            teamId = teamInfo.teamId;
+            projectId = teamInfo.projectId || null;
+          }
+        } catch (fallbackError) {
+          // Continue anyway
+        }
+      }
     }
 
-    if (insightsData && typeof insightsData === 'object' && 'insights' in insightsData) {
-      return Array.isArray(insightsData.insights) ? insightsData.insights : [];
+    if (!teamId) {
+      return [];
     }
 
-    return [];
+    // Check token type BEFORE making Big Brain API call
+    // Project tokens and service account tokens cannot access Big Brain API endpoints
+    // Reuse tokenDetails from Method 1 if available, otherwise fetch it
+    if (!tokenDetails) {
+      try {
+        tokenDetails = await getTokenDetails(bearerToken);
+      } catch (err) {
+        // Continue if we can't check token type - we'll see the error from the Big Brain API
+      }
+    }
+    
+    if (tokenDetails?.type === 'projectToken') {
+      return [];
+    }
+
+    // Get the period for data processing
+    const period = useInsightsPeriod();
+
+    // Call Big Brain API to get insights
+    const insightsQueryId = '9ab3b74e-a725-480b-88a6-43e6bd70bd82';
+
+    let insightsData;
+    try {
+      insightsData = await queryBigBrainUsage({
+        teamId,
+        queryId: insightsQueryId,
+        projectId,
+        deploymentName,
+        period,
+        componentPrefix: null,
+        accessToken: bearerToken,
+      });
+    } catch (error) {
+      
+      // Handle specific error cases
+      if (error instanceof Error) {
+        // Service account tokens don't have access to Big Brain API
+        if (error.message.includes('Service accounts cannot manage teams') || 
+            error.message.includes('ServiceAccount') ||
+            (error.message.includes('403') && error.message.includes('service'))) {
+          return [];
+        }
+        
+        // CORS errors
+        if (error.message.includes('CORS')) {
+          return [];
+        }
+        
+        // Permission/authentication errors
+        if (error.message.includes('403') || error.message.includes('Forbidden')) {
+          return [];
+        }
+      }
+      
+      return [];
+    }
+
+    if (!insightsData || !Array.isArray(insightsData)) {
+      return [];
+    }
+
+    // Transform the tuple format data: [kind, functionId, componentPath, detailsJSON]
+    const transformed = transformInsightsData(insightsData, period.from);
+
+    return transformed;
   } catch (error) {
+    // Continue anyway
     return [];
   }
 }

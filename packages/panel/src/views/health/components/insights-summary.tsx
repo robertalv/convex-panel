@@ -4,12 +4,16 @@ import { Card } from '../../../components/shared/card';
 import { fetchInsights } from '../../../utils/api/health';
 import type { Insight } from '../../../utils/api/types';
 import { InsightsSummaryListItem } from './insights-summary-list-item';
+import { useInsightsPeriod } from '../../../utils/api/insights';
+import { getTeamTokenFromEnv } from '../../../utils/api/utils';
+import { getTokenDetails } from '../../../utils/api/teams';
 
 export const InsightsSummary: React.FC<{
   deploymentUrl?: string;
   authToken: string;
+  teamAccessToken?: string;
   useMockData?: boolean;
-}> = ({ deploymentUrl, authToken, useMockData = false }) => {
+}> = ({ deploymentUrl, authToken, teamAccessToken, useMockData = false }) => {
   const [insights, setInsights] = useState<Insight[] | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,13 +30,78 @@ export const InsightsSummary: React.FC<{
       setLoading(true);
       setError(null);
       try {
-        const data = await fetchInsights(deploymentUrl, authToken, useMockData);
+        // Use the same token fallback logic as backup-restore:
+        // 1. teamAccessToken prop
+        // 2. getTeamTokenFromEnv() (environment variable)
+        // 3. authToken (fallback, might be project token)
+        let token = teamAccessToken;
+        if (!token) {
+          const envToken = getTeamTokenFromEnv();
+          if (envToken) {
+            token = envToken;
+          }
+        }
+        if (!token) {
+          token = authToken;
+        }
+
+        if (!token) {
+          setError('No access token available. Please provide a team access token for insights.');
+          setLoading(false);
+          return;
+        }
+
+        // Check token type BEFORE making insights calls (same as backup-restore)
+        // If it's a project token, we need a team token for Big Brain API
+        let isProjectToken = false;
+        try {
+          const tokenDetails = await getTokenDetails(token);
+          isProjectToken = tokenDetails?.type === 'projectToken';
+          
+          if (isProjectToken) {
+            // Try to get team token from env one more time (in case it's available)
+            const envTeamToken = getTeamTokenFromEnv();
+            if (envTeamToken && envTeamToken !== token) {
+              try {
+                const envTokenDetails = await getTokenDetails(envTeamToken);
+                if (envTokenDetails?.type !== 'projectToken' && envTokenDetails?.teamId) {
+                  token = envTeamToken;
+                  isProjectToken = false;
+                }
+              } catch {
+                // Environment token also failed, continue with error message
+              }
+            }
+            
+            // If still a project token, show error immediately with helpful instructions
+            if (isProjectToken) {
+              const envToken = getTeamTokenFromEnv();
+              const envTokenAvailable = !!envToken;
+              const isNext = typeof window !== 'undefined' && (window as any).__NEXT_DATA__;
+              const errorMsg = envTokenAvailable
+                ? 'Insights require a team access token. A project token was detected. ' +
+                  'The team token from CONVEX_ACCESS_TOKEN was found in the environment, but it may be a project token instead of a team token. ' +
+                  `Please ensure CONVEX_ACCESS_TOKEN in your .env file is a team access token (not a project token), or pass a team token via the \`teamAccessToken\` prop to ConvexPanel.`
+                : 'Insights require a team access token, but a project token is being used. ' +
+                  `Please provide a team access token by either: (1) Setting CONVEX_ACCESS_TOKEN in your .env file (for ${isNext ? 'Next.js' : 'Vite'} apps), or (2) Passing it via the \`teamAccessToken\` prop to ConvexPanel. ` +
+                  'Note: CONVEX_ACCESS_TOKEN must be a team access token (not a project token).';
+              setError(errorMsg);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (err) {
+          // Continue anyway - we'll see the error from the Big Brain API
+        }
+
+        const data = await fetchInsights(deploymentUrl, token, useMockData);
         if (mounted) {
           setInsights(data);
         }
       } catch (err) {
         if (mounted) {
-          setError(err instanceof Error ? err.message : 'Failed to fetch insights');
+          const errorMessage = err instanceof Error ? err.message : 'Failed to fetch insights';
+          setError(errorMessage);
         }
       } finally {
         if (mounted) {
@@ -50,26 +119,45 @@ export const InsightsSummary: React.FC<{
       mounted = false;
       clearInterval(interval);
     };
-  }, [deploymentUrl, authToken, useMockData]);
+  }, [deploymentUrl, authToken, teamAccessToken, useMockData]);
 
   const hasAnyInsights = insights && insights.length > 0;
+  const period = useInsightsPeriod();
 
-  // Get time range for display (last 30 minutes)
+  // Get time range for display (last 72 hours)
   const getTimeRange = (): string => {
-    const now = new Date();
-    const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
+    const fromDate = new Date(period.from);
     const formatTime = (date: Date) => {
       return date.toLocaleString('en-US', {
-        month: '2-digit',
-        day: '2-digit',
+        month: 'numeric',
+        day: 'numeric',
         year: 'numeric',
         hour: 'numeric',
-        minute: '2-digit',
+        minute: undefined,
         hour12: true,
       });
     };
-    return `${formatTime(thirtyMinutesAgo)} – Now`;
+    return `${formatTime(fromDate)} – Now`;
   };
+
+  // Show error message if present
+  if (error && !loading) {
+    return (
+      <Card
+        title="Insights"
+        action={<div style={{ fontSize: '11px', color: 'var(--color-panel-text-muted)' }}>{getTimeRange()}</div>}
+      >
+        <div style={{ 
+          padding: '24px', 
+          color: 'var(--color-panel-error)', 
+          fontSize: '13px',
+          lineHeight: '1.5',
+        }}>
+          {error}
+        </div>
+      </Card>
+    );
+  }
 
   if (!hasAnyInsights && !loading && insights !== undefined) {
     return (
@@ -205,11 +293,6 @@ export const InsightsSummary: React.FC<{
             {insights.map((insight, idx) => (
               <InsightsSummaryListItem key={idx} insight={insight} />
             ))}
-          </div>
-        )}
-        {error && (
-          <div style={{ padding: '16px', color: 'var(--color-panel-error)', fontSize: '12px' }}>
-            Error: {error}
           </div>
         )}
       </div>

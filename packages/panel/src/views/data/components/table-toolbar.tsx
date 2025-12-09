@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Filter, Plus, MoreVertical, EyeOff, Trash2, Edit2, X, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { FilterExpression, SortConfig } from '../../../types';
+import type { TableSchema } from '../../../types/tables';
 import { operatorOptions } from '../../../utils/constants';
 import { TooltipAction } from '../../../components/shared/tooltip-action';
 import { TableMenuDropdown } from './table-menu-dropdown';
+import { NaturalLanguageQuery } from './natural-language-query';
 
 export interface TableToolbarProps {
   documentCount: number;
@@ -26,6 +28,12 @@ export interface TableToolbarProps {
   onMetrics?: () => void;
   onClearTable?: () => void;
   onDeleteTable?: () => void;
+  tableName?: string;
+  tableSchema?: TableSchema;
+  availableFields?: string[];
+  adminClient?: any;
+  onNaturalLanguageQuery?: (filters: FilterExpression, sortConfig: SortConfig | null, limit: number | null) => void;
+  onNaturalLanguageQueryError?: (error: string) => void;
 }
 
 export const TableToolbar: React.FC<TableToolbarProps> = ({
@@ -49,6 +57,12 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
   onMetrics,
   onClearTable,
   onDeleteTable,
+  tableName,
+  tableSchema,
+  availableFields = [],
+  adminClient,
+  onNaturalLanguageQuery,
+  onNaturalLanguageQueryError,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
@@ -182,7 +196,20 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
         padding: '0 8px',
         backgroundColor: 'var(--color-panel-bg)',
       }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 auto', minWidth: 0, overflow: 'hidden' }}>
+        {tableName && tableSchema && adminClient && onNaturalLanguageQuery && (
+          <>
+            <NaturalLanguageQuery
+              tableName={tableName}
+              tableSchema={tableSchema}
+              availableFields={availableFields}
+              adminClient={adminClient}
+              onApply={onNaturalLanguageQuery}
+              onError={onNaturalLanguageQueryError}
+            />
+            <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--color-panel-border)' }}></div>
+          </>
+        )}
         <div
           onClick={onFilterToggle}
           style={{
@@ -222,7 +249,7 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
         {hasActiveFilters && (
           <>
             <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--color-panel-border)', margin: '0 4px' }}></div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0', position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0', position: 'relative', flex: '1 1 auto', minWidth: 0 }}>
               {/* Left Arrow with Fade */}
               {shouldScroll && canScrollLeft && (
                 <>
@@ -278,9 +305,11 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
                   display: 'flex', 
                   alignItems: 'center', 
                   gap: '6px', 
-                  flexWrap: shouldScroll ? 'nowrap' : 'wrap', 
-                  maxWidth: shouldScroll ? (canScrollLeft && canScrollRight ? '352px' : canScrollLeft || canScrollRight ? '376px' : '400px') : '400px',
-                  overflowX: shouldScroll ? 'auto' : 'hidden',
+                  flexWrap: 'nowrap', 
+                  flex: '1 1 auto',
+                  minWidth: 0,
+                  maxWidth: shouldScroll ? (canScrollLeft && canScrollRight ? '352px' : canScrollLeft || canScrollRight ? '376px' : '400px') : 'none',
+                  overflowX: shouldScroll ? 'auto' : 'visible',
                   overflowY: 'hidden',
                   WebkitOverflowScrolling: 'touch',
                   scrollbarWidth: 'none',

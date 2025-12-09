@@ -8,6 +8,7 @@ import {
   Sparkles,
   ExternalLink,
   BookOpen,
+  MessageCircle,
 } from 'lucide-react';
 import { ConvexLogo } from './icons';
 import { AskAI } from './ask-ai';
@@ -28,11 +29,12 @@ import { useThemeSafe } from '../hooks/useTheme';
 import { useHasSubscription } from '../hooks/useTeamOrbSubscription';
 import { SupportPopup } from './support-popup';
 import { SetupInstructions } from './setup-instructions';
-// import { UserMenu } from './user-menu';
 import { fetchDeploymentMetadata } from '../utils/api/deployments';
 import { extractDeploymentName, extractProjectName } from '../utils/api/utils';
 import { fetchProjectInfo } from '../utils/api/teams';
 import { useIsDeploymentPaused } from '../hooks/usePaginatedScheduledJobs';
+import { ChatbotSheet } from './chatbot-sheet';
+import { useDataViewContext } from '../contexts/data-view-context';
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -88,9 +90,11 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 }) => {
   const [internalActiveTab, setInternalActiveTab] = useActiveTab();
   const activeTab = externalActiveTab ?? internalActiveTab;
+  const dataViewContext = useDataViewContext();
   const [isResizing, setIsResizing] = useState(false);
   const [isSupportPopupOpen, setIsSupportPopupOpen] = useState(false);
   const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
+  const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [customHeight, setCustomHeight] = useState<number | null>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(PANEL_HEIGHT_STORAGE_KEY);
@@ -99,12 +103,9 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     return null;
   });
   const [sheetContainer, setSheetContainer] = useState<HTMLElement | null>(null);
-  
-  // Calculate isPanelExpanded early so it can be used in the callback ref
-  // Allow expansion even when not authenticated so users can see instructions
+
   const isPanelExpanded = Boolean(isOpen);
-  
-  // Callback ref to track the main content container
+
   const mainContentRef = useCallback((node: HTMLDivElement | null) => {
     if (node && isPanelExpanded) {
       setSheetContainer(node);
@@ -112,7 +113,10 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       setSheetContainer(null);
     }
   }, [isPanelExpanded]);
-  
+
+  useEffect(() => {
+  }, [sheetContainer]);
+
   const [deploymentMetadata, setDeploymentMetadata] = useState<{
     deploymentName?: string;
     projectName?: string;
@@ -203,7 +207,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   //   const prevDeps = prevDepsRef.current;
   //   const depsChanged = prevDeps.deploymentUrl !== currentDeps.deploymentUrl || 
   //                       prevDeps.accessToken !== currentDeps.accessToken;
-    
+
   //   // Update ref with current deps
   //   prevDepsRef.current = currentDeps;
 
@@ -212,7 +216,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
   //   const fetchDeploymentState = async () => {
   //     if (!isMounted || deploymentStateFetchRef.current.isFetching) return;
-      
+
   //     // Throttle: don't fetch if we fetched less than 1 second ago (unless forced)
   //     const now = Date.now();
   //     const timeSinceLastFetch = now - deploymentStateFetchRef.current.lastFetch;
@@ -240,12 +244,12 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   //       }
 
   //       const state = await getConvexDeploymentState(finalDeploymentUrl, finalAdminKey);
-        
+
   //       if (!isMounted) {
   //         deploymentStateFetchRef.current.isFetching = false;
   //         return;
   //       }
-        
+
   //       setDeploymentState(state.state);
   //       deploymentStateFetchRef.current.isFetching = false;
   //     } catch (error) {
@@ -281,20 +285,20 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   //   if (depsChanged || deploymentStateFetchRef.current.lastFetch === 0) {
   //     fetchDeploymentState();
   //   }
-    
+
   //   // Check for immediate state changes
   //   checkForStateChange();
-    
+
   //   // Listen for custom events
   //   window.addEventListener('deploymentStateChanged', handleDeploymentStateChange);
-    
+
   //   // Poll every 5 seconds (reduced from 2 seconds to reduce load)
   //   intervalId = setInterval(() => {
   //     if (!isMounted) return;
   //     checkForStateChange();
   //     fetchDeploymentState();
   //   }, 5000);
-    
+
   //   return () => {
   //     isMounted = false;
   //     deploymentStateFetchRef.current.isFetching = false;
@@ -317,11 +321,11 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   const projectName = useMemo(() => {
     return deploymentMetadata?.projectName || providedProjectName || extractProjectName(deploymentUrl) || 'convex-panel';
   }, [deploymentMetadata?.projectName, providedProjectName, deploymentUrl]);
-  
+
   const deploymentName = useMemo(() => {
     return deploymentMetadata?.deploymentName || extractDeploymentName(deploymentUrl) || 'convex-panel';
   }, [deploymentMetadata?.deploymentName, deploymentUrl]);
-  
+
   const deploymentType = deploymentMetadata?.deploymentType || providedEnvironment || 'development';
   const environment = deploymentType === 'prod' ? 'production' : deploymentType === 'preview' ? 'preview' : 'development';
 
@@ -345,14 +349,13 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     }
     return undefined;
   }, [projectInfo, project, projectName, deploymentName, team]);
-  
+
   const handleTabChange = (tab: TabId) => {
     setInternalActiveTab(tab);
     onTabChange?.(tab);
   };
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    // Allow resizing even when not authenticated
     e.preventDefault();
     setIsResizing(true);
   }, []);
@@ -374,12 +377,12 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       setIsResizing(false);
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isResizing]);
 
@@ -387,12 +390,11 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   const showGlobalRunner = useShowGlobalRunner();
   const [isGlobalRunnerVertical, setIsGlobalRunnerVertical] = useGlobalLocalStorage('functionRunnerOrientation', false);
   const [isRunnerExpanded, setIsRunnerExpanded] = useState(false);
-  
+
   useFunctionRunnerShortcuts();
 
   const getHeight = () => {
     const minHeight = PANEL_COLLAPSED_HEIGHT;
-    // Allow expansion even when not authenticated so users can see instructions
     if (!isOpen) return minHeight;
     if (customHeight !== null) return `${customHeight}px`;
     return PANEL_DEFAULT_HEIGHT;
@@ -407,8 +409,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     <>
       <div className="cp-flex cp-items-center cp-gap-2">
         <ConvexLogo width={30} height={30} />
-        <ProjectSelector 
-          team={projectInfo?.team || team} 
+        <ProjectSelector
+          team={projectInfo?.team || team}
           project={projectWithName}
           loading={isProjectSelectorLoading}
         />
@@ -443,13 +445,10 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
   const { theme, toggleTheme } = useThemeSafe();
 
-  // Get team ID for subscription check
   const teamId = projectInfo?.team?.id || team?.id;
-  // Convert string team ID to number if needed, or pass as-is if already a number
   const teamIdNumber = teamId ? (typeof teamId === 'string' ? parseInt(teamId, 10) : teamId) : undefined;
   const hasSubscription = useHasSubscription(teamIdNumber);
-  
-  // Show upgrade button if authenticated, not loading, and no subscription
+
   const showUpgradeButton = isAuthenticated && hasSubscription === false;
 
   const handleUpgradeClick = () => {
@@ -491,6 +490,17 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       >
         <HelpCircle size={14} /> Support
       </button>
+      {isAuthenticated && (
+        <button
+          type="button"
+          className="cp-support-btn"
+          onClick={() => setIsChatbotOpen(true)}
+          title="AI Assistant"
+        >
+          <MessageCircle size={14} />
+          Assistant
+        </button>
+      )}
       <button
         type="button"
         onClick={toggleTheme}
@@ -510,19 +520,31 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
           onLogout={onLogout}
         />
       )} */}
-      
+
       {isAuthenticated && (
         <>
-        <div className="cp-separator" />
-        <button type="button" onClick={onClose} className="cp-icon-btn cp-theme-toggle-btn">
-          {isOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-        </button>
+          <div className="cp-separator" />
+          <button type="button" onClick={onClose} className="cp-icon-btn cp-theme-toggle-btn">
+            {isOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          </button>
         </>
-)}
+      )}
     </>
   );
 
-  // Always render the BottomSheet - it should always be visible
+  const handleChatbotClose = useCallback(() => setIsChatbotOpen(false), []);
+
+  // Memoize ChatbotSheet props to prevent unnecessary re-renders
+  const chatbotCurrentTable = useMemo(() => {
+    return activeTab === 'data' ? dataViewContext.selectedTable : null;
+  }, [activeTab, dataViewContext.selectedTable]);
+
+  const chatbotAvailableFields = useMemo(() => {
+    return activeTab === 'data' ? dataViewContext.availableFields : [];
+  }, [activeTab, dataViewContext.availableFields]);
+
+  const chatbotIsInDataView = activeTab === 'data';
+
   return (
     <div
       className={`cp-bottom-sheet cp-theme-${theme}`}
@@ -543,7 +565,23 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       }}
     >
       {isPanelExpanded && (
-        <div onMouseDown={handleResizeStart} className="cp-resize-handle" />
+        <div
+          onMouseDown={handleResizeStart}
+          className="cp-resize-handle"
+          style={{
+            backgroundColor: isResizing ? 'var(--color-panel-accent, #6366f1)' : 'transparent',
+          }}
+          onMouseEnter={(e) => {
+            if (!isResizing) {
+              e.currentTarget.style.backgroundColor = 'var(--color-panel-accent, #6366f1)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isResizing) {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }
+          }}
+        />
       )}
       <div className="cp-header" style={{ borderBottom: isOpen ? undefined : 'none' }}>
         <div className="cp-header-section cp-header-section--left">{headerLeftContent}</div>
@@ -555,10 +593,10 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
           <div className="cp-flex cp-flex-1 cp-overflow-hidden">
             <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
 
-            <div 
-              className="cp-main-content" 
-              ref={mainContentRef} 
-              style={{ 
+            <div
+              className="cp-main-content"
+              ref={mainContentRef}
+              style={{
                 display: 'flex',
                 flexDirection: !isGlobalRunnerVertical ? 'column' : 'row',
                 flex: 1,
@@ -578,6 +616,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
                   minHeight: 0,
                   minWidth: 0,
                   position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column',
                 }}
               >
                 {/* Deployment Paused Banner */}
@@ -673,6 +713,22 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         projectSlug={projectSlug}
         accessToken={accessToken}
       />
+
+      {/* Chatbot Sheet */}
+      {isAuthenticated && deploymentUrl && accessToken ? (
+        <ChatbotSheet
+          isOpen={isChatbotOpen}
+          onClose={handleChatbotClose}
+          adminClient={adminClient}
+          accessToken={accessToken}
+          convexUrl={deploymentUrl}
+          onTabChange={onTabChange}
+          container={sheetContainer}
+          currentTable={chatbotCurrentTable}
+          availableFields={chatbotAvailableFields}
+          isInDataView={chatbotIsInDataView}
+        />
+      ) : null}
     </div>
   );
 };

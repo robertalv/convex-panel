@@ -11,6 +11,12 @@ const schema = defineSchema({
     ),
   })
     .index("by_done", ["done"]),
+  productHuntStats: defineTable({
+    postId: v.string(),
+    upvotes: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_postId", ["postId"]),
 });
 
 export default schema;

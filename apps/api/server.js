@@ -247,7 +247,6 @@ app.post('/v1/convex/oauth', async (req, res) => {
     }
 
     const token = await tokenResponse.json();
-    console.log('Token exchange successful');
     
     res.json(token);
   } catch (error) {
@@ -283,11 +282,6 @@ module.exports = app;
 // Start server only if not in Vercel environment
 if (process.env.VERCEL !== '1') {
   app.listen(PORT, () => {
-    console.log(`Convex Panel API Server running on port ${PORT}`);
-    console.log(`Health check: http://localhost:${PORT}/health`);
-    console.log(`OAuth exchange: http://localhost:${PORT}/v1/convex/oauth`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-
     const { key: resolvedClientIdKey, value: resolvedClientIdValue } = resolveEnvVar(
       CLIENT_ID_ENV_KEYS,
       'CONVEX_CLIENT_ID'
@@ -295,17 +289,6 @@ if (process.env.VERCEL !== '1') {
     const { key: resolvedClientSecretKey, value: resolvedClientSecretValue } = resolveEnvVar(
       CLIENT_SECRET_ENV_KEYS,
       'CONVEX_CLIENT_SECRET'
-    );
-
-    console.log(
-      `Client ID (${CLIENT_ID_ENV_KEYS.join(
-        ' | '
-      )}) -> using "${resolvedClientIdKey}": ${resolvedClientIdValue ? 'Set' : 'Missing'}`
-    );
-    console.log(
-      `Client Secret (${CLIENT_SECRET_ENV_KEYS.join(
-        ' | '
-      )}) -> using "${resolvedClientSecretKey}": ${resolvedClientSecretValue ? 'Set' : 'Missing'}`
     );
     
     if (!resolvedClientSecretValue) {
@@ -320,11 +303,9 @@ if (process.env.VERCEL !== '1') {
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully...');
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully...');
   process.exit(0);
 });

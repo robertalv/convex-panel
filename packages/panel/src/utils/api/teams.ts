@@ -3,7 +3,7 @@
  * Handles fetching teams, projects, deployments, and user profiles
  */
 
-import { ROUTES, SYSTEM_QUERIES } from '../constants';
+import { ROUTES, SYSTEM_QUERIES, CONVEX_API_DOMAIN, CONVEX_PROVISION_DOMAIN } from '../constants';
 import type {
   ProfileResponse,
   TeamResponse,
@@ -11,7 +11,6 @@ import type {
   DeploymentResponse,
 } from './types';
 import { extractDeploymentName, parseAccessToken } from './utils';
-import { CONVEX_API_DOMAIN } from '../constants';
 import { callConvexQuery } from './helpers';
 
 /**
@@ -139,7 +138,8 @@ export async function getTeamFromDeployment(
   accessToken: string,
   useBearerToken: boolean = false
 ): Promise<{ teamId: number; teamSlug?: string; projectId?: number; projectSlug?: string }> {
-  const endpoint = `https://${CONVEX_API_DOMAIN}${ROUTES.TEAM_FROM_DEPLOYMENT.replace('{deploymentName}', deploymentName)}`;
+  // Use provision domain as shown in Convex reference code
+  const endpoint = `https://${CONVEX_PROVISION_DOMAIN}${ROUTES.TEAM_FROM_DEPLOYMENT.replace('{deploymentName}', deploymentName)}`;
   const authHeader = useBearerToken
     ? `Bearer ${accessToken}`
     : `Convex ${accessToken}`;
@@ -158,6 +158,7 @@ export async function getTeamFromDeployment(
   }
 
   const result = await response.json();
+  // Response format: { team: string (slug), project: string (slug), teamId: number, projectId: number }
   return {
     teamId: result.teamId,
     teamSlug: result.team,

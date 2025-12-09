@@ -676,8 +676,6 @@ export const cleanupInternal = internalMutation({
     let deletedStates = 0;
     let deletedScopes = 0;
 
-    console.log(`[filterHistory cleanup] Starting cleanup with retention: ${args.retentionHours} hours (${retentionMs}ms), cutoff time: ${new Date(cutoffTime).toISOString()}`);
-
     // Get all scopes
     const allScopes = await ctx.db.query("scopes").collect();
 
@@ -727,8 +725,6 @@ export const cleanupInternal = internalMutation({
       deletedStates,
       deletedScopes,
     };
-    
-    console.log(`[filterHistory cleanup] Completed: deleted ${deletedStates} states, ${deletedScopes} scopes`);
     
     return result;
   },

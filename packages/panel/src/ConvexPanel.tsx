@@ -16,6 +16,7 @@ import { ThemeProvider } from './hooks/useTheme';
 import type { Theme } from './hooks/useTheme';
 import { SheetProvider } from './contexts/sheet-context';
 import { PortalProvider } from './contexts/portal-context';
+import { DataViewProvider } from './contexts/data-view-context';
 import { getStorageItem, setStorageItem } from './utils/storage';
 import { STORAGE_KEYS } from './utils/constants';
 import { setupGlobalErrorHandling } from './utils/error-handling';
@@ -348,6 +349,7 @@ const ConvexPanel = ({
   return (
     <PortalProvider value={portalContainer ?? null}>
     <ThemeProvider defaultTheme={defaultTheme}>
+      <DataViewProvider>
       <SheetProvider>
           <ToastProvider position="bottom-right">
           <BottomSheet
@@ -424,6 +426,7 @@ const ConvexPanel = ({
             />
           )}
       </SheetProvider>
+      </DataViewProvider>
     </ThemeProvider>
     </PortalProvider>
   );

@@ -83,6 +83,13 @@ export function Dropdown<T = string | number>({
     }
   }, [isOpen]);
 
+  const handleTriggerClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!disabled) {
+      setIsOpen(!isOpen);
+    }
+  };
+
   const selectedOption = options.find(opt => opt.value === value);
 
   const handleSelect = (optionValue: T) => {
@@ -131,7 +138,8 @@ export function Dropdown<T = string | number>({
         ref={triggerRef}
         type="button"
         disabled={disabled}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={handleTriggerClick}
+        onMouseDown={(e) => e.stopPropagation()}
         className={triggerClassName}
         style={{
           display: 'flex',
@@ -141,7 +149,7 @@ export function Dropdown<T = string | number>({
           height: '100%',
           minHeight: '100%',
           padding: '0 8px',
-          backgroundColor: 'var(--color-panel-bg-tertiary)',
+          backgroundColor: 'var(--color-panel-bg-secondary)',
           border: 'none',
           borderRight: '1px solid var(--color-panel-border)',
           fontSize: '10px',
@@ -156,12 +164,12 @@ export function Dropdown<T = string | number>({
         }}
         onMouseEnter={(e) => {
           if (!disabled && !isOpen) {
-            e.currentTarget.style.backgroundColor = 'var(--color-panel-active)';
+            e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
           }
         }}
         onMouseLeave={(e) => {
           if (!disabled) {
-            e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+            e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-active)';
           }
         }}
       >
@@ -196,7 +204,7 @@ export function Dropdown<T = string | number>({
             left: align === 'right' ? 'auto' : `${dropdownPosition.left}px`,
             right: align === 'right' ? `${window.innerWidth - dropdownPosition.left - dropdownPosition.width}px` : 'auto',
             width: `${dropdownPosition.width}px`,
-            backgroundColor: 'var(--color-panel-bg-tertiary)',
+            backgroundColor: 'var(--color-panel-bg)',
             border: '1px solid var(--color-panel-border)',
             borderRadius: '8px',
             boxShadow: '0 4px 16px var(--color-panel-shadow)',

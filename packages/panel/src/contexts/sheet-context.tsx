@@ -13,15 +13,17 @@ interface SheetContextValue {
   openSheet: (content: SheetContent) => void;
   closeSheet: () => void;
   sheetContent: SheetContent | null;
+  container: HTMLElement | null;
 }
 
 const SheetContext = createContext<SheetContextValue | null>(null);
 
 interface SheetProviderProps {
   children: ReactNode;
+  container?: HTMLElement | null;
 }
 
-export function SheetProvider({ children }: SheetProviderProps) {
+export function SheetProvider({ children, container = null }: SheetProviderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [sheetContent, setSheetContent] = useState<SheetContent | null>(null);
 
@@ -49,6 +51,7 @@ export function SheetProvider({ children }: SheetProviderProps) {
     openSheet,
     closeSheet,
     sheetContent,
+    container,
   };
 
   return (
@@ -75,6 +78,7 @@ export function useSheetSafe(): SheetContextValue {
       openSheet: () => {},
       closeSheet: () => {},
       sheetContent: null,
+      container: null,
     };
   }
   return context;

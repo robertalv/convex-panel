@@ -1049,7 +1049,7 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     background-color: var(--color-panel-accent-hover);
   }
   .cp-resize-handle {
-    height: 2px;
+    height: 4px;
     cursor: ns-resize;
     background-color: transparent;
     position: absolute;
@@ -1057,19 +1057,10 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     left: 0;
     right: 0;
     z-index: 10;
-    transition: background 0.15s ease;
+    transition: background-color 0.2s ease;
   }
   .cp-resize-handle:hover {
-    background: radial-gradient(ellipse at center, var(--color-panel-accent) 0%, transparent 70%);
-    @supports (color: color-mix(in lab, red, red)) {
-      background: radial-gradient(ellipse at center, color-mix(in srgb, var(--color-panel-accent) 50%, transparent) 0%, transparent 70%);
-    }
-    @supports (color: color-mix(in lab, red, red)) {
-      background: radial-gradient(ellipse at center, var(--color-panel-accent) 0%, transparent 70%);
-      @supports (color: color-mix(in lab, red, red)) {
-        background: radial-gradient(ellipse at center, color-mix(in srgb, var(--color-panel-accent) 50%, transparent) 0%, transparent 70%);
-      }
-    }
+    background-color: var(--color-panel-accent, #6366f1);
   }
   .cp-sidebar {
     width: 48px;
@@ -1605,7 +1596,8 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
 }
 .cp-health-container {
   padding: 16px;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   background-color: var(--color-panel-bg);
 }

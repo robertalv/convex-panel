@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, ExternalLink } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { Card } from '../../../components/shared/card';
 import { fetchRecentErrors } from '../../../utils/api/metrics';
 

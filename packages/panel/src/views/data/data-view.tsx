@@ -20,6 +20,7 @@ import { useShowGlobalRunner } from '../../lib/functionRunner';
 import { deleteTable, deleteDocuments } from '../../utils/api/documents';
 import { getAdminClientInfo } from '../../utils/adminClient';
 import { toast } from '../../utils/toast';
+import { useDataViewContext } from '../../contexts/data-view-context';
 
 export interface DataViewProps {
   convexUrl?: string;
@@ -74,9 +75,10 @@ export const DataView: React.FC<DataViewProps> = ({
     componentId: selectedComponentId,
   });
 
+  const { setDataViewContext } = useDataViewContext();
   const tableSchema = tableData.tables[tableData.selectedTable];
   const availableFields = tableSchema?.fields?.map(field => field.fieldName) || [];
-  
+
   const documentFields = useMemo(() => {
     const fieldsSet = new Set<string>();
     tableData.documents.forEach(doc => {
@@ -88,11 +90,33 @@ export const DataView: React.FC<DataViewProps> = ({
     });
     return Array.from(fieldsSet);
   }, [tableData.documents]);
-  
+
   const allFields = useMemo(() => {
     const combined = ['_id', ...availableFields, ...documentFields, '_creationTime'];
     return combined.filter((col, index, self) => self.indexOf(col) === index);
   }, [availableFields, documentFields]);
+
+  // Track previous values to avoid infinite loops
+  const prevTableRef = useRef<string | null>(null);
+  const prevFieldsRef = useRef<string>('');
+
+  // Update data view context for chatbot
+  useEffect(() => {
+    const currentTable = tableData.selectedTable;
+    const currentFieldsString = JSON.stringify(allFields.sort());
+
+    // Only update if table or fields actually changed
+    if (currentTable !== prevTableRef.current || currentFieldsString !== prevFieldsRef.current) {
+      if (currentTable && allFields.length > 0) {
+        setDataViewContext(currentTable, allFields);
+      } else {
+        setDataViewContext(null, []);
+      }
+
+      prevTableRef.current = currentTable;
+      prevFieldsRef.current = currentFieldsString;
+    }
+  }, [tableData.selectedTable, allFields, setDataViewContext]);
 
   const hiddenFieldsCount = useMemo(() => {
     if (allFields.length === 0) return 0;
@@ -119,10 +143,10 @@ export const DataView: React.FC<DataViewProps> = ({
   useEffect(() => {
     const currentTable = tableData.selectedTable;
     const fieldsString = JSON.stringify([...allFields].sort());
-    
+
     const tableChanged = currentTable !== lastTableRef.current;
     const fieldsChanged = fieldsString !== lastFieldsStringRef.current;
-    
+
     if (currentTable && allFields.length > 0) {
       if (tableChanged) {
         setVisibleFields([...allFields]);
@@ -130,10 +154,10 @@ export const DataView: React.FC<DataViewProps> = ({
         lastFieldsStringRef.current = fieldsString;
         setSelectedDocumentIds([]);
       } else if (fieldsChanged) {
-        const hadOnlySystemFields = visibleFields.length <= 2 && 
+        const hadOnlySystemFields = visibleFields.length <= 2 &&
           visibleFields.every(f => f === '_id' || f === '_creationTime');
         const nowHasMoreFields = allFields.length > 2;
-        
+
         if (hadOnlySystemFields && nowHasMoreFields) {
           setVisibleFields([...allFields]);
         } else {
@@ -161,10 +185,10 @@ export const DataView: React.FC<DataViewProps> = ({
   const prevSelectedIdsRef = useRef<string[]>([]);
 
   useEffect(() => {
-    const idsChanged = 
+    const idsChanged =
       prevSelectedIdsRef.current.length !== selectedDocumentIds.length ||
       prevSelectedIdsRef.current.some((id, idx) => id !== selectedDocumentIds[idx]);
-    
+
     if (idsChanged) {
       prevSelectedIdsRef.current = selectedDocumentIds;
       setWasEditSheetManuallyClosed(false);
@@ -200,13 +224,14 @@ export const DataView: React.FC<DataViewProps> = ({
   useEffect(() => {
     const handleFunctionCompleted = (event: CustomEvent) => {
       const { success, udfType, componentId } = event.detail;
-      
+
       if (success && (udfType === 'mutation' || udfType === 'action')) {
         const eventComponentId = componentId === 'app' ? null : componentId;
         const currentComponentId = selectedComponentId === 'app' ? null : selectedComponentId;
-        
+
         if (eventComponentId === currentComponentId || (eventComponentId === null && currentComponentId === null)) {
           setTimeout(() => {
+            tableData.fetchTables();
             if (tableData.selectedTable) {
               tableData.fetchTableData(tableData.selectedTable, null);
             }
@@ -258,7 +283,7 @@ export const DataView: React.FC<DataViewProps> = ({
             selectedCount={selectedDocumentIds.length}
             onDeleteSelected={() => {
               if (selectedDocumentIds.length === 0) return;
-              
+
               if (isEditingAllAndMoreThanOne) {
                 setIsClearTableDialogOpen(true);
               } else {
@@ -276,7 +301,7 @@ export const DataView: React.FC<DataViewProps> = ({
             }}
             onClearFilters={async () => {
               const newFilters = { clauses: [] };
-              
+
               tableData.setFilters(newFilters);
               tableData.setSortConfig(null);
             }}
@@ -336,8 +361,34 @@ export const DataView: React.FC<DataViewProps> = ({
             onDeleteTable={() => {
               setIsDeleteTableDialogOpen(true);
             }}
+            tableName={tableData.selectedTable}
+            tableSchema={tableSchema}
+            availableFields={allFields}
+            adminClient={adminClient}
+            onNaturalLanguageQuery={async (filters, sortConfig) => {
+              // Apply the converted filters and sort config
+              tableData.setFilters(filters);
+              if (sortConfig) {
+                tableData.setSortConfig(sortConfig);
+              } else {
+                tableData.setSortConfig(null);
+              }
+
+              // Note: Limit is not directly supported by the current table data system
+              // The limit would need to be handled at the query level
+              // For now, we'll just apply filters and sort, and the user can see results
+
+              // Refresh table data with new filters - wait for it to complete
+              if (tableData.selectedTable) {
+                await tableData.fetchTableData(tableData.selectedTable, null);
+              }
+            }}
+            onNaturalLanguageQueryError={(error) => {
+              onError?.(error);
+              toast('error', error);
+            }}
           />
-          
+
           <DataTable
             selectedTable={tableData.selectedTable}
             documents={tableData.documents}
@@ -368,19 +419,19 @@ export const DataView: React.FC<DataViewProps> = ({
                   enabled: true,
                 }],
               };
-              
+
               // Save filter to localStorage first
               saveTableFilters(tableName, filter);
-              
+
               // If we're already on this table, just apply the filter directly
               if (tableData.selectedTable === tableName) {
                 tableData.setFilters(filter);
                 return;
               }
-              
+
               // Set the selected table - this will trigger effects that may reset filters
               tableData.setSelectedTable(tableName);
-              
+
               // Set the filter after a delay to ensure table change effects complete
               // The useTableData hook has an effect that resets filters when table changes,
               // then loads from localStorage. We need to wait for that to complete.
@@ -524,8 +575,8 @@ export const DataView: React.FC<DataViewProps> = ({
           }
 
           try {
-            const normalizedComponentId = selectedComponentId === 'app' || selectedComponentId === null 
-              ? null 
+            const normalizedComponentId = selectedComponentId === 'app' || selectedComponentId === null
+              ? null
               : selectedComponentId;
 
             const result = await deleteDocuments(

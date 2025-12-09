@@ -179,7 +179,6 @@ export const addRandomTodosAfter5Min = internalMutation({
         await ctx.db.patch(todo._id, { done: true });
       }
   
-      console.log(`Archived ${oldTodos.length} todos older than 1 hour`);
       return { archived: oldTodos.length };
     },
   });
@@ -196,7 +195,6 @@ export const addRandomTodosAfter5Min = internalMutation({
         await ctx.db.delete(todo._id);
       }
   
-      console.log(`Deleted ${completedTodos.length} completed todos`);
       return { deleted: completedTodos.length };
     },
   });

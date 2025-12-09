@@ -9,7 +9,7 @@ import type {
   UseTableDataReturn,
   SortConfig
 } from '../types';
-import { saveActiveTable, getTableFilters, saveTableFilters } from '../utils/storage';
+import { saveActiveTable, getTableFilters, saveTableFilters, getTableSortConfig } from '../utils/storage';
 import { fetchTablesFromApi } from '../utils/api/tables';
 import { patchDocumentFields } from '../utils/api/documents';
 import { mockFetchTablesFromApi } from '../utils/mockData';
@@ -598,6 +598,61 @@ export const useTableData = ({
   }, [filters, selectedTable]);
 
   /**
+   * Listen for filter updates from chatbot or other sources
+   */
+  useEffect(() => {
+    const handleFilterUpdate = () => {
+      if (selectedTable) {
+        // Reload filters from storage when updated externally
+        const savedFilters = getTableFilters(selectedTable);
+        const savedSortConfig = getTableSortConfig(selectedTable);
+        
+        const currentFiltersJson = JSON.stringify(filtersRef.current);
+        const savedFiltersJson = JSON.stringify(savedFilters);
+        
+        let filtersChanged = false;
+        if (currentFiltersJson !== savedFiltersJson) {
+          setFilters(() => savedFilters);
+          filtersRef.current = savedFilters;
+          filtersChanged = true;
+        }
+        
+        let sortChanged = false;
+        if (savedSortConfig) {
+          const currentSortJson = JSON.stringify(sortConfig);
+          const savedSortJson = JSON.stringify(savedSortConfig);
+          if (currentSortJson !== savedSortJson) {
+            setSortConfig(savedSortConfig);
+            sortChanged = true;
+          }
+        } else if (sortConfig) {
+          // Clear sort config if it was removed
+          setSortConfig(null);
+          sortChanged = true;
+        }
+        
+        // If filters or sort changed, trigger a data fetch
+        if (filtersChanged || sortChanged) {
+          // Reset pagination
+          setContinueCursor(null);
+          setHasMore(true);
+          // Fetch with new filters
+          if (useMockData) {
+            fetchTableData(selectedTable, null);
+          } else {
+            debouncedFetchTableData(selectedTable, null);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('convex-panel-filters-updated', handleFilterUpdate);
+    return () => {
+      window.removeEventListener('convex-panel-filters-updated', handleFilterUpdate);
+    };
+  }, [selectedTable, sortConfig, fetchTableData, debouncedFetchTableData, useMockData]);
+
+  /**
    * Handle table selection: reset state and load saved filters
    * This effect runs when the table changes and prepares for a fresh fetch
    * 
@@ -629,6 +684,12 @@ export const useTableData = ({
           
           if (currentFiltersJson !== savedFiltersJson) {
             setFilters(() => savedFilters);
+          }
+          
+          // Load sort config from storage
+          const savedSortConfig = getTableSortConfig(selectedTable);
+          if (savedSortConfig) {
+            setSortConfig(savedSortConfig);
           }
           
           filtersLoadedRef.current[selectedTable] = true;
