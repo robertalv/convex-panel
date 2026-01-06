@@ -1,0 +1,888 @@
+@import "tailwindcss";
+
+/*
+ * Convex Desktop Design System
+ * Inspired by OpenCode's semantic token system and Convex's brand aesthetics
+ */
+
+@theme {
+  /* ========================================
+   * COLORS - Semantic Token System
+   * Matching Convex Panel's warm brown/beige palette
+   * ======================================== */
+
+  /* ========================================
+   * TAILWIND SEMANTIC COLOR UTILITIES
+   * These create utility classes like bg-surface, text-muted, border-border
+   * ======================================== */
+
+  /* Surface colors for backgrounds */
+  --color-surface: var(--color-surface-base);
+  --color-surface-alt: var(--color-surface-raised);
+  --color-overlay: var(--color-surface-overlay);
+
+  /* Border colors */
+  --color-border: var(--color-border-base);
+  --color-border-subtle: var(--color-border-muted);
+  --color-border-emphasis: var(--color-border-strong);
+
+  /* Text colors */
+  --color-foreground: var(--color-text-base);
+  --color-muted: var(--color-text-muted);
+  --color-subtle: var(--color-text-subtle);
+
+  /* Semantic status colors */
+  --color-success: var(--color-success-base);
+  --color-warning: var(--color-warning-base);
+  --color-error: var(--color-error-base);
+  --color-info: var(--color-info-base);
+  --color-accent: var(--color-brand-base);
+
+  /* Muted status backgrounds */
+  --color-success-bg: var(--color-success-muted);
+  --color-warning-bg: var(--color-warning-muted);
+  --color-error-bg: var(--color-error-muted);
+  --color-info-bg: var(--color-info-muted);
+  --color-accent-bg: var(--color-brand-muted);
+
+  /* Background layers - warm brown tones matching panel */
+  /* Panel: rgb(30, 28, 26) = ~oklch(0.18 0.01 55) */
+  --color-background-base: rgb(30, 28, 26);
+  --color-background-raised: rgb(36, 34, 31);
+  --color-background-elevated: rgb(42, 40, 37);
+
+  /* Surface layers - cards, panels, overlays */
+  /* Panel secondary: rgb(42, 40, 37), tertiary: rgb(60, 58, 55) */
+  --color-surface-base: rgb(42, 40, 37);
+  --color-surface-raised: rgb(52, 50, 47);
+  --color-surface-overlay: rgb(60, 58, 55);
+
+  /* Text hierarchy - warm beige/tan tones */
+  /* Panel: text rgb(255, 255, 255), secondary rgb(185, 177, 170), muted rgb(143, 135, 128) */
+  --color-text-base: rgb(255, 255, 255);
+  --color-text-muted: rgb(185, 177, 170);
+  --color-text-subtle: rgb(143, 135, 128);
+  --color-text-disabled: rgb(100, 95, 90);
+
+  /* Borders - warm gray with transparency */
+  /* Panel: rgba(163, 156, 148, 0.3) */
+  --color-border-base: rgba(163, 156, 148, 0.3);
+  --color-border-muted: rgba(163, 156, 148, 0.2);
+  --color-border-strong: rgba(163, 156, 148, 0.5);
+
+  /* Brand/Accent - Blue accent matching panel */
+  /* Panel accent: rgb(99, 168, 248), hover: rgb(143, 190, 255) */
+  --color-brand-base: rgb(99, 168, 248);
+  --color-brand-hover: rgb(143, 190, 255);
+  --color-brand-muted: rgba(99, 168, 248, 0.15);
+  --color-brand-subtle: rgba(99, 168, 248, 0.08);
+
+  /* Interactive states - using blue accent */
+  --color-interactive-base: rgb(99, 168, 248);
+  --color-interactive-hover: rgb(143, 190, 255);
+  --color-interactive-active: rgb(80, 140, 220);
+  --color-interactive-muted: rgba(99, 168, 248, 0.12);
+
+  /* Semantic - Status colors matching panel */
+  /* Panel success: rgb(180, 236, 146), warning: rgb(230, 226, 168), error: rgb(255, 202, 193) */
+  --color-success-base: rgb(180, 236, 146);
+  --color-success-muted: rgba(180, 236, 146, 0.15);
+  --color-success-text: rgb(180, 236, 146);
+
+  --color-warning-base: rgb(230, 226, 168);
+  --color-warning-muted: rgba(230, 226, 168, 0.15);
+  --color-warning-text: rgb(230, 226, 168);
+
+  --color-error-base: rgb(255, 202, 193);
+  --color-error-muted: rgba(255, 202, 193, 0.15);
+  --color-error-text: rgb(255, 202, 193);
+
+  --color-info-base: rgb(7, 191, 232);
+  --color-info-muted: rgba(7, 191, 232, 0.15);
+  --color-info-text: rgb(7, 191, 232);
+
+  /* ========================================
+   * TYPOGRAPHY
+   * ======================================== */
+  --font-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "SF Mono", "Fira Code", "JetBrains Mono", Consolas, monospace;
+
+  --font-size-xs: 0.6875rem; /* 11px */
+  --font-size-sm: 0.75rem; /* 12px */
+  --font-size-base: 0.875rem; /* 14px */
+  --font-size-lg: 1rem; /* 16px */
+  --font-size-xl: 1.125rem; /* 18px */
+  --font-size-2xl: 1.5rem; /* 24px */
+  --font-size-3xl: 1.875rem; /* 30px */
+
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* ========================================
+   * SPACING
+   * ======================================== */
+  --spacing-px: 1px;
+  --spacing-0: 0;
+  --spacing-0_5: 0.125rem; /* 2px */
+  --spacing-1: 0.25rem; /* 4px */
+  --spacing-1_5: 0.375rem; /* 6px */
+  --spacing-2: 0.5rem; /* 8px */
+  --spacing-2_5: 0.625rem; /* 10px */
+  --spacing-3: 0.75rem; /* 12px */
+  --spacing-4: 1rem; /* 16px */
+  --spacing-5: 1.25rem; /* 20px */
+  --spacing-6: 1.5rem; /* 24px */
+  --spacing-8: 2rem; /* 32px */
+  --spacing-10: 2.5rem; /* 40px */
+  --spacing-12: 3rem; /* 48px */
+  --spacing-16: 4rem; /* 64px */
+
+  /* ========================================
+   * RADIUS
+   * ======================================== */
+  --radius-none: 0;
+  --radius-sm: 0.25rem; /* 4px */
+  --radius-md: 0.375rem; /* 6px */
+  --radius-lg: 0.5rem; /* 8px */
+  --radius-xl: 0.75rem; /* 12px */
+  --radius-2xl: 1rem; /* 16px */
+  --radius-full: 9999px;
+
+  /* ========================================
+   * SHADOWS - matching panel's warm tones
+   * ======================================== */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md:
+    0 4px 6px -1px rgba(0, 0, 0, 0.35), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg:
+    0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.35);
+  --shadow-xl:
+    0 20px 25px -5px rgba(0, 0, 0, 0.45), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+
+  /* Glow effects for brand elements - blue accent */
+  --shadow-brand: 0 0 20px rgba(99, 168, 248, 0.3);
+  --shadow-brand-lg: 0 0 40px rgba(99, 168, 248, 0.4);
+
+  /* ========================================
+   * TRANSITIONS
+   * ======================================== */
+  --duration-fast: 100ms;
+  --duration-normal: 150ms;
+  --duration-slow: 300ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ========================================
+   * Z-INDEX
+   * ======================================== */
+  --z-dropdown: 50;
+  --z-sticky: 100;
+  --z-modal: 200;
+  --z-popover: 300;
+  --z-tooltip: 400;
+  --z-toast: 500;
+
+  /* ========================================
+   * CONVEX PANEL COLOR TOKENS
+   * Required by convex-panel component styles
+   * ======================================== */
+  --green-200: rgb(180, 236, 146);
+  --yellow-200: rgb(230, 226, 168);
+  --red-200: rgb(255, 202, 193);
+  --purple-500: rgb(141, 38, 118);
+  --info: rgb(7, 191, 232);
+
+  /* ========================================
+   * PANEL VARIABLE ALIASES (Dark Mode)
+   * Maps convex-panel's --color-panel-* variables
+   * to desktop's semantic tokens for compatibility
+   * ======================================== */
+  --color-panel-bg: var(--color-background-base);
+  --color-panel-bg-secondary: var(--color-surface-base);
+  --color-panel-bg-tertiary: var(--color-surface-overlay);
+  --color-panel-border: var(--color-border-base);
+  --color-panel-text: var(--color-text-base);
+  --color-panel-text-secondary: var(--color-text-muted);
+  --color-panel-text-muted: var(--color-text-subtle);
+  --color-panel-accent: var(--color-brand-base);
+  --color-panel-accent-hover: var(--color-brand-hover);
+  --color-panel-success: var(--color-success-base);
+  --color-panel-warning: var(--color-warning-base);
+  --color-panel-error: var(--color-error-base);
+  --color-panel-info: var(--color-info-base);
+  --color-panel-hover: rgba(255, 255, 255, 0.06);
+  --color-panel-active: rgba(255, 255, 255, 0.12);
+  --color-panel-shadow: rgba(0, 0, 0, 0.5);
+  --color-panel-code-bg: var(--color-surface-base);
+  --color-panel-scrollbar: rgb(107, 107, 107);
+  --color-panel-scrollbar-hover: rgb(147, 147, 147);
+  --color-panel-highlight-bg: rgb(109, 82, 23);
+  --color-panel-highlight-border: var(--color-success-base);
+  --color-panel-httpaction: rgb(168, 85, 247);
+  --color-panel-editorLineNumber-foreground: #858585;
+
+  /* Data table tokens */
+  --cp-data-header-bg: var(--color-surface-base);
+  --cp-data-header-text: var(--color-text-base);
+  --cp-data-header-border: var(--color-border-base);
+  --cp-data-row-border: var(--color-border-base);
+  --cp-data-row-hover-bg: rgba(255, 255, 255, 0.04);
+  --cp-data-row-selected-bg: rgba(255, 255, 255, 0.08);
+  --cp-data-cell-hover-bg: rgba(255, 255, 255, 0.06);
+  --cp-data-highlight-bg: rgb(109, 82, 23);
+  --cp-data-highlight-border: var(--color-success-base);
+  --cp-data-menu-bg: var(--color-surface-overlay);
+  --cp-data-menu-border: var(--color-border-base);
+  --cp-data-resize-indicator: var(--color-brand-base);
+}
+
+/* ========================================
+ * LIGHT THEME OVERRIDES
+ * Matching Convex Panel's light theme
+ * ======================================== */
+.light {
+  /* Panel light: rgb(243, 240, 237) */
+  --color-background-base: rgb(243, 240, 237);
+  --color-background-raised: rgb(248, 246, 243);
+  --color-background-elevated: rgb(253, 252, 250);
+
+  /* Panel light secondary: rgb(253, 252, 250), tertiary: rgb(240, 238, 235) */
+  --color-surface-base: rgb(253, 252, 250);
+  --color-surface-raised: rgb(248, 246, 243);
+  --color-surface-overlay: rgb(255, 255, 255);
+
+  /* Panel light text: rgb(42, 40, 37), secondary: rgb(120, 118, 113) */
+  --color-text-base: rgb(42, 40, 37);
+  --color-text-muted: rgb(120, 118, 113);
+  --color-text-subtle: rgb(150, 148, 143);
+  --color-text-disabled: rgb(180, 178, 173);
+
+  /* Panel light border: rgba(33, 34, 30, 0.14) */
+  --color-border-base: rgba(33, 34, 30, 0.14);
+  --color-border-muted: rgba(33, 34, 30, 0.08);
+  --color-border-strong: rgba(33, 34, 30, 0.25);
+
+  /* Panel light accent: rgb(48, 106, 207), hover: rgb(33, 34, 181) */
+  --color-brand-base: rgb(48, 106, 207);
+  --color-brand-hover: rgb(33, 34, 181);
+  --color-brand-muted: rgba(48, 106, 207, 0.12);
+  --color-brand-subtle: rgba(48, 106, 207, 0.06);
+
+  /* Interactive states for light theme */
+  --color-interactive-base: rgb(48, 106, 207);
+  --color-interactive-hover: rgb(33, 34, 181);
+  --color-interactive-active: rgb(60, 90, 180);
+  --color-interactive-muted: rgba(48, 106, 207, 0.12);
+
+  /* Status colors for light theme - darker variants */
+  --color-success-base: rgb(34, 137, 9);
+  --color-success-muted: rgba(34, 137, 9, 0.12);
+  --color-success-text: rgb(34, 137, 9);
+
+  --color-warning-base: rgb(109, 82, 23);
+  --color-warning-muted: rgba(109, 82, 23, 0.12);
+  --color-warning-text: rgb(109, 82, 23);
+
+  --color-error-base: rgb(168, 21, 21);
+  --color-error-muted: rgba(168, 21, 21, 0.12);
+  --color-error-text: rgb(168, 21, 21);
+
+  --color-info-base: rgb(7, 191, 232);
+  --color-info-muted: rgba(7, 191, 232, 0.12);
+  --color-info-text: rgb(0, 155, 200);
+
+  /* Light shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(30, 28, 25, 0.05);
+  --shadow-md:
+    0 4px 6px -1px rgba(30, 28, 25, 0.1), 0 2px 4px -2px rgba(30, 28, 25, 0.1);
+  --shadow-lg:
+    0 10px 15px -3px rgba(30, 28, 25, 0.1), 0 4px 6px -4px rgba(30, 28, 25, 0.1);
+
+  /* ========================================
+   * PANEL VARIABLE ALIASES (Light Mode)
+   * Maps convex-panel's --color-panel-* variables
+   * to desktop's semantic tokens for compatibility
+   * ======================================== */
+  --color-panel-bg: var(--color-background-base);
+  --color-panel-bg-secondary: var(--color-surface-base);
+  --color-panel-bg-tertiary: var(--color-surface-overlay);
+  --color-panel-border: var(--color-border-base);
+  --color-panel-text: var(--color-text-base);
+  --color-panel-text-secondary: var(--color-text-muted);
+  --color-panel-text-muted: var(--color-text-subtle);
+  --color-panel-accent: var(--color-brand-base);
+  --color-panel-accent-hover: var(--color-brand-hover);
+  --color-panel-success: var(--color-success-base);
+  --color-panel-warning: var(--color-warning-base);
+  --color-panel-error: var(--color-error-base);
+  --color-panel-info: var(--color-info-base);
+  --color-panel-hover: rgba(30, 28, 25, 0.06);
+  --color-panel-active: rgba(30, 28, 25, 0.1);
+  --color-panel-shadow: rgba(30, 28, 25, 0.18);
+  --color-panel-code-bg: rgb(249, 247, 238);
+  --color-panel-scrollbar: rgb(193, 193, 193);
+  --color-panel-scrollbar-hover: rgb(125, 125, 125);
+  --color-panel-highlight-bg: rgb(254, 252, 232);
+  --color-panel-highlight-border: var(--color-success-base);
+  --color-panel-httpaction: rgb(141, 38, 118);
+  --color-panel-editorLineNumber-foreground: #237893;
+
+  /* Data table tokens (light mode) */
+  --cp-data-header-bg: var(--color-surface-base);
+  --cp-data-header-text: var(--color-text-muted);
+  --cp-data-header-border: var(--color-border-base);
+  --cp-data-row-border: var(--color-border-base);
+  --cp-data-row-hover-bg: rgba(30, 28, 25, 0.05);
+  --cp-data-row-selected-bg: rgba(30, 28, 25, 0.08);
+  --cp-data-cell-hover-bg: rgba(30, 28, 25, 0.06);
+  --cp-data-highlight-bg: rgb(254, 252, 232);
+  --cp-data-highlight-border: var(--color-success-base);
+  --cp-data-menu-bg: var(--color-surface-overlay);
+  --cp-data-menu-border: var(--color-border-base);
+  --cp-data-resize-indicator: var(--color-brand-base);
+}
+
+/* ========================================
+ * BASE STYLES
+ * ======================================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: var(--line-height-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  background-color: var(--color-background-base);
+  color: var(--color-text-base);
+}
+
+/* Focus ring styles */
+:focus-visible {
+  outline: 2px solid var(--color-brand-base);
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background-color: var(--color-brand-muted);
+  color: var(--color-text-base);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-base);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-strong);
+}
+
+/* ========================================
+ * ANIMATIONS
+ * ======================================== */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInFromLoading {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fadeInFromLoading {
+  animation: fadeInFromLoading 0.3s ease-out;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-opacity {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+  }
+  25% {
+    transform: translateY(-20px) translateX(10px);
+  }
+  50% {
+    transform: translateY(-10px) translateX(-5px);
+  }
+  75% {
+    transform: translateY(-25px) translateX(5px);
+  }
+}
+
+@keyframes float-delayed {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+  }
+  33% {
+    transform: translateY(15px) translateX(-10px);
+  }
+  66% {
+    transform: translateY(-15px) translateX(10px);
+  }
+}
+
+@keyframes pulse-slow {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+}
+
+@keyframes code-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px oklch(0.65 0.25 250 / 0.9);
+  }
+  50% {
+    box-shadow: 0 0 40px oklch(0.65 0.25 250 / 0.5);
+  }
+}
+
+/* Utility animation classes */
+.animate-fade-in {
+  animation: fade-in var(--duration-normal) var(--ease-out);
+}
+
+.animate-fade-up {
+  animation: fade-up var(--duration-slow) var(--ease-out);
+}
+
+.animate-scale-in {
+  animation: scale-in var(--duration-normal) var(--ease-out);
+}
+
+.animate-pulse-opacity {
+  animation: pulse-opacity 1.5s ease-in-out infinite;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-base) 0%,
+    var(--color-surface-raised) 50%,
+    var(--color-surface-base) 100%
+  );
+  background-size: 200% 100%;
+}
+
+.animate-float-slow {
+  animation: float-slow 20s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float-delayed 25s ease-in-out infinite;
+  animation-delay: -5s;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 8s ease-in-out infinite;
+}
+
+.animate-code-glow {
+  animation: code-glow 2s ease-in-out infinite;
+}
+
+/* ========================================
+ * TAURI WINDOW STYLES
+ * ======================================== */
+/* Draggable title bar region for Tauri */
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+}
+
+/* Prevent text selection in UI elements */
+.select-none {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ========================================
+ * UTILITY CLASSES
+ * ======================================== */
+/* Typography utilities */
+.text-mono {
+  font-family: var(--font-mono);
+}
+
+/* Truncation */
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ========================================
+ * REACT FLOW THEME STYLES
+ * ======================================== */
+
+/* Controls hoverable wrapper */
+.react-flow-controls-hoverable {
+  background-color: var(--color-surface-raised) !important;
+  border: 1px solid var(--color-border-strong) !important;
+  box-shadow: var(--shadow-sm) !important;
+  border-radius: var(--radius-lg) !important;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background-color 0.2s !important;
+  overflow: hidden !important; /* Ensure border-radius is respected */
+}
+
+.react-flow-controls-hoverable:hover {
+  border-color: var(--color-border-strong) !important;
+  box-shadow: var(--shadow-sm) !important;
+  background-color: var(--color-surface-overlay) !important;
+  border-radius: var(
+    --radius-lg
+  ) !important; /* Ensure radius persists on hover */
+}
+
+/* Controls buttons */
+.react-flow-controls-themed button {
+  background-color: transparent !important;
+  border: none !important;
+  color: var(--color-text-subtle) !important;
+  transition: all var(--duration-fast) var(--ease-out) !important;
+  border-radius: 0 !important; /* Remove button border-radius to respect parent */
+}
+
+.react-flow-controls-themed button:hover {
+  background-color: var(--color-surface-overlay) !important;
+  color: var(--color-text-base) !important;
+  border-radius: 0 !important; /* Maintain no border-radius on hover */
+}
+
+/* First and last buttons should respect parent border-radius for vertical orientation (default) */
+.react-flow-controls-hoverable button:first-child {
+  border-top-left-radius: var(--radius-lg) !important;
+  border-top-right-radius: var(--radius-lg) !important;
+}
+
+.react-flow-controls-hoverable button:last-child {
+  border-bottom-left-radius: var(--radius-lg) !important;
+  border-bottom-right-radius: var(--radius-lg) !important;
+}
+
+/* Horizontal orientation support - override for row layout */
+.react-flow-controls-hoverable[style*="flex-direction: row"]
+  button:first-child {
+  border-top-left-radius: var(--radius-lg) !important;
+  border-bottom-left-radius: var(--radius-lg) !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.react-flow-controls-hoverable[style*="flex-direction: row"] button:last-child {
+  border-top-right-radius: var(--radius-lg) !important;
+  border-bottom-right-radius: var(--radius-lg) !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+}
+
+.react-flow-controls-hoverable:hover .react-flow-controls-themed button {
+  color: var(--color-text-base) !important;
+}
+
+.react-flow-controls-themed button:active {
+  background-color: var(--color-surface-base) !important;
+}
+
+.react-flow-controls-themed button svg {
+  fill: var(--color-text-subtle) !important;
+  transition: fill var(--duration-fast) var(--ease-out) !important;
+}
+
+.react-flow-controls-themed button:hover svg {
+  fill: var(--color-text-base) !important;
+}
+
+.react-flow-controls-hoverable:hover .react-flow-controls-themed button svg {
+  fill: var(--color-text-base) !important;
+}
+
+/* Minimap - styled to match Controls */
+/* React Flow wraps MiniMap in a div, target both the wrapper and SVG */
+.react-flow__minimap {
+  background-color: var(--color-surface-raised) !important;
+  border: 1px solid var(--color-border-strong) !important;
+  box-shadow: var(--shadow-sm) !important;
+  border-radius: var(--radius-lg) !important;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background-color 0.2s !important;
+}
+
+.react-flow__minimap:hover {
+  border-color: var(--color-border-strong) !important;
+  box-shadow: var(--shadow-sm) !important;
+  background-color: var(--color-surface-overlay) !important;
+}
+
+/* Target the SVG element inside the minimap */
+.react-flow__minimap svg {
+  border-radius: var(--radius-lg) !important;
+}
+
+.react-flow__minimap-mask {
+  fill: rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Light mode minimap mask */
+.light .react-flow__minimap-mask {
+  fill: rgba(0, 0, 0, 0.3) !important;
+}
+
+/* React Flow pane - base styles using CSS variables */
+.react-flow__pane {
+  background-color: var(--color-background-base) !important;
+}
+
+/* React Flow node selection */
+.react-flow__node.selected {
+  outline: 2px solid var(--color-brand-base) !important;
+  outline-offset: 2px;
+}
+
+/* React Flow viewport and container */
+.react-flow__viewport {
+  background-color: transparent !important;
+}
+
+.react-flow {
+  background-color: var(--color-background-base) !important;
+}
+
+/* Ensure background is visible */
+.react-flow__background {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 0 !important;
+}
+
+.react-flow__background svg {
+  display: block !important;
+  visibility: visible !important;
+}
+
+/* ========================================
+ * REACT FLOW DARK MODE ENHANCEMENTS
+ * ======================================== */
+
+/* Ensure dark mode cards are properly styled */
+:root:not(.light) .react-flow__node {
+  background-color: var(--color-surface-raised) !important;
+}
+
+/* Dark mode table node cards */
+:root:not(.light) [data-table-node] {
+  background-color: var(--color-surface-raised) !important;
+}
+
+/* Dark mode background pattern */
+.dark .react-flow__background pattern circle,
+:root:not(.light) .react-flow__background pattern circle {
+  fill: var(--color-border-muted) !important;
+}
+
+/* ========================================
+ * REACT FLOW LIGHT MODE ENHANCEMENTS
+ * ======================================== */
+
+/* Light mode specific overrides */
+.light .react-flow__pane {
+  background-color: var(--color-background-base) !important;
+}
+
+.light .react-flow {
+  background-color: var(--color-background-base) !important;
+}
+
+.light .react-flow__node {
+  background-color: var(--color-surface-base) !important;
+}
+
+.light [data-table-node] {
+  background-color: var(--color-surface-base) !important;
+}
+
+.light .react-flow__minimap {
+  background-color: var(--color-surface-raised) !important;
+  border-color: var(--color-border-strong) !important;
+}
+
+.light .react-flow__background pattern circle {
+  fill: var(--color-border-base) !important;
+}
+
+/* ========================================
+ * CP-THEME CLASS SUPPORT
+ * Ensures .cp-theme-dark and .cp-theme-light
+ * work correctly within the desktop app
+ * ======================================== */
+
+/* cp-theme-dark inherits from :root (dark mode default) */
+.cp-theme-dark {
+  --color-panel-bg: var(--color-background-base);
+  --color-panel-bg-secondary: var(--color-surface-base);
+  --color-panel-bg-tertiary: var(--color-surface-overlay);
+  --color-panel-border: var(--color-border-base);
+  --color-panel-text: var(--color-text-base);
+  --color-panel-text-secondary: var(--color-text-muted);
+  --color-panel-text-muted: var(--color-text-subtle);
+  --color-panel-accent: var(--color-brand-base);
+  --color-panel-accent-hover: var(--color-brand-hover);
+  --color-panel-success: var(--color-success-base);
+  --color-panel-warning: var(--color-warning-base);
+  --color-panel-error: var(--color-error-base);
+  --color-panel-info: var(--color-info-base);
+  --color-panel-hover: rgba(255, 255, 255, 0.06);
+  --color-panel-active: rgba(255, 255, 255, 0.12);
+  --color-panel-shadow: rgba(0, 0, 0, 0.5);
+}
+
+/* cp-theme-light uses light mode values */
+.cp-theme-light {
+  /* Override base colors for light theme context */
+  --color-background-base: rgb(243, 240, 237);
+  --color-surface-base: rgb(253, 252, 250);
+  --color-surface-raised: rgb(248, 246, 243);
+  --color-surface-overlay: rgb(255, 255, 255);
+  --color-text-base: rgb(42, 40, 37);
+  --color-text-muted: rgb(120, 118, 113);
+  --color-text-subtle: rgb(150, 148, 143);
+  --color-border-base: rgba(33, 34, 30, 0.14);
+  --color-border-muted: rgba(33, 34, 30, 0.08);
+  --color-border-strong: rgba(33, 34, 30, 0.25);
+  --color-brand-base: rgb(48, 106, 207);
+  --color-brand-hover: rgb(33, 34, 181);
+  --color-success-base: rgb(34, 137, 9);
+  --color-warning-base: rgb(109, 82, 23);
+  --color-error-base: rgb(168, 21, 21);
+  --color-info-base: rgb(7, 191, 232);
+
+  /* Panel variable mappings for light theme */
+  --color-panel-bg: var(--color-background-base);
+  --color-panel-bg-secondary: var(--color-surface-base);
+  --color-panel-bg-tertiary: var(--color-surface-overlay);
+  --color-panel-border: var(--color-border-base);
+  --color-panel-text: var(--color-text-base);
+  --color-panel-text-secondary: var(--color-text-muted);
+  --color-panel-text-muted: var(--color-text-subtle);
+  --color-panel-accent: var(--color-brand-base);
+  --color-panel-accent-hover: var(--color-brand-hover);
+  --color-panel-success: var(--color-success-base);
+  --color-panel-warning: var(--color-warning-base);
+  --color-panel-error: var(--color-error-base);
+  --color-panel-info: var(--color-info-base);
+  --color-panel-hover: rgba(30, 28, 25, 0.06);
+  --color-panel-active: rgba(30, 28, 25, 0.1);
+  --color-panel-shadow: rgba(30, 28, 25, 0.18);
+}

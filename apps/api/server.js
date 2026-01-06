@@ -1,21 +1,165 @@
-// Simple Express server for OAuth token exchange in dev environment
-// Run with: node dev/server.js
+/**
+ * Convex Panel API Server
+ *
+ * Production API for Convex Panel desktop app:
+ * - Convex OAuth token exchange
+ * - GitHub OAuth Device Flow
+ * - GitHub App management
+ * - Webhook receiver for schema updates
+ * - SSE for real-time notifications
+ *
+ * Deploy to: api.convexpanel.dev
+ */
 
-// Load environment variables from .env file (if dotenv is available)
 try {
-  require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+  require("dotenv").config({
+    path: require("path").join(__dirname, ".env.local"),
+  });
 } catch (e) {
-  console.error('dotenv not found, using environment variables directly');
+  // dotenv may not be available in production
 }
 
-const express = require('express');
-const cors = require('cors');
-const app = express();
+const express = require("express");
+const cors = require("cors");
 
+const githubOAuthRouter = require("./src/handlers/github-oauth");
+const githubAppRouter = require("./src/handlers/github-app");
+const {
+  router: webhookRouter,
+  setBroadcaster,
+} = require("./src/handlers/github-webhook");
+const {
+  router: eventsRouter,
+  broadcastToRepo,
+} = require("./src/handlers/events");
+
+const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Helper to resolve environment variables from multiple possible keys
-// (e.g. CONVEX_CLIENT_ID, OAUTH_CLIENT_ID, VITE_OAUTH_CLIENT_ID, NEXT_PUBLIC_OAUTH_CLIENT_ID)
+setBroadcaster(broadcastToRepo);
+
+// =============================================================================
+// CORS Configuration
+// =============================================================================
+
+const allowedOrigins = [
+  "https://convexpanel.dev",
+  "https://www.convexpanel.dev",
+  "https://api.convexpanel.dev",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:1420",
+  "http://localhost:14200",
+  "tauri://localhost",
+  ...(process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(",")
+    : []),
+];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+
+    const isAllowed = allowedOrigins.some((allowed) => {
+      if (
+        allowed.startsWith("http://localhost") ||
+        allowed.startsWith("https://localhost")
+      ) {
+        return origin.startsWith(allowed);
+      }
+      if (allowed === "tauri://localhost") {
+        return origin.startsWith("tauri://");
+      }
+      return origin === allowed || origin.endsWith(".convexpanel.dev");
+    });
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
+
+// =============================================================================
+// Middleware
+// =============================================================================
+
+app.use((req, res, next) => {
+  if (req.path === "/github/webhook" || req.path === "/v1/github/webhook") {
+    return next();
+  }
+  express.json()(req, res, next);
+});
+
+app.use(express.urlencoded({ extended: true }));
+
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    if (!req.path.includes("/events/subscribe")) {
+      console.log(`${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
+    }
+  });
+  next();
+});
+
+// =============================================================================
+// Routes
+// =============================================================================
+
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    service: "convex-panel-api",
+    version: process.env.npm_package_version || "1.0.0",
+  });
+});
+
+app.get("/", (req, res) => {
+  res.json({
+    service: "Convex Panel API",
+    version: "1.0.0",
+    endpoints: {
+      health: "/health",
+      convexOAuth: "/v1/convex/oauth",
+      githubDeviceCode: "/v1/github/device/code",
+      githubDeviceToken: "/v1/github/device/token",
+      githubAppInstallUrl: "/v1/github/app/install-url",
+      githubAppInstallations: "/v1/github/app/installations",
+      githubAppRepos: "/v1/github/app/repos",
+      githubWebhook: "/v1/github/webhook",
+      eventsSubscribe: "/v1/events/subscribe",
+    },
+  });
+});
+
+app.use("/v1/github", githubOAuthRouter);
+app.use("/github", githubOAuthRouter);
+
+app.use("/v1/github/app", githubAppRouter);
+app.use("/github/app", githubAppRouter);
+
+app.use("/v1/github/webhook", webhookRouter);
+app.use("/github/webhook", webhookRouter);
+
+app.use("/v1/events", eventsRouter);
+app.use("/events", eventsRouter);
+
+// =============================================================================
+// Convex OAuth Token Exchange (existing functionality)
+// =============================================================================
+
 const resolveEnvVar = (keys, fallbackKey) => {
   for (const key of keys) {
     if (process.env[key]) {
@@ -26,194 +170,77 @@ const resolveEnvVar = (keys, fallbackKey) => {
 };
 
 const CLIENT_ID_ENV_KEYS = [
-  'CONVEX_CLIENT_ID',
-  'OAUTH_CLIENT_ID',
-  'VITE_OAUTH_CLIENT_ID',
-  'NEXT_PUBLIC_OAUTH_CLIENT_ID',
-  'REACT_APP_OAUTH_CLIENT_ID',
+  "CONVEX_CLIENT_ID",
+  "OAUTH_CLIENT_ID",
+  "VITE_OAUTH_CLIENT_ID",
+  "NEXT_PUBLIC_OAUTH_CLIENT_ID",
+  "REACT_APP_OAUTH_CLIENT_ID",
 ];
 
 const CLIENT_SECRET_ENV_KEYS = [
-  'CONVEX_CLIENT_SECRET',
-  'OAUTH_CLIENT_SECRET',
-  'VITE_OAUTH_CLIENT_SECRET',
-  'NEXT_PUBLIC_OAUTH_CLIENT_SECRET',
-  'REACT_APP_OAUTH_CLIENT_SECRET',
+  "CONVEX_CLIENT_SECRET",
+  "OAUTH_CLIENT_SECRET",
+  "VITE_OAUTH_CLIENT_SECRET",
+  "NEXT_PUBLIC_OAUTH_CLIENT_SECRET",
+  "REACT_APP_OAUTH_CLIENT_SECRET",
 ];
 
-// CORS configuration - allow requests from convexpanel.dev and subdomains
-const allowedOrigins = [
-  'https://convexpanel.dev',
-  'https://www.convexpanel.dev',
-  'https://api.convexpanel.dev',
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://localhost:14200', // Tauri
-  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : []),
-];
-
-const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Check if origin is allowed
-    const isAllowed = allowedOrigins.some(allowed => {
-      if (allowed.startsWith('http://localhost') || allowed.startsWith('https://localhost')) {
-        return origin.startsWith(allowed);
-      }
-      // Allow any subdomain of convexpanel.dev
-      return origin === allowed || origin.endsWith('.convexpanel.dev');
-    });
-
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      console.warn(`CORS blocked origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-};
-
-app.use(cors(corsOptions));
-
-app.options('/v1/convex/oauth', cors(corsOptions), (req, res) => {
+app.options("/v1/convex/oauth", cors(corsOptions), (req, res) => {
   res.sendStatus(204);
 });
 
+app.post("/v1/convex/oauth", async (req, res) => {
+  console.debug("Token exchange request received");
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+  const {
+    code,
+    codeVerifier,
+    redirectUri,
+    clientId: clientIdFromBody,
+  } = req.body;
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    service: 'convex-panel-api',
-    version: process.env.npm_package_version || '1.0.0',
-  });
-});
-
-// Root endpoint
-app.get('/', (req, res) => {
-  res.json({
-    service: 'Convex Panel API',
-    version: '1.0.0',
-    endpoints: {
-      health: '/health',
-      oauthExchange: '/v1/convex/oauth',
-    },
-  });
-});
-
-app.post('/v1/convex/oauth', async (req, res) => {
-  console.debug('Token exchange request received');
-  console.debug('Request body:', { 
-    hasCode: !!req.body.code, 
-    hasCodeVerifier: !!req.body.codeVerifier,
-    redirectUri: req.body.redirectUri 
-  });
-  
-  const { code, codeVerifier, redirectUri, clientId: clientIdFromBody } = req.body;
-  
   if (!code) {
-    return res.status(400).json({ error: 'No authorization code provided' });
+    return res.status(400).json({ error: "No authorization code provided" });
   }
 
-  // Get OAuth credentials from environment (no hardcoded defaults in production)
-  // Prefer clientId from the request body (so frontend and backend stay in sync),
-  // but fall back to any of the supported env vars for existing deployments.
-  const { key: clientIdEnvKey, value: clientIdEnvValue } = resolveEnvVar(
+  const { value: clientIdEnvValue } = resolveEnvVar(
     CLIENT_ID_ENV_KEYS,
-    'CONVEX_CLIENT_ID'
+    "CONVEX_CLIENT_ID",
   );
-  const { key: clientSecretEnvKey, value: clientSecretEnvValue } = resolveEnvVar(
+  const { value: clientSecretEnvValue } = resolveEnvVar(
     CLIENT_SECRET_ENV_KEYS,
-    'CONVEX_CLIENT_SECRET'
+    "CONVEX_CLIENT_SECRET",
   );
 
   const clientId = clientIdFromBody || clientIdEnvValue;
   const clientSecret = clientSecretEnvValue;
-  const finalRedirectUri = redirectUri || process.env.DEFAULT_REDIRECT_URI || 'https://convexpanel.dev';
-
-  // Extra diagnostics to confirm which env vars are being used (without logging full secrets)
-  console.debug('[OAuth] Credential resolution:', {
-    clientIdFromBodyPreview: clientIdFromBody
-      ? `${String(clientIdFromBody).substring(0, 6)}…${String(clientIdFromBody).substring(
-          String(clientIdFromBody).length - 4
-        )}`
-      : null,
-    clientIdEnvKey,
-    clientIdEnvValuePresent: !!clientIdEnvValue,
-    clientIdPreview: clientId
-      ? `${String(clientId).substring(0, 6)}…${String(clientId).substring(
-          String(clientId).length - 4
-        )}`
-      : null,
-    clientSecretEnvKey,
-    clientSecretEnvValuePresent: !!clientSecretEnvValue,
-    clientSecretLength: clientSecret ? String(clientSecret).length : 0,
-    clientSecretPreview: clientSecret
-      ? `${String(clientSecret).substring(0, 4)}…${String(clientSecret).substring(
-          String(clientSecret).length - 4
-        )}`
-      : null,
-  });
+  const finalRedirectUri =
+    redirectUri ||
+    process.env.DEFAULT_REDIRECT_URI ||
+    "https://convexpanel.dev";
 
   if (!clientId || !clientSecret) {
-    console.error('OAuth client credentials not fully configured');
-    console.error('Current env lookup:', {
-      clientIdFromBody: !!clientIdFromBody,
-      clientIdEnvKey,
-      clientIdEnvValuePresent: !!clientIdEnvValue,
-      clientSecretEnvKey,
-      clientSecretEnvValuePresent: !!clientSecretEnvValue,
-    });
-    return res.status(500).json({ 
-      error: 'OAuth client credentials not configured. Provide clientId in request body or set CONVEX_CLIENT_ID and CONVEX_CLIENT_SECRET environment variables.' 
+    console.error("OAuth client credentials not fully configured");
+    return res.status(500).json({
+      error: "OAuth client credentials not configured.",
     });
   }
-
-  console.debug('Exchanging code for token...');
-  console.debug('Client ID:', clientId);
-  console.debug('Redirect URI:', finalRedirectUri);
-  console.debug('Has code verifier:', !!codeVerifier);
-  console.debug('Code (first 20 chars):', code.substring(0, 20) + '...');
 
   try {
     const body = new URLSearchParams({
       client_id: clientId,
       client_secret: clientSecret,
-      grant_type: 'authorization_code',
+      grant_type: "authorization_code",
       redirect_uri: finalRedirectUri,
       code,
       ...(codeVerifier && { code_verifier: codeVerifier }),
     });
 
-    console.debug('Request params:', {
-      client_id: clientId,
-      has_client_secret: !!clientSecret,
-      grant_type: 'authorization_code',
-      redirect_uri: finalRedirectUri,
-      has_code: !!code,
-      has_code_verifier: !!codeVerifier,
-    });
-
-    const tokenResponse = await fetch('https://api.convex.dev/oauth/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+    const tokenResponse = await fetch("https://api.convex.dev/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
     });
-
-    console.debug('Convex API response status:', tokenResponse.status);
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
@@ -223,89 +250,65 @@ app.post('/v1/convex/oauth', async (req, res) => {
       } catch {
         errorData = { error: errorText };
       }
-      
-      console.error('Token exchange failed:', {
-        status: tokenResponse.status,
-        statusText: tokenResponse.statusText,
-        error: errorData,
-      });
-      
-      let errorMessage = `Token exchange failed: ${errorText}`;
-      if (errorData.code === 'InternalServerError') {
-        errorMessage = `Convex API returned an internal server error. This usually means:\n` +
-          `1. The redirect URI doesn't match what's registered in your OAuth app\n` +
-          `2. The authorization code has expired or was already used\n` +
-          `3. There's a mismatch between client ID and client secret\n` +
-          `4. The redirect URI in your OAuth app must exactly match: ${finalRedirectUri}\n\n` +
-          `Check your OAuth app settings at: https://dashboard.convex.dev/team/settings`;
-      }
-       
-      return res.status(tokenResponse.status).json({ 
-        error: errorMessage,
-        details: errorData
+
+      return res.status(tokenResponse.status).json({
+        error: `Token exchange failed: ${errorText}`,
+        details: errorData,
       });
     }
 
     const token = await tokenResponse.json();
-    
     res.json(token);
   } catch (error) {
-    console.error('Error during token exchange:', error);
-    res.status(500).json({ 
-      error: error.message || 'Internal server error during token exchange' 
+    console.error("Error during token exchange:", error);
+    res.status(500).json({
+      error: error.message || "Internal server error during token exchange",
     });
   }
 });
 
-// Error handling middleware
+// =============================================================================
+// Error Handling
+// =============================================================================
+
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
+  console.error("Unhandled error:", err);
   res.status(500).json({
-    error: 'Internal server error',
-    code: 'INTERNAL_ERROR',
-    ...(process.env.NODE_ENV === 'development' && { details: err.message }),
+    error: "Internal server error",
+    code: "INTERNAL_ERROR",
+    ...(process.env.NODE_ENV === "development" && { details: err.message }),
   });
 });
 
-// 404 handler
 app.use((req, res) => {
   res.status(404).json({
-    error: 'Endpoint not found',
-    code: 'NOT_FOUND',
+    error: "Endpoint not found",
+    code: "NOT_FOUND",
     path: req.path,
   });
 });
 
-// Export the app for Vercel serverless functions
+// =============================================================================
+// Server Startup
+// =============================================================================
+
 module.exports = app;
 
-// Start server only if not in Vercel environment
-if (process.env.VERCEL !== '1') {
+if (process.env.VERCEL !== "1") {
   app.listen(PORT, () => {
-    const { key: resolvedClientIdKey, value: resolvedClientIdValue } = resolveEnvVar(
-      CLIENT_ID_ENV_KEYS,
-      'CONVEX_CLIENT_ID'
-    );
-    const { key: resolvedClientSecretKey, value: resolvedClientSecretValue } = resolveEnvVar(
-      CLIENT_SECRET_ENV_KEYS,
-      'CONVEX_CLIENT_SECRET'
-    );
-    
-    if (!resolvedClientSecretValue) {
+    console.log(`Convex Panel API listening on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+
+    if (!process.env.GITHUB_CLIENT_ID) {
+      console.warn("GITHUB_CLIENT_ID not set - GitHub OAuth will not work");
+    }
+    if (!process.env.GITHUB_WEBHOOK_SECRET) {
       console.warn(
-        `No client secret found. Checked keys: ${CLIENT_SECRET_ENV_KEYS.join(
-          ', '
-        )}. Set one of these (e.g. CONVEX_CLIENT_SECRET) to enable OAuth token exchange.`
+        "GITHUB_WEBHOOK_SECRET not set - Webhook signatures will not be verified",
       );
     }
   });
 }
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  process.exit(0);
-});
+process.on("SIGTERM", () => process.exit(0));
+process.on("SIGINT", () => process.exit(0));

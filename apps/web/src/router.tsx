@@ -11,6 +11,7 @@ import { StartPage } from "./components/startpage";
 import { Header } from "./components/header";
 import { DocsPage } from "./components/docs-page";
 import { ChangelogPage } from "./components/changelog-page";
+import { DownloadPage } from "./components/download-page";
 
 const RootLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="min-h-screen bg-background-primary text-content-primary antialiased flex flex-col">
@@ -33,6 +34,12 @@ const HomePage: React.FC = () => {
 const DocsRouteComponent: React.FC = () => <DocsPage />;
 
 const ChangelogRouteComponent: React.FC = () => <ChangelogPage />;
+
+const DownloadRouteComponent: React.FC = () => (
+  <main className="w-full px-4 md:px-12 lg:px-36 overflow-hidden">
+    <DownloadPage />
+  </main>
+);
 
 // Build the TanStack router route tree
 const rootRoute = new RootRoute({
@@ -63,7 +70,13 @@ const changelogRoute = new Route({
   component: ChangelogRouteComponent,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, docsRoute, changelogRoute]);
+const downloadRoute = new Route({
+  getParentRoute: () => rootRoute,
+  path: "/download",
+  component: DownloadRouteComponent,
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, docsRoute, changelogRoute, downloadRoute]);
 
 export const router = new Router({ routeTree });
 

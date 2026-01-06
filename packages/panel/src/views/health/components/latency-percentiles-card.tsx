@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { HealthCard } from './health-card';
-import type { MetricHealth } from './big-metric';
-import { fetchLatencyPercentiles } from '../../../utils/api/metrics';
-import type { APIResponse } from '../types';
+import React, { useState, useEffect, useMemo } from "react";
+import { HealthCard } from "./health-card";
+import type { MetricHealth } from "./big-metric";
+import { fetchLatencyPercentiles } from "../../../utils/api/metrics";
+import type { APIResponse } from "../types";
 
 interface LatencyPercentilesCardProps {
   deploymentUrl?: string;
@@ -15,6 +15,103 @@ interface LatencyData {
   p95: number | null;
   p99: number | null;
 }
+
+interface PercentileBarProps {
+  label: string;
+  value: number | null;
+  maxValue: number;
+  color: string;
+  health?: MetricHealth;
+}
+
+const PercentileBar: React.FC<PercentileBarProps> = ({
+  label,
+  value,
+  maxValue,
+  color,
+  health,
+}) => {
+  const percentage =
+    value !== null ? Math.min((value / maxValue) * 100, 100) : 0;
+
+  const getHealthColor = () => {
+    switch (health) {
+      case "error":
+        return "var(--color-panel-error)";
+      case "warning":
+        return "var(--color-panel-warning)";
+      default:
+        return color;
+    }
+  };
+
+  const formatLatency = (ms: number | null): string => {
+    if (ms === null) return "N/A";
+    if (ms < 1) return `${(ms * 1000).toFixed(0)}μs`;
+    if (ms < 1000) return `${ms.toFixed(0)}ms`;
+    return `${(ms / 1000).toFixed(2)}s`;
+  };
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+      }}
+    >
+      <div
+        style={{
+          width: "28px",
+          fontSize: "10px",
+          fontWeight: 600,
+          color: "var(--color-panel-text-muted)",
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          flex: 1,
+          height: "20px",
+          backgroundColor: "var(--color-panel-bg-secondary)",
+          borderRadius: "4px",
+          overflow: "hidden",
+          position: "relative",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: `${percentage}%`,
+            backgroundColor: getHealthColor(),
+            borderRadius: "4px",
+            transition: "width 0.3s ease",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            paddingLeft: "8px",
+            fontSize: "11px",
+            fontWeight: 500,
+            color: percentage > 40 ? "#fff" : "var(--color-panel-text)",
+            zIndex: 1,
+          }}
+        >
+          {formatLatency(value)}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const LatencyPercentilesCard: React.FC<LatencyPercentilesCardProps> = ({
   deploymentUrl,
@@ -37,13 +134,21 @@ export const LatencyPercentilesCard: React.FC<LatencyPercentilesCardProps> = ({
       try {
         setLoading(true);
         setError(null);
-        const result = await fetchLatencyPercentiles(deploymentUrl, authToken, useMockData);
+        const result = await fetchLatencyPercentiles(
+          deploymentUrl,
+          authToken,
+          useMockData,
+        );
         if (mounted) {
           setData(result);
         }
       } catch (err) {
         if (mounted) {
-          setError(err instanceof Error ? err.message : 'Failed to fetch latency percentiles');
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to fetch latency percentiles",
+          );
         }
       } finally {
         if (mounted) {
@@ -76,7 +181,7 @@ export const LatencyPercentilesCard: React.FC<LatencyPercentilesCardProps> = ({
     data.forEach((item) => {
       const percentile = item[0];
       const timeSeries = item[1];
-      
+
       if (!Array.isArray(timeSeries) || timeSeries.length === 0) {
         return;
       }
@@ -84,8 +189,11 @@ export const LatencyPercentilesCard: React.FC<LatencyPercentilesCardProps> = ({
       // Get the most recent non-null value
       for (let i = timeSeries.length - 1; i >= 0; i--) {
         const [_, value] = timeSeries[i];
-        if (value !== null && typeof value === 'number') {
-          const percentileNum = typeof percentile === 'number' ? percentile : parseInt(String(percentile), 10);
+        if (value !== null && typeof value === "number") {
+          const percentileNum =
+            typeof percentile === "number"
+              ? percentile
+              : parseInt(String(percentile), 10);
           if (percentileNum === 50) {
             latencyData.p50 = value;
           } else if (percentileNum === 95) {
@@ -102,28 +210,50 @@ export const LatencyPercentilesCard: React.FC<LatencyPercentilesCardProps> = ({
   }, [data]);
 
   // Calculate health status based on p95 latency
-  const healthStatus = useMemo((): { health: MetricHealth; message: string } => {
+  const healthStatus = useMemo((): {
+    health: MetricHealth;
+    message: string;
+  } => {
     const p95 = currentLatency.p95;
     if (p95 === null) {
-      return { health: 'healthy', message: 'No latency data available' };
+      return { health: "healthy", message: "No latency data available" };
     }
 
     // Thresholds: < 100ms healthy, 100-500ms warning, > 500ms error
     if (p95 < 100) {
-      return { health: 'healthy', message: 'Latency is within normal range' };
+      return { health: "healthy", message: "Latency is within normal range" };
     } else if (p95 < 500) {
-      return { health: 'warning', message: 'Latency is elevated' };
+      return { health: "warning", message: "Latency is elevated" };
     } else {
-      return { health: 'error', message: 'Latency is high' };
+      return { health: "error", message: "Latency is high" };
     }
   }, [currentLatency]);
 
-  // Format latency value for display
-  const formatLatency = (ms: number | null): string => {
-    if (ms === null) return 'N/A';
-    if (ms < 1) return `${(ms * 1000).toFixed(0)}μs`;
-    if (ms < 1000) return `${ms.toFixed(0)}ms`;
-    return `${(ms / 1000).toFixed(2)}s`;
+  // Calculate the max value for the bar chart scaling
+  const maxValue = useMemo(() => {
+    const values = [
+      currentLatency.p50,
+      currentLatency.p95,
+      currentLatency.p99,
+    ].filter((v): v is number => v !== null);
+    if (values.length === 0) return 100;
+    return Math.max(...values) * 1.2; // Add 20% headroom
+  }, [currentLatency]);
+
+  // Get health for p95 specifically (the key indicator)
+  const getP95Health = (): MetricHealth | undefined => {
+    if (currentLatency.p95 === null) return undefined;
+    if (currentLatency.p95 < 100) return undefined;
+    if (currentLatency.p95 < 500) return "warning";
+    return "error";
+  };
+
+  // Get health for p99
+  const getP99Health = (): MetricHealth | undefined => {
+    if (currentLatency.p99 === null) return undefined;
+    if (currentLatency.p99 < 200) return undefined;
+    if (currentLatency.p99 < 1000) return "warning";
+    return "error";
   };
 
   return (
@@ -133,75 +263,82 @@ export const LatencyPercentilesCard: React.FC<LatencyPercentilesCardProps> = ({
       loading={loading}
       error={error}
     >
-      {currentLatency.p50 !== null || currentLatency.p95 !== null || currentLatency.p99 !== null ? (
+      {currentLatency.p50 !== null ||
+      currentLatency.p95 !== null ||
+      currentLatency.p99 !== null ? (
         <div
           style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-            padding: '8px',
-            height: '100%',
-            justifyContent: 'center',
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+            padding: "12px 4px",
+            height: "100%",
+            justifyContent: "center",
           }}
         >
+          <PercentileBar
+            label="p50"
+            value={currentLatency.p50}
+            maxValue={maxValue}
+            color="#3B82F6"
+          />
+          <PercentileBar
+            label="p95"
+            value={currentLatency.p95}
+            maxValue={maxValue}
+            color="#F59E0B"
+            health={getP95Health()}
+          />
+          <PercentileBar
+            label="p99"
+            value={currentLatency.p99}
+            maxValue={maxValue}
+            color="#EF4444"
+            health={getP99Health()}
+          />
+
           <div
             style={{
-              display: 'flex',
-              justifyContent: 'space-around',
-              alignItems: 'center',
-              gap: '16px',
+              fontSize: "10px",
+              color:
+                healthStatus.health === "healthy"
+                  ? "var(--color-panel-text-muted)"
+                  : healthStatus.health === "warning"
+                    ? "var(--color-panel-warning)"
+                    : "var(--color-panel-error)",
+              textAlign: "center",
+              marginTop: "4px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "4px",
             }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-              <div style={{ fontSize: '11px', color: 'var(--color-panel-text-muted)' }}>p50</div>
-              <div style={{ fontSize: '20px', fontWeight: 600, color: 'var(--color-panel-text)' }}>
-                {formatLatency(currentLatency.p50)}
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-              <div style={{ fontSize: '11px', color: 'var(--color-panel-text-muted)' }}>p95</div>
-              <div
+            {healthStatus.health !== "healthy" && (
+              <span
                 style={{
-                  fontSize: '20px',
-                  fontWeight: 600,
-                  color:
-                    healthStatus.health === 'error'
-                      ? 'var(--color-panel-error)'
-                      : healthStatus.health === 'warning'
-                      ? 'var(--color-panel-warning)'
-                      : 'var(--color-panel-text)',
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  backgroundColor:
+                    healthStatus.health === "warning"
+                      ? "var(--color-panel-warning)"
+                      : "var(--color-panel-error)",
                 }}
-              >
-                {formatLatency(currentLatency.p95)}
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-              <div style={{ fontSize: '11px', color: 'var(--color-panel-text-muted)' }}>p99</div>
-              <div style={{ fontSize: '20px', fontWeight: 600, color: 'var(--color-panel-text)' }}>
-                {formatLatency(currentLatency.p99)}
-              </div>
-            </div>
-          </div>
-          <div
-            style={{
-              fontSize: '11px',
-              color: 'var(--color-panel-text-secondary)',
-              textAlign: 'center',
-              marginTop: '8px',
-            }}
-          >
+              />
+            )}
             {healthStatus.message}
           </div>
         </div>
       ) : (
         <div
           style={{
-            display: 'flex',
-            height: '100%',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--color-panel-text-muted)',
-            fontSize: '12px',
+            display: "flex",
+            height: "100%",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--color-panel-text-muted)",
+            fontSize: "12px",
           }}
         >
           No latency data available
@@ -210,3 +347,6 @@ export const LatencyPercentilesCard: React.FC<LatencyPercentilesCardProps> = ({
     </HealthCard>
   );
 };
+
+
+

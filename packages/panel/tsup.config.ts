@@ -8,7 +8,7 @@ const sharedExternal = [
   'convex',
   'convex/react',
   'convex/browser',
-  
+
   // Heavy UI libraries - DON'T bundle these!
   'monaco-editor',
   '@monaco-editor/react',
@@ -17,14 +17,14 @@ const sharedExternal = [
   'sonner',
   'react-window',
   'react-hotkeys-hook',
-  
+
   // Utilities
   'date-fns',
   'classnames',
   'lodash',
   'swr',
   'debounce',
-  
+
   // Framework specific
   'vite',
   'next',
@@ -52,7 +52,7 @@ export default defineConfig([
     splitting: true, // Enable code splitting
     treeshake: true,
     sourcemap: true,
-    clean: true,
+    clean: false,
     minify: true,
     external: sharedExternal,
     injectStyle: false,
@@ -64,7 +64,7 @@ export default defineConfig([
     },
     esbuildOptions: getEsbuildOptions(true),
   },
-  
+
   // Vite plugin (minimal bundle)
   {
     entry: ['src/vite/index.ts'],
@@ -84,7 +84,7 @@ export default defineConfig([
     },
     esbuildOptions: getEsbuildOptions(false),
   },
-  
+
   // Next.js adapter
   {
     entry: ['src/nextjs/index.tsx'],
@@ -105,7 +105,7 @@ export default defineConfig([
     },
     esbuildOptions: getEsbuildOptions(true),
   },
-  
+
   // React/Vite adapter
   {
     entry: ['src/react/index.tsx'],

@@ -1,26 +1,33 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { TableSidebar } from './components/table-sidebar';
-import { TableToolbar } from './components/table-toolbar';
-import { DataTable } from './components/table/data-table';
-import { FilterSheet } from './components/filter-sheet';
-import { AddDocumentSheet } from './components/add-document-sheet';
-import { EditDocumentSheet } from './components/edit-document-sheet';
-import { SchemaView } from './components/schema-view';
-import { IndexesView } from './components/indexes-view';
-import { MetricsView } from './components/metrics-view';
-import { ConfirmDialog } from '../../components/shared/confirm-dialog';
-import { ClearTableConfirmation } from './components/clear-table-confirmation';
-import type { CustomQuery } from '../../types/functions';
-import { useTableData } from '../../hooks/useTableData';
-import { useComponents } from '../../hooks/useComponents';
-import { useContainerRef } from '../../hooks/useContainerRef';
-import { saveTableFilters } from '../../utils/storage';
-import { useSheetSafe } from '../../contexts/sheet-context';
-import { useShowGlobalRunner } from '../../lib/functionRunner';
-import { deleteTable, deleteDocuments } from '../../utils/api/documents';
-import { getAdminClientInfo } from '../../utils/adminClient';
-import { toast } from '../../utils/toast';
-import { useDataViewContext } from '../../contexts/data-view-context';
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+  useCallback,
+} from "react";
+import { PanelLeftOpen } from "lucide-react";
+import { TableSidebar } from "./components/table-sidebar";
+import { TableToolbar } from "./components/table-toolbar";
+import { DataTable } from "./components/table/data-table";
+import { FilterSheet } from "./components/filter-sheet";
+import { AddDocumentSheet } from "./components/add-document-sheet";
+import { EditDocumentSheet } from "./components/edit-document-sheet";
+import { SchemaSheet } from "./components/schema-sheet";
+import { IndexesView } from "./components/indexes-view";
+import { MetricsView } from "./components/metrics-view";
+import { ConfirmDialog } from "../../components/shared/confirm-dialog";
+import { ClearTableConfirmation } from "./components/clear-table-confirmation";
+import type { CustomQuery } from "../../types/functions";
+import { useTableData } from "../../hooks/useTableData";
+import { useComponents } from "../../hooks/useComponents";
+import { useContainerRef } from "../../hooks/useContainerRef";
+import { saveTableFilters, updateRecentlyViewedTable } from "../../utils/storage";
+import { useSheetActionsSafe } from "../../contexts/sheet-context";
+import { useShowGlobalRunner } from "../../lib/functionRunner";
+import { deleteTable, deleteDocuments } from "../../utils/api/documents";
+import { getAdminClientInfo } from "../../utils/adminClient";
+import { toast } from "../../utils/toast";
+import { useDataViewActions } from "../../contexts/data-view-context";
 
 export interface DataViewProps {
   convexUrl?: string;
@@ -31,9 +38,20 @@ export interface DataViewProps {
   onError?: (error: string) => void;
   teamSlug?: string;
   projectSlug?: string;
+  /**
+   * Render mode for the EditDocumentSheet:
+   * - 'portal': Uses createPortal to render as overlay (default)
+   * - 'inline': Renders inline as flex sibling for push-aside layouts (desktop)
+   */
+  sheetRenderMode?: "portal" | "inline";
+  /**
+   * Optional initial table to select when the view loads.
+   * Useful for deep-linking from other views (e.g., Schema Visualizer).
+   */
+  initialTable?: string | null;
 }
 
-export const DataView: React.FC<DataViewProps> = ({
+const DataViewComponent: React.FC<DataViewProps> = ({
   convexUrl,
   accessToken,
   adminClient,
@@ -41,11 +59,14 @@ export const DataView: React.FC<DataViewProps> = ({
   onError,
   teamSlug,
   projectSlug,
+  sheetRenderMode = "portal",
+  initialTable,
 }) => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isAddDocumentOpen, setIsAddDocumentOpen] = useState(false);
   const [isEditDocumentOpen, setIsEditDocumentOpen] = useState(false);
-  const [wasEditSheetManuallyClosed, setWasEditSheetManuallyClosed] = useState(false);
+  const [wasEditSheetManuallyClosed, setWasEditSheetManuallyClosed] =
+    useState(false);
   const [visibleFields, setVisibleFields] = useState<string[]>([]);
   const [isColumnVisibilityOpen, setIsColumnVisibilityOpen] = useState(false);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
@@ -53,7 +74,8 @@ export const DataView: React.FC<DataViewProps> = ({
   const [isClearTableDialogOpen, setIsClearTableDialogOpen] = useState(false);
   const [isDeleteRowsDialogOpen, setIsDeleteRowsDialogOpen] = useState(false);
   const [rowsToDelete, setRowsToDelete] = useState<string[]>([]);
-  const { openSheet } = useSheetSafe();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { openSheet } = useSheetActionsSafe();
   const showGlobalRunner = useShowGlobalRunner();
 
   const {
@@ -67,7 +89,7 @@ export const DataView: React.FC<DataViewProps> = ({
   });
 
   const tableData = useTableData({
-    convexUrl: convexUrl || '',
+    convexUrl: convexUrl || "",
     accessToken,
     adminClient,
     useMockData,
@@ -75,15 +97,31 @@ export const DataView: React.FC<DataViewProps> = ({
     componentId: selectedComponentId,
   });
 
-  const { setDataViewContext } = useDataViewContext();
+  // Handle initialTable prop - select the table when provided and tables are loaded
+  const initialTableAppliedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      initialTable &&
+      Object.keys(tableData.tables).length > 0 &&
+      tableData.tables[initialTable] &&
+      initialTableAppliedRef.current !== initialTable
+    ) {
+      // Only apply once per unique initialTable value
+      initialTableAppliedRef.current = initialTable;
+      tableData.setSelectedTable(initialTable);
+    }
+  }, [initialTable, tableData.tables, tableData.setSelectedTable]);
+
+  const { setDataViewContext } = useDataViewActions();
   const tableSchema = tableData.tables[tableData.selectedTable];
-  const availableFields = tableSchema?.fields?.map(field => field.fieldName) || [];
+  const availableFields =
+    tableSchema?.fields?.map((field) => field.fieldName) || [];
 
   const documentFields = useMemo(() => {
     const fieldsSet = new Set<string>();
-    tableData.documents.forEach(doc => {
-      Object.keys(doc).forEach(key => {
-        if (key !== '_id' && key !== '_creationTime') {
+    tableData.documents.forEach((doc) => {
+      Object.keys(doc).forEach((key) => {
+        if (key !== "_id" && key !== "_creationTime") {
           fieldsSet.add(key);
         }
       });
@@ -92,13 +130,18 @@ export const DataView: React.FC<DataViewProps> = ({
   }, [tableData.documents]);
 
   const allFields = useMemo(() => {
-    const combined = ['_id', ...availableFields, ...documentFields, '_creationTime'];
+    const combined = [
+      "_id",
+      ...availableFields,
+      ...documentFields,
+      "_creationTime",
+    ];
     return combined.filter((col, index, self) => self.indexOf(col) === index);
   }, [availableFields, documentFields]);
 
   // Track previous values to avoid infinite loops
   const prevTableRef = useRef<string | null>(null);
-  const prevFieldsRef = useRef<string>('');
+  const prevFieldsRef = useRef<string>("");
 
   // Update data view context for chatbot
   useEffect(() => {
@@ -106,7 +149,10 @@ export const DataView: React.FC<DataViewProps> = ({
     const currentFieldsString = JSON.stringify(allFields.sort());
 
     // Only update if table or fields actually changed
-    if (currentTable !== prevTableRef.current || currentFieldsString !== prevFieldsRef.current) {
+    if (
+      currentTable !== prevTableRef.current ||
+      currentFieldsString !== prevFieldsRef.current
+    ) {
       if (currentTable && allFields.length > 0) {
         setDataViewContext(currentTable, allFields);
       } else {
@@ -126,19 +172,122 @@ export const DataView: React.FC<DataViewProps> = ({
 
   const allRowsSelected = useMemo(() => {
     if (tableData.documents.length === 0) return false;
-    return tableData.documents.every(doc => selectedDocumentIds.includes(doc._id));
+    return tableData.documents.every((doc) =>
+      selectedDocumentIds.includes(doc._id),
+    );
   }, [tableData.documents, selectedDocumentIds]);
 
-  const isEditingAllAndMoreThanOne = allRowsSelected && selectedDocumentIds.length > 1;
+  const isEditingAllAndMoreThanOne =
+    allRowsSelected && selectedDocumentIds.length > 1;
 
   const lastTableRef = useRef<string | null>(null);
-  const lastFieldsStringRef = useRef<string>('');
-  const [dataViewRef, containerRef] = useContainerRef('.cp-main-content');
+  const lastFieldsStringRef = useRef<string>("");
+  const [dataViewRef, containerRef] = useContainerRef(".cp-main-content");
 
-  const handleOpenAddDocument = () => {
+  const handleOpenAddDocument = useCallback(() => {
     if (!tableData.selectedTable) return;
     setIsAddDocumentOpen(true);
-  };
+  }, [tableData.selectedTable]);
+
+  // Memoize callbacks for DataTable to make React.memo effective
+  // Use specific properties from tableData instead of the entire object
+  const handleDocumentUpdate = useCallback(() => {
+    if (tableData.selectedTable) {
+      tableData.fetchTableData(tableData.selectedTable, null);
+    }
+  }, [tableData.selectedTable, tableData.fetchTableData]);
+
+  const handleNavigateToTable = useCallback(
+    (tableName: string, documentId: string) => {
+      // Create filter to show only this document by _id
+      const filter = {
+        clauses: [
+          {
+            field: "_id",
+            op: "eq" as const,
+            value: documentId,
+            enabled: true,
+          },
+        ],
+      };
+
+      // Save filter to localStorage first
+      saveTableFilters(tableName, filter);
+
+      // If we're already on this table, just apply the filter directly
+      if (tableData.selectedTable === tableName) {
+        tableData.setFilters(filter);
+        return;
+      }
+
+      // Set the selected table - this will trigger effects that may reset filters
+      tableData.setSelectedTable(tableName);
+
+      // Set the filter after a delay to ensure table change effects complete
+      // The useTableData hook has an effect that resets filters when table changes,
+      // then loads from localStorage. We need to wait for that to complete.
+      setTimeout(() => {
+        tableData.setFilters(filter);
+      }, 150);
+    },
+    [tableData.selectedTable, tableData.setFilters, tableData.setSelectedTable],
+  );
+
+  // Memoize sheet opening callbacks to prevent re-renders when these are passed as props
+  const handleOpenSchema = useCallback(() => {
+    openSheet({
+      content: (
+        <SchemaSheet
+          tableName={tableData.selectedTable}
+          tableSchema={tableSchema}
+          documents={tableData.documents}
+          adminClient={adminClient}
+          componentId={selectedComponentId}
+        />
+      ),
+      width: "600px",
+    });
+  }, [
+    openSheet,
+    tableData.selectedTable,
+    tableSchema,
+    tableData.documents,
+    adminClient,
+    selectedComponentId,
+  ]);
+
+  const handleOpenIndexes = useCallback(() => {
+    openSheet({
+      content: (
+        <IndexesView
+          tableName={tableData.selectedTable}
+          adminClient={adminClient}
+          componentId={selectedComponentId}
+        />
+      ),
+      width: "600px",
+    });
+  }, [openSheet, tableData.selectedTable, adminClient, selectedComponentId]);
+
+  const handleOpenMetrics = useCallback(() => {
+    openSheet({
+      content: (
+        <MetricsView
+          tableName={tableData.selectedTable}
+          deploymentUrl={convexUrl}
+          accessToken={accessToken}
+          componentId={selectedComponentId}
+        />
+      ),
+      width: "90vw",
+    });
+  }, [
+    openSheet,
+    tableData.selectedTable,
+    convexUrl,
+    accessToken,
+    selectedComponentId,
+  ]);
 
   useEffect(() => {
     const currentTable = tableData.selectedTable;
@@ -154,24 +303,38 @@ export const DataView: React.FC<DataViewProps> = ({
         lastFieldsStringRef.current = fieldsString;
         setSelectedDocumentIds([]);
       } else if (fieldsChanged) {
-        const hadOnlySystemFields = visibleFields.length <= 2 &&
-          visibleFields.every(f => f === '_id' || f === '_creationTime');
+        const hadOnlySystemFields =
+          visibleFields.length <= 2 &&
+          visibleFields.every((f) => f === "_id" || f === "_creationTime");
         const nowHasMoreFields = allFields.length > 2;
 
         if (hadOnlySystemFields && nowHasMoreFields) {
           setVisibleFields([...allFields]);
         } else {
           // Otherwise, just add missing fields
-          const missingFields = allFields.filter(field => !visibleFields.includes(field));
+          const missingFields = allFields.filter(
+            (field) => !visibleFields.includes(field),
+          );
           if (missingFields.length > 0) {
-            setVisibleFields([...new Set([...visibleFields, ...missingFields])]);
+            setVisibleFields([
+              ...new Set([...visibleFields, ...missingFields]),
+            ]);
           }
         }
         lastFieldsStringRef.current = fieldsString;
       }
-    } else if (currentTable && allFields.length === 2 && allFields.includes('_id') && allFields.includes('_creationTime')) {
-      if (visibleFields.length === 0 || !visibleFields.includes('_id') || !visibleFields.includes('_creationTime')) {
-        setVisibleFields(['_id', '_creationTime']);
+    } else if (
+      currentTable &&
+      allFields.length === 2 &&
+      allFields.includes("_id") &&
+      allFields.includes("_creationTime")
+    ) {
+      if (
+        visibleFields.length === 0 ||
+        !visibleFields.includes("_id") ||
+        !visibleFields.includes("_creationTime")
+      ) {
+        setVisibleFields(["_id", "_creationTime"]);
       }
     }
   }, [tableData.selectedTable, allFields, visibleFields]);
@@ -187,7 +350,9 @@ export const DataView: React.FC<DataViewProps> = ({
   useEffect(() => {
     const idsChanged =
       prevSelectedIdsRef.current.length !== selectedDocumentIds.length ||
-      prevSelectedIdsRef.current.some((id, idx) => id !== selectedDocumentIds[idx]);
+      prevSelectedIdsRef.current.some(
+        (id, idx) => id !== selectedDocumentIds[idx],
+      );
 
     if (idsChanged) {
       prevSelectedIdsRef.current = selectedDocumentIds;
@@ -196,13 +361,21 @@ export const DataView: React.FC<DataViewProps> = ({
   }, [selectedDocumentIds]);
 
   useEffect(() => {
-    if (selectedDocumentIds.length > 0 && !isEditDocumentOpen && !wasEditSheetManuallyClosed) {
+    if (
+      selectedDocumentIds.length > 0 &&
+      !isEditDocumentOpen &&
+      !wasEditSheetManuallyClosed
+    ) {
       setIsEditDocumentOpen(true);
     } else if (selectedDocumentIds.length === 0 && isEditDocumentOpen) {
       setIsEditDocumentOpen(false);
       setWasEditSheetManuallyClosed(false);
     }
-  }, [selectedDocumentIds.length, isEditDocumentOpen, wasEditSheetManuallyClosed]);
+  }, [
+    selectedDocumentIds.length,
+    isEditDocumentOpen,
+    wasEditSheetManuallyClosed,
+  ]);
 
   const hasInitialized = useRef(false);
 
@@ -225,11 +398,15 @@ export const DataView: React.FC<DataViewProps> = ({
     const handleFunctionCompleted = (event: CustomEvent) => {
       const { success, udfType, componentId } = event.detail;
 
-      if (success && (udfType === 'mutation' || udfType === 'action')) {
-        const eventComponentId = componentId === 'app' ? null : componentId;
-        const currentComponentId = selectedComponentId === 'app' ? null : selectedComponentId;
+      if (success && (udfType === "mutation" || udfType === "action")) {
+        const eventComponentId = componentId === "app" ? null : componentId;
+        const currentComponentId =
+          selectedComponentId === "app" ? null : selectedComponentId;
 
-        if (eventComponentId === currentComponentId || (eventComponentId === null && currentComponentId === null)) {
+        if (
+          eventComponentId === currentComponentId ||
+          (eventComponentId === null && currentComponentId === null)
+        ) {
           setTimeout(() => {
             tableData.fetchTables();
             if (tableData.selectedTable) {
@@ -240,38 +417,119 @@ export const DataView: React.FC<DataViewProps> = ({
       }
     };
 
-    window.addEventListener('convex-panel-function-completed', handleFunctionCompleted as EventListener);
+    window.addEventListener(
+      "convex-panel-function-completed",
+      handleFunctionCompleted as EventListener,
+    );
 
     return () => {
-      window.removeEventListener('convex-panel-function-completed', handleFunctionCompleted as EventListener);
+      window.removeEventListener(
+        "convex-panel-function-completed",
+        handleFunctionCompleted as EventListener,
+      );
     };
   }, [tableData, selectedComponentId]);
 
+  // Track recently viewed tables
+  useEffect(() => {
+    if (tableData.selectedTable) {
+      updateRecentlyViewedTable(tableData.selectedTable);
+    }
+  }, [tableData.selectedTable]);
+
+  const isInlineMode = sheetRenderMode === "inline";
+
+  // Wrap content in flex container for inline mode
+  const wrapperStyle = isInlineMode
+    ? ({
+        display: "flex",
+        height: "100%",
+        width: "100%",
+        overflow: "hidden",
+      } as const)
+    : ({
+        width: "100%",
+        height: "100%",
+        overflow: "hidden",
+      } as const);
+
+  const dataContainerStyle = isInlineMode
+    ? ({
+        flex: 1,
+        minWidth: 0,
+        display: "flex",
+        overflow: "hidden",
+      } as const)
+    : ({
+        width: "100%",
+        minWidth: 0,
+        overflow: "hidden",
+      } as const);
+
   return (
-    <>
-      <div className="cp-data-container" ref={dataViewRef}>
-        <TableSidebar
-          tables={tableData.tables}
-          selectedTable={tableData.selectedTable}
-          setSelectedTable={tableData.setSelectedTable}
-          isLoading={tableData.isLoading}
-          selectedComponent={selectedComponent}
-          onComponentSelect={setSelectedComponent}
-          availableComponents={componentNames}
-          convexUrl={convexUrl}
-          accessToken={accessToken}
-          adminClient={adminClient}
-          componentId={selectedComponentId}
-          onTableCreated={() => {
-            tableData.fetchTables();
-          }}
-        />
+    <div style={wrapperStyle}>
+      <div
+        className="cp-data-container"
+        ref={dataViewRef}
+        style={dataContainerStyle}
+      >
+        {!sidebarCollapsed && (
+          <TableSidebar
+            tables={tableData.tables}
+            selectedTable={tableData.selectedTable}
+            setSelectedTable={tableData.setSelectedTable}
+            isLoading={tableData.isLoading}
+            selectedComponent={selectedComponent}
+            onComponentSelect={setSelectedComponent}
+            availableComponents={componentNames}
+            convexUrl={convexUrl}
+            accessToken={accessToken}
+            adminClient={adminClient}
+            componentId={selectedComponentId}
+            onTableCreated={() => {
+              tableData.fetchTables();
+            }}
+          />
+        )}
+
+        {sidebarCollapsed && (
+          <button
+            onClick={() => setSidebarCollapsed(false)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '40px',
+              height: '100%',
+              backgroundColor: 'var(--color-panel-bg)',
+              border: 'none',
+              borderRight: '1px solid var(--color-panel-border)',
+              color: 'var(--color-panel-text-secondary)',
+              cursor: 'pointer',
+              padding: 0,
+              transition: 'background-color 0.2s, color 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+              e.currentTarget.style.color = 'var(--color-panel-text)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-panel-bg)';
+              e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
+            }}
+            title="Show sidebar"
+          >
+            <PanelLeftOpen size={16} />
+          </button>
+        )}
 
         <div className="cp-data-main">
           <TableToolbar
             documentCount={tableData.documentCount}
             onFilterToggle={() => setIsFilterOpen(!isFilterOpen)}
             isFilterOpen={isFilterOpen}
+            onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+            sidebarCollapsed={sidebarCollapsed}
             onAddDocument={handleOpenAddDocument}
             onColumnVisibilityToggle={() => {
               setIsColumnVisibilityOpen(!isColumnVisibilityOpen);
@@ -310,51 +568,15 @@ export const DataView: React.FC<DataViewProps> = ({
             }}
             onCustomQuery={() => {
               const customQuery: CustomQuery = {
-                type: 'customQuery',
+                type: "customQuery",
                 table: tableData.selectedTable,
                 componentId: selectedComponentId,
               };
-              showGlobalRunner(customQuery);
+              showGlobalRunner(customQuery, false, true); // Open in vertical mode
             }}
-            onSchema={() => {
-              openSheet({
-                title: `Schema for table ${tableData.selectedTable}`,
-                content: (
-                  <SchemaView
-                    tableName={tableData.selectedTable}
-                    tableSchema={tableSchema}
-                  />
-                ),
-                width: '600px',
-              });
-            }}
-            onIndexes={() => {
-              openSheet({
-                title: `Indexes for table ${tableData.selectedTable}`,
-                content: (
-                  <IndexesView
-                    tableName={tableData.selectedTable}
-                    adminClient={adminClient}
-                    componentId={selectedComponentId}
-                  />
-                ),
-                width: '600px',
-              });
-            }}
-            onMetrics={() => {
-              openSheet({
-                title: `${tableData.selectedTable} Metrics`,
-                content: (
-                  <MetricsView
-                    tableName={tableData.selectedTable}
-                    deploymentUrl={convexUrl}
-                    accessToken={accessToken}
-                    componentId={selectedComponentId}
-                  />
-                ),
-                width: '90vw',
-              });
-            }}
+            onSchema={handleOpenSchema}
+            onIndexes={handleOpenIndexes}
+            onMetrics={handleOpenMetrics}
             onClearTable={() => {
               setIsClearTableDialogOpen(true);
             }}
@@ -385,7 +607,7 @@ export const DataView: React.FC<DataViewProps> = ({
             }}
             onNaturalLanguageQueryError={(error) => {
               onError?.(error);
-              toast('error', error);
+              toast("error", error);
             }}
           />
 
@@ -398,47 +620,13 @@ export const DataView: React.FC<DataViewProps> = ({
             selectedDocumentIds={selectedDocumentIds}
             onSelectionChange={setSelectedDocumentIds}
             adminClient={adminClient}
-            onDocumentUpdate={() => {
-              // Refresh table data after update
-              if (tableData.selectedTable) {
-                tableData.fetchTableData(tableData.selectedTable, null);
-              }
-            }}
+            onDocumentUpdate={handleDocumentUpdate}
             deploymentUrl={convexUrl}
             componentId={selectedComponentId}
             filters={tableData.filters}
             setFilters={tableData.setFilters}
             onAddDocument={handleOpenAddDocument}
-            onNavigateToTable={(tableName: string, documentId: string) => {
-              // Create filter to show only this document by _id
-              const filter = {
-                clauses: [{
-                  field: '_id',
-                  op: 'eq' as const,
-                  value: documentId,
-                  enabled: true,
-                }],
-              };
-
-              // Save filter to localStorage first
-              saveTableFilters(tableName, filter);
-
-              // If we're already on this table, just apply the filter directly
-              if (tableData.selectedTable === tableName) {
-                tableData.setFilters(filter);
-                return;
-              }
-
-              // Set the selected table - this will trigger effects that may reset filters
-              tableData.setSelectedTable(tableName);
-
-              // Set the filter after a delay to ensure table change effects complete
-              // The useTableData hook has an effect that resets filters when table changes,
-              // then loads from localStorage. We need to wait for that to complete.
-              setTimeout(() => {
-                tableData.setFilters(filter);
-              }, 150);
-            }}
+            onNavigateToTable={handleNavigateToTable}
             accessToken={accessToken}
             teamSlug={teamSlug}
             projectSlug={projectSlug}
@@ -461,7 +649,8 @@ export const DataView: React.FC<DataViewProps> = ({
         visibleFields={visibleFields}
         onVisibleFieldsChange={setVisibleFields}
         openColumnVisibility={isColumnVisibilityOpen}
-        container={containerRef}
+        container={isInlineMode ? undefined : containerRef}
+        renderMode={sheetRenderMode}
       />
 
       <AddDocumentSheet
@@ -476,7 +665,8 @@ export const DataView: React.FC<DataViewProps> = ({
             tableData.fetchTableData(tableData.selectedTable, null);
           }
         }}
-        container={containerRef}
+        container={isInlineMode ? undefined : containerRef}
+        renderMode={sheetRenderMode}
       />
 
       <EditDocumentSheet
@@ -496,7 +686,8 @@ export const DataView: React.FC<DataViewProps> = ({
             tableData.fetchTableData(tableData.selectedTable, null);
           }
         }}
-        container={containerRef}
+        container={isInlineMode ? undefined : containerRef}
+        renderMode={sheetRenderMode}
       />
 
       <ClearTableConfirmation
@@ -528,7 +719,7 @@ export const DataView: React.FC<DataViewProps> = ({
             const finalAdminKey = accessToken || clientInfo.adminKey;
 
             if (!clientInfo.deploymentUrl || !finalAdminKey) {
-              onError?.('Missing deployment URL or admin key');
+              onError?.("Missing deployment URL or admin key");
               return;
             }
 
@@ -536,11 +727,11 @@ export const DataView: React.FC<DataViewProps> = ({
               clientInfo.deploymentUrl,
               finalAdminKey,
               [tableData.selectedTable],
-              selectedComponentId
+              selectedComponentId,
             );
 
             if (!result.success) {
-              onError?.(result.error || 'Failed to delete table');
+              onError?.(result.error || "Failed to delete table");
               return;
             }
 
@@ -549,11 +740,11 @@ export const DataView: React.FC<DataViewProps> = ({
             if (tableNames.length > 0) {
               tableData.setSelectedTable(tableNames[0]);
             } else {
-              tableData.setSelectedTable('');
+              tableData.setSelectedTable("");
             }
           } catch (error: any) {
-            console.error('Error deleting table:', error);
-            onError?.(error?.message || 'Failed to delete table');
+            console.error("Error deleting table:", error);
+            onError?.(error?.message || "Failed to delete table");
           }
         }}
         title="Delete table"
@@ -570,33 +761,38 @@ export const DataView: React.FC<DataViewProps> = ({
           setRowsToDelete([]);
         }}
         onConfirm={async () => {
-          if (!tableData.selectedTable || !adminClient || rowsToDelete.length === 0) {
+          if (
+            !tableData.selectedTable ||
+            !adminClient ||
+            rowsToDelete.length === 0
+          ) {
             return;
           }
 
           try {
-            const normalizedComponentId = selectedComponentId === 'app' || selectedComponentId === null
-              ? null
-              : selectedComponentId;
+            const normalizedComponentId =
+              selectedComponentId === "app" || selectedComponentId === null
+                ? null
+                : selectedComponentId;
 
             const result = await deleteDocuments(
               tableData.selectedTable,
               rowsToDelete,
               adminClient,
-              normalizedComponentId
+              normalizedComponentId,
             );
 
-            if (result && typeof result === 'object' && 'success' in result) {
+            if (result && typeof result === "object" && "success" in result) {
               if (!result.success) {
-                toast('error', result.error || 'Failed to delete documents');
+                toast("error", result.error || "Failed to delete documents");
                 return;
               }
             }
 
             const count = rowsToDelete.length;
             toast(
-              'success',
-              `Deleted ${count} ${count === 1 ? 'document' : 'documents'}.`
+              "success",
+              `Deleted ${count} ${count === 1 ? "document" : "documents"}.`,
             );
 
             setSelectedDocumentIds([]);
@@ -604,20 +800,23 @@ export const DataView: React.FC<DataViewProps> = ({
               tableData.fetchTableData(tableData.selectedTable, null);
             }
           } catch (error: any) {
-            console.error('Error deleting documents:', error);
-            toast('error', error?.message || 'Failed to delete documents');
+            console.error("Error deleting documents:", error);
+            toast("error", error?.message || "Failed to delete documents");
           } finally {
             setIsDeleteRowsDialogOpen(false);
             setRowsToDelete([]);
           }
         }}
-        title={`Delete ${rowsToDelete.length.toLocaleString()} selected document${rowsToDelete.length > 1 ? 's' : ''}`}
+        title={`Delete ${rowsToDelete.length.toLocaleString()} selected document${rowsToDelete.length > 1 ? "s" : ""}`}
         message="Are you sure you want to permanently delete these documents?"
         confirmLabel="Delete"
         cancelLabel="Cancel"
         variant="danger"
       />
-    </>
+    </div>
   );
 };
 
+// Memoize DataView to prevent re-renders when parent re-renders
+// but props haven't changed (e.g., when sheet state changes)
+export const DataView = React.memo(DataViewComponent);

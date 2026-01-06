@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { X } from 'lucide-react';
-import { fetchTableRate } from '../../../utils/api/metrics';
-import type { TimeseriesBucket } from '../../../utils/api/types';
-import { useSheetSafe } from '../../../contexts/sheet-context';
+import React, { useState, useEffect, useMemo, memo } from "react";
+import { fetchTableRate } from "../../../utils/api/metrics";
+import type { TimeseriesBucket } from "../../../utils/api/types";
+import { useSheetActionsSafe } from "../../../contexts/sheet-context";
+import { SheetLayout } from "../../../components/shared/sheet-layout";
 import {
   LineChart,
   Line,
@@ -11,8 +11,8 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-} from 'recharts';
-import { format } from 'date-fns';
+} from "recharts";
+import { format } from "date-fns";
 
 export interface MetricsViewProps {
   tableName: string;
@@ -22,7 +22,10 @@ export interface MetricsViewProps {
 }
 
 // Calculate time buckets based on time range (similar to Convex's calcBuckets)
-function calcBuckets(start: Date, end: Date): {
+function calcBuckets(
+  start: Date,
+  end: Date,
+): {
   startTime: Date;
   endTime: Date;
   numBuckets: number;
@@ -57,12 +60,12 @@ function calcBuckets(start: Date, end: Date): {
 
   function formatTime(time: Date): string {
     if (timeMultiplier === secondsInMinute) {
-      return format(time, 'h:mm a');
+      return format(time, "h:mm a");
     }
     if (timeMultiplier === secondsInHour) {
-      return format(time, 'hh a');
+      return format(time, "hh a");
     }
-    return format(time, 'yyyy-MM-dd');
+    return format(time, "yyyy-MM-dd");
   }
 
   const startTime = new Date(startMins * 1000 * 60);
@@ -77,316 +80,265 @@ function calcBuckets(start: Date, end: Date): {
   };
 }
 
-export const MetricsView: React.FC<MetricsViewProps> = ({
-  tableName,
-  deploymentUrl,
-  accessToken,
-  componentId,
-}) => {
-  const { closeSheet } = useSheetSafe();
-  const [readsData, setReadsData] = useState<TimeseriesBucket[]>([]);
-  const [writesData, setWritesData] = useState<TimeseriesBucket[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+export const MetricsView: React.FC<MetricsViewProps> = memo(
+  ({ tableName, deploymentUrl, accessToken, componentId }) => {
+    const { closeSheet } = useSheetActionsSafe();
+    const [readsData, setReadsData] = useState<TimeseriesBucket[]>([]);
+    const [writesData, setWritesData] = useState<TimeseriesBucket[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  useEffect(() => {
-    const fetchMetrics = async () => {
-      if (!deploymentUrl || !accessToken || !tableName) {
-        setIsLoading(false);
-        return;
-      }
+    useEffect(() => {
+      const fetchMetrics = async () => {
+        if (!deploymentUrl || !accessToken || !tableName) {
+          setIsLoading(false);
+          return;
+        }
 
-      setIsLoading(true);
-      setError(null);
+        setIsLoading(true);
+        setError(null);
 
-      try {
-        // Fetch metrics for the last hour
-        const end = new Date();
-        const start = new Date(end.getTime() - 60 * 60 * 1000); // 1 hour ago
-        
-        // Calculate optimal buckets based on time range
-        const { startTime, endTime, numBuckets, timeMultiplier } = calcBuckets(start, end);
+        try {
+          // Fetch metrics for the last hour
+          const end = new Date();
+          const start = new Date(end.getTime() - 60 * 60 * 1000); // 1 hour ago
 
-        const [reads, writes] = await Promise.all([
-          fetchTableRate(deploymentUrl, tableName, 'rowsRead', startTime, endTime, numBuckets, accessToken),
-          fetchTableRate(deploymentUrl, tableName, 'rowsWritten', startTime, endTime, numBuckets, accessToken),
-        ]);
+          // Calculate optimal buckets based on time range
+          const { startTime, endTime, numBuckets, timeMultiplier } =
+            calcBuckets(start, end);
 
-        // Apply time multiplier to convert to rate per time unit
-        const adjustedReads = reads.map(bucket => ({
-          ...bucket,
-          metric: bucket.metric !== null ? bucket.metric * timeMultiplier : null,
-        }));
-        const adjustedWrites = writes.map(bucket => ({
-          ...bucket,
-          metric: bucket.metric !== null ? bucket.metric * timeMultiplier : null,
-        }));
+          const [reads, writes] = await Promise.all([
+            fetchTableRate(
+              deploymentUrl,
+              tableName,
+              "rowsRead",
+              startTime,
+              endTime,
+              numBuckets,
+              accessToken,
+            ),
+            fetchTableRate(
+              deploymentUrl,
+              tableName,
+              "rowsWritten",
+              startTime,
+              endTime,
+              numBuckets,
+              accessToken,
+            ),
+          ]);
 
-        setReadsData(adjustedReads);
-        setWritesData(adjustedWrites);
-        setLastUpdated(new Date());
-      } catch (err: any) {
-        console.error('Error fetching table metrics:', err);
-        setError(err?.message || 'Failed to fetch metrics');
-        setReadsData([]);
-        setWritesData([]);
-      } finally {
-        setIsLoading(false);
-      }
+          // Apply time multiplier to convert to rate per time unit
+          const adjustedReads = reads.map((bucket) => ({
+            ...bucket,
+            metric:
+              bucket.metric !== null ? bucket.metric * timeMultiplier : null,
+          }));
+          const adjustedWrites = writes.map((bucket) => ({
+            ...bucket,
+            metric:
+              bucket.metric !== null ? bucket.metric * timeMultiplier : null,
+          }));
+
+          setReadsData(adjustedReads);
+          setWritesData(adjustedWrites);
+          setLastUpdated(new Date());
+        } catch (err: any) {
+          console.error("Error fetching table metrics:", err);
+          setError(err?.message || "Failed to fetch metrics");
+          setReadsData([]);
+          setWritesData([]);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchMetrics();
+
+      // Refresh metrics every 30 seconds
+      const interval = setInterval(fetchMetrics, 30000);
+      return () => clearInterval(interval);
+    }, [tableName, deploymentUrl, accessToken, componentId]);
+
+    // Format time for display
+    const formatTime = (date: Date): string => {
+      const hour12 = date.getHours() % 12 || 12;
+      const ampm = date.getHours() >= 12 ? "PM" : "AM";
+      const mins = date.getMinutes().toString().padStart(2, "0");
+      return `${hour12}:${mins} ${ampm}`;
     };
 
-    fetchMetrics();
+    // Calculate max value for Y-axis scaling
+    // const maxValue = useMemo(() => {
+    //   const allValues = [
+    //     ...readsData.map(d => d.metric || 0),
+    //     ...writesData.map(d => d.metric || 0),
+    //   ];
+    //   if (allValues.length === 0) return 4;
+    //   const max = Math.max(...allValues);
+    //   // Round up to nearest nice number
+    //   if (max === 0) return 4;
+    //   const magnitude = Math.pow(10, Math.floor(Math.log10(max)));
+    //   return Math.ceil(max / magnitude) * magnitude;
+    // }, [readsData, writesData]);
 
-    // Refresh metrics every 30 seconds
-    const interval = setInterval(fetchMetrics, 30000);
-    return () => clearInterval(interval);
-  }, [tableName, deploymentUrl, accessToken, componentId]);
+    // const graphHeight = 200;
+    // const graphWidth = 600;
 
-  // Format time for display
-  const formatTime = (date: Date): string => {
-    const hour12 = date.getHours() % 12 || 12;
-    const ampm = date.getHours() >= 12 ? 'PM' : 'AM';
-    const mins = date.getMinutes().toString().padStart(2, '0');
-    return `${hour12}:${mins} ${ampm}`;
-  };
+    // Generate time labels from data
+    // const timeLabels = useMemo(() => {
+    //   const times = readsData.length > 0
+    //     ? readsData.map(d => d.time)
+    //     : writesData.length > 0
+    //       ? writesData.map(d => d.time)
+    //       : [];
 
-  // Calculate max value for Y-axis scaling
-  // const maxValue = useMemo(() => {
-  //   const allValues = [
-  //     ...readsData.map(d => d.metric || 0),
-  //     ...writesData.map(d => d.metric || 0),
-  //   ];
-  //   if (allValues.length === 0) return 4;
-  //   const max = Math.max(...allValues);
-  //   // Round up to nearest nice number
-  //   if (max === 0) return 4;
-  //   const magnitude = Math.pow(10, Math.floor(Math.log10(max)));
-  //   return Math.ceil(max / magnitude) * magnitude;
-  // }, [readsData, writesData]);
+    //   // Sample every nth label to avoid crowding
+    //   const sampleRate = Math.max(1, Math.floor(times.length / 7));
+    //   return times
+    //     .filter((_, i) => i % sampleRate === 0 || i === times.length - 1)
+    //     .map(formatTime);
+    // }, [readsData, writesData]);
 
-  // const graphHeight = 200;
-  // const graphWidth = 600;
+    // Render data line for a graph
+    // const renderDataLine = (data: TimeseriesBucket[], color: string) => {
+    //   if (data.length === 0 || maxValue === 0) return null;
 
-  // Generate time labels from data
-  // const timeLabels = useMemo(() => {
-  //   const times = readsData.length > 0 
-  //     ? readsData.map(d => d.time)
-  //     : writesData.length > 0
-  //       ? writesData.map(d => d.time)
-  //       : [];
-    
-  //   // Sample every nth label to avoid crowding
-  //   const sampleRate = Math.max(1, Math.floor(times.length / 7));
-  //   return times
-  //     .filter((_, i) => i % sampleRate === 0 || i === times.length - 1)
-  //     .map(formatTime);
-  // }, [readsData, writesData]);
+    //   const points = data
+    //     .map((bucket, index) => {
+    //       const x = (index / (data.length - 1)) * graphWidth;
+    //       const y = graphHeight - ((bucket.metric || 0) / maxValue) * graphHeight;
+    //       return `${x},${y}`;
+    //     })
+    //     .join(' ');
 
-  // Render data line for a graph
-  // const renderDataLine = (data: TimeseriesBucket[], color: string) => {
-  //   if (data.length === 0 || maxValue === 0) return null;
+    //   const areaPoints = `${points} ${graphWidth},${graphHeight} 0,${graphHeight}`;
 
-  //   const points = data
-  //     .map((bucket, index) => {
-  //       const x = (index / (data.length - 1)) * graphWidth;
-  //       const y = graphHeight - ((bucket.metric || 0) / maxValue) * graphHeight;
-  //       return `${x},${y}`;
-  //     })
-  //     .join(' ');
+    //   return (
+    //     <>
+    //       <polygon
+    //         points={areaPoints}
+    //         fill={`color-mix(in srgb, ${color} 18%, transparent)`}
+    //         stroke="none"
+    //       />
+    //       <polyline
+    //         points={points}
+    //         fill="none"
+    //         stroke={color}
+    //         strokeWidth={2}
+    //         strokeLinecap="round"
+    //         strokeLinejoin="round"
+    //       />
+    //     </>
+    //   );
+    // };
 
-  //   const areaPoints = `${points} ${graphWidth},${graphHeight} 0,${graphHeight}`;
+    const formatNumber = (value: number) => {
+      if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+      if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+      return value.toFixed(value >= 10 ? 0 : 1);
+    };
 
-  //   return (
-  //     <>
-  //       <polygon
-  //         points={areaPoints}
-  //         fill={`color-mix(in srgb, ${color} 18%, transparent)`}
-  //         stroke="none"
-  //       />
-  //       <polyline
-  //         points={points}
-  //         fill="none"
-  //         stroke={color}
-  //         strokeWidth={2}
-  //         strokeLinecap="round"
-  //         strokeLinejoin="round"
-  //       />
-  //     </>
-  //   );
-  // };
+    const readsTotal = useMemo(
+      () => readsData.reduce((sum, bucket) => sum + (bucket.metric || 0), 0),
+      [readsData],
+    );
 
-  const formatNumber = (value: number) => {
-    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-    if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
-    return value.toFixed(value >= 10 ? 0 : 1);
-  };
+    const writesTotal = useMemo(
+      () => writesData.reduce((sum, bucket) => sum + (bucket.metric || 0), 0),
+      [writesData],
+    );
 
-  const readsTotal = useMemo(
-    () => readsData.reduce((sum, bucket) => sum + (bucket.metric || 0), 0),
-    [readsData],
-  );
+    const peakValue = useMemo(() => {
+      const combined = [...readsData, ...writesData].map((b) => b.metric || 0);
+      return combined.length ? Math.max(...combined) : 0;
+    }, [readsData, writesData]);
 
-  const writesTotal = useMemo(
-    () => writesData.reduce((sum, bucket) => sum + (bucket.metric || 0), 0),
-    [writesData],
-  );
+    const latestReads = readsData.length
+      ? readsData[readsData.length - 1].metric || 0
+      : 0;
+    const latestWrites = writesData.length
+      ? writesData[writesData.length - 1].metric || 0
+      : 0;
+    const avgReads = readsData.length ? readsTotal / readsData.length : 0;
+    const avgWrites = writesData.length ? writesTotal / writesData.length : 0;
 
-  const peakValue = useMemo(() => {
-    const combined = [...readsData, ...writesData].map(b => b.metric || 0);
-    return combined.length ? Math.max(...combined) : 0;
-  }, [readsData, writesData]);
-
-  const latestReads = readsData.length ? readsData[readsData.length - 1].metric || 0 : 0;
-  const latestWrites = writesData.length ? writesData[writesData.length - 1].metric || 0 : 0;
-  const avgReads = readsData.length ? readsTotal / readsData.length : 0;
-  const avgWrites = writesData.length ? writesTotal / writesData.length : 0;
-
-  const getTrendPercent = (data: TimeseriesBucket[]) => {
-    if (data.length < 2) return 0;
-    const first = data[0].metric || 0;
-    const last = data[data.length - 1].metric || 0;
-    if (first === 0) {
-      return last === 0 ? 0 : 100;
-    }
-    return ((last - first) / Math.abs(first)) * 100;
-  };
-
-  const readsTrend = getTrendPercent(readsData);
-  const writesTrend = getTrendPercent(writesData);
-
-  // Format chart data for recharts
-  const chartData = useMemo(() => {
-    if (readsData.length === 0 && writesData.length === 0) {
-      return [];
-    }
-
-    // Get formatTime function from calcBuckets
-    const end = new Date();
-    const start = new Date(end.getTime() - 60 * 60 * 1000);
-    const { formatTime } = calcBuckets(start, end);
-
-    const maxLength = Math.max(readsData.length, writesData.length);
-    const data = [];
-
-    for (let i = 0; i < maxLength; i++) {
-      const readBucket = readsData[i];
-      const writeBucket = writesData[i];
-      const time = readBucket?.time || writeBucket?.time;
-
-      if (time) {
-        data.push({
-          time: formatTime(time),
-          reads: readBucket?.metric ?? 0,
-          writes: writeBucket?.metric ?? 0,
-        });
+    const getTrendPercent = (data: TimeseriesBucket[]) => {
+      if (data.length < 2) return 0;
+      const first = data[0].metric || 0;
+      const last = data[data.length - 1].metric || 0;
+      if (first === 0) {
+        return last === 0 ? 0 : 100;
       }
-    }
+      return ((last - first) / Math.abs(first)) * 100;
+    };
 
-    return data;
-  }, [readsData, writesData]);
+    const readsTrend = getTrendPercent(readsData);
+    const writesTrend = getTrendPercent(writesData);
 
-  return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        backgroundColor: 'var(--color-panel-bg-secondary)',
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0px 12px',
-          borderBottom: '1px solid var(--color-panel-border)',
-          backgroundColor: 'var(--color-panel-bg-secondary)',
-          height: '40px',
-          flexShrink: 0,
-        }}
-      >
-        <div
+    // Format chart data for recharts
+    const chartData = useMemo(() => {
+      if (readsData.length === 0 && writesData.length === 0) {
+        return [];
+      }
+
+      // Get formatTime function from calcBuckets
+      const end = new Date();
+      const start = new Date(end.getTime() - 60 * 60 * 1000);
+      const { formatTime } = calcBuckets(start, end);
+
+      const maxLength = Math.max(readsData.length, writesData.length);
+      const data = [];
+
+      for (let i = 0; i < maxLength; i++) {
+        const readBucket = readsData[i];
+        const writeBucket = writesData[i];
+        const time = readBucket?.time || writeBucket?.time;
+
+        if (time) {
+          data.push({
+            time: formatTime(time),
+            reads: readBucket?.metric ?? 0,
+            writes: writeBucket?.metric ?? 0,
+          });
+        }
+      }
+
+      return data;
+    }, [readsData, writesData]);
+
+    const subtitle = (
+      <>
+        for{" "}
+        <code
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '14px',
-            fontWeight: 500,
-            color: 'var(--color-panel-text)',
+            fontFamily: "monospace",
+            fontSize: "12px",
+            padding: "2px 4px",
+            borderRadius: "3px",
+            backgroundColor: "var(--color-panel-bg-tertiary)",
+            border: "1px solid var(--color-panel-border)",
           }}
         >
-          <span>Metrics</span>
-          <span
-            style={{
-              fontSize: '12px',
-              fontWeight: 400,
-              color: 'var(--color-panel-text-muted)',
-            }}
-          >
-            for{' '}
-            <code
-              style={{
-                fontFamily: 'monospace',
-                fontSize: '12px',
-                padding: '2px 4px',
-                borderRadius: '3px',
-                backgroundColor: 'var(--color-panel-bg-tertiary)',
-                border: '1px solid var(--color-panel-border)',
-              }}
-            >
-              {tableName}
-            </code>
-          </span>
-        </div>
+          {tableName}
+        </code>
+      </>
+    );
 
-        {/* Close Button */}
-        {closeSheet && (
-          <button
-            type="button"
-            onClick={closeSheet}
-            style={{
-              padding: '6px',
-              color: 'var(--color-panel-text-secondary)',
-              backgroundColor: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '4px',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = 'var(--color-panel-text)';
-              e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <X size={18} />
-          </button>
-        )}
-      </div>
-
-      {/* Content */}
-      <div
-        style={{
-          flex: 1,
-          overflow: 'auto',
-          padding: '20px',
-        }}
+    return (
+      <SheetLayout
+        title="Metrics"
+        subtitle={subtitle}
+        onClose={closeSheet}
+        contentStyle={{ padding: "20px" }}
       >
         {isLoading && (
           <div
             style={{
-              padding: '12px',
-              fontSize: '12px',
-              color: 'var(--color-panel-text-muted)',
+              padding: "12px",
+              fontSize: "12px",
+              color: "var(--color-panel-text-muted)",
             }}
           >
             Loading metrics…
@@ -396,13 +348,13 @@ export const MetricsView: React.FC<MetricsViewProps> = ({
         {error && !isLoading && (
           <div
             style={{
-              padding: '12px',
-              marginBottom: '12px',
-              fontSize: '12px',
-              color: 'var(--color-panel-error)',
-              backgroundColor: 'var(--color-panel-bg-tertiary)',
-              border: '1px solid var(--color-panel-border)',
-              borderRadius: '6px',
+              padding: "12px",
+              marginBottom: "12px",
+              fontSize: "12px",
+              color: "var(--color-panel-error)",
+              backgroundColor: "var(--color-panel-bg-tertiary)",
+              border: "1px solid var(--color-panel-border)",
+              borderRadius: "6px",
             }}
           >
             {error}
@@ -411,208 +363,262 @@ export const MetricsView: React.FC<MetricsViewProps> = ({
 
         {!isLoading && !error && (
           <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-              <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-panel-text-secondary)' }}>
-                Reads and writes over the last hour. Values are aggregated into fixed time buckets.
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+                marginBottom: "16px",
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "12px",
+                  color: "var(--color-panel-text-secondary)",
+                }}
+              >
+                Reads and writes over the last hour. Values are aggregated into
+                fixed time buckets.
               </p>
               {lastUpdated && (
-                <span style={{ fontSize: '11px', color: 'var(--color-panel-text-muted)' }}>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--color-panel-text-muted)",
+                  }}
+                >
                   Updated {formatTime(lastUpdated)} • Auto‑refreshing every 30s
                 </span>
               )}
             </div>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-            gap: '12px',
-            marginBottom: '20px',
-          }}
-        >
-          <StatsCard label="Total reads (1h)" value={formatNumber(readsTotal)} color="var(--color-panel-accent)" />
-          <StatsCard label="Total writes (1h)" value={formatNumber(writesTotal)} color="var(--color-panel-warning)" />
-          <StatsCard label="Peak throughput" value={formatNumber(peakValue)} color="var(--color-panel-text)" />
-        </div>
-
-        <div
-          style={{
-            marginTop: '24px',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-            gap: '12px',
-          }}
-        >
-          <MetricDetailCard
-            title="Reads overview"
-            latestLabel="Current interval"
-            latestValue={formatNumber(latestReads)}
-            averageValue={formatNumber(avgReads)}
-            trend={readsTrend}
-            color="var(--color-panel-accent)"
-          />
-          <MetricDetailCard
-            title="Writes overview"
-            latestLabel="Current interval"
-            latestValue={formatNumber(latestWrites)}
-            averageValue={formatNumber(avgWrites)}
-            trend={writesTrend}
-            color="var(--color-panel-warning)"
-          />
-        </div>
-
-
-        {/* Charts */}
-        <div
-          style={{
-            marginTop: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '24px',
-          }}
-        >
-          <div>
-            <h3
-              style={{
-                margin: '0 0 12px 0',
-                fontSize: '14px',
-                fontWeight: 600,
-                color: 'var(--color-panel-text)',
-              }}
-            >
-              Reads
-            </h3>
             <div
               style={{
-                backgroundColor: 'var(--color-panel-bg-tertiary)',
-                border: '1px solid var(--color-panel-border)',
-                borderRadius: '6px',
-                padding: '16px',
-                height: '200px',
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: "12px",
+                marginBottom: "20px",
               }}
             >
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} syncId="table-metrics">
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="var(--color-panel-border)"
-                    opacity={0.3}
-                  />
-                  <XAxis
-                    dataKey="time"
-                    stroke="var(--color-panel-text-muted)"
-                    tick={{ fill: 'var(--color-panel-text-muted)', fontSize: 12 }}
-                    tickLine={{ stroke: 'var(--color-panel-text-muted)' }}
-                  />
-                  <YAxis
-                    stroke="var(--color-panel-text-muted)"
-                    tick={{ fill: 'var(--color-panel-text-muted)', fontSize: 12 }}
-                    tickLine={false}
-                    width={60}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'var(--color-panel-bg)',
-                      border: '1px solid var(--color-panel-border)',
-                      borderRadius: '6px',
-                      color: 'var(--color-panel-text)',
-                    }}
-                    labelStyle={{ color: 'var(--color-panel-text)' }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="reads"
-                    stroke="var(--color-panel-accent)"
-                    strokeWidth={2}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <StatsCard
+                label="Total reads (1h)"
+                value={formatNumber(readsTotal)}
+                color="var(--color-panel-accent)"
+              />
+              <StatsCard
+                label="Total writes (1h)"
+                value={formatNumber(writesTotal)}
+                color="var(--color-panel-warning)"
+              />
+              <StatsCard
+                label="Peak throughput"
+                value={formatNumber(peakValue)}
+                color="var(--color-panel-text)"
+              />
             </div>
-          </div>
 
-          <div>
-            <h3
-              style={{
-                margin: '0 0 12px 0',
-                fontSize: '14px',
-                fontWeight: 600,
-                color: 'var(--color-panel-text)',
-              }}
-            >
-              Writes
-            </h3>
             <div
               style={{
-                backgroundColor: 'var(--color-panel-bg-tertiary)',
-                border: '1px solid var(--color-panel-border)',
-                borderRadius: '6px',
-                padding: '16px',
-                height: '200px',
+                marginTop: "24px",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                gap: "12px",
               }}
             >
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} syncId="table-metrics">
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="var(--color-panel-border)"
-                    opacity={0.3}
-                  />
-                  <XAxis
-                    dataKey="time"
-                    stroke="var(--color-panel-text-muted)"
-                    tick={{ fill: 'var(--color-panel-text-muted)', fontSize: 12 }}
-                    tickLine={{ stroke: 'var(--color-panel-text-muted)' }}
-                  />
-                  <YAxis
-                    stroke="var(--color-panel-text-muted)"
-                    tick={{ fill: 'var(--color-panel-text-muted)', fontSize: 12 }}
-                    tickLine={false}
-                    width={60}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'var(--color-panel-bg)',
-                      border: '1px solid var(--color-panel-border)',
-                      borderRadius: '6px',
-                      color: 'var(--color-panel-text)',
-                    }}
-                    labelStyle={{ color: 'var(--color-panel-text)' }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="writes"
-                    stroke="var(--color-panel-warning)"
-                    strokeWidth={2}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <MetricDetailCard
+                title="Reads overview"
+                latestLabel="Current interval"
+                latestValue={formatNumber(latestReads)}
+                averageValue={formatNumber(avgReads)}
+                trend={readsTrend}
+                color="var(--color-panel-accent)"
+              />
+              <MetricDetailCard
+                title="Writes overview"
+                latestLabel="Current interval"
+                latestValue={formatNumber(latestWrites)}
+                averageValue={formatNumber(avgWrites)}
+                trend={writesTrend}
+                color="var(--color-panel-warning)"
+              />
             </div>
-          </div>
-        </div>
+
+            {/* Charts */}
+            <div
+              style={{
+                marginTop: "24px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "24px",
+              }}
+            >
+              <div>
+                <h3
+                  style={{
+                    margin: "0 0 12px 0",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "var(--color-panel-text)",
+                  }}
+                >
+                  Reads
+                </h3>
+                <div
+                  style={{
+                    backgroundColor: "var(--color-panel-bg-tertiary)",
+                    border: "1px solid var(--color-panel-border)",
+                    borderRadius: "6px",
+                    padding: "16px",
+                    height: "200px",
+                  }}
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData} syncId="table-metrics">
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="var(--color-panel-border)"
+                        opacity={0.3}
+                      />
+                      <XAxis
+                        dataKey="time"
+                        stroke="var(--color-panel-text-muted)"
+                        tick={{
+                          fill: "var(--color-panel-text-muted)",
+                          fontSize: 12,
+                        }}
+                        tickLine={{ stroke: "var(--color-panel-text-muted)" }}
+                      />
+                      <YAxis
+                        stroke="var(--color-panel-text-muted)"
+                        tick={{
+                          fill: "var(--color-panel-text-muted)",
+                          fontSize: 12,
+                        }}
+                        tickLine={false}
+                        width={60}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "var(--color-panel-bg)",
+                          border: "1px solid var(--color-panel-border)",
+                          borderRadius: "6px",
+                          color: "var(--color-panel-text)",
+                        }}
+                        labelStyle={{ color: "var(--color-panel-text)" }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="reads"
+                        stroke="var(--color-panel-accent)"
+                        strokeWidth={2}
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div>
+                <h3
+                  style={{
+                    margin: "0 0 12px 0",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "var(--color-panel-text)",
+                  }}
+                >
+                  Writes
+                </h3>
+                <div
+                  style={{
+                    backgroundColor: "var(--color-panel-bg-tertiary)",
+                    border: "1px solid var(--color-panel-border)",
+                    borderRadius: "6px",
+                    padding: "16px",
+                    height: "200px",
+                  }}
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData} syncId="table-metrics">
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="var(--color-panel-border)"
+                        opacity={0.3}
+                      />
+                      <XAxis
+                        dataKey="time"
+                        stroke="var(--color-panel-text-muted)"
+                        tick={{
+                          fill: "var(--color-panel-text-muted)",
+                          fontSize: 12,
+                        }}
+                        tickLine={{ stroke: "var(--color-panel-text-muted)" }}
+                      />
+                      <YAxis
+                        stroke="var(--color-panel-text-muted)"
+                        tick={{
+                          fill: "var(--color-panel-text-muted)",
+                          fontSize: 12,
+                        }}
+                        tickLine={false}
+                        width={60}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "var(--color-panel-bg)",
+                          border: "1px solid var(--color-panel-border)",
+                          borderRadius: "6px",
+                          color: "var(--color-panel-text)",
+                        }}
+                        labelStyle={{ color: "var(--color-panel-text)" }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="writes"
+                        stroke="var(--color-panel-warning)"
+                        strokeWidth={2}
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
           </>
         )}
-      </div>
-    </div>
-  );
-};
+      </SheetLayout>
+    );
+  },
+);
 
-const StatsCard = ({ label, value, color }: { label: string; value: string; color: string }) => (
+MetricsView.displayName = "MetricsView";
+
+const StatsCard = ({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color: string;
+}) => (
   <div
     style={{
-      backgroundColor: 'var(--color-panel-bg-tertiary)',
-      border: '1px solid var(--color-panel-border)',
-      borderRadius: '6px',
-      padding: '12px 14px',
-      display: 'flex',
-      flexDirection: 'column',
+      backgroundColor: "var(--color-panel-bg-tertiary)",
+      border: "1px solid var(--color-panel-border)",
+      borderRadius: "6px",
+      padding: "12px 14px",
+      display: "flex",
+      flexDirection: "column",
       gap: 4,
     }}
   >
-    <span style={{ fontSize: 11, color: 'var(--color-panel-text-muted)' }}>{label}</span>
+    <span style={{ fontSize: 11, color: "var(--color-panel-text-muted)" }}>
+      {label}
+    </span>
     <span style={{ fontSize: 18, fontWeight: 600, color }}>{value}</span>
   </div>
 );
@@ -634,61 +640,77 @@ const MetricDetailCard = ({
 }) => (
   <div
     style={{
-      backgroundColor: 'var(--color-panel-bg-tertiary)',
-      border: '1px solid var(--color-panel-border)',
-      borderRadius: '6px',
-      padding: '16px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '10px',
+      backgroundColor: "var(--color-panel-bg-tertiary)",
+      border: "1px solid var(--color-panel-border)",
+      borderRadius: "6px",
+      padding: "16px",
+      display: "flex",
+      flexDirection: "column",
+      gap: "10px",
     }}
   >
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <div style={{ fontSize: '13px', color: 'var(--color-panel-text)' }}>{title}</div>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}
+    >
+      <div style={{ fontSize: "13px", color: "var(--color-panel-text)" }}>
+        {title}
+      </div>
       <span
         style={{
-          fontSize: '11px',
-          padding: '2px 8px',
-          borderRadius: '999px',
-          backgroundColor: 'var(--color-panel-bg-secondary)',
-          color: 'var(--color-panel-text-muted)',
+          fontSize: "11px",
+          padding: "2px 8px",
+          borderRadius: "999px",
+          backgroundColor: "var(--color-panel-bg-secondary)",
+          color: "var(--color-panel-text-muted)",
         }}
       >
         Last hour
       </span>
     </div>
     <div>
-      <div style={{ fontSize: '12px', color: 'var(--color-panel-text-muted)', marginBottom: '4px' }}>
+      <div
+        style={{
+          fontSize: "12px",
+          color: "var(--color-panel-text-muted)",
+          marginBottom: "4px",
+        }}
+      >
         {latestLabel}
       </div>
-      <div style={{ fontSize: '24px', fontWeight: 600, color }}>{latestValue}</div>
+      <div style={{ fontSize: "24px", fontWeight: 600, color }}>
+        {latestValue}
+      </div>
     </div>
     <div
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        fontSize: '12px',
-        color: 'var(--color-panel-text-muted)',
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        fontSize: "12px",
+        color: "var(--color-panel-text-muted)",
       }}
     >
       <span>
-        Avg per interval{' '}
-        <strong style={{ color: 'var(--color-panel-text)' }}>{averageValue}</strong>
+        Avg per interval{" "}
+        <strong style={{ color: "var(--color-panel-text)" }}>
+          {averageValue}
+        </strong>
       </span>
-      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+      <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
         <span
           style={{
-            color: trend >= 0 ? color : 'var(--color-panel-error)',
+            color: trend >= 0 ? color : "var(--color-panel-error)",
             fontWeight: 600,
           }}
         >
-          {trend >= 0 ? '▲' : '▼'} {Math.abs(trend).toFixed(1)}%
+          {trend >= 0 ? "▲" : "▼"} {Math.abs(trend).toFixed(1)}%
         </span>
         <span>vs start</span>
       </span>
     </div>
   </div>
 );
-
-

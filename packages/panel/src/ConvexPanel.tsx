@@ -1,25 +1,30 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { ConvexReactClient, useConvex } from 'convex/react';
-import { ConvexClient } from 'convex/browser';
-import { ToastProvider } from './components/toast';
-import { useOAuth } from './hooks/useOAuth';
-import type { UseOAuthReturn } from './hooks/useOAuth';
-import { MainViews } from './components/main-view';
-import { BottomSheet } from './components/bottom-sheet';
-import { AuthPanel } from './components/auth-panel';
-import { OAuthErrorPopup } from './components/oauth-error-popup';
-import { getConvexUrl, getOAuthConfigFromEnv, isDevelopment } from './utils/env';
-import { getTeamTokenFromEnv } from './utils/api/utils';
-import type { Team, Project } from './types';
-import { useActiveTab } from './hooks/useActiveTab';
-import { ThemeProvider } from './hooks/useTheme';
-import type { Theme } from './hooks/useTheme';
-import { SheetProvider } from './contexts/sheet-context';
-import { PortalProvider } from './contexts/portal-context';
-import { DataViewProvider } from './contexts/data-view-context';
-import { getStorageItem, setStorageItem } from './utils/storage';
-import { STORAGE_KEYS } from './utils/constants';
-import { setupGlobalErrorHandling } from './utils/error-handling';
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { ConvexReactClient, useConvex } from "convex/react";
+import { ConvexClient } from "convex/browser";
+import { ToastProvider } from "./components/toast";
+import { useOAuth } from "./hooks/useOAuth";
+import type { UseOAuthReturn } from "./hooks/useOAuth";
+
+import { MainViews } from "./components/main-view";
+import { BottomSheet } from "./components/bottom-sheet";
+import { AuthPanel } from "./components/auth-panel";
+import { OAuthErrorPopup } from "./components/oauth-error-popup";
+import {
+  getConvexUrl,
+  getOAuthConfigFromEnv,
+  isDevelopment,
+} from "./utils/env";
+import { getTeamTokenFromEnv } from "./utils/api/utils";
+import type { Team, Project } from "./types";
+import { useActiveTab } from "./hooks/useActiveTab";
+import { ThemeProvider } from "./hooks/useTheme";
+import type { Theme } from "./hooks/useTheme";
+import { SheetProvider } from "./contexts/sheet-context";
+import { PortalProvider } from "./contexts/portal-context";
+import { DataViewProvider } from "./contexts/data-view-context";
+import { getStorageItem, setStorageItem } from "./utils/storage";
+import { STORAGE_KEYS } from "./utils/constants";
+import { setupGlobalErrorHandling } from "./utils/error-handling";
 
 export interface ConvexPanelProps {
   convex?: ConvexReactClient | any;
@@ -30,7 +35,7 @@ export interface ConvexPanelProps {
   oauthConfig?: {
     clientId: string;
     redirectUri: string;
-    scope?: 'team' | 'project';
+    scope?: "team" | "project";
     tokenExchangeUrl?: string;
   };
   /** Optional custom authentication implementation. If provided, internal OAuth logic is skipped. */
@@ -39,6 +44,10 @@ export interface ConvexPanelProps {
   mockup?: boolean;
   /** Force display the panel even if not in development mode (useful for testing) */
   forceDisplay?: boolean;
+  /** Display the panel in fullscreen mode, filling the entire viewport. Useful for desktop apps. */
+  fullscreen?: boolean;
+  /** Whether to show the header (default: true). Useful for desktop apps to hide panel header. */
+  headerVisible?: boolean;
   teamSlug?: string;
   projectSlug?: string;
   team?: Team;
@@ -46,7 +55,8 @@ export interface ConvexPanelProps {
   /** Initial theme for the panel. Defaults to 'dark'. User's preference is persisted in localStorage. */
   defaultTheme?: Theme;
   /** Optional portal container for overlays rendered from within the panel */
-  portalContainer?: Element | DocumentFragment | null;
+  /** Optional custom header component to render instead of the default header */
+  customHeader?: React.ReactNode;
   [key: string]: any;
 }
 
@@ -61,11 +71,14 @@ const ConvexPanel = ({
   useMockData = false,
   mockup = false,
   forceDisplay = false,
+  fullscreen = false,
+  headerVisible = true,
+  customHeader,
   teamSlug,
   projectSlug,
   team,
   project,
-  defaultTheme = 'dark',
+  defaultTheme = "dark",
   onError,
   theme,
   mergedTheme,
@@ -80,7 +93,7 @@ const ConvexPanel = ({
 
   const [isMounted, setIsMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       return getStorageItem<boolean>(STORAGE_KEYS.BOTTOM_SHEET_EXPANDED, true);
     }
     return true;
@@ -90,12 +103,18 @@ const ConvexPanel = ({
   // Listen for navigation event from function runner to switch to functions tab
   useEffect(() => {
     const handleNavigateToFunctions = () => {
-      setActiveTab('functions');
+      setActiveTab("functions");
     };
 
-    window.addEventListener('convex-panel-navigate-to-functions-code', handleNavigateToFunctions);
+    window.addEventListener(
+      "convex-panel-navigate-to-functions-code",
+      handleNavigateToFunctions,
+    );
     return () => {
-      window.removeEventListener('convex-panel-navigate-to-functions-code', handleNavigateToFunctions);
+      window.removeEventListener(
+        "convex-panel-navigate-to-functions-code",
+        handleNavigateToFunctions,
+      );
     };
   }, [setActiveTab]);
 
@@ -106,18 +125,18 @@ const ConvexPanel = ({
   } catch (e) {
     convexError = e instanceof Error ? e : new Error(String(e));
     convexFromContext = undefined;
-    if (typeof window !== 'undefined' && isDevelopment()) {
-      console.warn('[ConvexPanel] useConvex() failed:', convexError.message);
+    if (typeof window !== "undefined" && isDevelopment()) {
+      console.warn("[ConvexPanel] useConvex() failed:", convexError.message);
     }
   }
 
   const convex = providedConvex || convexFromContext;
-  
+
   const deployUrlFromClient = useMemo(() => {
     if (convex) {
-      const url = 
-        (convex as any).address || 
-        (convex as any)._baseUrl || 
+      const url =
+        (convex as any).address ||
+        (convex as any)._baseUrl ||
         (convex as any).baseUrl ||
         (convex as any).url ||
         (convex as any)?._client?.address ||
@@ -126,34 +145,36 @@ const ConvexPanel = ({
         (convex as any)?._client?.url ||
         (convex as any)?._httpClient?.baseURL ||
         (convex as any)?._client?._httpClient?.baseURL;
-      
+
       return url || null;
     }
     return null;
   }, [convex]);
-  
+
   const deployUrlFromEnv = useMemo(() => {
     const envUrl = getConvexUrl();
     if (envUrl) return envUrl;
-    
-    if (typeof window !== 'undefined') {
+
+    if (typeof window !== "undefined") {
       try {
         // Check Next.js __NEXT_DATA__
         const nextData = (window as any).__NEXT_DATA__;
         if (nextData?.env) {
-          const nextUrl = nextData.env.NEXT_PUBLIC_CONVEX_URL || nextData.env.VITE_CONVEX_URL;
+          const nextUrl =
+            nextData.env.NEXT_PUBLIC_CONVEX_URL || nextData.env.VITE_CONVEX_URL;
           if (nextUrl) {
             return nextUrl;
           }
         }
-              } catch (e) {
+      } catch (e) {
         // Ignore
       }
     }
     return undefined;
   }, []);
-  
-  const deployUrl = providedDeployUrl || deployUrlFromClient || deployUrlFromEnv;
+
+  const deployUrl =
+    providedDeployUrl || deployUrlFromClient || deployUrlFromEnv;
 
   // Memoize OAuth config to prevent infinite loops (new object on every render)
   // Environment variables don't change during runtime, so we can safely memoize
@@ -172,31 +193,39 @@ const ConvexPanel = ({
   }, [providedTeamAccessToken]);
 
   // OAuth authentication (skip if mockup mode or auth provided)
-  const internalAuth = useOAuth(mockup || providedAuth ? null : (oauthConfig || null));
+  const internalAuth = useOAuth(
+    mockup || providedAuth ? null : oauthConfig || null,
+  );
   const oauth = providedAuth || internalAuth;
 
   // Determine which token to use (OAuth, provided, or from environment)
   // In mockup mode, skip authentication
   // Priority: OAuth token > provided accessToken > envTeamAccessToken
-  const effectiveAccessToken = mockup 
-    ? undefined 
-    : (oauth.token?.access_token || providedAccessToken || envTeamAccessToken || undefined);
-  const isAuthenticated = mockup 
-    ? true 
-    : (oauth.isAuthenticated || !!providedAccessToken || !!envTeamAccessToken);
+  const effectiveAccessToken = mockup
+    ? undefined
+    : oauth.token?.access_token ||
+      providedAccessToken ||
+      envTeamAccessToken ||
+      undefined;
+  const isAuthenticated = mockup
+    ? true
+    : oauth.isAuthenticated || !!providedAccessToken || !!envTeamAccessToken;
 
   useEffect(() => {
     setIsMounted(true);
 
     // Inject visitors.now analytics script
-    if (typeof document !== 'undefined') {
-      const scriptId = 'visitors-now-script';
+    if (typeof document !== "undefined") {
+      const scriptId = "visitors-now-script";
       // Check if script already exists
       if (!document.getElementById(scriptId)) {
-        const script = document.createElement('script');
+        const script = document.createElement("script");
         script.id = scriptId;
-        script.src = 'https://cdn.visitors.now/v.js';
-        script.setAttribute('data-token', 'f306f3ae-cc04-42bd-8d48-66531197290d');
+        script.src = "https://cdn.visitors.now/v.js";
+        script.setAttribute(
+          "data-token",
+          "f306f3ae-cc04-42bd-8d48-66531197290d",
+        );
         script.async = true;
         document.head.appendChild(script);
       }
@@ -205,7 +234,7 @@ const ConvexPanel = ({
 
   // Persist bottom sheet expanded state
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       setStorageItem(STORAGE_KEYS.BOTTOM_SHEET_EXPANDED, isOpen);
     }
   }, [isOpen]);
@@ -214,27 +243,43 @@ const ConvexPanel = ({
   const adminClient = useMemo(() => {
     if (!isMounted) return null;
     // Create adminClient if we have a URL and either deployKey, OAuth token, or env token
-    if (deployUrl && (providedDeployKey || effectiveAccessToken || envTeamAccessToken)) {
+    if (
+      deployUrl &&
+      (providedDeployKey || effectiveAccessToken || envTeamAccessToken)
+    ) {
       return new ConvexClient(deployUrl);
     }
     return null;
-  }, [deployUrl, providedDeployKey, effectiveAccessToken, envTeamAccessToken, isMounted]);
+  }, [
+    deployUrl,
+    providedDeployKey,
+    effectiveAccessToken,
+    envTeamAccessToken,
+    isMounted,
+  ]);
 
   // Set admin auth - prefer deployKey, fall back to OAuth token, then envTeamAccessToken
   useEffect(() => {
     if (!isMounted || !adminClient) return;
 
     // Use deployKey if available, otherwise use OAuth token, then envTeamAccessToken
-    const authToken = providedDeployKey || effectiveAccessToken || envTeamAccessToken;
+    const authToken =
+      providedDeployKey || effectiveAccessToken || envTeamAccessToken;
     if (authToken) {
       (adminClient as any).setAdminAuth(authToken);
       (adminClient as any)._adminKey = authToken;
       (adminClient as any)._adminAuth = authToken;
     }
-  }, [adminClient, providedDeployKey, effectiveAccessToken, envTeamAccessToken, isMounted]);
+  }, [
+    adminClient,
+    providedDeployKey,
+    effectiveAccessToken,
+    envTeamAccessToken,
+    isMounted,
+  ]);
 
   // Don't render during SSR
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return null;
   }
 
@@ -247,7 +292,7 @@ const ConvexPanel = ({
 
   const toggleOpen = useCallback(() => {
     // Always allow expansion - users can see instructions even when not authenticated
-    setIsOpen(prev => !prev);
+    setIsOpen((prev) => !prev);
   }, []);
 
   const [validationError, setValidationError] = useState<{
@@ -259,7 +304,9 @@ const ConvexPanel = ({
   const handleConnect = useCallback(async () => {
     if (!oauthConfig) {
       setValidationError({
-        errors: ['OAuth configuration is missing. Please provide oauthConfig with at least a clientId.'],
+        errors: [
+          "OAuth configuration is missing. Please provide oauthConfig with at least a clientId.",
+        ],
         warnings: [],
       });
       setShowErrorPopup(true);
@@ -272,12 +319,12 @@ const ConvexPanel = ({
     // Validate configuration and endpoint before connecting
     // Skip endpoint check in development to avoid CORS issues
     try {
-      const { validateOAuthSetup } = await import('./utils/oauthValidation');
+      const { validateOAuthSetup } = await import("./utils/oauthValidation");
       const isDev = isDevelopment();
-      const validation = await validateOAuthSetup(oauthConfig, { 
-        checkEndpoint: !isDev // Only check endpoint in production
+      const validation = await validateOAuthSetup(oauthConfig, {
+        checkEndpoint: !isDev, // Only check endpoint in production
       });
-      
+
       // Only block on actual configuration errors, not endpoint reachability issues
       if (!validation.isValid || validation.errors.length > 0) {
         setValidationError({
@@ -287,10 +334,13 @@ const ConvexPanel = ({
         setShowErrorPopup(true);
         return;
       }
-      
+
       // Show warnings but don't block
       if (validation.warnings.length > 0) {
-        console.warn('[ConvexPanel] OAuth setup warnings:', validation.warnings);
+        console.warn(
+          "[ConvexPanel] OAuth setup warnings:",
+          validation.warnings,
+        );
       }
 
       // If there are only warnings, show them but allow continuation
@@ -307,9 +357,13 @@ const ConvexPanel = ({
       // Proceed with authentication
       await oauth.authenticate();
     } catch (error) {
-      console.error('[ConvexPanel] Validation error:', error);
+      console.error("[ConvexPanel] Validation error:", error);
       setValidationError({
-        errors: [error instanceof Error ? error.message : 'Failed to validate OAuth configuration'],
+        errors: [
+          error instanceof Error
+            ? error.message
+            : "Failed to validate OAuth configuration",
+        ],
         warnings: [],
       });
       setShowErrorPopup(true);
@@ -323,7 +377,7 @@ const ConvexPanel = ({
       try {
         await oauth.authenticate();
       } catch (error) {
-        console.error('[ConvexPanel] Authentication error:', error);
+        console.error("[ConvexPanel] Authentication error:", error);
       }
     }
   }, [oauthConfig, oauth]);
@@ -337,7 +391,7 @@ const ConvexPanel = ({
     // Reset panel state
     setIsOpen(false);
     // Clear any stored authentication state
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       // Clear any other auth-related storage if needed
       localStorage.removeItem(STORAGE_KEYS.OAUTH_TOKEN);
     }
@@ -345,89 +399,116 @@ const ConvexPanel = ({
     window.location.reload();
   }, [oauth]);
 
+  // Memoize containerProps to prevent unnecessary re-renders of MainViews
+  // Note: We intentionally don't spread restProps here as it creates a new object every render
+  // and breaks memoization. Only explicitly list the props that MainViews needs.
+  const containerProps = useMemo(
+    () => ({
+      convex: convex,
+      accessToken: effectiveAccessToken || "",
+      teamAccessToken: envTeamAccessToken,
+      deployUrl: deployUrl,
+      baseUrl: deployUrl,
+      adminClient: adminClient,
+      useMockData: mockup || useMockData || !effectiveAccessToken,
+      onError,
+      theme,
+      mergedTheme,
+      settings,
+      teamSlug,
+      projectSlug,
+    }),
+    [
+      convex,
+      effectiveAccessToken,
+      envTeamAccessToken,
+      deployUrl,
+      adminClient,
+      mockup,
+      useMockData,
+      onError,
+      theme,
+      mergedTheme,
+      settings,
+      teamSlug,
+      projectSlug,
+    ],
+  );
+
   // Root container with scoped styles - no CSS imports
   return (
     <PortalProvider value={portalContainer ?? null}>
-    <ThemeProvider defaultTheme={defaultTheme}>
-      <DataViewProvider>
-      <SheetProvider>
-          <ToastProvider position="bottom-right">
-          <BottomSheet
-          isOpen={isOpen}
-          onClose={toggleOpen}
-          projectName={deployUrl ? undefined : ''}
-          deploymentUrl={deployUrl}
-          environment="development"
-          isAuthenticated={isAuthenticated}
-          oauthConfig={oauthConfig}
-          onConnect={handleConnect}
-          onLogout={handleLogout}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          adminClient={adminClient}
-          accessToken={effectiveAccessToken}
-          isOAuthToken={!!oauth.token?.access_token}
-          teamSlug={teamSlug}
-          projectSlug={projectSlug}
-          team={team}
-          project={project}
-        >
-          {!isAuthenticated ? (
-            <AuthPanel
-              oauthConfig={oauthConfig}
-              onConnect={handleConnect}
-              error={oauth.error}
-              isLoading={oauth.isLoading}
-              deploymentUrl={deployUrl}
-              teamSlug={teamSlug}
-              projectSlug={projectSlug}
-              accessToken={effectiveAccessToken}
-            />
-          ) : (
-            <MainViews
-              activeTab={activeTab}
-              containerProps={{
-                convex: convex,
-                accessToken: effectiveAccessToken || '',
-                teamAccessToken: envTeamAccessToken,
-                deployUrl: deployUrl,
-                baseUrl: deployUrl,
-                adminClient: adminClient,
-                useMockData: mockup || useMockData || !effectiveAccessToken,
-                onError,
-                theme,
-                mergedTheme,
-                settings,
-                teamSlug,
-                projectSlug,
-                // Allow any other props that might be needed by child components
-                ...restProps
-              }}
-            />
-          )}
-          </BottomSheet>
-          </ToastProvider>
-          {showErrorPopup && validationError && (
-            <OAuthErrorPopup
-              isOpen={showErrorPopup}
-              onClose={() => {
-                setShowErrorPopup(false);
-              }}
-              onContinue={
-                validationError.errors.length === 0 && validationError.warnings.length > 0
-                  ? () => {
-                      setShowErrorPopup(false);
-                      handleContinueAfterWarnings();
-                    }
-                  : undefined
-              }
-              errors={validationError.errors}
-              warnings={validationError.warnings}
-            />
-          )}
-      </SheetProvider>
-      </DataViewProvider>
-    </ThemeProvider>
+      <ThemeProvider defaultTheme={defaultTheme}>
+        <DataViewProvider>
+          <SheetProvider>
+            <ToastProvider position="bottom-right">
+              <BottomSheet
+                isOpen={isOpen}
+                onClose={toggleOpen}
+                projectName={deployUrl ? undefined : ""}
+                deploymentUrl={deployUrl}
+                environment="development"
+                isAuthenticated={isAuthenticated}
+                oauthConfig={oauthConfig}
+                onConnect={handleConnect}
+                onLogout={handleLogout}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                adminClient={adminClient}
+                accessToken={effectiveAccessToken}
+                isOAuthToken={!!oauth.token?.access_token}
+                teamSlug={teamSlug}
+                projectSlug={projectSlug}
+                team={team}
+                project={project}
+                fullscreen={fullscreen}
+                headerVisible={headerVisible}
+                customHeader={customHeader}
+              >
+                {!isAuthenticated ? (
+                  <AuthPanel
+                    oauthConfig={oauthConfig}
+                    onConnect={handleConnect}
+                    error={oauth.error}
+                    isLoading={oauth.isLoading}
+                    deploymentUrl={deployUrl}
+                    teamSlug={teamSlug}
+                    projectSlug={projectSlug}
+                    accessToken={effectiveAccessToken}
+                  />
+                ) : (deployUrl || "") !== "" ? (
+                  <MainViews
+                    activeTab={activeTab}
+                    containerProps={containerProps}
+                  />
+                ) : (
+                  // If authenticated but no deployUrl, render children (empty state)
+                  restProps.children
+                )}
+              </BottomSheet>
+            </ToastProvider>
+            {showErrorPopup && validationError && (
+              <OAuthErrorPopup
+                isOpen={showErrorPopup}
+                onClose={() => {
+                  setShowErrorPopup(false);
+                }}
+                onContinue={
+                  validationError.errors.length === 0 &&
+                  validationError.warnings.length > 0
+                    ? () => {
+                        setShowErrorPopup(false);
+                        handleContinueAfterWarnings();
+                      }
+                    : undefined
+                }
+                errors={validationError.errors}
+                warnings={validationError.warnings}
+              />
+            )}
+          </SheetProvider>
+        </DataViewProvider>
+      </ThemeProvider>
     </PortalProvider>
   );
 };

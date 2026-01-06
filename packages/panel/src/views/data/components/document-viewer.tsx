@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Copy, Loader2, ExternalLink } from 'lucide-react';
-import { copyToClipboard } from '../../../utils/toast';
-import { createDocumentLink, formatTimestamp } from './table/data-table-utils';
-import { useSheetSafe } from '../../../contexts/sheet-context';
-import { Tooltip } from '../../../components/shared/tooltip';
+import React, { useState, useEffect } from "react";
+import { Copy, Loader2, ExternalLink } from "lucide-react";
+import { copyToClipboard } from "../../../utils/toast";
+import { createDocumentLink, formatTimestamp } from "./table/data-table-utils";
+import { useSheetActionsSafe } from "../../../contexts/sheet-context";
+import { Tooltip } from "../../../components/shared/tooltip";
 
 export interface DocumentViewerProps {
   documentId: string;
@@ -28,7 +28,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   teamSlug,
   projectSlug,
 }) => {
-  const { closeSheet } = useSheetSafe();
+  const { closeSheet } = useSheetActionsSafe();
   const [document, setDocument] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,18 +47,23 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
         setError(null);
 
         // Normalize componentId: 'app' means root (null)
-        const normalizedComponentId = componentId === 'app' || componentId === null ? null : componentId;
+        const normalizedComponentId =
+          componentId === "app" || componentId === null ? null : componentId;
 
         // Create a filter for the specific document ID
-        const filterString = btoa(JSON.stringify({
-          clauses: [{
-            op: 'eq',
-            field: '_id',
-            value: documentId,
-            enabled: true,
-            id: `_id_${Date.now()}`
-          }]
-        }));
+        const filterString = btoa(
+          JSON.stringify({
+            clauses: [
+              {
+                op: "eq",
+                field: "_id",
+                value: documentId,
+                enabled: true,
+                id: `_id_${Date.now()}`,
+              },
+            ],
+          }),
+        );
 
         const result = await adminClient.query(
           "_system/frontend/paginatedTableDocuments:default" as any,
@@ -71,23 +76,23 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
               cursor: null,
               id: Date.now(),
             },
-          }
+          },
         );
 
         if (!cancelled) {
           const documents = result?.page || [];
           const doc = documents[0] || null;
-          
+
           if (doc && doc._id === documentId) {
             setDocument(doc);
           } else {
-            setError('Document not found');
+            setError("Document not found");
           }
           setIsLoading(false);
         }
       } catch (err: any) {
         if (!cancelled) {
-          setError(err?.message || 'Failed to load document');
+          setError(err?.message || "Failed to load document");
           setIsLoading(false);
         }
       }
@@ -115,7 +120,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     componentId || null,
     teamSlug,
     projectSlug,
-    accessToken
+    accessToken,
   );
 
   // Format creation date
@@ -127,17 +132,17 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     return (
       <div
         style={{
-          padding: '20px',
-          minHeight: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px',
-          color: 'var(--color-panel-text-secondary)',
-          fontSize: '14px',
+          padding: "20px",
+          minHeight: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "8px",
+          color: "var(--color-panel-text-secondary)",
+          fontSize: "14px",
         }}
       >
-        <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+        <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
         <span>Loading document...</span>
         <style>{`
           @keyframes spin {
@@ -153,10 +158,10 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     return (
       <div
         style={{
-          padding: '20px',
-          minHeight: '100%',
-          color: 'var(--color-panel-error)',
-          fontSize: '14px',
+          padding: "20px",
+          minHeight: "100%",
+          color: "var(--color-panel-error)",
+          fontSize: "14px",
         }}
       >
         {error}
@@ -168,10 +173,10 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     return (
       <div
         style={{
-          padding: '20px',
-          minHeight: '100%',
-          color: 'var(--color-panel-text-muted)',
-          fontSize: '14px',
+          padding: "20px",
+          minHeight: "100%",
+          color: "var(--color-panel-text-muted)",
+          fontSize: "14px",
         }}
       >
         Document not found
@@ -184,43 +189,43 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   return (
     <div
       style={{
-        padding: '20px',
-        minHeight: '100%',
-        display: 'flex',
-        flexDirection: 'column',
+        padding: "20px",
+        minHeight: "100%",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       {/* Header */}
       <div
         style={{
-          marginBottom: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          marginBottom: "16px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
         }}
       >
         <div>
           <div
             style={{
-              fontSize: '13px',
-              color: 'var(--color-panel-text-muted)',
-              marginBottom: '4px',
+              fontSize: "13px",
+              color: "var(--color-panel-text-muted)",
+              marginBottom: "4px",
             }}
           >
             Document
           </div>
           <div
             style={{
-              fontSize: '14px',
-              color: 'var(--color-panel-text)',
-              fontFamily: 'monospace',
+              fontSize: "14px",
+              color: "var(--color-panel-text)",
+              fontFamily: "monospace",
               fontWeight: 500,
             }}
           >
             {documentId}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: "flex", gap: "8px" }}>
           {(onNavigateToTable || dashboardLink) && (
             <button
               onClick={(e) => {
@@ -229,28 +234,29 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                   onNavigateToTable(tableName, documentId);
                   closeSheet();
                 } else if (dashboardLink) {
-                  window.open(dashboardLink, '_blank', 'noopener,noreferrer');
+                  window.open(dashboardLink, "_blank", "noopener,noreferrer");
                   closeSheet();
                 }
               }}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                background: 'none',
-                border: 'none',
-                color: 'var(--color-panel-accent)',
-                cursor: 'pointer',
-                fontSize: '12px',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                transition: 'background 0.15s',
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                background: "none",
+                border: "none",
+                color: "var(--color-panel-accent)",
+                cursor: "pointer",
+                fontSize: "12px",
+                padding: "6px 12px",
+                borderRadius: "6px",
+                transition: "background 0.15s",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+                e.currentTarget.style.backgroundColor =
+                  "var(--color-panel-hover)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.backgroundColor = "transparent";
               }}
             >
               <ExternalLink size={14} />
@@ -260,23 +266,24 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
           <button
             onClick={handleCopy}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'none',
-              border: 'none',
-              color: 'var(--color-panel-accent)',
-              cursor: 'pointer',
-              fontSize: '12px',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              transition: 'background 0.15s',
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              background: "none",
+              border: "none",
+              color: "var(--color-panel-accent)",
+              cursor: "pointer",
+              fontSize: "12px",
+              padding: "6px 12px",
+              borderRadius: "6px",
+              transition: "background 0.15s",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+              e.currentTarget.style.backgroundColor =
+                "var(--color-panel-hover)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.backgroundColor = "transparent";
             }}
           >
             <Copy size={14} />
@@ -289,23 +296,23 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
       <div
         style={{
           flex: 1,
-          padding: '16px',
-          backgroundColor: 'var(--color-panel-bg)',
-          borderRadius: '8px',
-          border: '1px solid var(--color-panel-border)',
-          overflow: 'auto',
+          padding: "16px",
+          backgroundColor: "var(--color-panel-bg)",
+          borderRadius: "8px",
+          border: "1px solid var(--color-panel-border)",
+          overflow: "auto",
         }}
       >
         <pre
           style={{
             margin: 0,
             padding: 0,
-            color: 'var(--color-panel-text)',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            fontFamily: 'monospace',
-            fontSize: '13px',
-            lineHeight: '1.6',
+            color: "var(--color-panel-text)",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            fontFamily: "monospace",
+            fontSize: "13px",
+            lineHeight: "1.6",
           }}
         >
           {jsonString}
@@ -315,26 +322,28 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
       {/* Metadata */}
       <div
         style={{
-          marginTop: '16px',
-          paddingTop: '16px',
-          borderTop: '1px solid var(--color-panel-border)',
-          fontSize: '12px',
-          color: 'var(--color-panel-text-muted)',
+          marginTop: "16px",
+          paddingTop: "16px",
+          borderTop: "1px solid var(--color-panel-border)",
+          fontSize: "12px",
+          color: "var(--color-panel-text-muted)",
         }}
       >
-        <div style={{ marginBottom: '4px' }}>
-          <strong>Table:</strong>{' '}
-          <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>{tableName}</span>
+        <div style={{ marginBottom: "4px" }}>
+          <strong>Table:</strong>{" "}
+          <span style={{ fontFamily: "monospace", fontSize: "11px" }}>
+            {tableName}
+          </span>
         </div>
         {creationDate && document?._creationTime && (
-          <div style={{ marginBottom: '4px' }}>
-            <strong>Created:</strong>{' '}
+          <div style={{ marginBottom: "4px" }}>
+            <strong>Created:</strong>{" "}
             <Tooltip
               content={document._creationTime.toString()}
               position="top"
               maxWidth={300}
             >
-              <span style={{ cursor: 'help' }}>{creationDate}</span>
+              <span style={{ cursor: "help" }}>{creationDate}</span>
             </Tooltip>
           </div>
         )}
@@ -345,4 +354,3 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     </div>
   );
 };
-

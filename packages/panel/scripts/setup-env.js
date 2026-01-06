@@ -17,6 +17,43 @@
 const fs = require("fs").promises;
 const path = require("path");
 const readline = require("readline");
+const https = require("https");
+
+// Helper for HTTP requests (since fetch might not be available)
+function request(url, options = {}, body = null) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(url, options, (res) => {
+      let data = "";
+      res.on("data", (chunk) => {
+        data += chunk;
+      });
+      res.on("end", () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            resolve(data);
+          }
+        } else {
+          reject({ statusCode: res.statusCode, body: data });
+        }
+      });
+    });
+
+    req.on("error", (err) => {
+      reject(err);
+    });
+
+    if (body) {
+      req.write(body);
+    }
+    req.end();
+  });
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 // ANSI color codes
 const colors = {
@@ -63,7 +100,7 @@ function selectOption(options, promptText) {
     }
     process.stdin.resume();
     process.stdin.setEncoding('utf8');
-    
+
     // Enable keypress events
     readline.emitKeypressEvents(process.stdin);
 
@@ -76,23 +113,23 @@ function selectOption(options, promptText) {
 
       // Print prompt
       process.stdout.write(promptText + '\n');
-      
+
       // Print options
       options.forEach((option, index) => {
         if (index === selectedIndex) {
           process.stdout.write(
-            colorize('  → ', "cyan") + 
-            colorize(option.name, "bright") + 
+            colorize('  → ', "cyan") +
+            colorize(option.name, "bright") +
             '\n'
           );
         } else {
           process.stdout.write('    ' + option.name + '\n');
         }
       });
-      
+
       // Print instructions
       process.stdout.write('\n' + colorize(`Use ↑↓ arrows or numbers (1-${options.length}) to select, Enter/Space to confirm`, "dim") + '\n');
-      
+
       // Calculate lines to clear next time (prompt + options + blank + instructions)
       linesToClear = 1 + options.length + 2;
     };
@@ -103,10 +140,10 @@ function selectOption(options, promptText) {
 
     let escapeSequence = '';
     let escapeTimeout = null;
-    
+
     const onData = (chunk) => {
       const str = chunk.toString();
-      
+
       // Handle Ctrl+C
       if (str === '\x03') {
         // Restore terminal state
@@ -118,7 +155,7 @@ function selectOption(options, promptText) {
         if (escapeTimeout) clearTimeout(escapeTimeout);
         process.exit(0);
       }
-      
+
       // Handle escape sequences (arrow keys come as multiple chunks: \x1b, then [A or [B)
       if (str === '\x1b' || str === '\u001b' || str.charCodeAt(0) === 27) {
         escapeSequence = str;
@@ -129,11 +166,11 @@ function selectOption(options, promptText) {
         }, 100);
         return; // Wait for next chunk
       }
-      
+
       if (escapeSequence) {
         escapeSequence += str;
         if (escapeTimeout) clearTimeout(escapeTimeout);
-        
+
         // Check for complete escape sequences
         if (escapeSequence.match(/^\x1b\[A/) || escapeSequence.match(/^\u001b\[A/)) {
           // Up arrow
@@ -161,7 +198,7 @@ function selectOption(options, promptText) {
           return;
         }
       }
-      
+
       // Handle Enter
       if (str === '\r' || str === '\n') {
         // Restore terminal state
@@ -171,13 +208,13 @@ function selectOption(options, promptText) {
         process.stdin.pause();
         process.stdin.removeListener('data', onData);
         if (escapeTimeout) clearTimeout(escapeTimeout);
-        
+
         // Clear the menu area
         if (linesToClear > 0) {
           process.stdout.write(`\x1B[${linesToClear}A`);
           process.stdout.write('\x1B[0J');
         }
-        
+
         resolve(selectedIndex);
       } else if (str === ' ') {
         // Space
@@ -188,13 +225,13 @@ function selectOption(options, promptText) {
         process.stdin.pause();
         process.stdin.removeListener('data', onData);
         if (escapeTimeout) clearTimeout(escapeTimeout);
-        
+
         // Clear the menu area
         if (linesToClear > 0) {
           process.stdout.write(`\x1B[${linesToClear}A`);
           process.stdout.write('\x1B[0J');
         }
-        
+
         resolve(selectedIndex);
       } else if (str === 'k' || str === 'K') {
         // Vim-style up
@@ -215,13 +252,13 @@ function selectOption(options, promptText) {
           process.stdin.pause();
           process.stdin.removeListener('data', onData);
           if (escapeTimeout) clearTimeout(escapeTimeout);
-          
+
           // Clear the menu area
           if (linesToClear > 0) {
             process.stdout.write(`\x1B[${linesToClear}A`);
             process.stdout.write('\x1B[0J');
           }
-          
+
           resolve(num);
         }
       }
@@ -241,7 +278,7 @@ function selectOption(options, promptText) {
           if (escapeTimeout) clearTimeout(escapeTimeout);
           process.exit(0);
         }
-        
+
         // Handle arrow keys - this should work
         if (key.name === 'up' || (key.sequence === '\x1b[A' || key.sequence === '\u001b[A')) {
           selectedIndex = (selectedIndex - 1 + options.length) % options.length;
@@ -260,13 +297,13 @@ function selectOption(options, promptText) {
           process.stdin.removeListener('keypress', onKeypress);
           process.stdin.removeListener('data', onData);
           if (escapeTimeout) clearTimeout(escapeTimeout);
-          
+
           // Clear the menu area
           if (linesToClear > 0) {
             process.stdout.write(`\x1B[${linesToClear}A`);
             process.stdout.write('\x1B[0J');
           }
-          
+
           resolve(selectedIndex);
           return;
         } else if (key.name && key.name.match(/^\d+$/) && parseInt(key.name) >= 1 && parseInt(key.name) <= options.length) {
@@ -281,13 +318,13 @@ function selectOption(options, promptText) {
             process.stdin.removeListener('keypress', onKeypress);
             process.stdin.removeListener('data', onData);
             if (escapeTimeout) clearTimeout(escapeTimeout);
-            
+
             // Clear the menu area
             if (linesToClear > 0) {
               process.stdout.write(`\x1B[${linesToClear}A`);
               process.stdout.write('\x1B[0J');
             }
-            
+
             resolve(num);
             return;
           }
@@ -300,13 +337,13 @@ function selectOption(options, promptText) {
           process.stdin.removeListener('keypress', onKeypress);
           process.stdin.removeListener('data', onData);
           if (escapeTimeout) clearTimeout(escapeTimeout);
-          
+
           // Clear the menu area
           if (linesToClear > 0) {
             process.stdout.write(`\x1B[${linesToClear}A`);
             process.stdout.write('\x1B[0J');
           }
-          
+
           resolve(selectedIndex);
           return;
         }
@@ -396,7 +433,7 @@ async function main() {
   // Check if we can detect from existing env vars
   const hasVite = map.has("VITE_CONVEX_URL");
   const hasNext = map.has("NEXT_PUBLIC_CONVEX_URL");
-  
+
   if (hasVite && !hasNext) {
     prefix = "VITE_";
     printInfo(`Detected ${colorize("Vite", "cyan")} framework from existing environment variables.`);
@@ -410,7 +447,7 @@ async function main() {
       frameworks,
       colorize("Select your framework:", "bright")
     );
-    
+
     if (selectedIndex >= 0 && selectedIndex < frameworks.length) {
       prefix = frameworks[selectedIndex].prefix;
       console.log();
@@ -427,7 +464,7 @@ async function main() {
       frameworks,
       colorize("Select your framework:", "bright")
     );
-    
+
     if (selectedIndex >= 0 && selectedIndex < frameworks.length) {
       prefix = frameworks[selectedIndex].prefix;
       console.log();
@@ -447,8 +484,8 @@ async function main() {
     printSuccess(`${convexUrlKey} ${colorize("already set", "dim")}; leaving existing value unchanged.`);
   } else {
     const url = await ask(
-      colorize("→ ", "cyan") + colorize("Convex deployment URL", "bright") + 
-      colorize(" (e.g. https://your-deployment.convex.cloud)", "dim") + 
+      colorize("→ ", "cyan") + colorize("Convex deployment URL", "bright") +
+      colorize(" (e.g. https://your-deployment.convex.cloud)", "dim") +
       colorize(` for ${convexUrlKey}: `, "reset")
     );
     if (url) {
@@ -464,8 +501,8 @@ async function main() {
     console.log();
     printInfo(colorize("Get your OAuth Client ID from:", "dim") + " " + colorize("https://dashboard.convex.dev", "cyan"));
     const clientId = await ask(
-      colorize("→ ", "cyan") + colorize("OAuth Client ID", "bright") + 
-      colorize(" (from Convex dashboard)", "dim") + 
+      colorize("→ ", "cyan") + colorize("OAuth Client ID", "bright") +
+      colorize(" (from Convex dashboard)", "dim") +
       colorize(` for ${oauthClientIdKey}: `, "reset")
     );
     if (clientId) {
@@ -480,8 +517,8 @@ async function main() {
     console.log();
     printInfo(colorize("Get your OAuth Client Secret from:", "dim") + " " + colorize("https://dashboard.convex.dev", "cyan"));
     const clientSecret = await ask(
-      colorize("→ ", "cyan") + colorize("OAuth Client Secret", "bright") + 
-      colorize(" (from Convex dashboard)", "dim") + 
+      colorize("→ ", "cyan") + colorize("OAuth Client Secret", "bright") +
+      colorize(" (from Convex dashboard)", "dim") +
       colorize(" for CONVEX_CLIENT_SECRET: ", "reset")
     );
     if (clientSecret) {
@@ -495,9 +532,9 @@ async function main() {
     printSuccess(`${tokenExchangeUrlKey} ${colorize("already set", "dim")}; leaving existing value unchanged.`);
   } else {
     // Get the CONVEX_URL from map or from what we just added
-    const convexUrl = map.get(convexUrlKey) || 
-                     (updates.find(u => u.startsWith(convexUrlKey))?.split("=")[1] || "");
-    
+    const convexUrl = map.get(convexUrlKey) ||
+      (updates.find(u => u.startsWith(convexUrlKey))?.split("=")[1] || "");
+
     const suggestedSite =
       convexUrl && convexUrl.includes(".convex.cloud")
         ? convexUrl.replace(".convex.cloud", ".convex.site") + "/oauth/exchange"
@@ -506,12 +543,12 @@ async function main() {
     console.log();
     let prompt = colorize("→ ", "cyan") + colorize("Token Exchange URL", "bright");
     if (suggestedSite) {
-      prompt += colorize(" (press Enter to use suggested)", "dim") + 
-                colorize(` ${suggestedSite}`, "gray") + 
-                colorize(": ", "reset");
+      prompt += colorize(" (press Enter to use suggested)", "dim") +
+        colorize(` ${suggestedSite}`, "gray") +
+        colorize(": ", "reset");
     } else {
-      prompt += colorize(" (e.g. https://your-deployment.convex.site/oauth/exchange)", "dim") + 
-                colorize(": ", "reset");
+      prompt += colorize(" (e.g. https://your-deployment.convex.site/oauth/exchange)", "dim") +
+        colorize(": ", "reset");
     }
 
     let tokenUrl = await ask(prompt);
@@ -528,23 +565,33 @@ async function main() {
   if (map.has("CONVEX_ACCESS_TOKEN")) {
     printSuccess(`CONVEX_ACCESS_TOKEN ${colorize("already set", "dim")}; leaving existing value unchanged.`);
   } else {
-    console.log();
-    printInfo(colorize("Get your access token from:", "dim") + " " + colorize("https://dashboard.convex.dev/t/{team_name}/settings/access-tokens", "cyan"));
-    printInfo(colorize("(Or go to https://dashboard.convex.dev -> Team Settings -> Access Tokens -> Create Token)", "dim"));
-    const accessToken = await ask(
-      colorize("→ ", "cyan") + colorize("Convex Access Token", "bright") + 
-      colorize(" (from Convex dashboard)", "dim") + 
-      colorize(" for CONVEX_ACCESS_TOKEN", "reset") + 
-      colorize(" (optional, press Enter to skip): ", "dim")
-    );
+    // Attempt device auth
+    const accessToken = await deviceAuth();
     if (accessToken) {
+      printSuccess("Successfully logged in to Convex!");
       updates.push(`CONVEX_ACCESS_TOKEN=${accessToken}`);
     } else {
-      // Add comment and empty value if user skipped
-      updates.push("");
-      updates.push("# Please get your access token from https://dashboard.convex.dev/t/{team_name}/settings/access-tokens");
-      updates.push("# Replace team name with your own or just go to https://dashboard.convex.dev -> Team Settings -> Access Tokens -> Create Token");
-      updates.push("CONVEX_ACCESS_TOKEN=");
+      console.log();
+      printWarning("Login skipped or failed. You can set the token manually.");
+
+      console.log();
+      printInfo(colorize("Get your access token from:", "dim") + " " + colorize("https://dashboard.convex.dev/t/{team_name}/settings/access-tokens", "cyan"));
+      printInfo(colorize("(Or go to https://dashboard.convex.dev -> Team Settings -> Access Tokens -> Create Token)", "dim"));
+      const manualToken = await ask(
+        colorize("→ ", "cyan") + colorize("Convex Access Token", "bright") +
+        colorize(" (from Convex dashboard)", "dim") +
+        colorize(" for CONVEX_ACCESS_TOKEN", "reset") +
+        colorize(" (optional, press Enter to skip): ", "dim")
+      );
+      if (manualToken) {
+        updates.push(`CONVEX_ACCESS_TOKEN=${manualToken}`);
+      } else {
+        // Add comment and empty value if user skipped
+        updates.push("");
+        updates.push("# Please get your access token from https://dashboard.convex.dev/t/{team_name}/settings/access-tokens");
+        updates.push("# Replace team name with your own or just go to https://dashboard.convex.dev -> Team Settings -> Access Tokens -> Create Token");
+        updates.push("CONVEX_ACCESS_TOKEN=");
+      }
     }
   }
 

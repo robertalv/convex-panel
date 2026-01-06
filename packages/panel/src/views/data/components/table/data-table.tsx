@@ -4,27 +4,30 @@ import React, {
   useMemo,
   useRef,
   useState,
-} from 'react';
+} from "react";
 import type {
   TableDocument,
   TableDefinition,
   FilterExpression,
-} from '../../../../types';
-import { ContextMenu } from '../../../../components/shared/context-menu';
-import { patchDocumentFields, deleteDocuments } from '../../../../utils/api/documents';
-import { toast } from '../../../../utils/toast';
-import { EmptyTableState } from './empty-table-state';
-import { TableHeader } from './table-header';
-import { TableRow } from './table-row';
-import { TableFooter } from './table-footer';
-import { buildCellMenuItems } from './data-table-menu';
+} from "../../../../types";
+import { ContextMenu } from "../../../../components/shared/context-menu";
+import {
+  patchDocumentFields,
+  deleteDocuments,
+} from "../../../../utils/api/documents";
+import { toast } from "../../../../utils/toast";
+import { EmptyTableState } from "./empty-table-state";
+import { TableHeader } from "./table-header";
+import { TableRow } from "./table-row";
+import { TableFooter } from "./table-footer";
+import { buildCellMenuItems } from "./data-table-menu";
 import {
   buildColumnMeta,
   formatValue,
   isConvexId,
   DEFAULT_COLUMN_WIDTH,
   MIN_COLUMN_WIDTH,
-} from './data-table-utils';
+} from "./data-table-utils";
 
 export interface DataTableProps {
   selectedTable: string;
@@ -47,7 +50,7 @@ export interface DataTableProps {
   onAddDocument?: () => void;
 }
 
-export const DataTable: React.FC<DataTableProps> = ({
+const DataTableComponent: React.FC<DataTableProps> = ({
   selectedTable,
   documents,
   isLoading,
@@ -72,7 +75,7 @@ export const DataTable: React.FC<DataTableProps> = ({
   const [dragState, setDragState] = useState<{
     dragging?: string;
     over?: string;
-    position?: 'left' | 'right';
+    position?: "left" | "right";
   } | null>(null);
   const [hoveredHeader, setHoveredHeader] = useState<string | null>(null);
   const [hoveredCell, setHoveredCell] = useState<{
@@ -91,7 +94,7 @@ export const DataTable: React.FC<DataTableProps> = ({
     column: string;
     value: any;
   } | null>(null);
-  const [editingValue, setEditingValue] = useState<string>('');
+  const [editingValue, setEditingValue] = useState<string>("");
   const [editingError, setEditingError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const editInputRef = useRef<HTMLTextAreaElement>(null);
@@ -125,15 +128,15 @@ export const DataTable: React.FC<DataTableProps> = ({
   const hasSelectedTable = Boolean(selectedTable);
   const tableSchema = hasSelectedTable ? tables[selectedTable] : undefined;
 
-  const columnMeta = useMemo(
-    () => buildColumnMeta(tableSchema),
-    [tableSchema],
-  );
+  const columnMeta = useMemo(() => buildColumnMeta(tableSchema), [tableSchema]);
 
   const baseColumns = useMemo(() => {
-    const schemaColumns = tableSchema?.fields?.map((field) => field.fieldName) || [];
-    const combined = ['_id', ...schemaColumns, '_creationTime'];
-    const unique = combined.filter((col, index, self) => self.indexOf(col) === index);
+    const schemaColumns =
+      tableSchema?.fields?.map((field) => field.fieldName) || [];
+    const combined = ["_id", ...schemaColumns, "_creationTime"];
+    const unique = combined.filter(
+      (col, index, self) => self.indexOf(col) === index,
+    );
     return hasSelectedTable ? unique : [];
   }, [tableSchema, hasSelectedTable]);
 
@@ -143,7 +146,7 @@ export const DataTable: React.FC<DataTableProps> = ({
       return baseColumns;
     }
     // Filter columns based on visibleFields
-    return baseColumns.filter(col => visibleFields.includes(col));
+    return baseColumns.filter((col) => visibleFields.includes(col));
   }, [baseColumns, visibleFields]);
 
   useEffect(() => {
@@ -159,7 +162,7 @@ export const DataTable: React.FC<DataTableProps> = ({
 
   const renderEmptyState = useCallback(() => {
     const columnsForEmptyState =
-      orderedColumns.length > 0 ? orderedColumns : ['_id', '_creationTime'];
+      orderedColumns.length > 0 ? orderedColumns : ["_id", "_creationTime"];
     return (
       <EmptyTableState
         columns={columnsForEmptyState}
@@ -173,13 +176,13 @@ export const DataTable: React.FC<DataTableProps> = ({
       if (columnWidths[column]) {
         return columnWidths[column];
       }
-      if (column === '_id') {
+      if (column === "_id") {
         return 220;
       }
-      if (column === '_creationTime') {
+      if (column === "_creationTime") {
         return 180;
       }
-      return DEFAULT_COLUMN_WIDTH;  
+      return DEFAULT_COLUMN_WIDTH;
     },
     [columnWidths],
   );
@@ -194,7 +197,12 @@ export const DataTable: React.FC<DataTableProps> = ({
       0,
     );
     return selectionColumnWidth + dataWidth + baseTrailingSpacerWidth;
-  }, [orderedColumns, getColumnWidth, selectionColumnWidth, baseTrailingSpacerWidth]);
+  }, [
+    orderedColumns,
+    getColumnWidth,
+    selectionColumnWidth,
+    baseTrailingSpacerWidth,
+  ]);
 
   useEffect(() => {
     if (!tableContainerRef.current) return;
@@ -239,8 +247,7 @@ export const DataTable: React.FC<DataTableProps> = ({
   const isAllSelected =
     allDocumentIds.length > 0 &&
     allDocumentIds.every((id) => selectedDocumentIds.includes(id));
-  const isIndeterminate =
-    selectedDocumentIds.length > 0 && !isAllSelected;
+  const isIndeterminate = selectedDocumentIds.length > 0 && !isAllSelected;
 
   const toggleSelectAll = useCallback(() => {
     onSelectionChange(isAllSelected ? [] : allDocumentIds);
@@ -250,7 +257,9 @@ export const DataTable: React.FC<DataTableProps> = ({
     (id: string) => {
       const isSelected = selectedDocumentIds.includes(id);
       if (isSelected) {
-        onSelectionChange(selectedDocumentIds.filter((selectedId) => selectedId !== id));
+        onSelectionChange(
+          selectedDocumentIds.filter((selectedId) => selectedId !== id),
+        );
       } else {
         onSelectionChange([...selectedDocumentIds, id]);
       }
@@ -277,9 +286,10 @@ export const DataTable: React.FC<DataTableProps> = ({
   useEffect(() => {
     const prevDocs = previousDocumentsRef.current;
     const prevFilters = previousFiltersRef.current;
-    
+
     // Check if filters changed - if so, reset document reference and skip highlighting
-    const filtersChanged = JSON.stringify(prevFilters) !== JSON.stringify(filters);
+    const filtersChanged =
+      JSON.stringify(prevFilters) !== JSON.stringify(filters);
     if (filtersChanged) {
       previousFiltersRef.current = filters;
       previousDocumentsRef.current = documents;
@@ -291,7 +301,7 @@ export const DataTable: React.FC<DataTableProps> = ({
       }
       return;
     }
-    
+
     // Skip highlighting on initial load (when previousDocumentsRef is empty)
     // Only highlight when there are previous documents to compare against
     if (prevDocs.length === 0) {
@@ -312,7 +322,7 @@ export const DataTable: React.FC<DataTableProps> = ({
         // New document: highlight all of its fields (except internal metadata)
         newRowIds.push(doc._id);
         const cols = Object.keys(doc).filter(
-          (key) => key !== '_id' && key !== '_creationTime',
+          (key) => key !== "_id" && key !== "_creationTime",
         );
         if (cols.length) {
           updatedCells[doc._id] = cols;
@@ -321,7 +331,7 @@ export const DataTable: React.FC<DataTableProps> = ({
         // Existing document: highlight only changed fields
         const changedCols: string[] = [];
         for (const key of Object.keys(doc)) {
-          if (key === '_id' || key === '_creationTime') continue;
+          if (key === "_id" || key === "_creationTime") continue;
           if ((prev as any)[key] !== (doc as any)[key]) {
             changedCols.push(key);
           }
@@ -386,19 +396,19 @@ export const DataTable: React.FC<DataTableProps> = ({
       };
 
       const handleUp = () => {
-        window.removeEventListener('pointermove', handleMove);
-        window.removeEventListener('pointerup', handleUp);
+        window.removeEventListener("pointermove", handleMove);
+        window.removeEventListener("pointerup", handleUp);
         setResizingHover((prev) => (prev === column ? null : prev));
       };
 
-      window.addEventListener('pointermove', handleMove);
-      window.addEventListener('pointerup', handleUp);
+      window.addEventListener("pointermove", handleMove);
+      window.addEventListener("pointerup", handleUp);
     },
     [getColumnWidth],
   );
 
   const reorderColumns = useCallback(
-    (source: string, target: string, position: 'left' | 'right') => {
+    (source: string, target: string, position: "left" | "right") => {
       if (source === target) {
         return;
       }
@@ -408,7 +418,7 @@ export const DataTable: React.FC<DataTableProps> = ({
         if (targetIndex === -1) {
           return prev;
         }
-        const insertIndex = position === 'left' ? targetIndex : targetIndex + 1;
+        const insertIndex = position === "left" ? targetIndex : targetIndex + 1;
         const next = [...withoutSource];
         next.splice(insertIndex, 0, source);
         return next;
@@ -418,7 +428,7 @@ export const DataTable: React.FC<DataTableProps> = ({
   );
 
   const handleDragStart = useCallback((column: string) => {
-    setDragState({ dragging: column, over: column, position: 'right' });
+    setDragState({ dragging: column, over: column, position: "right" });
   }, []);
 
   const handleDragOver = useCallback(
@@ -428,7 +438,8 @@ export const DataTable: React.FC<DataTableProps> = ({
         return;
       }
       const bounds = event.currentTarget.getBoundingClientRect();
-      const position = event.clientX - bounds.left < bounds.width / 2 ? 'left' : 'right';
+      const position =
+        event.clientX - bounds.left < bounds.width / 2 ? "left" : "right";
       setDragState((prev) =>
         prev
           ? {
@@ -445,7 +456,11 @@ export const DataTable: React.FC<DataTableProps> = ({
   const handleDrop = useCallback(
     (column: string) => {
       if (dragState?.dragging && dragState.over) {
-        reorderColumns(dragState.dragging, column, dragState.position ?? 'right');
+        reorderColumns(
+          dragState.dragging,
+          column,
+          dragState.position ?? "right",
+        );
       }
       setDragState(null);
     },
@@ -463,97 +478,111 @@ export const DataTable: React.FC<DataTableProps> = ({
     const handleMouseDown = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (
-        target.closest('.global-context-menu') ||
-        target.closest('[data-menu-trigger]')
+        target.closest(".global-context-menu") ||
+        target.closest("[data-menu-trigger]")
       ) {
         return;
       }
       setCellMenuState(null);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         setCellMenuState(null);
       }
     };
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [cellMenuState]);
 
   // Check if a column is editable (not a system field)
   const isEditableColumn = useCallback((column: string) => {
-    return column !== '_id' && column !== '_creationTime';
+    return column !== "_id" && column !== "_creationTime";
   }, []);
 
   // Validate edited value against schema
-  const validateValue = useCallback((value: string, column: string, originalValue: any): string | null => {
-    const meta = columnMeta[column];
-    if (!meta) return null;
+  const validateValue = useCallback(
+    (value: string, column: string, originalValue: any): string | null => {
+      const meta = columnMeta[column];
+      if (!meta) return null;
 
-    // Check if it's an ID field that references another table
-    if (meta.linkTable) {
-      // For ID references, validate it's a valid Convex ID
-      if (!isConvexId(value)) {
-        return `Type 'string' is not assignable to: v.id("${meta.linkTable}")`;
+      // Check if it's an ID field that references another table
+      if (meta.linkTable) {
+        // For ID references, validate it's a valid Convex ID
+        if (!isConvexId(value)) {
+          return `Type 'string' is not assignable to: v.id("${meta.linkTable}")`;
+        }
       }
-    }
 
-    // Check if original was a number
-    if (typeof originalValue === 'number') {
-      const numValue = parseFloat(value);
-      if (isNaN(numValue)) {
-        return `Type 'string' is not assignable to: v.number()`;
+      // Check if original was a number
+      if (typeof originalValue === "number") {
+        const numValue = parseFloat(value);
+        if (isNaN(numValue)) {
+          return `Type 'string' is not assignable to: v.number()`;
+        }
       }
-    }
 
-    // Check if original was a boolean
-    if (typeof originalValue === 'boolean') {
-      if (value.toLowerCase() !== 'true' && value.toLowerCase() !== 'false') {
-        return `Type 'string' is not assignable to: v.boolean()`;
+      // Check if original was a boolean
+      if (typeof originalValue === "boolean") {
+        if (value.toLowerCase() !== "true" && value.toLowerCase() !== "false") {
+          return `Type 'string' is not assignable to: v.boolean()`;
+        }
       }
-    }
 
-    return null;
-  }, [columnMeta]);
+      return null;
+    },
+    [columnMeta],
+  );
 
   // Start editing a cell
-  const startEditing = useCallback((rowId: string, column: string, value: any) => {
-    if (!isEditableColumn(column)) {
-      return;
-    }
-    const stringValue = formatValue(value);
-    setEditingCell({ rowId, column, value });
-    setEditingValue(stringValue);
-    setEditingError(null);
-  }, [isEditableColumn]);
+  const startEditing = useCallback(
+    (rowId: string, column: string, value: any) => {
+      if (!isEditableColumn(column)) {
+        return;
+      }
+      const stringValue = formatValue(value);
+      setEditingCell({ rowId, column, value });
+      setEditingValue(stringValue);
+      setEditingError(null);
+    },
+    [isEditableColumn],
+  );
 
   // Cancel editing
   const cancelEditing = useCallback(() => {
     setEditingCell(null);
-    setEditingValue('');
+    setEditingValue("");
     setEditingError(null);
   }, []);
 
   // Handle delete document
-  const handleDeleteDocument = useCallback(async (documentId: string) => {
-    if (!adminClient || !selectedTable) return;
+  const handleDeleteDocument = useCallback(
+    async (documentId: string) => {
+      if (!adminClient || !selectedTable) return;
 
-    try {
-      await deleteDocuments(selectedTable, [documentId], adminClient, componentId);
-      toast('success', 'Document deleted successfully');
-      
-      // Refresh table data
-      if (onDocumentUpdate) {
-        onDocumentUpdate();
+      try {
+        await deleteDocuments(
+          selectedTable,
+          [documentId],
+          adminClient,
+          componentId,
+        );
+        toast("success", "Document deleted successfully");
+
+        // Refresh table data
+        if (onDocumentUpdate) {
+          onDocumentUpdate();
+        }
+      } catch (error: any) {
+        console.error("Error deleting document:", error);
+        toast("error", error?.message || "Failed to delete document");
       }
-    } catch (error: any) {
-      console.error('Error deleting document:', error);
-      toast('error', error?.message || 'Failed to delete document');
-    }
-  }, [adminClient, selectedTable, componentId, onDocumentUpdate]);
+    },
+    [adminClient, selectedTable, componentId, onDocumentUpdate],
+  );
 
   // Handle clicks outside the editor to close it
   useEffect(() => {
@@ -564,7 +593,7 @@ export const DataTable: React.FC<DataTableProps> = ({
       if (
         editorRef.current &&
         !editorRef.current.contains(target) &&
-        !(target instanceof Element && target.closest('[data-menu-trigger]'))
+        !(target instanceof Element && target.closest("[data-menu-trigger]"))
       ) {
         // Don't close if clicking on context menu
         if (!(target instanceof Element && target.closest('[role="menu"]'))) {
@@ -575,26 +604,36 @@ export const DataTable: React.FC<DataTableProps> = ({
 
     // Add event listener with a small delay to avoid closing immediately on open
     const timeout = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     }, 100);
 
     return () => {
       clearTimeout(timeout);
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [editingCell, cancelEditing]);
 
   // Validate editing value on change
   useEffect(() => {
     if (editingCell) {
-      const error = validateValue(editingValue, editingCell.column, editingCell.value);
+      const error = validateValue(
+        editingValue,
+        editingCell.column,
+        editingCell.value,
+      );
       setEditingError(error);
     }
   }, [editingValue, editingCell, validateValue]);
 
   // Save edited value
   const saveEditing = useCallback(async () => {
-    if (!editingCell || !adminClient || !selectedTable || isSaving || editingError) {
+    if (
+      !editingCell ||
+      !adminClient ||
+      !selectedTable ||
+      isSaving ||
+      editingError
+    ) {
       return;
     }
 
@@ -605,29 +644,33 @@ export const DataTable: React.FC<DataTableProps> = ({
       const originalValue = editingCell.value;
 
       // Try to parse as JSON if it looks like JSON
-      if (typeof originalValue === 'object' && originalValue !== null) {
+      if (typeof originalValue === "object" && originalValue !== null) {
         try {
           parsedValue = JSON.parse(editingValue);
         } catch {
           // If parsing fails, keep as string
           parsedValue = editingValue;
         }
-      } else if (typeof originalValue === 'number') {
+      } else if (typeof originalValue === "number") {
         // Try to parse as number
         const numValue = parseFloat(editingValue);
         if (!isNaN(numValue)) {
           parsedValue = numValue;
         }
-      } else if (typeof originalValue === 'boolean') {
+      } else if (typeof originalValue === "boolean") {
         // Parse boolean
-        if (editingValue.toLowerCase() === 'true') {
+        if (editingValue.toLowerCase() === "true") {
           parsedValue = true;
-        } else if (editingValue.toLowerCase() === 'false') {
+        } else if (editingValue.toLowerCase() === "false") {
           parsedValue = false;
         }
       } else if (originalValue === null || originalValue === undefined) {
         // If original was null/undefined, try to parse or keep as string
-        if (editingValue.trim() === '' || editingValue.toLowerCase() === 'null' || editingValue.toLowerCase() === 'unset') {
+        if (
+          editingValue.trim() === "" ||
+          editingValue.toLowerCase() === "null" ||
+          editingValue.toLowerCase() === "unset"
+        ) {
           parsedValue = null;
         } else {
           try {
@@ -643,7 +686,7 @@ export const DataTable: React.FC<DataTableProps> = ({
         selectedTable,
         [editingCell.rowId],
         { [editingCell.column]: parsedValue },
-        adminClient
+        adminClient,
       );
 
       // Call update callback if provided
@@ -653,14 +696,22 @@ export const DataTable: React.FC<DataTableProps> = ({
 
       // Clear editing state
       setEditingCell(null);
-      setEditingValue('');
+      setEditingValue("");
     } catch (error) {
-      console.error('Error updating document:', error);
+      console.error("Error updating document:", error);
       // Keep editing state so user can retry
     } finally {
       setIsSaving(false);
     }
-  }, [editingCell, editingValue, adminClient, selectedTable, isSaving, editingError, onDocumentUpdate]);
+  }, [
+    editingCell,
+    editingValue,
+    adminClient,
+    selectedTable,
+    isSaving,
+    editingError,
+    onDocumentUpdate,
+  ]);
 
   // Handle keyboard events for editing
   useEffect(() => {
@@ -669,18 +720,18 @@ export const DataTable: React.FC<DataTableProps> = ({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         event.preventDefault();
         cancelEditing();
-      } else if (event.key === 'Enter' && !event.shiftKey) {
+      } else if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         saveEditing();
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [editingCell, cancelEditing, saveEditing]);
 
@@ -695,12 +746,12 @@ export const DataTable: React.FC<DataTableProps> = ({
   const renderLoadingState = () => (
     <div
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100%',
-        color: 'var(--color-panel-text-secondary)',
-        fontSize: '14px',
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100%",
+        color: "var(--color-panel-text-secondary)",
+        fontSize: "14px",
       }}
     >
       Loading...
@@ -713,72 +764,71 @@ export const DataTable: React.FC<DataTableProps> = ({
 
   const handleCellHoverLeave = useCallback((rowId: string, column: string) => {
     setHoveredCell((prev) =>
-      prev &&
-      prev.rowId === rowId &&
-      prev.column === column
-        ? null
-        : prev,
+      prev && prev.rowId === rowId && prev.column === column ? null : prev,
     );
   }, []);
 
-  const handleCellContextMenu = useCallback((event: React.MouseEvent, rowId: string, column: string, value: any) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const position = clampPosition(
-      event.clientX,
-      event.clientY,
-    );
-    setCellMenuState({
-      rowId,
-      column,
-      value,
-      position,
-    });
-  }, [clampPosition]);
+  const handleCellContextMenu = useCallback(
+    (event: React.MouseEvent, rowId: string, column: string, value: any) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const position = clampPosition(event.clientX, event.clientY);
+      setCellMenuState({
+        rowId,
+        column,
+        value,
+        position,
+      });
+    },
+    [clampPosition],
+  );
 
-  const handleCellMenuClick = useCallback((event: React.MouseEvent, rowId: string, column: string, value: any) => {
-    event.stopPropagation();
-    const rect = event.currentTarget.getBoundingClientRect();
-    const position = clampPosition(rect.right, rect.bottom);
-    setCellMenuState(
-      cellMenuState?.rowId === rowId && cellMenuState?.column === column
-        ? null
-        : {
-            rowId,
-            column,
-            value,
-            position,
-          },
-    );
-  }, [cellMenuState, clampPosition]);
+  const handleCellMenuClick = useCallback(
+    (event: React.MouseEvent, rowId: string, column: string, value: any) => {
+      event.stopPropagation();
+      const rect = event.currentTarget.getBoundingClientRect();
+      const position = clampPosition(rect.right, rect.bottom);
+      setCellMenuState(
+        cellMenuState?.rowId === rowId && cellMenuState?.column === column
+          ? null
+          : {
+              rowId,
+              column,
+              value,
+              position,
+            },
+      );
+    },
+    [cellMenuState, clampPosition],
+  );
 
   return (
     <div
       style={{
-        display: 'flex',
-        flexDirection: 'column',
+        display: "flex",
+        flexDirection: "column",
         flex: 1,
         minHeight: 0,
-        overflow: 'hidden',
+        overflow: "hidden",
       }}
     >
       <div
         ref={tableContainerRef}
         style={{
           flex: 1,
-          overflow: 'auto',
+          overflow: "auto",
           minHeight: 0,
         }}
       >
         {!hasSelectedTable ? (
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              color: 'var(--color-panel-text-secondary)',
-              fontSize: '14px',
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+              color: "var(--color-panel-text-secondary)",
+              fontSize: "14px",
             }}
           >
             Select a table to view data
@@ -788,12 +838,12 @@ export const DataTable: React.FC<DataTableProps> = ({
         ) : documents.length === 0 ? (
           renderEmptyState()
         ) : (
-          <div style={{ width: '100%', height: '100%', overflow: 'auto' }}>
+          <div style={{ width: "100%", height: "100%", overflowX: "hidden", overflowY: "auto" }}>
             <table
               style={{
-                textAlign: 'left',
-                borderCollapse: 'collapse',
-                tableLayout: 'fixed',
+                textAlign: "left",
+                borderCollapse: "collapse",
+                tableLayout: "fixed",
                 width: renderedTableWidth,
                 minWidth: renderedTableWidth,
               }}
@@ -821,21 +871,25 @@ export const DataTable: React.FC<DataTableProps> = ({
                 onColumnDrop={handleDrop}
                 onColumnDragEnd={handleDragEnd}
                 onColumnMouseEnter={(column) => setHoveredHeader(column)}
-                onColumnMouseLeave={(column) => setHoveredHeader((prev) => (prev === column ? null : prev))}
+                onColumnMouseLeave={(column) =>
+                  setHoveredHeader((prev) => (prev === column ? null : prev))
+                }
                 onColumnDragStart={(column, event) => {
-                  event.dataTransfer.effectAllowed = 'move';
-                  event.dataTransfer.setData('text/plain', column);
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("text/plain", column);
                   handleDragStart(column);
                 }}
                 onColumnResizeStart={startResizing}
                 onColumnResizeHoverEnter={(column) => setResizingHover(column)}
-                onColumnResizeHoverLeave={(column) => setResizingHover((prev) => (prev === column ? null : prev))}
+                onColumnResizeHoverLeave={(column) =>
+                  setResizingHover((prev) => (prev === column ? null : prev))
+                }
               />
               <tbody
                 style={{
-                  fontSize: '11px',
-                  fontFamily: 'monospace',
-                  color: 'var(--color-panel-text)',
+                  fontSize: "11px",
+                  fontFamily: "monospace",
+                  color: "var(--color-panel-text)",
                 }}
               >
                 {documents.map((doc: TableDocument) => (
@@ -852,7 +906,9 @@ export const DataTable: React.FC<DataTableProps> = ({
                     editingValue={editingValue}
                     editingError={editingError}
                     isSaving={isSaving}
-                    editInputRef={editInputRef as React.RefObject<HTMLTextAreaElement>}
+                    editInputRef={
+                      editInputRef as React.RefObject<HTMLTextAreaElement>
+                    }
                     editorRef={editorRef as React.RefObject<HTMLDivElement>}
                     trailingSpacerWidth={trailingSpacerWidth}
                     adminClient={adminClient}
@@ -911,7 +967,7 @@ export const DataTable: React.FC<DataTableProps> = ({
               setFilters,
               onDeleteDocument: handleDeleteDocument,
               getDocument: (documentId: string) => {
-                return documents.find(doc => doc._id === documentId);
+                return documents.find((doc) => doc._id === documentId);
               },
             },
           )}
@@ -921,3 +977,7 @@ export const DataTable: React.FC<DataTableProps> = ({
     </div>
   );
 };
+
+// Memoize DataTable to prevent re-renders when parent re-renders
+// but props haven't changed (e.g., when sheet state changes)
+export const DataTable = React.memo(DataTableComponent);

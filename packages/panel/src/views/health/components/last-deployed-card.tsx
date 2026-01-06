@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowUp } from 'lucide-react';
-import { HealthCard } from './health-card';
-import { TimestampDistance } from './timestamp-distance';
-import { fetchLastPushEvent, fetchServerVersion } from '../../../utils/api/health';
+import React, { useState, useEffect } from "react";
+import { ArrowUp } from "lucide-react";
+import { HealthCard } from "./health-card";
+import { TimestampDistance } from "./timestamp-distance";
+import {
+  fetchLastPushEvent,
+  fetchServerVersion,
+} from "../../../utils/api/health";
 
 interface LastDeployedCardProps {
   deploymentUrl?: string;
@@ -53,7 +56,11 @@ export const LastDeployedCard: React.FC<LastDeployedCardProps> = ({
         setVersion(serverVersion);
       } catch (err) {
         if (mounted) {
-          setError(err instanceof Error ? err.message : 'Failed to fetch deployment info');
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to fetch deployment info",
+          );
         }
       } finally {
         if (mounted) {
@@ -81,7 +88,9 @@ export const LastDeployedCard: React.FC<LastDeployedCardProps> = ({
 
     async function checkVersion() {
       try {
-        const response = await fetch('https://registry.npmjs.org/convex/latest');
+        const response = await fetch(
+          "https://registry.npmjs.org/convex/latest",
+        );
         if (!response.ok) return;
 
         const data = await response.json();
@@ -91,13 +100,13 @@ export const LastDeployedCard: React.FC<LastDeployedCardProps> = ({
 
         if (version && data.version) {
           // Simple version comparison without semver
-          const currentParts = version.split('.').map(Number);
-          const latestParts = data.version.split('.').map(Number);
-          
+          const currentParts = version.split(".").map(Number);
+          const latestParts = data.version.split(".").map(Number);
+
           if (currentParts.length === 3 && latestParts.length === 3) {
             const isHigherMajor = latestParts[0] > currentParts[0];
-            const isHigherMinor = 
-              latestParts[0] === currentParts[0] && 
+            const isHigherMinor =
+              latestParts[0] === currentParts[0] &&
               latestParts[1] > currentParts[1];
             const hasNewVersion = isHigherMajor || isHigherMinor;
             setHasUpdate(hasNewVersion);
@@ -116,15 +125,15 @@ export const LastDeployedCard: React.FC<LastDeployedCardProps> = ({
   }, [version]);
 
   const getUpdateType = (): string => {
-    if (!version || !latestVersion) return '';
-    const currentMajor = version.split('.')[0];
-    const latestMajor = latestVersion.split('.')[0];
-    const currentMinor = version.split('.')[1];
-    const latestMinor = latestVersion.split('.')[1];
+    if (!version || !latestVersion) return "";
+    const currentMajor = version.split(".")[0];
+    const latestMajor = latestVersion.split(".")[0];
+    const currentMinor = version.split(".")[1];
+    const latestMinor = latestVersion.split(".")[1];
 
-    if (latestMajor !== currentMajor) return 'major';
-    if (latestMinor !== currentMinor) return 'minor';
-    return 'patch';
+    if (latestMajor !== currentMajor) return "major";
+    if (latestMinor !== currentMinor) return "minor";
+    return "patch";
   };
 
   return (
@@ -136,22 +145,27 @@ export const LastDeployedCard: React.FC<LastDeployedCardProps> = ({
     >
       <div
         style={{
-          display: 'flex',
-          height: '100%',
-          width: '100%',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '0 8px 8px',
+          display: "flex",
+          height: "100%",
+          width: "100%",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "8px",
+          padding: "0 4px 4px",
         }}
       >
         {loading ? (
-          <span style={{ fontSize: '12px', color: 'var(--color-panel-text-muted)' }}>Loading...</span>
+          <span
+            style={{ fontSize: "11px", color: "var(--color-panel-text-muted)" }}
+          >
+            Loading...
+          </span>
         ) : !lastDeployed ? (
           <span
             style={{
-              fontSize: '14px',
-              color: 'var(--color-panel-text-secondary)',
+              fontSize: "13px",
+              color: "var(--color-panel-text-secondary)",
             }}
           >
             Never
@@ -163,20 +177,21 @@ export const LastDeployedCard: React.FC<LastDeployedCardProps> = ({
         {version && (
           <div
             style={{
-              display: 'flex',
-              height: '32px',
-              alignItems: 'center',
-              gap: '8px',
+              display: "flex",
+              height: "28px",
+              alignItems: "center",
+              gap: "6px",
             }}
           >
             <span
               style={{
-                fontSize: '14px',
-                color: 'var(--color-panel-text-secondary)',
-                fontFamily: 'monospace',
-                backgroundColor: 'var(--color-panel-bg-tertiary)',
-                padding: '3px 6px',
-                borderRadius: '4px',
+                fontSize: "12px",
+                color: "var(--color-panel-text-secondary)",
+                fontFamily: "monospace",
+                backgroundColor: "var(--color-panel-bg-tertiary)",
+                padding: "2px 5px",
+                borderRadius: "4px",
+                whiteSpace: "nowrap",
               }}
             >
               Convex v{version}
@@ -187,11 +202,11 @@ export const LastDeployedCard: React.FC<LastDeployedCardProps> = ({
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  color: 'var(--color-panel-text-secondary)',
-                  textDecoration: 'none',
-                  cursor: 'pointer',
+                  display: "flex",
+                  alignItems: "center",
+                  color: "var(--color-panel-text-secondary)",
+                  textDecoration: "none",
+                  cursor: "pointer",
                 }}
                 title={`A ${getUpdateType()} update is available for Convex (${version} → ${latestVersion})`}
               >
@@ -204,4 +219,3 @@ export const LastDeployedCard: React.FC<LastDeployedCardProps> = ({
     </HealthCard>
   );
 };
-
