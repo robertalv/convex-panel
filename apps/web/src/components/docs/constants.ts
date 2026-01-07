@@ -1,13 +1,12 @@
 import type { ClassValue } from "clsx";
 
-export type Framework = "react" | "vite" | "nextjs" | "vue" | "svelte";
+export type Framework = "react" | "vite" | "nextjs" | "tanstack-start";
 
 export const frameworks: { id: Framework; label: string; icon: string }[] = [
   { id: "react", label: "React", icon: "⚛️" },
   { id: "vite", label: "Vite", icon: "⚡" },
   { id: "nextjs", label: "Next.js", icon: "▲" },
-  { id: "vue", label: "Vue", icon: "💚" },
-  { id: "svelte", label: "Svelte", icon: "🔥" },
+  { id: "tanstack-start", label: "TanStack Start", icon: "💚" },
 ];
 
 export type DocsPath =

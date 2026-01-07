@@ -1,0 +1,84 @@
+{
+  "name": "@convex-panel/ai-analysis",
+  "description": "AI-powered log and error analysis component for Convex Panel",
+  "repository": "github:devwithbobby/convex-panel",
+  "homepage": "https://github.com/devwithbobby/convex-panel#readme",
+  "bugs": {
+    "url": "https://github.com/devwithbobby/convex-panel/issues"
+  },
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "keywords": [
+    "convex",
+    "component",
+    "ai",
+    "analysis",
+    "logs",
+    "errors"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "run-p -r 'dev:*'",
+    "dev:backend": "convex dev --typecheck-components",
+    "dev:build": "chokidar 'tsconfig*.json' 'src/**/*.ts' -i '**/*.test.ts' -c 'npx convex codegen --component-dir ./src/component && npm run build' --initial",
+    "predev": "path-exists .env.local || (npm run build && convex dev --until-success)",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "build": "tsc --project ./tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run --typecheck",
+    "test:watch": "vitest --typecheck --clearScreen false",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    },
+    "./test": "./src/test.ts",
+    "./_generated/component.js": {
+      "types": "./dist/component/_generated/component.d.ts"
+    },
+    "./convex.config.js": {
+      "types": "./dist/component/convex.config.d.ts",
+      "default": "./dist/component/convex.config.js"
+    },
+    "./convex.config": {
+      "types": "./dist/component/convex.config.d.ts",
+      "default": "./dist/component/convex.config.js"
+    }
+  },
+  "peerDependencies": {
+    "convex": "^1.29.3"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^1.0.0",
+    "@ai-sdk/provider": "^2.0.0",
+    "@ai-sdk/openai": "^2.0.80",
+    "@convex-dev/agent": "^0.3.2",
+    "ai": "^5.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@convex-dev/crons": "^0.2.0",
+    "@convex-dev/eslint-plugin": "^1.0.0",
+    "@types/node": "^20.19.25",
+    "chokidar-cli": "3.0.0",
+    "convex": "1.29.3",
+    "convex-test": "0.0.40",
+    "eslint": "9.39.1",
+    "npm-run-all2": "8.0.4",
+    "path-exists-cli": "2.0.0",
+    "prettier": "3.6.2",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.47.0",
+    "vitest": "3.2.4"
+  },
+  "types": "./dist/client/index.d.ts",
+  "module": "./dist/client/index.js"
+}

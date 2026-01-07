@@ -2722,11 +2722,13 @@ export default app;`,
 import { components } from "./_generated/api";
 import { RAG } from "@convex-dev/rag";
 // Any AI SDK model that supports embeddings will work.
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
+
+const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const rag = new RAG(components.rag, {
-  textEmbeddingModel: openai.embedding("text-embedding-3-small"),
-  embeddingDimension: 1536, // Needs to match your embedding model
+  textEmbeddingModel: openai.textEmbeddingModel("text-embedding-3-large"),
+  embeddingDimension: 3072, // text-embedding-3-large default dimension (supports v2 spec in AI SDK 5)
 });`,
       },
       {
@@ -2783,7 +2785,11 @@ const rag = new RAG(components.rag, {
           'This will automatically search for relevant entries and use them as context for the LLM, using default formatting.',
           'The arguments to `generateText` are compatible with all arguments to `generateText` from the AI SDK.',
         ],
-        code: `export const askQuestion = action({
+        code: `import { createOpenAI } from "@ai-sdk/openai";
+
+const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+export const askQuestion = action({
   args: {
     prompt: v.string(),
   },
@@ -2813,7 +2819,9 @@ const rag = new RAG(components.rag, {
 import { components } from "./_generated/api";
 import { RAG } from "@convex-dev/rag";
 // Any AI SDK model that supports embeddings will work.
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
+
+const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Optional: Add type safety to your filters.
 type FilterTypes = {
@@ -2823,8 +2831,8 @@ type FilterTypes = {
 };
 
 const rag = new RAG<FilterTypes>(components.rag, {
-  textEmbeddingModel: openai.embedding("text-embedding-3-small"),
-  embeddingDimension: 1536, // Needs to match your embedding model
+  textEmbeddingModel: openai.textEmbeddingModel("text-embedding-3-large"),
+  embeddingDimension: 3072, // text-embedding-3-large default dimension (supports v2 spec in AI SDK 5)
   filterNames: ["category", "contentType", "categoryAndType"],
 });`,
       },
@@ -3908,9 +3916,9 @@ export const sendManualEmail = internalMutation({
       'npm install',
       'npm run dev',
     ],
-    longDescription: 'Store and serve files with Cloudflare R2. This component provides hooks for React and Svelte that handle the entire upload process, including generating signed URLs, uploading files to R2, and storing file metadata in your Convex database.',
+    longDescription: 'Store and serve files with Cloudflare R2. This component provides hooks for React that handle the entire upload process, including generating signed URLs, uploading files to R2, and storing file metadata in your Convex database.',
     features: [
-      'Upload files from React or Svelte using convenient hooks.',
+      'Upload files from React using convenient hooks.',
       'Generate signed URLs for secure file uploads.',
       'Store file metadata automatically in your Convex database.',
       'Store files directly from actions (server-side storage).',
@@ -3927,8 +3935,7 @@ export const sendManualEmail = internalMutation({
         paragraphs: [
           'Store and serve files with Cloudflare R2.',
         ],
-        code: `// or @convex-dev/r2/svelte for Svelte!
-import { useUploadFile } from "@convex-dev/r2/react";
+        code: `import { useUploadFile } from "@convex-dev/r2/react";
 
 // Upload files from React
 const uploadFile = useUploadFile(api.example);
@@ -4038,7 +4045,7 @@ npx convex env set R2_BUCKET xxxxx`,
       {
         heading: 'Uploading files',
         paragraphs: [
-          'File uploads to R2 typically use signed urls. The R2 component provides hooks for React and Svelte that handle the entire upload process:',
+          'File uploads to R2 typically use signed urls. The R2 component provides hooks for React that handle the entire upload process:',
         ],
         codeBlocks: [
           {
@@ -4121,37 +4128,6 @@ export default function App() {
     </form>
   );
 }`,
-          },
-          {
-            subheading: 'Svelte example',
-            code: `<script lang="ts">
-   import { useUploadFile } from "@convex-dev/r2/svelte";
-   import { api } from "../convex/_generated/api";
-
-   const uploadFile = useUploadFile(api.example);
-   let selectedImage = $state<File | null>(null);
-
-   async function handleUpload(file: File) {
-     await uploadFile(file);
-     selectedImage = null;
-   }
- </script>
-
- <form
-   onsubmit={() => {
-     if (selectedImage) handleUpload(selectedImage);
-   }}
- >
-   <input
-     type="file"
-     accept="image/*"
-     onchange={(e) => {
-       selectedImage = e.currentTarget.files?.[0] ?? null;
-     }}
-     disabled={selectedImage !== null}
-   />
-   <button type="submit" disabled={selectedImage === null}> Upload </button>
- </form>`,
           },
         ],
       },

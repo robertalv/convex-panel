@@ -41,6 +41,7 @@ export const STORAGE_KEYS: Record<string, string> = {
   DEPLOYMENT_STATE_CHANGED: `${STORAGE_PREFIX}:deployment-state-changed`,
   FILTER_HISTORY_RETENTION_MS: `${STORAGE_PREFIX}:filter-history-retention-ms`,
   FILTER_HISTORY_SESSION_PREFIX: `${STORAGE_PREFIX}:filter-history-session`,
+  LOGS_FILTERS: `${STORAGE_PREFIX}:logs-filters`,
 }
 
 export const PANEL_MIN_HEIGHT = 40;
@@ -179,7 +180,7 @@ export const ROUTES = {
   DASHBOARD_PROFILE: '/api/dashboard/profile',
   TOKEN_DETAILS: '/v1/token_details',
   TEAMS: '/api/v1/teams',
-  TEAM_FROM_DEPLOYMENT: '/api/v1/deployments/{deploymentName}/team_and_project',
+  TEAM_FROM_DEPLOYMENT: '/api/deployment/{deploymentName}/team_and_project',
   FETCH_TEAMS: '/api/dashboard/teams',
   FETCH_PROJECTS: '/api/dashboard/teams/{teamId}/projects',
   FETCH_DEPLOYMENTS: '/api/dashboard/projects/{projectId}/instances',
@@ -259,7 +260,6 @@ export const SYSTEM_QUERIES = {
   FUNCTION_API_SPEC: '_system/cli/modules:apiSpec',
   LAST_PUSH_EVENT: '_system/frontend/deploymentEvents:lastPushEvent',
   GET_VERSION: '_system/frontend/getVersion:default',
-  INSIGHTS_LIST: '_system/frontend/insights:list',
   GET_ALL_TABLE_FIELDS: '_system/frontend/getAllTableFields:default',
   GET_TABLE_MAPPING: '_system/frontend/getTableMapping',
   GET_TABLE_SIZE: '_system/frontend/tableSize:default',

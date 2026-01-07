@@ -6,53 +6,6 @@
 import { isNextJSEnv } from './platform';
 
 /**
- * Unwrap Vue reactive values to plain JavaScript primitives
- * This is needed when reading from Vue reactive proxies
- */
-export const unwrapVueValue = (value: any): string | undefined => {
-  if (value === null || value === undefined) return undefined;
-  
-  // If it's already a plain string, return it
-  if (typeof value === 'string') return value;
-  
-  // If it's a number or boolean, convert to string
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-  
-  // If it's a Vue reactive proxy, try to unwrap it
-  if (value && typeof value === 'object') {
-    // Check if it's a Vue reactive object
-    if ('__v_isReactive' in value || '__v_isRef' in value || '__v_isVNode' in value) {
-      // Try to get the raw value using JSON serialization
-      try {
-        const serialized = JSON.parse(JSON.stringify(value));
-        if (typeof serialized === 'string') {
-          return serialized;
-        }
-        return String(serialized);
-      } catch {
-        // If JSON serialization fails, try direct string conversion
-        return String(value);
-      }
-    }
-    
-    // For other objects, try JSON serialization
-    try {
-      const serialized = JSON.parse(JSON.stringify(value));
-      if (typeof serialized === 'string') {
-        return serialized;
-      }
-      return String(serialized);
-    } catch {
-      return String(value);
-    }
-  }
-  
-  return String(value);
-};
-
-/**
  * Utility to safely get environment variables in Next.js and Vite
  * Checks NEXT_PUBLIC_ and VITE_ prefixes for maximum compatibility
  */

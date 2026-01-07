@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type SettingsSection = 'environment-variables' | 'url-deploy-key' | 'authentication' | 'components' | 'backup-restore' | 'integrations' | 'pause-deployment';
+export type SettingsSection = 'environment-variables' | 'url-deploy-key' | 'authentication' | 'components' | 'backup-restore' | 'integrations' | 'pause-deployment' | 'ai-analysis';
 
 export interface SettingsSidebarProps {
   selectedSection: SettingsSection;
@@ -19,6 +19,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
     { id: 'backup-restore', label: 'Backup & Restore' },
     { id: 'integrations', label: 'Integrations' },
     { id: 'pause-deployment', label: 'Pause Deployment' },
+    { id: 'ai-analysis', label: 'AI Analysis' },
   ];
 
   return (

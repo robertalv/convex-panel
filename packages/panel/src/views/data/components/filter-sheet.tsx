@@ -1,8 +1,12 @@
-import React, { useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import { DataFilterPanel } from './data-filter-panel';
-import type { FilterExpression, SortConfig, TableDefinition } from '../../../types';
-import { createSessionStorageFilterHistoryApi } from '../../../utils/filterHistoryStorage';
+import React, { useMemo } from "react";
+import { DataFilterPanel } from "./data-filter-panel";
+import { Sheet } from "../../../components/shared/sheet";
+import type {
+  FilterExpression,
+  SortConfig,
+  TableDefinition,
+} from "../../../types";
+import { createSessionStorageFilterHistoryApi } from "../../../utils/filterHistoryStorage";
 
 export interface FilterSheetProps {
   isOpen: boolean;
@@ -18,6 +22,12 @@ export interface FilterSheetProps {
   openColumnVisibility?: boolean;
   userId?: string;
   container?: HTMLElement | null;
+  /**
+   * Render mode for the sheet:
+   * - 'portal': Uses createPortal to render the sheet (default, used for overlays)
+   * - 'inline': Renders directly without portal (used for push-aside layouts in desktop)
+   */
+  renderMode?: "portal" | "inline";
 }
 
 export const FilterSheet: React.FC<FilterSheetProps> = ({
@@ -32,131 +42,45 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
   visibleFields,
   onVisibleFieldsChange,
   openColumnVisibility,
-  userId = 'default',
+  userId = "default",
   container,
+  renderMode = "portal",
 }) => {
   const filterHistoryApi = useMemo(() => {
     return createSessionStorageFilterHistoryApi();
   }, []);
-  // if the sheet is open, prevent the body from scrolling
-  useEffect(() => {
-    if (!container && isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else if (!container) {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      if (!container) {
-        document.body.style.overflow = '';
-      }
-    };
-  }, [isOpen, container]);
 
-  // Handle escape key
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
-  const isInContainer = Boolean(container);
-  const portalTarget = container || document.body;
-  const positionType = isInContainer ? 'absolute' : 'fixed';
-
-  const sheetContent = (
-    <>
-      {/* Backdrop - only show when not in container */}
-      {!isInContainer && (
-        <div
-          onClick={onClose}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'color-mix(in srgb, var(--color-panel-bg) 80%, transparent)',
-            zIndex: 999,
-            animation: 'fadeIn 0.2s ease-out',
-          }}
-        />
-      )}
-
-      {/* Sheet */}
+  return (
+    <Sheet
+      isOpen={isOpen}
+      onClose={onClose}
+      width="480px"
+      container={container}
+      renderMode={renderMode}
+    >
       <div
         style={{
-          position: positionType,
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: '480px',
-          maxWidth: isInContainer ? '50vw' : '90vw',
-          backgroundColor: 'var(--color-panel-bg)',
-          borderLeft: '1px solid var(--color-panel-border)',
-          zIndex: isInContainer ? 1000 : 1000,
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: isInContainer ? undefined : '-4px 0 24px var(--color-panel-shadow)',
-          animation: 'slideInRight 0.3s ease-out',
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          backgroundColor: "var(--color-panel-bg)",
         }}
-        onClick={(e) => e.stopPropagation()}
       >
-        {/* Content - Header is inside DataFilterPanel */}
-        <div
-          style={{
-            flex: 1,
-            overflow: 'hidden',
-            backgroundColor: 'var(--color-panel-bg)',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          <DataFilterPanel
-            filters={filters}
-            setFilters={setFilters}
-            sortConfig={sortConfig}
-            setSortConfig={setSortConfig}
-            selectedTable={selectedTable}
-            tables={tables}
-            visibleFields={visibleFields}
-            onVisibleFieldsChange={onVisibleFieldsChange}
-            onClose={onClose}
-            openColumnVisibility={openColumnVisibility}
-            filterHistoryApi={filterHistoryApi}
-            userId={userId}
-          />
-        </div>
+        <DataFilterPanel
+          filters={filters}
+          setFilters={setFilters}
+          sortConfig={sortConfig}
+          setSortConfig={setSortConfig}
+          selectedTable={selectedTable}
+          tables={tables}
+          visibleFields={visibleFields}
+          onVisibleFieldsChange={onVisibleFieldsChange}
+          onClose={onClose}
+          openColumnVisibility={openColumnVisibility}
+          filterHistoryApi={filterHistoryApi}
+          userId={userId}
+        />
       </div>
-
-      {/* Animations */}
-      <style>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-
-        @keyframes slideInRight {
-          from {
-            transform: translateX(100%);
-          }
-          to {
-            transform: translateX(0);
-          }
-        }
-      `}</style>
-    </>
+    </Sheet>
   );
-
-  return createPortal(sheetContent, portalTarget);
 };
-

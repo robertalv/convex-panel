@@ -1,0 +1,35 @@
+name = "convex-panel-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# If you have a custom domain, uncomment and configure:
+# routes = [
+#   { pattern = "api.convexpanel.dev/*", zone_name = "convexpanel.dev" }
+# ]
+
+# KV Namespaces (replace IDs with your actual namespace IDs from Step 3)
+[[kv_namespaces]]
+binding = "SUBSCRIPTIONS"
+id = "YOUR_SUBSCRIPTIONS_NAMESPACE_ID"
+preview_id = "YOUR_SUBSCRIPTIONS_PREVIEW_ID"  # Optional, for dev
+
+[[kv_namespaces]]
+binding = "RATE_LIMITS"
+id = "YOUR_RATE_LIMITS_NAMESPACE_ID"
+preview_id = "YOUR_RATE_LIMITS_PREVIEW_ID"  # Optional, for dev
+
+# Durable Objects
+[[durable_objects.bindings]]
+name = "REPO_BROADCASTER"
+class_name = "RepoEventBroadcaster"
+script_name = "convex-panel-api"
+
+# Migration for Durable Objects (required on first deploy)
+[[migrations]]
+tag = "v1"
+new_classes = ["RepoEventBroadcaster"]
+
+# Environment variables (secrets are set separately via wrangler secret put)
+[vars]
+# No public vars needed - all sensitive data goes in secrets

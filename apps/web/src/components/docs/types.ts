@@ -1,6 +1,6 @@
 import type React from "react";
 
-export type Framework = "react" | "next" | "vue" | "svelte" | "tanstack-start";
+export type Framework = "react" | "next" | "tanstack-start" | "tanstack-router";
 
 export type DocSectionId =
   | "quick-start"

@@ -1611,6 +1611,7 @@ export const FunctionsView: React.FC<FunctionsViewProps> = ({
                       setIsDetailOpen(false);
                     }}
                     container={containerRef.current}
+                    adminClient={adminClient}
                   />
                 </div>
               )}

@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
-import { useThemeSafe } from '../../hooks/useTheme';
-import { useSheetSafe } from '../../contexts/sheet-context';
-import { usePortalTarget } from '../../contexts/portal-context';
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
+import { X } from "lucide-react";
+import { useThemeSafe } from "../../hooks/useTheme";
+import { useSheetActionsSafe } from "../../contexts/sheet-context";
+import { usePortalTarget } from "../../contexts/portal-context";
 
 export interface ViewingAction {
   title?: string;
@@ -20,7 +20,7 @@ export interface ContextMenuItemDescriptor {
   submenu?: ContextMenuEntry[];
 }
 
-export type ContextMenuEntry = ContextMenuItemDescriptor | { type: 'divider' };
+export type ContextMenuEntry = ContextMenuItemDescriptor | { type: "divider" };
 
 export interface ContextMenuProps {
   items: ContextMenuEntry[];
@@ -36,29 +36,35 @@ function parseShortcut(shortcut: string): {
   shift: boolean;
   alt: boolean;
 } {
-  const parts = shortcut.toLowerCase().split('+');
+  const parts = shortcut.toLowerCase().split("+");
   return {
     key: parts[parts.length - 1],
-    meta: parts.includes('meta') || parts.includes('cmd'),
-    ctrl: parts.includes('ctrl'),
-    shift: parts.includes('shift'),
-    alt: parts.includes('alt'),
+    meta: parts.includes("meta") || parts.includes("cmd"),
+    ctrl: parts.includes("ctrl"),
+    shift: parts.includes("shift"),
+    alt: parts.includes("alt"),
   };
 }
 
 // Check if keyboard event matches shortcut
 function matchesShortcut(
   event: KeyboardEvent,
-  shortcut: { key: string; meta: boolean; ctrl: boolean; shift: boolean; alt: boolean }
+  shortcut: {
+    key: string;
+    meta: boolean;
+    ctrl: boolean;
+    shift: boolean;
+    alt: boolean;
+  },
 ): boolean {
-  const isMac = navigator.platform.includes('Mac');
+  const isMac = navigator.platform.includes("Mac");
   const key = event.key.toLowerCase();
 
   // Map special keys
   const keyMap: Record<string, string> = {
-    'enter': 'return',
-    ' ': 'space',
-    'escape': 'esc',
+    enter: "return",
+    " ": "space",
+    escape: "esc",
   };
 
   const normalizedKey = keyMap[key] || key;
@@ -67,7 +73,11 @@ function matchesShortcut(
   if (normalizedKey !== normalizedShortcutKey) return false;
 
   // Check modifiers
-  const metaMatch = shortcut.meta ? (isMac ? event.metaKey : event.ctrlKey) : !event.metaKey && !event.ctrlKey;
+  const metaMatch = shortcut.meta
+    ? isMac
+      ? event.metaKey
+      : event.ctrlKey
+    : !event.metaKey && !event.ctrlKey;
   const ctrlMatch = shortcut.ctrl ? event.ctrlKey : !event.ctrlKey;
   const shiftMatch = shortcut.shift === event.shiftKey;
   const altMatch = shortcut.alt === event.altKey;
@@ -80,19 +90,22 @@ function matchesShortcut(
   return metaMatch && ctrlMatch && shiftMatch && altMatch;
 }
 
-const ViewingContentWrapper: React.FC<{ title?: string; children: React.ReactNode }> = ({ title, children }) => {
-  const { closeSheet } = useSheetSafe();
+const ViewingContentWrapper: React.FC<{
+  title?: string;
+  children: React.ReactNode;
+}> = ({ title, children }) => {
+  const { closeSheet } = useSheetActionsSafe();
 
   // Parse title to separate "Viewing" from field name
   const parseTitle = (title?: string) => {
     if (!title) return { prefix: null, fieldName: null };
-    
+
     // Check if title starts with "Viewing " (case-insensitive)
     const viewingMatch = title.match(/^Viewing\s+(.+)$/i);
     if (viewingMatch) {
-      return { prefix: 'Viewing', fieldName: viewingMatch[1] };
+      return { prefix: "Viewing", fieldName: viewingMatch[1] };
     }
-    
+
     // If no "Viewing" prefix, treat entire title as field name
     return { prefix: null, fieldName: title };
   };
@@ -102,46 +115,46 @@ const ViewingContentWrapper: React.FC<{ title?: string; children: React.ReactNod
   return (
     <div
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        backgroundColor: 'var(--color-panel-bg-secondary)',
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        backgroundColor: "var(--color-panel-bg-secondary)",
       }}
     >
       {/* Header */}
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0px 12px',
-          borderBottom: '1px solid var(--color-panel-border)',
-          backgroundColor: 'var(--color-panel-bg-secondary)',
-          height: '40px',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0px 12px",
+          borderBottom: "1px solid var(--color-panel-border)",
+          backgroundColor: "var(--color-panel-bg-secondary)",
+          height: "40px",
           flexShrink: 0,
         }}
       >
         <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '14px',
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            fontSize: "14px",
             fontWeight: 500,
-            color: 'var(--color-panel-text)',
+            color: "var(--color-panel-text)",
           }}
         >
           {prefix && <span>{prefix}</span>}
           {fieldName && (
             <span
               style={{
-                fontSize: '12px',
+                fontSize: "12px",
                 fontWeight: 500,
-                fontFamily: 'monospace',
-                border: '1px solid var(--color-panel-border)',
-                borderRadius: '6px',
-                padding: '4px',
-                color: 'var(--color-panel-text)',
+                fontFamily: "monospace",
+                border: "1px solid var(--color-panel-border)",
+                borderRadius: "6px",
+                padding: "4px",
+                color: "var(--color-panel-text)",
               }}
             >
               {fieldName}
@@ -155,24 +168,25 @@ const ViewingContentWrapper: React.FC<{ title?: string; children: React.ReactNod
             type="button"
             onClick={closeSheet}
             style={{
-              padding: '6px',
-              color: 'var(--color-panel-text-secondary)',
-              backgroundColor: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '4px',
-              transition: 'all 0.2s',
+              padding: "6px",
+              color: "var(--color-panel-text-secondary)",
+              backgroundColor: "transparent",
+              border: "none",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "4px",
+              transition: "all 0.2s",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = 'var(--color-panel-text)';
-              e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+              e.currentTarget.style.color = "var(--color-panel-text)";
+              e.currentTarget.style.backgroundColor =
+                "var(--color-panel-border)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
-              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = "var(--color-panel-text-secondary)";
+              e.currentTarget.style.backgroundColor = "transparent";
             }}
           >
             <X size={18} />
@@ -184,7 +198,7 @@ const ViewingContentWrapper: React.FC<{ title?: string; children: React.ReactNod
       <div
         style={{
           flex: 1,
-          overflow: 'auto',
+          overflow: "auto",
         }}
       >
         {children}
@@ -202,16 +216,20 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   const submenuRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const { theme } = useThemeSafe();
-  const { openSheet } = useSheetSafe();
+  const { openSheet } = useSheetActionsSafe();
   const portalTarget = usePortalTarget();
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [hoveredItemIndex, setHoveredItemIndex] = useState<number | null>(null);
-  const [submenuPosition, setSubmenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [submenuPosition, setSubmenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const closeSubmenuTimeoutRef = useRef<number | null>(null);
 
   // Get only actionable items (no dividers)
   const actionableItems = items.filter(
-    (item): item is ContextMenuItemDescriptor => !('type' in item && (item as { type: string }).type === 'divider')
+    (item): item is ContextMenuItemDescriptor =>
+      !("type" in item && (item as { type: string }).type === "divider"),
   );
 
   // Execute selected item
@@ -245,40 +263,47 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       if (!menuRef.current) return;
       const target = event.target as Node;
       // Only close if the click is truly outside both menus
-      if (!menuRef.current.contains(target) &&
-        !(submenuRef.current && submenuRef.current.contains(target))) {
+      if (
+        !menuRef.current.contains(target) &&
+        !(submenuRef.current && submenuRef.current.contains(target))
+      ) {
         onClose();
       }
     };
     const handleContextMenu = (event: MouseEvent) => {
       if (!menuRef.current) return;
       const target = event.target as Node;
-      if (!menuRef.current.contains(target) &&
-        !(submenuRef.current && submenuRef.current.contains(target))) {
+      if (
+        !menuRef.current.contains(target) &&
+        !(submenuRef.current && submenuRef.current.contains(target))
+      ) {
         onClose();
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         event.preventDefault();
         onClose();
         return;
       }
 
       // Arrow key navigation
-      if (event.key === 'ArrowDown') {
+      if (event.key === "ArrowDown") {
         event.preventDefault();
         setSelectedIndex((prev) => (prev + 1) % actionableItems.length);
         return;
       }
-      if (event.key === 'ArrowUp') {
+      if (event.key === "ArrowUp") {
         event.preventDefault();
-        setSelectedIndex((prev) => (prev - 1 + actionableItems.length) % actionableItems.length);
+        setSelectedIndex(
+          (prev) =>
+            (prev - 1 + actionableItems.length) % actionableItems.length,
+        );
         return;
       }
 
       // Enter or Space to activate
-      if (event.key === 'Enter' || event.key === ' ') {
+      if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         executeSelected();
         return;
@@ -343,13 +368,13 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       }
     };
 
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('contextmenu', handleContextMenu);
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('contextmenu', handleContextMenu);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("keydown", handleKeyDown);
       // Clear timeout on unmount
       if (closeSubmenuTimeoutRef.current) {
         clearTimeout(closeSubmenuTimeoutRef.current);
@@ -364,35 +389,35 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       ref={menuRef}
       className={`global-context-menu cp-theme-${theme}`}
       style={{
-        position: 'fixed',
+        position: "fixed",
         top: position.y,
         left: position.x,
         minWidth: 220,
-        backgroundColor: 'var(--color-panel-bg-secondary)',
-        border: '1px solid var(--color-panel-border)',
+        backgroundColor: "var(--color-panel-bg-secondary)",
+        border: "1px solid var(--color-panel-border)",
         borderRadius: 12,
-        boxShadow: '0 20px 35px var(--color-panel-shadow)',
-        padding: '6px 0',
+        boxShadow: "0 20px 35px var(--color-panel-shadow)",
+        padding: "6px 0",
         zIndex: 100000,
-        pointerEvents: 'auto',
+        pointerEvents: "auto",
       }}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
       {items.map((item, index) => {
-        if ('type' in item && item.type === 'divider') {
+        if ("type" in item && item.type === "divider") {
           return (
             <div
               key={`divider-${index}`}
               style={{
-                borderTop: '1px solid var(--color-panel-border)',
-                margin: '6px 0',
+                borderTop: "1px solid var(--color-panel-border)",
+                margin: "6px 0",
               }}
             />
           );
         }
         const action = item as ContextMenuItemDescriptor;
-        const actionableIndex = actionableItems.findIndex(a => a === action);
+        const actionableIndex = actionableItems.findIndex((a) => a === action);
         const isSelected = actionableIndex === selectedIndex;
 
         const hasSubmenu = Boolean(action.submenu && action.submenu.length > 0);
@@ -401,7 +426,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         return (
           <div
             key={action.label}
-            style={{ position: 'relative' }}
+            style={{ position: "relative" }}
             onMouseEnter={() => {
               setSelectedIndex(actionableIndex);
               // Clear any pending close timeout
@@ -426,7 +451,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             onMouseLeave={(e) => {
               // Check if mouse is moving to submenu
               const relatedTarget = e.relatedTarget as HTMLElement;
-              if (relatedTarget && submenuRef.current?.contains(relatedTarget)) {
+              if (
+                relatedTarget &&
+                submenuRef.current?.contains(relatedTarget)
+              ) {
                 return; // Don't close if moving to submenu
               }
               // Add a small delay before closing to allow mouse to move to submenu
@@ -474,32 +502,46 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 e.stopPropagation();
               }}
               style={{
-                width: '100%',
-                padding: '6px 14px',
+                width: "100%",
+                padding: "6px 14px",
                 backgroundColor: isSelected
-                  ? (action.destructive
-                    ? 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)'
-                    : 'var(--color-panel-hover)')
-                  : 'transparent',
-                border: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                fontSize: '12px',
-                color: action.destructive ? 'var(--color-panel-error)' : 'var(--color-panel-text)',
-                cursor: 'pointer',
-                transition: 'background 0.15s,color 0.15s',
+                  ? action.destructive
+                    ? "color-mix(in srgb, var(--color-panel-error) 10%, transparent)"
+                    : "var(--color-panel-hover)"
+                  : "transparent",
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontSize: "12px",
+                color: action.destructive
+                  ? "var(--color-panel-error)"
+                  : "var(--color-panel-text)",
+                cursor: "pointer",
+                transition: "background 0.15s,color 0.15s",
               }}
             >
               <span>{action.label}</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "8px" }}
+              >
                 {action.shortcut && (
-                  <span style={{ color: 'var(--color-panel-text-muted)', fontSize: '11px' }}>
+                  <span
+                    style={{
+                      color: "var(--color-panel-text-muted)",
+                      fontSize: "11px",
+                    }}
+                  >
                     {action.shortcut}
                   </span>
                 )}
                 {hasSubmenu && (
-                  <span style={{ color: 'var(--color-panel-text-muted)', fontSize: '10px' }}>
+                  <span
+                    style={{
+                      color: "var(--color-panel-text-muted)",
+                      fontSize: "10px",
+                    }}
+                  >
                     ▶
                   </span>
                 )}
@@ -510,21 +552,21 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               <div
                 ref={submenuRef}
                 style={{
-                  position: 'fixed',
+                  position: "fixed",
                   top: submenuPosition.top,
                   left: submenuPosition.left,
                   minWidth: 220,
-                  backgroundColor: 'var(--color-panel-bg-secondary)',
-                  border: '1px solid var(--color-panel-border)',
+                  backgroundColor: "var(--color-panel-bg-secondary)",
+                  border: "1px solid var(--color-panel-border)",
                   borderRadius: 12,
-                  boxShadow: '0 20px 35px var(--color-panel-shadow)',
-                  padding: '6px 0',
+                  boxShadow: "0 20px 35px var(--color-panel-shadow)",
+                  padding: "6px 0",
                   zIndex: 100001,
-                  maxHeight: '400px',
-                  overflowY: 'auto',
+                  maxHeight: "400px",
+                  overflowY: "auto",
                   // Overlap with parent menu to bridge gap
-                  marginLeft: '0px',
-                  pointerEvents: 'auto',
+                  marginLeft: "0px",
+                  pointerEvents: "auto",
                 }}
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
@@ -543,13 +585,13 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 }}
               >
                 {action.submenu.map((subItem, subIndex) => {
-                  if ('type' in subItem && subItem.type === 'divider') {
+                  if ("type" in subItem && subItem.type === "divider") {
                     return (
                       <div
                         key={`sub-divider-${subIndex}`}
                         style={{
-                          borderTop: '1px solid var(--color-panel-border)',
-                          margin: '6px 0',
+                          borderTop: "1px solid var(--color-panel-border)",
+                          margin: "6px 0",
                         }}
                       />
                     );
@@ -569,31 +611,41 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                         e.stopPropagation();
                       }}
                       style={{
-                        width: '100%',
-                        padding: '6px 14px',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        fontSize: '12px',
-                        color: subAction.destructive ? 'var(--color-panel-error)' : 'var(--color-panel-text)',
-                        cursor: 'pointer',
-                        transition: 'background 0.15s,color 0.15s',
+                        width: "100%",
+                        padding: "6px 14px",
+                        backgroundColor: "transparent",
+                        border: "none",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        fontSize: "12px",
+                        color: subAction.destructive
+                          ? "var(--color-panel-error)"
+                          : "var(--color-panel-text)",
+                        cursor: "pointer",
+                        transition: "background 0.15s,color 0.15s",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = subAction.destructive
-                          ? 'color-mix(in srgb, var(--color-panel-error) 10%, transparent)'
-                          : 'var(--color-panel-hover)';
+                        e.currentTarget.style.backgroundColor =
+                          subAction.destructive
+                            ? "color-mix(in srgb, var(--color-panel-error) 10%, transparent)"
+                            : "var(--color-panel-hover)";
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                        e.currentTarget.style.color = subAction.destructive ? 'var(--color-panel-error)' : 'var(--color-panel-text)';
+                        e.currentTarget.style.backgroundColor = "transparent";
+                        e.currentTarget.style.color = subAction.destructive
+                          ? "var(--color-panel-error)"
+                          : "var(--color-panel-text)";
                       }}
                     >
                       <span>{subAction.label}</span>
                       {subAction.shortcut && (
-                        <span style={{ color: 'var(--color-panel-text-muted)', fontSize: '11px' }}>
+                        <span
+                          style={{
+                            color: "var(--color-panel-text-muted)",
+                            fontSize: "11px",
+                          }}
+                        >
                           {subAction.shortcut}
                         </span>
                       )}
@@ -606,7 +658,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         );
       })}
     </div>,
-    portalTarget
+    portalTarget,
   );
 };
-

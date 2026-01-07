@@ -274,7 +274,6 @@ export function ObjectEditor(props: ObjectEditorProps) {
         width: '100%',
         maxWidth: '100%',
         borderRadius: '4px',
-        border: '1px solid var(--color-panel-border)',
         ...(numLines > 2 && multilineClasses ? {} : {}),
       }}
       onScroll={(e) => e.stopPropagation()}

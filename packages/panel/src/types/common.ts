@@ -3,14 +3,14 @@
  */
 
 type EditorOptions = {
-  lineNumbers?: 'on' | 'off';
+  lineNumbers?: "on" | "off";
   minimap?: { enabled?: boolean };
   scrollbar?: {
     alwaysConsumeMouseWheel?: boolean;
     horizontalScrollbarSize?: number;
     verticalScrollbarSize?: number;
     useShadows?: boolean;
-    vertical?: 'visible' | 'auto' | 'hidden';
+    vertical?: "visible" | "auto" | "hidden";
   };
   [key: string]: any;
 };
@@ -32,22 +32,27 @@ export interface ThemeClasses {
   warningText?: string;
 }
 
-export type ButtonPosition = 'bottom-left' | 'bottom-center' | 'bottom-right' | 'right-center' | 'top-right';
+export type ButtonPosition =
+  | "bottom-left"
+  | "bottom-center"
+  | "bottom-right"
+  | "right-center"
+  | "top-right";
 
-export type SortDirection = 'asc' | 'desc';
+export type SortDirection = "asc" | "desc";
 
 export interface SortConfig {
   field: string;
   direction: SortDirection;
 }
 
-export type EnvType = 'development' | 'preview' | 'production';
-export type DeploymentKind = 'cloud' | 'local' | 'self-hosted';
+export type EnvType = "development" | "preview" | "production";
+export type DeploymentKind = "cloud" | "local" | "self-hosted";
 
 export interface ConvexPanelSettings {
   showDebugFilters: boolean;
   showStorageDebug: boolean;
-  logLevel: 'debug' | 'info' | 'warn' | 'error';
+  logLevel: "debug" | "info" | "warn" | "error";
   healthCheckInterval: number;
   showRequestIdInput: boolean;
   showLimitInput: boolean;
@@ -104,3 +109,11 @@ export const editorOptions: EditorOptions & DiffEditorOptions = {
 
 export type MultiSelectValue = string[] | "all";
 
+/**
+ * Custom fetch function type for environments that need to override native fetch
+ * (e.g., Tauri desktop apps that need CORS-free HTTP requests)
+ */
+export type FetchFn = (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) => Promise<Response>;

@@ -177,16 +177,17 @@ function getSessionFilterHistoryStatus(scope: string): {
 
 /**
  * Get current filter state at head position
+ * TODO: Implement this after the convex-component is updated to support it
  */
-function getCurrentSessionFilterState(scope: string): { filters: FilterExpression; sortConfig: SortConfig | null } | null {
-  const history = initOrGetHistory(scope);
+// function getCurrentSessionFilterState(scope: string): { filters: FilterExpression; sortConfig: SortConfig | null } | null {
+//   const history = initOrGetHistory(scope);
   
-  if (history.states.length === 0 || history.head < 0) {
-    return null;
-  }
+//   if (history.states.length === 0 || history.head < 0) {
+//     return null;
+//   }
   
-  return history.states[history.head];
-}
+//   return history.states[history.head];
+// }
 
 /**
  * Filter history API interface matching the one used by DataFilterPanel
@@ -196,7 +197,7 @@ export interface FilterHistoryApi {
   undo: (scope: string, count?: number) => Promise<{ filters: FilterExpression; sortConfig: SortConfig | null } | null>;
   redo: (scope: string, count?: number) => Promise<{ filters: FilterExpression; sortConfig: SortConfig | null } | null>;
   getStatus: (scope: string) => Promise<{ canUndo: boolean; canRedo: boolean; position: number | null; length: number }>;
-  getCurrentState: (scope: string) => Promise<{ filters: FilterExpression; sortConfig: SortConfig | null } | null>;
+  // getCurrentState: (scope: string) => Promise<{ filters: FilterExpression; sortConfig: SortConfig | null } | null>;
 }
 
 /**
@@ -217,8 +218,8 @@ export function createSessionStorageFilterHistoryApi(): FilterHistoryApi {
     getStatus: async (scope: string) => {
       return getSessionFilterHistoryStatus(scope);
     },
-    getCurrentState: async (scope: string) => {
-      return getCurrentSessionFilterState(scope);
-    },
+    // getCurrentState: async (scope: string) => {
+    //   return getCurrentSessionFilterState(scope);
+    // },
   };
 }

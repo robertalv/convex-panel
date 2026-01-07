@@ -1,8 +1,8 @@
-import React from 'react';
-import { Settings as SettingsIcon } from 'lucide-react';
-import type { TableDefinition } from '../../../../types';
-import { useSheetSafe } from '../../../../contexts/sheet-context';
-import { SchemaSheet } from '../schema-sheet';
+import React from "react";
+import { Settings as SettingsIcon } from "lucide-react";
+import type { TableDefinition } from "../../../../types";
+import { useSheetActionsSafe } from "../../../../contexts/sheet-context";
+import { SchemaSheet } from "../schema-sheet";
 
 export interface TableFooterProps {
   tableName: string;
@@ -12,14 +12,14 @@ export interface TableFooterProps {
   componentId?: string | null;
 }
 
-export const TableFooter: React.FC<TableFooterProps> = ({ 
-  tableName, 
-  tableSchema, 
+export const TableFooter: React.FC<TableFooterProps> = ({
+  tableName,
+  tableSchema,
   documents,
   adminClient,
   componentId,
 }) => {
-  const { openSheet } = useSheetSafe();
+  const { openSheet } = useSheetActionsSafe();
 
   const handleOpenSchema = () => {
     openSheet({
@@ -32,19 +32,19 @@ export const TableFooter: React.FC<TableFooterProps> = ({
           componentId={componentId}
         />
       ),
-      width: '600px',
+      width: "600px",
     });
   };
 
   return (
     <div
       style={{
-        height: '40px',
-        borderTop: '1px solid var(--color-panel-border)',
-        backgroundColor: 'var(--color-panel-bg)',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 8px',
+        height: "45px",
+        borderTop: "1px solid var(--color-panel-border)",
+        backgroundColor: "var(--color-panel-bg)",
+        display: "flex",
+        alignItems: "center",
+        padding: "0 8px",
         flexShrink: 0,
       }}
     >
@@ -52,24 +52,24 @@ export const TableFooter: React.FC<TableFooterProps> = ({
         type="button"
         onClick={handleOpenSchema}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          color: 'var(--color-panel-text-muted)',
-          fontSize: '12px',
-          border: '1px solid var(--color-panel-border)',
-          borderRadius: '8px',
-          padding: '6px 12px',
-          backgroundColor: 'transparent',
-          cursor: 'pointer',
+          display: "flex",
+          alignItems: "center",
+          gap: "4px",
+          color: "var(--color-panel-text-muted)",
+          fontSize: "11px",
+          borderRadius: "8px",
+          padding: "6px 10px",
+          backgroundColor: "transparent",
+          cursor: "pointer",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.color = 'var(--color-panel-text)';
-          e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+          e.currentTarget.style.color = "var(--color-panel-text)";
+          e.currentTarget.style.backgroundColor =
+            "var(--color-panel-bg-tertiary)";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.color = 'var(--color-panel-text-muted)';
-          e.currentTarget.style.backgroundColor = 'transparent';
+          e.currentTarget.style.color = "var(--color-panel-text-muted)";
+          e.currentTarget.style.backgroundColor = "transparent";
         }}
       >
         <SettingsIcon size={12} />
@@ -78,4 +78,3 @@ export const TableFooter: React.FC<TableFooterProps> = ({
     </div>
   );
 };
-

@@ -1,12 +1,18 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import type { ChartData, TimeRange } from '../types';
-import { generateColor, formatFunctionName } from '../../../utils';
-import { transformFunctionToSVGPath } from '../utils';
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+} from "react";
+import type { ChartData, TimeRange } from "../types";
+import { generateColor, formatFunctionName } from "../../../utils";
+import { transformFunctionToSVGPath } from "../utils";
 
 interface FunctionRateChartProps {
   chartData: ChartData;
   timeRange: TimeRange;
-  kind: 'cacheHitRate' | 'failureRate';
+  kind: "cacheHitRate" | "failureRate";
 }
 
 export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
@@ -15,10 +21,16 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
   kind,
 }) => {
   const [hoverX, setHoverX] = useState<number | null>(null);
-  const [hoverValues, setHoverValues] = useState<Map<string, number>>(new Map());
+  const [hoverValues, setHoverValues] = useState<Map<string, number>>(
+    new Map(),
+  );
   const [hoverTime, setHoverTime] = useState<string | null>(null);
-  const [visibleFunctions, setVisibleFunctions] = useState<Set<string>>(new Set());
-  const [currentTime, setCurrentTime] = useState<number>(Math.floor(Date.now() / 1000));
+  const [visibleFunctions, setVisibleFunctions] = useState<Set<string>>(
+    new Set(),
+  );
+  const [currentTime, setCurrentTime] = useState<number>(
+    Math.floor(Date.now() / 1000),
+  );
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -65,7 +77,12 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!svgRef.current || !containerRef.current || chartData.timestamps.length === 0) return;
+      if (
+        !svgRef.current ||
+        !containerRef.current ||
+        chartData.timestamps.length === 0
+      )
+        return;
 
       const rect = containerRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -93,7 +110,11 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
       chartData.functionData.forEach((valueMap, functionName) => {
         if (visibleFunctions.has(functionName)) {
           const value = valueMap.get(closestTs);
-          if (value !== undefined && value !== null && typeof value === 'number') {
+          if (
+            value !== undefined &&
+            value !== null &&
+            typeof value === "number"
+          ) {
             values.set(functionName, value);
           }
         }
@@ -104,13 +125,16 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
         setHoverValues(values);
         // Format time range (e.g., "3:40 PM – 3:41 PM")
         const timeStr = new Date(closestTs * 1000).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
+          hour: "2-digit",
+          minute: "2-digit",
         });
-        const nextMinute = new Date((closestTs + 60) * 1000).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
+        const nextMinute = new Date((closestTs + 60) * 1000).toLocaleTimeString(
+          [],
+          {
+            hour: "2-digit",
+            minute: "2-digit",
+          },
+        );
         setHoverTime(`${timeStr} – ${nextMinute}`);
       } else {
         setHoverX(null);
@@ -118,7 +142,7 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
         setHoverTime(null);
       }
     },
-    [chartData, visibleFunctions]
+    [chartData, visibleFunctions],
   );
 
   const handleMouseLeave = useCallback(() => {
@@ -147,7 +171,7 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
         return next;
       });
     },
-    [chartData.functionData]
+    [chartData.functionData],
   );
 
   // Calculate current time X position using the real-time current time
@@ -161,7 +185,7 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
     const progress = (currentTime - minTs) / (maxTs - minTs);
     return progress * 300;
   }, [chartData.timestamps, currentTime]);
-  
+
   const functionNames = Array.from(chartData.functionData.keys());
 
   return (
@@ -169,32 +193,50 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
       <div
         ref={containerRef}
         style={{
-          height: '100px',
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap: '4px',
-          position: 'relative',
-          width: '100%',
-          cursor: 'crosshair',
+          height: "100px",
+          display: "flex",
+          alignItems: "flex-end",
+          gap: "4px",
+          position: "relative",
+          width: "100%",
+          cursor: "crosshair",
         }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
         <svg
           ref={svgRef}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+          }}
           preserveAspectRatio="none"
           viewBox="0 0 300 100"
         >
           <defs>
             {/* Generate gradients for each function */}
             {functionNames.map((functionName) => {
-              const color = functionColors.get(functionName) || '#3B82F6';
-              const gradientId = `grad-${functionName.replace(/[^a-zA-Z0-9]/g, '-')}`;
+              const color = functionColors.get(functionName) || "#3B82F6";
+              const gradientId = `grad-${functionName.replace(/[^a-zA-Z0-9]/g, "-")}`;
               return (
-                <linearGradient key={gradientId} id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.2 }} />
-                  <stop offset="100%" style={{ stopColor: color, stopOpacity: 0 }} />
+                <linearGradient
+                  key={gradientId}
+                  id={gradientId}
+                  x1="0%"
+                  y1="0%"
+                  x2="0%"
+                  y2="100%"
+                >
+                  <stop
+                    offset="0%"
+                    style={{ stopColor: color, stopOpacity: 0.2 }}
+                  />
+                  <stop
+                    offset="100%"
+                    style={{ stopColor: color, stopOpacity: 0 }}
+                  />
                 </linearGradient>
               );
             })}
@@ -202,8 +244,8 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
           {/* Render all function lines */}
           {functionNames.map((functionName) => {
             const path = functionPaths.get(functionName);
-            const color = functionColors.get(functionName) || '#3B82F6';
-            const gradientId = `grad-${functionName.replace(/[^a-zA-Z0-9]/g, '-')}`;
+            const color = functionColors.get(functionName) || "#3B82F6";
+            const gradientId = `grad-${functionName.replace(/[^a-zA-Z0-9]/g, "-")}`;
             const isVisible = visibleFunctions.has(functionName);
 
             if (!path || !isVisible) return null;
@@ -230,9 +272,33 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
             );
           })}
           {/* Grid lines */}
-          <line x1="0" y1="25" x2="300" y2="25" stroke="var(--color-panel-border)" strokeDasharray="4" opacity="0.5" />
-          <line x1="0" y1="50" x2="300" y2="50" stroke="var(--color-panel-border)" strokeDasharray="4" opacity="0.5" />
-          <line x1="0" y1="75" x2="300" y2="75" stroke="var(--color-panel-border)" strokeDasharray="4" opacity="0.5" />
+          <line
+            x1="0"
+            y1="25"
+            x2="300"
+            y2="25"
+            stroke="var(--color-panel-border)"
+            strokeDasharray="4"
+            opacity="0.5"
+          />
+          <line
+            x1="0"
+            y1="50"
+            x2="300"
+            y2="50"
+            stroke="var(--color-panel-border)"
+            strokeDasharray="4"
+            opacity="0.5"
+          />
+          <line
+            x1="0"
+            y1="75"
+            x2="300"
+            y2="75"
+            stroke="var(--color-panel-border)"
+            strokeDasharray="4"
+            opacity="0.5"
+          />
           {/* Current time line (yellow, right edge) */}
           {chartData.timestamps.length > 0 && (
             <line
@@ -265,85 +331,92 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
             (() => {
               const padding = 5;
               const usableHeight = 90;
-              return Array.from(hoverValues.entries()).map(([functionName, value]) => {
-                const color = functionColors.get(functionName) || '#3B82F6';
-                const percentage = Math.max(0, Math.min(100, value));
-                const y = 100 - padding - (percentage / 100) * usableHeight;
-                return (
-                  <circle
-                    key={functionName}
-                    cx={hoverX}
-                    cy={y}
-                    r="4"
-                    fill={color}
-                    stroke="var(--color-panel-bg)"
-                    strokeWidth="2"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                );
-              });
+              return Array.from(hoverValues.entries()).map(
+                ([functionName, value]) => {
+                  const color = functionColors.get(functionName) || "#3B82F6";
+                  const percentage = Math.max(0, Math.min(100, value));
+                  const y = 100 - padding - (percentage / 100) * usableHeight;
+                  return (
+                    <circle
+                      key={functionName}
+                      cx={hoverX}
+                      cy={y}
+                      r="4"
+                      fill={color}
+                      stroke="var(--color-panel-bg)"
+                      strokeWidth="2"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  );
+                },
+              );
             })()}
         </svg>
         {/* Tooltip with all function values */}
         {hoverX !== null && hoverValues.size > 0 && hoverTime !== null && (
           <div
             style={{
-              position: 'absolute',
-              left: `${(hoverX / 300) * 100}%`,
-              top: '8px',
-              transform: 'translateX(-50%)',
-              backgroundColor: 'var(--color-panel-bg-tertiary)',
-              border: '1px solid var(--color-panel-border)',
-              color: 'var(--color-panel-text)',
-              padding: '8px 12px',
-              borderRadius: '4px',
-              fontSize: '11px',
-              pointerEvents: 'none',
+              position: "absolute",
+              left: hoverX < 150 ? `${(hoverX / 300) * 100}%` : "auto",
+              right:
+                hoverX >= 150 ? `${((300 - hoverX) / 300) * 100}%` : "auto",
+              top: "8px",
+              transform: hoverX < 150 ? "translateX(-10%)" : "translateX(10%)",
+              backgroundColor: "var(--color-panel-bg-tertiary)",
+              border: "1px solid var(--color-panel-border)",
+              color: "var(--color-panel-text)",
+              padding: "6px 10px",
+              borderRadius: "4px",
+              fontSize: "10px",
+              pointerEvents: "none",
               zIndex: 10,
-              minWidth: '200px',
-              boxShadow: '0 2px 8px var(--color-panel-shadow)',
+              minWidth: "150px",
+              maxWidth: "min(250px, 80vw)",
+              boxShadow: "0 2px 8px var(--color-panel-shadow)",
             }}
           >
-            <div style={{ marginBottom: '6px', fontWeight: 500 }}>{hoverTime}</div>
+            <div style={{ marginBottom: "6px", fontWeight: 500 }}>
+              {hoverTime}
+            </div>
             {Array.from(hoverValues.entries()).map(([functionName, value]) => {
-              const color = functionColors.get(functionName) || '#3B82F6';
+              const color = functionColors.get(functionName) || "#3B82F6";
               const displayName =
-                functionName === '_rest'
-                  ? `All${functionNames.length > 1 ? ' other' : ''} ${kind === 'cacheHitRate' ? 'queries' : 'functions'}`
+                functionName === "_rest"
+                  ? `All${functionNames.length > 1 ? " other" : ""} ${kind === "cacheHitRate" ? "queries" : "functions"}`
                   : formatFunctionName(functionName);
               return (
                 <div
                   key={functionName}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '12px',
-                    marginBottom: '4px',
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    marginBottom: "4px",
                   }}
                 >
                   <div
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
                       flex: 1,
                       minWidth: 0,
                     }}
                   >
                     <div
                       style={{
-                        width: '8px',
-                        height: '2px',
+                        width: "8px",
+                        height: "2px",
                         backgroundColor: color,
                         flexShrink: 0,
                       }}
                     ></div>
                     <span
                       style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
                       }}
                     >
                       {displayName}
@@ -362,21 +435,21 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
       {functionNames.length > 0 && (
         <div
           style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '8px',
-            marginTop: '8px',
-            padding: '0 4px',
-            justifyContent: 'center',
-            fontSize: '11px',
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "6px",
+            marginTop: "6px",
+            padding: "0 2px",
+            justifyContent: "center",
+            fontSize: "10px",
           }}
         >
           {functionNames.map((functionName) => {
-            const color = functionColors.get(functionName) || '#3B82F6';
+            const color = functionColors.get(functionName) || "#3B82F6";
             const isVisible = visibleFunctions.has(functionName);
             const displayName =
-              functionName === '_rest'
-                ? `All${functionNames.length > 1 ? ' other' : ''} ${kind === 'cacheHitRate' ? 'queries' : 'functions'}`
+              functionName === "_rest"
+                ? `All${functionNames.length > 1 ? " other" : ""} ${kind === "cacheHitRate" ? "queries" : "functions"}`
                 : formatFunctionName(functionName);
 
             return (
@@ -384,43 +457,45 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
                 key={functionName}
                 onClick={() => toggleFunction(functionName)}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  background: 'none',
-                  border: 'none',
-                  color: isVisible ? 'var(--color-panel-text)' : 'var(--color-panel-text-muted)',
-                  cursor: 'pointer',
-                  padding: '2px 4px',
-                  fontSize: '11px',
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "3px",
+                  background: "none",
+                  border: "none",
+                  color: isVisible
+                    ? "var(--color-panel-text)"
+                    : "var(--color-panel-text-muted)",
+                  cursor: "pointer",
+                  padding: "2px 3px",
+                  fontSize: "10px",
                   opacity: isVisible ? 1 : 0.5,
-                  transition: 'opacity 0.2s',
+                  transition: "opacity 0.2s",
                 }}
                 onMouseEnter={(e) => {
                   if (!isVisible) {
-                    e.currentTarget.style.opacity = '0.7';
+                    e.currentTarget.style.opacity = "0.7";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isVisible) {
-                    e.currentTarget.style.opacity = '0.5';
+                    e.currentTarget.style.opacity = "0.5";
                   }
                 }}
               >
                 <div
                   style={{
-                    width: '10px',
-                    height: '2px',
+                    width: "8px",
+                    height: "2px",
                     backgroundColor: color,
                     flexShrink: 0,
                   }}
                 ></div>
                 <span
                   style={{
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    maxWidth: '200px',
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    maxWidth: "120px",
                   }}
                 >
                   {displayName}
@@ -432,12 +507,12 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
       )}
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontSize: '10px',
-          color: 'var(--color-panel-text-muted)',
-          marginTop: '6px',
-          width: '100%',
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: "10px",
+          color: "var(--color-panel-text-muted)",
+          marginTop: "6px",
+          width: "100%",
         }}
       >
         <span>{timeRange.start}</span>
@@ -446,4 +521,3 @@ export const FunctionRateChart: React.FC<FunctionRateChartProps> = ({
     </>
   );
 };
-

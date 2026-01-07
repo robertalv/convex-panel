@@ -1,12 +1,5 @@
 /// <reference types="vite/client" />
 
-// Vue component type declarations
-declare module '*.vue' {
-  import type { DefineComponent } from 'vue';
-  const component: DefineComponent<{}, {}, any>;
-  export default component;
-}
-
 // Image file type declarations for Vite
 declare module '*.webp' {
   const src: string;

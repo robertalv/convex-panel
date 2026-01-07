@@ -1,10 +1,16 @@
-import React from 'react';
-import { MoreVertical, Link2 } from 'lucide-react';
-import { Tooltip } from '../../../../components/shared/tooltip';
-import { DocumentPreview } from '../document-preview';
-import { InlineCellEditor } from './inline-cell-editor';
-import { formatValue, formatTimestamp, getValueColor, isConvexId, createDocumentLink } from './data-table-utils';
-import type { ColumnMeta } from './data-table-utils';
+import React from "react";
+import { MoreVertical, Link2 } from "lucide-react";
+import { Tooltip } from "../../../../components/shared/tooltip";
+import { DocumentPreview } from "../document-preview";
+import { InlineCellEditor } from "./inline-cell-editor";
+import {
+  formatValue,
+  formatTimestamp,
+  getValueColor,
+  isConvexId,
+  createDocumentLink,
+} from "./data-table-utils";
+import type { ColumnMeta } from "./data-table-utils";
 
 export interface TableCellProps {
   column: string;
@@ -70,37 +76,41 @@ export const TableCell: React.FC<TableCellProps> = ({
   projectSlug,
 }) => {
   const isUnset = value === null || value === undefined;
-  const showLink = columnMeta?.linkTable && column !== '_id' && typeof value === 'string' && isConvexId(value);
+  const showLink =
+    columnMeta?.linkTable &&
+    column !== "_id" &&
+    typeof value === "string" &&
+    isConvexId(value);
 
   return (
     <td
       style={{
         padding: 0,
-        borderRight: '1px solid var(--cp-data-row-border)',
+        borderRight: "1px solid var(--cp-data-row-border)",
         width,
         minWidth: width,
         maxWidth: width,
-        transition: 'background-color 0.35s ease, box-shadow 0.35s ease',
+        transition: "background-color 0.35s ease, box-shadow 0.35s ease",
         backgroundColor: isEditing
-          ? 'var(--color-panel-bg-secondary)'
+          ? "var(--color-panel-bg-secondary)"
           : isHighlighted
-            ? 'var(--cp-data-highlight-bg)'
+            ? "var(--cp-data-highlight-bg)"
             : isMenuOpen
-              ? 'var(--color-panel-active)'
+              ? "var(--color-panel-active)"
               : isHovered
-                ? 'var(--color-panel-hover)'
-                : 'transparent',
+                ? "var(--color-panel-hover)"
+                : "transparent",
         boxShadow: isHighlighted
-          ? '0 0 0 1px var(--cp-data-highlight-border)'
+          ? "0 0 0 1px var(--cp-data-highlight-border)"
           : isMenuOpen
-            ? '0 0 0 1px var(--color-panel-active)'
-            : 'none',
+            ? "0 0 0 1px var(--color-panel-active)"
+            : "none",
         animation: isHighlighted
-          ? 'var(--animate-highlight), var(--animate-highlightBorder)'
+          ? "var(--animate-highlight), var(--animate-highlightBorder)"
           : undefined,
-        position: 'relative',
-        overflow: 'hidden',
-        boxSizing: 'border-box',
+        position: "relative",
+        overflow: isEditing ? "visible" : "hidden",
+        boxSizing: "border-box",
       }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -130,22 +140,22 @@ export const TableCell: React.FC<TableCellProps> = ({
       ) : (
         <div
           style={{
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '6px 12px',
-            gap: '8px',
-            cursor: isEditable ? 'pointer' : 'default',
-            height: '100%',
-            boxSizing: 'border-box',
+            position: "relative",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "6px 12px",
+            gap: "8px",
+            cursor: isEditable ? "pointer" : "default",
+            height: "100%",
+            boxSizing: "border-box",
           }}
         >
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
               flex: 1,
               minWidth: 0,
             }}
@@ -155,7 +165,7 @@ export const TableCell: React.FC<TableCellProps> = ({
                 content={
                   <DocumentPreview
                     documentId={value}
-                    tableName={columnMeta?.linkTable || ''}
+                    tableName={columnMeta?.linkTable || ""}
                     adminClient={adminClient}
                     deploymentUrl={deploymentUrl}
                     componentId={componentId}
@@ -170,15 +180,15 @@ export const TableCell: React.FC<TableCellProps> = ({
               >
                 <div
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     flexShrink: 0,
-                    cursor: 'pointer',
-                    width: '18px',
-                    height: '18px',
-                    minWidth: '18px',
-                    minHeight: '18px',
+                    cursor: "pointer",
+                    width: "18px",
+                    height: "18px",
+                    minWidth: "18px",
+                    minHeight: "18px",
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -187,9 +197,17 @@ export const TableCell: React.FC<TableCellProps> = ({
                       if (onNavigateToTable) {
                         onNavigateToTable(referencedTable, value);
                       } else {
-                        const linkUrl = createDocumentLink(deploymentUrl, referencedTable, value, componentId || null, teamSlug, projectSlug, accessToken);
+                        const linkUrl = createDocumentLink(
+                          deploymentUrl,
+                          referencedTable,
+                          value,
+                          componentId || null,
+                          teamSlug,
+                          projectSlug,
+                          accessToken,
+                        );
                         if (linkUrl) {
-                          window.open(linkUrl, '_blank', 'noopener,noreferrer');
+                          window.open(linkUrl, "_blank", "noopener,noreferrer");
                         }
                       }
                     }
@@ -198,31 +216,30 @@ export const TableCell: React.FC<TableCellProps> = ({
                   <Link2
                     size={14}
                     style={{
-                      color: 'var(--color-panel-text-secondary)',
+                      color: "var(--color-panel-text-secondary)",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.color = 'var(--color-panel-accent)';
+                      e.currentTarget.style.color = "var(--color-panel-accent)";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.color = 'var(--color-panel-text-secondary)';
+                      e.currentTarget.style.color =
+                        "var(--color-panel-text-secondary)";
                     }}
                   />
                 </div>
               </Tooltip>
             )}
-            {column === '_creationTime' && typeof value === 'number' ? (
-              <Tooltip
-                content={value.toString()}
-                position="top"
-                maxWidth={300}
-              >
+            {column === "_creationTime" && typeof value === "number" ? (
+              <Tooltip content={value.toString()} position="top" maxWidth={300}>
                 <span
                   style={{
-                    color: isUnset ? 'var(--color-panel-text-muted)' : getValueColor(value),
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    fontStyle: isUnset ? 'italic' : 'normal',
+                    color: isUnset
+                      ? "var(--color-panel-text-muted)"
+                      : getValueColor(value),
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    fontStyle: isUnset ? "italic" : "normal",
                     flex: 1,
                     minWidth: 0,
                   }}
@@ -233,11 +250,13 @@ export const TableCell: React.FC<TableCellProps> = ({
             ) : (
               <span
                 style={{
-                  color: isUnset ? 'var(--color-panel-text-muted)' : getValueColor(value),
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  fontStyle: isUnset ? 'italic' : 'normal',
+                  color: isUnset
+                    ? "var(--color-panel-text-muted)"
+                    : getValueColor(value),
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  fontStyle: isUnset ? "italic" : "normal",
                   flex: 1,
                   minWidth: 0,
                 }}
@@ -255,16 +274,16 @@ export const TableCell: React.FC<TableCellProps> = ({
                 width: 20,
                 height: 20,
                 borderRadius: 6,
-                border: '1px solid var(--color-panel-border)',
-                backgroundColor: 'var(--color-panel-bg-tertiary)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--color-panel-text)',
-                cursor: 'pointer',
+                border: "1px solid var(--color-panel-border)",
+                backgroundColor: "var(--color-panel-bg-tertiary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--color-panel-text)",
+                cursor: "pointer",
               }}
             >
-              <MoreVertical 
+              <MoreVertical
                 size={12}
                 color="var(--color-panel-text-secondary)"
               />
@@ -275,4 +294,3 @@ export const TableCell: React.FC<TableCellProps> = ({
     </td>
   );
 };
-

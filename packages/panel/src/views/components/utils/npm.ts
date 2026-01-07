@@ -139,15 +139,6 @@ export async function fetchNpmPackageInfo(
 
     const data: NpmPackageRegistryData = await response.json();
 
-    // Single console log to see raw npm data structure
-    console.log(`[NPM Raw Data] Package: ${packageName}`, {
-      hasMaintainers: !!data.maintainers,
-      maintainersCount: data.maintainers?.length || 0,
-      hasPublisher: !!data.publisher,
-      hasVersions: !!data.versions,
-      latestVersion: data["dist-tags"]?.latest,
-      rawData: data,
-    });
 
     const latestVersion =
       data["dist-tags"]?.latest ?? data.version ?? undefined;

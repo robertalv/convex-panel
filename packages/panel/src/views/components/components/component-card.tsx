@@ -1,5 +1,4 @@
 import React from 'react';
-import { getDeveloperLogoUrl } from '../utils/developer-logos';
 
 export interface ComponentCardProps {
   title: string;
@@ -148,34 +147,12 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
             fontSize: '11px',
           }}>
             {developer && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
+              <span style={{
+                color: 'var(--color-panel-text-muted)',
+                fontWeight: 500,
               }}>
-                {getDeveloperLogoUrl(developer) && (
-                  <img
-                    src={getDeveloperLogoUrl(developer)}
-                    alt={developer}
-                    style={{
-                      width: '16px',
-                      height: '16px',
-                      borderRadius: '50%',
-                      objectFit: 'contain',
-                      flexShrink: 0,
-                    }}
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                )}
-                <span style={{
-                  color: 'var(--color-panel-text-muted)',
-                  fontWeight: 500,
-                }}>
-                  {developer}
-                </span>
-              </div>
+                {developer}
+              </span>
             )}
             {weeklyDownloads !== undefined && (
               <span style={{

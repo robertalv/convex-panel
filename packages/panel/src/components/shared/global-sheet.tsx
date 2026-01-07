@@ -1,6 +1,9 @@
-import React from 'react';
-import { Sheet } from './sheet';
-import { useSheetSafe } from '../../contexts/sheet-context';
+import React from "react";
+import { Sheet } from "./sheet";
+import {
+  useSheetStateSafe,
+  useSheetActionsSafe,
+} from "../../contexts/sheet-context";
 
 export interface GlobalSheetProps {
   container?: HTMLElement | null;
@@ -12,7 +15,8 @@ export interface GlobalSheetProps {
  * Otherwise, it renders as a global portal to document.body.
  */
 export const GlobalSheet: React.FC<GlobalSheetProps> = ({ container }) => {
-  const { isOpen, closeSheet, sheetContent } = useSheetSafe();
+  const { isOpen, sheetContent } = useSheetStateSafe();
+  const { closeSheet } = useSheetActionsSafe();
 
   if (!sheetContent) return null;
 
@@ -29,4 +33,3 @@ export const GlobalSheet: React.FC<GlobalSheetProps> = ({ container }) => {
     </Sheet>
   );
 };
-

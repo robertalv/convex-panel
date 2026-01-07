@@ -1,18 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Sheet } from '../../../components/shared/sheet';
 import type { FunctionExecutionLog } from '../../../types';
 import { Card } from '../../../components/shared/card';
-import { X, Info, Copy, ChevronUp, ChevronDown, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { X, Info, Copy, ChevronUp, ChevronDown, AlertCircle, CheckCircle2, XCircle, Loader2, Lightbulb, Sparkles } from 'lucide-react';
 import { TooltipAction } from '../../../components/shared/tooltip-action';
+import { analyzeError, getErrorAnalysis, suggestFix, type ErrorAnalysis, type FixSuggestion } from '../../../utils/api/aiAnalysis';
+import { handleCopyAIPrompt } from '../../../utils/aiPrompt';
 
 interface FunctionExecutionDetailSheetProps {
   log: FunctionExecutionLog | null;
   isOpen: boolean;
   onClose: () => void;
   container?: HTMLElement | null;
+  adminClient?: any;
 }
 
-type DetailTab = 'execution' | 'request' | 'functions';
+type DetailTab = 'execution' | 'request' | 'functions' | 'analysis';
 
 const formatDateTime = (timestamp: number) => {
   if (!timestamp) return 'N/A';
@@ -79,10 +82,102 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
   isOpen,
   onClose,
   container: propContainer,
+  adminClient,
 }) => {
   const [activeTab, setActiveTab] = useState<DetailTab>('execution');
   const [resourcesExpanded, setResourcesExpanded] = useState(true);
+  const [aiAnalysis, setAiAnalysis] = useState<ErrorAnalysis | null>(null);
+  const [fixSuggestion, setFixSuggestion] = useState<FixSuggestion | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [showAnalysisTab, setShowAnalysisTab] = useState(false);
+  const [, setStreamingAnalysis] = useState<Partial<ErrorAnalysis> | null>(null);
+  const [streamingText, setStreamingText] = useState<{ rootCause?: string; suggestions?: string[] }>({});
   const container = propContainer || null;
+  const hasLoadedAnalysisRef = useRef(false);
+
+  // Extract log properties safely (hooks must be called before early return)
+  const logLines = log?.logLines;
+  const requestId = log?.requestId;
+  const functionIdentifier = log?.functionIdentifier;
+  const startedAt = log?.startedAt;
+  const error = log?.error;
+  const success = log?.success;
+
+  // Memoize logLines processing to avoid recreating on every render
+  const processedLogLines = useMemo(() => {
+    if (!logLines) return [];
+    return logLines.map((l: any) => typeof l === 'string' ? l : JSON.stringify(l));
+  }, [logLines]);
+
+  const hasError = log ? (!success || error) : false;
+
+  // Reset the ref when requestId changes (different execution selected)
+  useEffect(() => {
+    if (!log) return;
+    hasLoadedAnalysisRef.current = false;
+    setAiAnalysis(null);
+    setFixSuggestion(null);
+    setAnalysisError(null);
+    setShowAnalysisTab(false);
+    setStreamingAnalysis(null);
+    setStreamingText({});
+  }, [requestId, log]);
+
+  // Load existing analysis if available
+  useEffect(() => {
+    if (!log || !hasError || !adminClient || !requestId) return;
+    // Only load once per requestId to avoid infinite loops
+    if (!hasLoadedAnalysisRef.current) {
+      hasLoadedAnalysisRef.current = true;
+      getErrorAnalysis(adminClient, requestId)
+        .then((analysis) => {
+          if (analysis) {
+            setAiAnalysis(analysis);
+            setShowAnalysisTab(true); // Show the analysis tab if analysis exists
+            setActiveTab('analysis'); // Automatically switch to analysis tab
+            // Get fix suggestion if we have analysis
+            if (analysis.rootCause) {
+              suggestFix(adminClient, {
+                errorMessage: error || '',
+                functionPath: functionIdentifier || '',
+                timestamp: startedAt || 0,
+                stackTrace: undefined, // FunctionExecutionLog doesn't have stackTrace
+                logLines: processedLogLines,
+                rootCause: analysis.rootCause,
+                severity: analysis.severity,
+              })
+                .then(setFixSuggestion)
+                .catch(() => {
+                  // Ignore errors getting fix suggestion
+                });
+            }
+          }
+        })
+        .catch(() => {
+          // Ignore errors loading analysis
+        });
+    }
+  }, [hasError, adminClient, requestId, error, functionIdentifier, startedAt, processedLogLines, log]);
+
+  // Fallback: Show analysis tab if aiAnalysis exists (in case the above effect didn't run)
+  useEffect(() => {
+    if (aiAnalysis && !showAnalysisTab) {
+      setShowAnalysisTab(true);
+    }
+  }, [aiAnalysis, showAnalysisTab]);
+
+  // Stream text word by word - MUST be called before early return (Rules of Hooks)
+  const streamText = useCallback(async (text: string, updateFn: (text: string) => void) => {
+    const words = text.split(' ');
+    let currentText = '';
+
+    for (let i = 0; i < words.length; i++) {
+      currentText += (i > 0 ? ' ' : '') + words[i];
+      updateFn(currentText);
+      await new Promise((resolve) => setTimeout(resolve, Math.random() * 30 + 20));
+    }
+  }, []);
 
   if (!isOpen || !log) {
     return null;
@@ -90,24 +185,93 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
 
   const {
     executionId,
-    functionIdentifier,
     udfType,
-    startedAt,
     completedAt,
     durationMs,
     environment,
     usageStats,
-    requestId,
     caller,
     identityType,
-    success,
-    error,
     returnBytes,
-    logLines,
   } = log;
 
-  const timestampInfo = formatTimestampWithRelative(startedAt);
-  const hasError = !success || error;
+  const timestampInfo = formatTimestampWithRelative(startedAt ?? 0);
+
+  const handleAnalyzeWithAI = async () => {
+    if (!adminClient || !hasError) return;
+
+    // Immediately show analysis tab and start analysis
+    setShowAnalysisTab(true);
+    setActiveTab('analysis');
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+    setStreamingText({});
+    setStreamingAnalysis({ errorId: requestId || `error-${startedAt ?? Date.now()}` });
+
+    try {
+      const errorId = requestId || `error-${startedAt ?? Date.now()}`;
+      
+      // Start analysis - this will stream results as they come in
+      const analysis = await analyzeError(adminClient, {
+        errorId,
+        errorMessage: error || 'Unknown error',
+        functionPath: functionIdentifier || '',
+        timestamp: startedAt ?? Date.now(),
+        stackTrace: undefined,
+        logLines: processedLogLines,
+      });
+
+      // Stream the root cause
+      if (analysis.rootCause) {
+        await streamText(analysis.rootCause, (text) => {
+          setStreamingText((prev) => ({ ...prev, rootCause: text }));
+        });
+      }
+
+      // Stream suggestions one by one
+      if (analysis.suggestions && analysis.suggestions.length > 0) {
+        const streamedSuggestions: string[] = [];
+        for (let idx = 0; idx < analysis.suggestions.length; idx++) {
+          const suggestion = analysis.suggestions[idx];
+          await streamText(suggestion, (text) => {
+            const updated = [...streamedSuggestions];
+            updated[idx] = text;
+            setStreamingText((prev) => ({ ...prev, suggestions: updated }));
+          });
+          streamedSuggestions[idx] = suggestion; // Ensure full text is stored
+        }
+      }
+
+      // Update with full analysis result after streaming
+      setAiAnalysis(analysis);
+      setStreamingAnalysis(null);
+      setStreamingText({});
+
+      // Get fix suggestion
+      if (analysis.rootCause) {
+        try {
+          const suggestion = await suggestFix(adminClient, {
+                errorMessage: error || '',
+                functionPath: functionIdentifier || '',
+                timestamp: startedAt ?? 0,
+            stackTrace: undefined,
+            logLines: processedLogLines,
+            rootCause: analysis.rootCause,
+            severity: analysis.severity,
+          });
+          setFixSuggestion(suggestion);
+        } catch (err) {
+          console.error('Failed to get fix suggestion:', err);
+        }
+      }
+    } catch (err: any) {
+      setAnalysisError(err?.message || 'Failed to analyze error');
+      setStreamingAnalysis(null);
+      setStreamingText({});
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const sheetContent = (
     <div
@@ -198,13 +362,21 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
         >
           <div
             style={{
-              fontSize: '12px',
-              fontWeight: 600,
-              color: 'var(--color-content-error)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
               marginBottom: '8px',
             }}
           >
-            Error
+            <div
+              style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--color-content-error)',
+              }}
+            >
+              Error
+            </div>
           </div>
           <div
             style={{
@@ -239,6 +411,7 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
           </button>
         </div>
       )}
+
 
       {logLines && logLines.length > 0 && (() => {
         const nonEmptyLogLines = logLines.filter((line: string) => {
@@ -360,36 +533,108 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
         style={{
           borderBottom: '1px solid var(--color-panel-border)',
           display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
         }}
       >
-        {(['execution', 'request', 'functions'] as DetailTab[]).map((tab) => (
+        <div style={{ display: 'flex' }}>
+          {(['execution', 'request', 'functions'] as DetailTab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                padding: '10px 16px',
+                fontSize: 12,
+                fontWeight: 500,
+                border: 'none',
+                borderBottom:
+                  activeTab === tab
+                    ? '2px solid var(--color-panel-accent)'
+                    : '2px solid transparent',
+                backgroundColor: 'transparent',
+                color:
+                  activeTab === tab
+                    ? 'var(--color-panel-text)'
+                    : 'var(--color-panel-text-muted)',
+                cursor: 'pointer',
+              }}
+            >
+              {tab === 'execution'
+                ? 'Execution'
+                : tab === 'request'
+                ? 'Request'
+                : 'Functions Called'}
+            </button>
+          ))}
+          {showAnalysisTab && (
+            <button
+              onClick={() => setActiveTab('analysis')}
+              style={{
+                padding: '10px 16px',
+                fontSize: 12,
+                fontWeight: 500,
+                border: 'none',
+                borderBottom:
+                  activeTab === 'analysis'
+                    ? '2px solid var(--color-panel-accent)'
+                    : '2px solid transparent',
+                backgroundColor: 'transparent',
+                color:
+                  activeTab === 'analysis'
+                    ? 'var(--color-panel-text)'
+                    : 'var(--color-panel-text-muted)',
+                cursor: 'pointer',
+              }}
+            >
+              Analysis
+            </button>
+          )}
+        </div>
+        {hasError && adminClient && !showAnalysisTab && (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={handleAnalyzeWithAI}
+            disabled={isAnalyzing}
             style={{
-              padding: '10px 16px',
-              fontSize: 12,
+              padding: '6px 12px',
+              marginRight: '12px',
+              fontSize: 11,
               fontWeight: 500,
               border: 'none',
-              borderBottom:
-                activeTab === tab
-                  ? '2px solid var(--color-panel-accent)'
-                  : '2px solid transparent',
-              backgroundColor: 'transparent',
-              color:
-                activeTab === tab
-                  ? 'var(--color-panel-text)'
-                  : 'var(--color-panel-text-muted)',
-              cursor: 'pointer',
+              borderRadius: '8px',
+              backgroundColor: 'var(--color-panel-bg-secondary)',
+              color: 'var(--color-panel-text)',
+              cursor: isAnalyzing ? 'not-allowed' : 'pointer',
+              opacity: isAnalyzing ? 0.5 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s',
             }}
+            onMouseEnter={(e) => {
+              if (!isAnalyzing) {
+                e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isAnalyzing) {
+                e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-secondary)';
+              }
+            }}
+            title="Analyze with AI"
           >
-            {tab === 'execution'
-              ? 'Execution'
-              : tab === 'request'
-              ? 'Request'
-              : 'Functions Called'}
+            {isAnalyzing ? (
+              <>
+                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <Sparkles size={14} />
+                Analyze
+              </>
+            )}
           </button>
-        ))}
+        )}
       </div>
 
       <div
@@ -456,7 +701,7 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
                   Started at
                 </span>
                 <span style={{ color: 'var(--color-panel-text-secondary)' }}>
-                  {formatDateTime(startedAt)}
+                  {formatDateTime(startedAt ?? 0)}
                 </span>
 
                 <span style={{ color: 'var(--color-panel-text-muted)' }}>
@@ -470,7 +715,7 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
                   Duration
                 </span>
                 <span style={{ color: 'var(--color-panel-text-secondary)' }}>
-                  {formatDuration(durationMs)}
+                  {formatDuration(durationMs ?? 0)}
                 </span>
 
                 <span style={{ color: 'var(--color-panel-text-muted)' }}>
@@ -541,7 +786,7 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
                         color: 'var(--color-panel-text-secondary)',
                       }}
                     >
-                      {formatCompute(usageStats?.memory_used_mb, durationMs)}
+                      {formatCompute(usageStats?.memory_used_mb, durationMs ?? 0)}
                     </div>
                   </div>
 
@@ -662,7 +907,7 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
                   Started at
                 </span>
                 <span style={{ color: 'var(--color-panel-text-secondary)' }}>
-                  {formatDateTime(startedAt)}
+                  {formatDateTime(startedAt ?? 0)}
                 </span>
 
                 <span style={{ color: 'var(--color-panel-text-muted)' }}>
@@ -676,7 +921,7 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
                   Duration
                 </span>
                 <span style={{ color: 'var(--color-panel-text-secondary)' }}>
-                  {formatDuration(durationMs)}
+                  {formatDuration(durationMs ?? 0)}
                 </span>
 
                 <span style={{ color: 'var(--color-panel-text-muted)' }}>
@@ -768,7 +1013,9 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
                   )}
                   <div style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '4px' }}>
                     {(() => {
-                      const parts = functionIdentifier.split(':');
+                      const funcId = log.functionIdentifier;
+                      if (!funcId) return <span style={{ color: 'var(--color-panel-text)' }}>Unknown</span>;
+                      const parts = funcId.split(':');
                       if (parts.length > 1) {
                         return (
                           <>
@@ -783,7 +1030,7 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
                       }
                       return (
                         <span style={{ color: 'var(--color-panel-text)' }}>
-                          {functionIdentifier}
+                          {funcId}
                         </span>
                       );
                     })()}
@@ -801,19 +1048,376 @@ export const FunctionExecutionDetailSheet: React.FC<FunctionExecutionDetailSheet
             </div>
           </div>
         )}
+
+        {activeTab === 'analysis' && (
+          <Card>
+            <div style={{ fontSize: 12 }}>
+              {!adminClient ? (
+                <div style={{ color: 'var(--color-panel-text-muted)', padding: '16px' }}>
+                  Admin client is required for AI analysis.
+                </div>
+              ) : !hasError ? (
+                <div style={{ color: 'var(--color-panel-text-muted)', padding: '16px' }}>
+                  AI analysis is only available for failed function executions.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Loading State - Show when analyzing */}
+                  {isAnalyzing && (
+                    <div
+                      style={{
+                        padding: '16px',
+                        textAlign: 'center',
+                        color: 'var(--color-panel-text-muted)',
+                      }}
+                    >
+                      <Loader2 
+                        size={16} 
+                        style={{ 
+                          animation: 'spin 1s linear infinite',
+                          margin: '0 auto 8px',
+                          display: 'block'
+                        }} 
+                      />
+                      <div 
+                        style={{ 
+                          fontSize: '12px', 
+                          marginBottom: '12px',
+                          fontWeight: 500,
+                          color: 'var(--color-panel-text)',
+                          background: 'linear-gradient(90deg, var(--color-panel-text) 0%, var(--color-panel-text-muted) 50%, var(--color-panel-text) 100%)',
+                          backgroundSize: '200% 100%',
+                          backgroundClip: 'text',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                          animation: 'shimmer 2s ease-in-out infinite',
+                        }}
+                      >
+                        Thinking...
+                      </div>
+                      {streamingText.rootCause && (
+                        <div style={{ 
+                          textAlign: 'left',
+                          padding: '12px',
+                          backgroundColor: 'var(--color-panel-bg-secondary)',
+                          border: '1px solid var(--color-panel-border)',
+                          borderRadius: '6px',
+                          marginTop: '12px',
+                        }}>
+                          <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--color-panel-text)', marginBottom: '4px' }}>
+                            Root Cause
+                          </div>
+                          <div style={{ 
+                            fontSize: '12px', 
+                            color: 'var(--color-panel-text-secondary)', 
+                            lineHeight: '1.5',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                          }}>
+                            {streamingText.rootCause}
+                            <span style={{ 
+                              display: 'inline-block',
+                              width: '2px',
+                              height: '14px',
+                              backgroundColor: 'var(--color-panel-text-secondary)',
+                              marginLeft: '2px',
+                              animation: 'blink 1s step-end infinite',
+                              verticalAlign: 'baseline',
+                            }} />
+                          </div>
+                        </div>
+                      )}
+                      {streamingText.suggestions && streamingText.suggestions.length > 0 && (
+                        <div style={{ 
+                          textAlign: 'left',
+                          padding: '12px',
+                          backgroundColor: 'var(--color-panel-bg-secondary)',
+                          border: '1px solid var(--color-panel-border)',
+                          borderRadius: '6px',
+                          marginTop: '12px',
+                        }}>
+                          <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--color-panel-text)', marginBottom: '4px' }}>
+                            Suggestions
+                          </div>
+                          <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: 'var(--color-panel-text-secondary)' }}>
+                            {streamingText.suggestions.map((suggestion, i) => (
+                              <li key={i} style={{ marginBottom: '4px' }}>
+                                {suggestion}
+                                {i === streamingText.suggestions!.length - 1 && (
+                                  <span style={{ 
+                                    display: 'inline-block',
+                                    width: '2px',
+                                    height: '12px',
+                                    backgroundColor: 'var(--color-panel-text-secondary)',
+                                    marginLeft: '2px',
+                                    animation: 'blink 1s step-end infinite',
+                                    verticalAlign: 'baseline',
+                                  }} />
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Re-analyze Button - Show when not analyzing and no results */}
+                  {!isAnalyzing && (!aiAnalysis || analysisError) && (
+                    <div
+                      style={{
+                        padding: '16px',
+                        backgroundColor: 'var(--color-panel-bg-secondary)',
+                        border: '1px solid var(--color-panel-border)',
+                        borderRadius: '6px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ marginBottom: '12px', color: 'var(--color-panel-text)', fontSize: '12px' }}>
+                        {aiAnalysis ? 'Re-analyze this error with AI' : 'Click the button below to analyze this error with AI'}
+                      </div>
+                      <button
+                        onClick={handleAnalyzeWithAI}
+                        disabled={isAnalyzing}
+                        style={{
+                          padding: '8px 16px',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          border: 'none',
+                          borderRadius: '6px',
+                          backgroundColor: 'var(--color-panel-accent)',
+                          color: '#fff',
+                          cursor: isAnalyzing ? 'not-allowed' : 'pointer',
+                          opacity: isAnalyzing ? 0.5 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          margin: '0 auto',
+                        }}
+                      >
+                        {aiAnalysis ? 'Re-analyze' : 'Analyze with AI'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Error State */}
+                  {analysisError && (
+                    <div
+                      style={{
+                        padding: '12px',
+                        backgroundColor: 'var(--color-background-error)',
+                        border: '1px solid var(--color-border-error)',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        color: 'var(--color-content-error)',
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, marginBottom: '4px' }}>Analysis Error</div>
+                      <div>{analysisError}</div>
+                    </div>
+                  )}
+
+                  {/* Analysis Results */}
+                  {aiAnalysis && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {/* Re-analyze and Copy buttons at top of results */}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                        <button
+                          onClick={async () => {
+                            await handleCopyAIPrompt({
+                              analysis: aiAnalysis,
+                              functionPath: functionIdentifier || undefined,
+                              errorMessage: error || undefined,
+                              errorId: requestId || undefined,
+                            });
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            border: '1px solid var(--color-panel-border)',
+                            borderRadius: '6px',
+                            backgroundColor: 'transparent',
+                            color: 'var(--color-panel-text-muted)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = 'var(--color-panel-text)';
+                            e.currentTarget.style.borderColor = 'var(--color-panel-accent)';
+                            e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                            e.currentTarget.style.borderColor = 'var(--color-panel-border)';
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                          title="Copy AI prompt for Cursor/VSCode"
+                        >
+                          <Sparkles size={12} />
+                          Copy Analysis
+                        </button>
+                        <button
+                          onClick={handleAnalyzeWithAI}
+                          disabled={isAnalyzing}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            border: '1px solid var(--color-panel-border)',
+                            borderRadius: '6px',
+                            backgroundColor: 'transparent',
+                            color: 'var(--color-panel-text)',
+                            cursor: isAnalyzing ? 'not-allowed' : 'pointer',
+                            opacity: isAnalyzing ? 0.5 : 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.2s',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isAnalyzing) {
+                              e.currentTarget.style.backgroundColor = 'var(--color-panel-border)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isAnalyzing) {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }
+                          }}
+                        >
+                          {isAnalyzing ? (
+                            <>
+                              <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                              Analyzing...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles size={12} />
+                              Re-analyze
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--color-panel-text)', marginBottom: '4px' }}>
+                          Root Cause
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--color-panel-text-secondary)', lineHeight: '1.5', marginBottom: '4px' }}>
+                          {aiAnalysis.rootCause}
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'var(--color-panel-text-muted)' }}>
+                          Confidence: {Math.round(aiAnalysis.confidence * 100)}% | Severity: {aiAnalysis.severity}
+                        </div>
+                      </div>
+
+                      {aiAnalysis.suggestions.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--color-panel-text)', marginBottom: '4px' }}>
+                            Suggestions
+                          </div>
+                          <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '11px', color: 'var(--color-panel-text-secondary)' }}>
+                            {aiAnalysis.suggestions.map((suggestion, i) => (
+                              <li key={i} style={{ marginBottom: '4px' }}>
+                                {suggestion}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {fixSuggestion && (
+                        <div
+                          style={{
+                            padding: '12px',
+                            backgroundColor: 'var(--color-panel-bg-secondary)',
+                            border: '1px solid var(--color-panel-border)',
+                            borderRadius: '6px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                            <Lightbulb size={14} style={{ color: 'var(--color-panel-accent)' }} />
+                            <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--color-panel-text)' }}>
+                              Fix Suggestion
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--color-panel-text-secondary)', marginBottom: '8px', lineHeight: '1.5' }}>
+                            {fixSuggestion.suggestion}
+                          </div>
+                          {fixSuggestion.codeExample && (
+                            <div
+                              style={{
+                                marginTop: '8px',
+                                padding: '8px',
+                                backgroundColor: 'var(--color-panel-bg-tertiary)',
+                                borderRadius: '4px',
+                                fontFamily: 'monospace',
+                                fontSize: '10px',
+                                color: 'var(--color-panel-text-secondary)',
+                                whiteSpace: 'pre-wrap',
+                              }}
+                            >
+                              {fixSuggestion.codeExample}
+                            </div>
+                          )}
+                          {fixSuggestion.documentationLinks.length > 0 && (
+                            <div style={{ marginTop: '8px', fontSize: '10px', color: 'var(--color-panel-text-muted)' }}>
+                              Documentation: {fixSuggestion.documentationLinks.join(', ')}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );
 
   return (
-    <Sheet
-      isOpen={isOpen}
-      onClose={onClose}
-      width="420px"
-      container={container}
-    >
-      {sheetContent}
-    </Sheet>
+    <>
+      <style>{`
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        @keyframes shimmer {
+          0% {
+            background-position: -200% 0;
+          }
+          100% {
+            background-position: 200% 0;
+          }
+        }
+        @keyframes blink {
+          0%, 50% {
+            opacity: 1;
+          }
+          51%, 100% {
+            opacity: 0;
+          }
+        }
+      `}</style>
+      <Sheet
+        isOpen={isOpen}
+        onClose={onClose}
+        width="420px"
+        container={container}
+      >
+        {sheetContent}
+      </Sheet>
+    </>
   );
 };
 

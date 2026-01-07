@@ -8,11 +8,13 @@
  * @module
  */
 
+import type * as aiAnalysis from "../aiAnalysis.js";
 import type * as crons from "../crons.js";
 import type * as dummyjson from "../dummyjson.js";
 import type * as http from "../http.js";
 import type * as loops from "../loops.js";
 import type * as stats from "../stats.js";
+import type * as test from "../test.js";
 import type * as todos from "../todos.js";
 
 import type {
@@ -22,11 +24,13 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  aiAnalysis: typeof aiAnalysis;
   crons: typeof crons;
   dummyjson: typeof dummyjson;
   http: typeof http;
   loops: typeof loops;
   stats: typeof stats;
+  test: typeof test;
   todos: typeof todos;
 }>;
 
@@ -631,6 +635,477 @@ export declare const components: {
         "internal",
         { count?: number; scope: string },
         any | null
+      >;
+    };
+  };
+  aiAnalysis: {
+    analysis: {
+      correlation: {
+        calculateCorrelationScore: FunctionReference<
+          "query",
+          "internal",
+          {
+            deploymentDescription?: string;
+            deploymentTime: number;
+            errorTimestamp: number;
+            functionPath?: string;
+          },
+          number
+        >;
+        findDeploymentImpact: FunctionReference<
+          "action",
+          "internal",
+          {
+            deployments: Array<{
+              commitHash?: string;
+              deploymentId: string;
+              deploymentTime: number;
+              description?: string;
+            }>;
+            errorId: string;
+            errorMessage: string;
+            functionPath?: string;
+            timestamp: number;
+          },
+          {
+            affectedFunctions: Array<string>;
+            correlationScore: number;
+            deploymentId: string;
+            reasoning: string;
+          } | null
+        >;
+        getDeploymentCorrelations: FunctionReference<
+          "query",
+          "internal",
+          { deploymentId: string },
+          Array<{
+            affectedFunctions: Array<string>;
+            correlationScore: number;
+            deploymentId: string;
+            deploymentTime: number;
+            errorId: string;
+          }>
+        >;
+        getErrorCorrelations: FunctionReference<
+          "query",
+          "internal",
+          { errorId: string },
+          Array<{
+            affectedFunctions: Array<string>;
+            correlationScore: number;
+            deploymentId: string;
+            deploymentTime: number;
+            errorId: string;
+          }>
+        >;
+        getRecentCorrelations: FunctionReference<
+          "query",
+          "internal",
+          { limit?: number },
+          Array<{
+            affectedFunctions: Array<string>;
+            correlationScore: number;
+            deploymentId: string;
+            deploymentTime: number;
+            errorId: string;
+            reasoning: string;
+          }>
+        >;
+      };
+      errorAnalysis: {
+        analyzeError: FunctionReference<
+          "action",
+          "internal",
+          {
+            deploymentId?: string;
+            errorId: string;
+            errorMessage: string;
+            functionPath?: string;
+            logLines?: Array<string>;
+            stackTrace?: string;
+            timestamp: number;
+          },
+          {
+            confidence: number;
+            errorId: string;
+            relatedIssues?: Array<string>;
+            rootCause: string;
+            severity: "low" | "medium" | "high" | "critical";
+            suggestions: Array<string>;
+          }
+        >;
+        getErrorAnalysis: FunctionReference<
+          "query",
+          "internal",
+          { errorId: string },
+          {
+            confidence: number;
+            deploymentId?: string;
+            errorId: string;
+            errorMessage: string;
+            functionPath?: string;
+            rootCause: string;
+            severity: "low" | "medium" | "high" | "critical";
+            suggestions: Array<string>;
+            timestamp: number;
+          } | null
+        >;
+        getRecentAnalyses: FunctionReference<
+          "query",
+          "internal",
+          { functionPath?: string; limit?: number },
+          Array<{
+            confidence: number;
+            deploymentId?: string;
+            errorId: string;
+            errorMessage: string;
+            functionPath?: string;
+            rootCause: string;
+            severity: "low" | "medium" | "high" | "critical";
+            suggestions: Array<string>;
+            timestamp: number;
+          }>
+        >;
+      };
+      logSummarization: {
+        getLogSummary: FunctionReference<
+          "query",
+          "internal",
+          { timeWindow: { end: number; start: number } },
+          {
+            affectedFunctions: Array<string>;
+            errorCount: number;
+            functionCount: number;
+            keyEvents: Array<string>;
+            summary: string;
+            timeWindow: { end: number; start: number };
+          } | null
+        >;
+        getRecentSummaries: FunctionReference<
+          "query",
+          "internal",
+          { limit?: number },
+          Array<{
+            affectedFunctions: Array<string>;
+            errorCount: number;
+            functionCount: number;
+            keyEvents: Array<string>;
+            summary: string;
+            timeWindow: { end: number; start: number };
+          }>
+        >;
+        identifyPatterns: FunctionReference<
+          "action",
+          "internal",
+          {
+            logs: Array<{
+              errorMessage?: string;
+              functionPath?: string;
+              logLevel?: string;
+              message: string;
+              timestamp: number;
+            }>;
+          },
+          Array<string>
+        >;
+        summarizeByFunction: FunctionReference<
+          "action",
+          "internal",
+          {
+            logs: Array<{
+              errorMessage?: string;
+              functionPath?: string;
+              logLevel?: string;
+              message: string;
+              timestamp: number;
+            }>;
+          },
+          Record<
+            string,
+            { errorCount: number; keyEvents: Array<string>; summary: string }
+          >
+        >;
+        summarizeLogs: FunctionReference<
+          "action",
+          "internal",
+          {
+            groupByFunction?: boolean;
+            includePatterns?: boolean;
+            logs: Array<{
+              errorMessage?: string;
+              functionPath?: string;
+              logLevel?: string;
+              message: string;
+              timestamp: number;
+            }>;
+            timeWindow?: { end: number; start: number };
+          },
+          {
+            affectedFunctions: Array<string>;
+            errorCount: number;
+            functionCount: number;
+            keyEvents: Array<string>;
+            patterns?: Array<string>;
+            summary: string;
+          }
+        >;
+      };
+      naturalLanguageQuery: {
+        convertNaturalLanguageQuery: FunctionReference<
+          "action",
+          "internal",
+          {
+            fields: Array<{
+              fieldName: string;
+              optional?: boolean;
+              type: string;
+            }>;
+            query: string;
+            sampleDocuments?: Array<any>;
+            tableName: string;
+          },
+          {
+            filters: Array<{
+              field: string;
+              op:
+                | "eq"
+                | "neq"
+                | "gt"
+                | "gte"
+                | "lt"
+                | "lte"
+                | "contains"
+                | "not_contains"
+                | "starts_with"
+                | "ends_with";
+              value: any;
+            }>;
+            limit: number | null;
+            sortConfig: { direction: "asc" | "desc"; field: string } | null;
+          }
+        >;
+      };
+      suggestions: {
+        getDocumentationLinks: FunctionReference<
+          "action",
+          "internal",
+          { errorMessage: string; functionPath?: string },
+          Array<string>
+        >;
+        suggestFix: FunctionReference<
+          "action",
+          "internal",
+          {
+            errorMessage: string;
+            functionPath?: string;
+            logLines?: Array<string>;
+            rootCause: string;
+            severity: "low" | "medium" | "high" | "critical";
+            stackTrace?: string;
+            timestamp: number;
+          },
+          {
+            codeExample?: string;
+            confidence: number;
+            documentationLinks: Array<string>;
+            suggestion: string;
+          }
+        >;
+        suggestPrevention: FunctionReference<
+          "action",
+          "internal",
+          {
+            errorMessage: string;
+            functionPath?: string;
+            rootCause: string;
+            severity: "low" | "medium" | "high" | "critical";
+          },
+          {
+            codePatterns?: Array<string>;
+            monitoringSuggestions: Array<string>;
+            preventiveMeasures: Array<string>;
+          }
+        >;
+      };
+    };
+    cache: {
+      clearCache: FunctionReference<"mutation", "internal", {}, null>;
+    };
+    chats: {
+      createChat: FunctionReference<
+        "mutation",
+        "internal",
+        { title: string },
+        { chatId: string }
+      >;
+      deleteChat: FunctionReference<
+        "mutation",
+        "internal",
+        { chatId: string },
+        null
+      >;
+      generateResponse: FunctionReference<
+        "action",
+        "internal",
+        {
+          accessToken?: string;
+          chatId: string;
+          componentId?: string | null;
+          convexUrl?: string;
+          prompt: string;
+          tableName?: string;
+        },
+        { message?: string; success: boolean }
+      >;
+      generateResponseStream: FunctionReference<
+        "action",
+        "internal",
+        {
+          accessToken?: string;
+          chatId: string;
+          componentId?: string | null;
+          convexUrl?: string;
+          prompt: string;
+          tableName?: string;
+        },
+        { message?: string; success: boolean; threadId?: string }
+      >;
+      getAgentMessages: FunctionReference<
+        "query",
+        "internal",
+        { chatId: string },
+        Array<any>
+      >;
+      getChat: FunctionReference<
+        "query",
+        "internal",
+        { chatId: string },
+        {
+          _creationTime: number;
+          _id: string;
+          messages: Array<{
+            _creationTime: number;
+            _id: string;
+            chatId: string;
+            content: string;
+            error?: boolean;
+            role: "user" | "assistant";
+            timestamp: number;
+          }>;
+          threadId?: string;
+          title: string;
+          updatedAt: number;
+        } | null
+      >;
+      getChatMessages: FunctionReference<
+        "query",
+        "internal",
+        { chatId: string },
+        Array<{
+          _id: string;
+          chatId: string;
+          content: string;
+          error?: boolean;
+          role: "user" | "assistant";
+          timestamp: number;
+        }>
+      >;
+      listAgentTools: FunctionReference<
+        "query",
+        "internal",
+        {},
+        Array<{ description: string; name: string }>
+      >;
+      listChats: FunctionReference<
+        "query",
+        "internal",
+        {},
+        Array<{
+          _creationTime: number;
+          _id: string;
+          threadId?: string;
+          title: string;
+          updatedAt: number;
+        }>
+      >;
+      listChatStreams: FunctionReference<
+        "query",
+        "internal",
+        {
+          chatId: string;
+          streamArgs?:
+            | { kind: "list"; startOrder?: number }
+            | {
+                cursors: Array<{ cursor: number; streamId: string }>;
+                kind: "deltas";
+              };
+        },
+        any
+      >;
+      saveMessage: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          chatId: string;
+          content: string;
+          error?: boolean;
+          role: "user" | "assistant";
+        },
+        { messageId: string }
+      >;
+      updateChatTitle: FunctionReference<
+        "mutation",
+        "internal",
+        { chatId: string; title: string },
+        null
+      >;
+    };
+    config: {
+      getConfig: FunctionReference<
+        "query",
+        "internal",
+        {},
+        {
+          automaticAnalysis: boolean;
+          embeddingModel?: string;
+          enabled: boolean;
+          maxTokens?: number;
+          model: string;
+          provider: "openai" | "anthropic" | "none";
+          temperature?: number;
+          updatedAt: number;
+        } | null
+      >;
+      setConfig: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          apiKey: string;
+          automaticAnalysis: boolean;
+          embeddingModel?: string;
+          enabled: boolean;
+          maxTokens?: number;
+          model: string;
+          provider: "openai" | "anthropic" | "none";
+          temperature?: number;
+        },
+        null
+      >;
+      testConnection: FunctionReference<
+        "action",
+        "internal",
+        { apiKey: string; model: string; provider: "openai" | "anthropic" },
+        { error?: string; success: boolean }
+      >;
+      validateConfig: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          apiKey: string;
+          model: string;
+          provider: "openai" | "anthropic" | "none";
+        },
+        { error?: string; valid: boolean }
       >;
     };
   };

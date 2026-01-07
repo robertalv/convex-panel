@@ -35,80 +35,86 @@ pnpm add convex-panel --save-dev
 bun add convex-panel --dev
 ```
 
-## Environment Setup
+## Quick Setup
 
-Create a `.env.local` (or `.env`) file in your project root.
-
-### Minimum configuration
-
-For Convex Panel to connect to your deployment you need a Convex URL:
-
-- **Next.js**
+The easiest way to get started is using the interactive setup command:
 
 ```bash
-NEXT_PUBLIC_CONVEX_URL="https://your-deployment.convex.cloud"
+npx convex-panel setup
 ```
 
-- **Vite / React**
+This command will:
+- Create or update `convex/http.ts` with OAuth endpoints
+- Prompt you for required environment variables
+- Configure your project for OAuth authentication
+
+## Step-by-Step Setup Guide
+
+### Step 1: Install Convex Panel
 
 ```bash
-VITE_CONVEX_URL="https://your-deployment.convex.cloud"
+npm install convex-panel --save-dev
 ```
 
-- **Create React App**
+### Step 2: Run Setup Command
+
+From your project root (where your `convex/` folder lives), run:
 
 ```bash
-REACT_APP_CONVEX_URL="https://your-deployment.convex.cloud"
+npx convex-panel setup
 ```
 
-### Optional: OAuth + automatic setup
+This interactive command will:
+1. **Create/update `convex/http.ts`**: Adds OAuth HTTP action endpoints (`POST /oauth/exchange` and `OPTIONS /oauth/exchange`) to handle token exchange
+2. **Prompt for environment variables**: Guides you through setting up:
+   - `VITE_CONVEX_URL` or `NEXT_PUBLIC_CONVEX_URL` (your Convex deployment URL)
+   - `VITE_OAUTH_CLIENT_ID` or `NEXT_PUBLIC_OAUTH_CLIENT_ID` (OAuth client ID)
+   - `VITE_CONVEX_TOKEN_EXCHANGE_URL` or `NEXT_PUBLIC_CONVEX_TOKEN_EXCHANGE_URL` (token exchange URL)
+   - `CONVEX_CLIENT_SECRET` (OAuth client secret - local only)
+   - `CONVEX_ACCESS_TOKEN` (optional access token)
 
-Convex Panel can use OAuth to obtain a short‑lived admin token instead of manual tokens.  
-To make this easy, the package ships with setup scripts that:
+> **Note:** If `http.ts` is created in the wrong location (e.g., a `/convex` folder in your app root instead of your actual `convex/` folder), simply move the file to the correct `convex/` directory in your project.
 
-- Inject an OAuth HTTP action into your `convex/http.ts` (for code → token exchange).
-- Help you configure the required environment variables.
+### Step 3: Configure OAuth in Convex Dashboard
 
-From your app root (where `convex/` lives), add these scripts to your app's `package.json`:
+1. Go to [Convex Dashboard](https://dashboard.convex.dev)
+2. Navigate to your team settings and create an OAuth application
+3. Copy the **Client ID** and **Client Secret**
+4. In your Convex deployment settings, add these environment variables:
+   - `CONVEX_CLIENT_ID` - Use the same Client ID from your `.env` file
+   - `CONVEX_CLIENT_SECRET` - Use the Client Secret (this should **never** be in your frontend `.env` file, only in Convex dashboard)
+   - Optionally `OAUTH_REDIRECT_URI` - Your frontend origin (e.g., `http://localhost:5173` or `https://your-site.com`)
 
-```json
-"scripts": {
-  "convex-panel:setup:oauth": "node ./node_modules/convex-panel/scripts/setup-oauth.js",
-  "convex-panel:setup:env": "node ./node_modules/convex-panel/scripts/setup-env.js"
-}
+### Step 4: Create Access Token
+
+1. Go to [Convex Dashboard](https://dashboard.convex.dev) → Team Settings → Access Tokens
+2. Create a new access token (team-level token recommended)
+3. Copy the token value
+4. The setup script should have already prompted you for `CONVEX_ACCESS_TOKEN` - if not, add it to your `.env` file:
+   ```bash
+   CONVEX_ACCESS_TOKEN=your-token-here
+   ```
+
+### Step 5: Framework-Specific Configuration
+
+#### Next.js
+
+Add the access token to your `next.config.js`:
+
+```javascript
+// next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  env: {
+    CONVEX_ACCESS_TOKEN: process.env.CONVEX_ACCESS_TOKEN,
+  },
+  // ... other config
+};
+
+module.exports = nextConfig;
 ```
 
-Then run:
-
-```bash
-npm run convex-panel:setup:oauth
-npm run convex-panel:setup:env
-```
-
-These scripts will:
-
-- Create or update `convex/http.ts` to add:
-  - `POST /oauth/exchange`
-  - `OPTIONS /oauth/exchange` (CORS preflight)
-- Prompt you for, and append to your env file (without overwriting existing values):
-  - `VITE_CONVEX_URL` – Convex deployment URL (e.g. `https://your-deployment.convex.cloud`)
-  - `VITE_OAUTH_CLIENT_ID` – Convex OAuth client ID from the Convex dashboard
-  - `VITE_CONVEX_TOKEN_EXCHANGE_URL` – usually `https://your-deployment.convex.site/oauth/exchange`
-
-In your Convex deployment settings you should also configure:
-
-- `CONVEX_CLIENT_ID` – same OAuth client ID
-- `CONVEX_CLIENT_SECRET` – OAuth client secret (server‑side only, never in frontend env)
-- Optionally `OAUTH_REDIRECT_URI` – your frontend origin (e.g. `https://your-site.com`)
-
-> **Note:** The panel auto‑detects environment variables based on your framework.  
-> If you don’t want OAuth, you can skip the setup scripts and use manual tokens instead (see `accessToken` / `deployKey` props below).
-
-## Quick Start
-
-### Next.js (App Router)
-
-**Recommended: Use the Next.js-specific import** (includes SSR handling):
+Then use the panel in your app:
 
 ```tsx
 // app/providers.tsx
@@ -129,32 +135,7 @@ export function ConvexClientProvider({ children }: { children: React.ReactNode }
 }
 ```
 
-**Alternative: Using the default import** (requires manual SSR handling):
-
-```tsx
-// app/providers.tsx
-"use client";
-
-import { ConvexReactClient, ConvexProvider } from "convex/react";
-import dynamic from "next/dynamic";
-
-const ConvexPanel = dynamic(() => import("convex-panel"), { ssr: false });
-
-const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-
-export function ConvexClientProvider({ children }: { children: React.ReactNode }) {
-  return (
-    <ConvexProvider client={convex}>
-      {children}
-      <ConvexPanel />
-    </ConvexProvider>
-  );
-}
-```
-
-### Vite / React
-
-**Recommended: Use the React-specific import**:
+#### Vite / React (Standard)
 
 ```tsx
 // src/App.tsx
@@ -173,26 +154,134 @@ function App() {
 }
 ```
 
-**Alternative: Using the default import**:
+#### Tanstack Start
+
+Update your `vite.config.ts`:
+
+```typescript
+// vite.config.ts
+import { defineConfig, loadEnv } from "vite";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  const accessToken = env.CONVEX_ACCESS_TOKEN;
+
+  return {
+    plugins: [tanstackStart()],
+    define: {
+      // This replaces __CONVEX_ACCESS_TOKEN__ at build time
+      __CONVEX_ACCESS_TOKEN__: JSON.stringify(accessToken),
+    },
+  };
+});
+```
+
+Then use in your root component:
 
 ```tsx
-// src/App.tsx
+// app/root.tsx
 import { ConvexReactClient, ConvexProvider } from "convex/react";
-import ConvexPanel from "convex-panel";
+import { ConvexPanel } from "convex-panel/react";
 
-const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
+declare const __CONVEX_ACCESS_TOKEN__: string | undefined;
 
-function App() {
+function RootDocument() {
+  const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
+  
   return (
     <ConvexProvider client={convex}>
       {/* Your app */}
-      <ConvexPanel />
+      {__CONVEX_ACCESS_TOKEN__ && (
+        <ConvexPanel accessToken={__CONVEX_ACCESS_TOKEN__} />
+      )}
     </ConvexProvider>
   );
 }
 ```
 
-That's it! The panel will appear at the bottom of your screen. Click to expand and authenticate with your Convex account via OAuth.
+#### React Router
+
+Update your `vite.config.ts`:
+
+```typescript
+// vite.config.ts
+import { reactRouter } from "@react-router/dev/vite";
+import { defineConfig, loadEnv } from "vite";
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  const accessToken = env.CONVEX_ACCESS_TOKEN;
+
+  return {
+    plugins: [reactRouter()],
+    define: {
+      __CONVEX_ACCESS_TOKEN__: JSON.stringify(accessToken),
+    },
+  };
+});
+```
+
+Then use in your root component:
+
+```tsx
+// app/root.tsx
+import { ConvexReactClient, ConvexProvider } from "convex/react";
+import { ConvexPanel } from "convex-panel/react";
+
+declare const __CONVEX_ACCESS_TOKEN__: string | undefined;
+
+export default function App() {
+  const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
+  
+  return (
+    <ConvexProvider client={convex}>
+      {/* Your app */}
+      <ConvexPanel accessToken={__CONVEX_ACCESS_TOKEN__} />
+    </ConvexProvider>
+  );
+}
+```
+
+### Step 6: Connect to Your Convex Project
+
+1. Start your development server
+2. The Convex Panel will appear at the bottom of your screen
+3. Click the **"Connect"** button
+4. You'll be redirected to Convex OAuth login
+5. After authentication, you'll be redirected back to your app
+6. Select your Convex project from the dropdown in the panel
+7. The panel will now be connected and ready to use!
+
+## Environment Variables
+
+### Local Environment (`.env` or `.env.local`)
+
+These variables go in your project's `.env` file:
+
+| Variable | Framework | Description |
+|----------|-----------|-------------|
+| `VITE_CONVEX_URL` | Vite/React | Your Convex deployment URL |
+| `NEXT_PUBLIC_CONVEX_URL` | Next.js | Your Convex deployment URL |
+| `REACT_APP_CONVEX_URL` | Create React App | Your Convex deployment URL |
+| `VITE_OAUTH_CLIENT_ID` | Vite/React | OAuth client ID from Convex dashboard |
+| `NEXT_PUBLIC_OAUTH_CLIENT_ID` | Next.js | OAuth client ID from Convex dashboard |
+| `VITE_CONVEX_TOKEN_EXCHANGE_URL` | Vite/React | Token exchange URL (usually `https://your-deployment.convex.site/oauth/exchange`) |
+| `NEXT_PUBLIC_CONVEX_TOKEN_EXCHANGE_URL` | Next.js | Token exchange URL |
+| `CONVEX_CLIENT_SECRET` | All | OAuth client secret (local only, never commit) |
+| `CONVEX_ACCESS_TOKEN` | All | Access token for direct authentication (optional) |
+
+### Convex Dashboard Environment Variables
+
+These variables must be set in your Convex deployment settings (not in your local `.env`):
+
+| Variable | Description |
+|----------|-------------|
+| `CONVEX_CLIENT_ID` | Same OAuth client ID as in your `.env` file |
+| `CONVEX_CLIENT_SECRET` | OAuth client secret (server-side only) |
+| `OAUTH_REDIRECT_URI` | Optional: Your frontend origin for OAuth redirects |
+
+> **Important:** `CONVEX_CLIENT_SECRET` should **never** be in your frontend `.env` file. It must only exist in your Convex deployment environment variables.
 
 ## Framework-Specific Imports
 
@@ -226,8 +315,7 @@ All imports provide the same functionality - choose based on your framework for 
 
 ### OAuth Configuration (Advanced)
 
-For custom OAuth setups, you can provide an `oauthConfig`.  
-This is useful if you have your own backend endpoint for token exchange:
+For custom OAuth setups, you can provide an `oauthConfig`. This is useful if you have your own backend endpoint for token exchange:
 
 ```tsx
 <ConvexPanel
@@ -338,16 +426,26 @@ npm run build
 ### Panel not appearing?
 - Ensure the component is inside a `ConvexProvider`
 - Check for z-index conflicts with your app
-- Use dynamic import for Next.js: `dynamic(() => import("convex-panel"), { ssr: false })`
+- Use framework-specific import for Next.js: `convex-panel/nextjs`
 
 ### Authentication issues?
-- The panel auto-redirects to OAuth login
+- Verify OAuth credentials are set in both `.env` and Convex dashboard
+- Check that `CONVEX_CLIENT_SECRET` is in Convex dashboard (not in `.env`)
+- Ensure token exchange URL matches your deployment
 - Check browser console for errors
-- Ensure your Convex URL is correctly configured
 
 ### Build warnings about "use client"?
 - This is expected for client components
 - Won't affect functionality
+
+### http.ts file in wrong location?
+- If the setup script created `http.ts` in the wrong folder, manually move it to your actual `convex/` directory
+- Ensure the file is in the same directory as your other Convex functions
+
+### Access token not working?
+- For Next.js: Ensure `CONVEX_ACCESS_TOKEN` is exposed in `next.config.js` `env` config
+- For Vite: Ensure `__CONVEX_ACCESS_TOKEN__` is defined in `vite.config.ts` and passed to the component
+- Verify the token is a valid team-level access token from Convex dashboard
 
 ## License
 
