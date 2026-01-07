@@ -7,11 +7,14 @@
  * Storage is keyed by team slug + project slug combination.
  */
 
+import type { GitHubRepo } from "../github/types";
+
 const STORAGE_KEY = "convex-panel-github-settings";
-const STORAGE_VERSION = 2; // Bumped version to migrate from path-based to project-based storage
+const STORAGE_VERSION = 3; // Bumped version to support storing full repo objects
 
 export interface ProjectGitHubSettings {
   repoFullName: string | null;
+  fullRepo: GitHubRepo | null; // Store full repo object for immediate restoration
   branch: string | null;
   lastUpdated: number;
 }
@@ -61,6 +64,20 @@ function getStore(): GitHubSettingsStore {
         "to",
         STORAGE_VERSION,
       );
+      // For version 2->3 migration, we need to add fullRepo: null to existing settings
+      if (parsed.version === 2) {
+        const migratedProjects: { [projectKey: string]: any } = {};
+        for (const [key, settings] of Object.entries(parsed.projects || {})) {
+          const settingsObj = settings as any;
+          migratedProjects[key] = {
+            repoFullName: settingsObj.repoFullName ?? null,
+            branch: settingsObj.branch ?? null,
+            fullRepo: null, // Add new field, will be populated on next selection
+            lastUpdated: settingsObj.lastUpdated ?? Date.now(),
+          };
+        }
+        return { version: STORAGE_VERSION, projects: migratedProjects };
+      }
       return { version: STORAGE_VERSION, projects: {} };
     }
 
@@ -97,6 +114,7 @@ export function getProjectGitHubSettings(
 
   return {
     repoFullName: settings.repoFullName,
+    fullRepo: settings.fullRepo,
     branch: settings.branch,
     lastUpdated: settings.lastUpdated,
   };
@@ -114,6 +132,7 @@ export function saveProjectGitHubSettings(
 
   const existing = store.projects[key] || {
     repoFullName: null,
+    fullRepo: null,
     branch: null,
     lastUpdated: 0,
   };

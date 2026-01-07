@@ -2,6 +2,9 @@ export interface SharedConfig {
   version: string;
 }
 
+// Application types (User, Team, Project, Deployment, etc.)
+export * from "./application";
+
 // Filter types
 export * from "./filters";
 

@@ -107,25 +107,28 @@ export const SchemaGraph = forwardRef<SchemaGraphRef, SchemaGraphProps>(
 
     // Calculate initial layout
     const initialLayout = useMemo(() => {
-      console.debug(`[SchemaGraph] Layout algorithm: ${settings.layout}`);
-      const result = calculateLayout(schema, settings.layout);
-      console.debug(
-        `[SchemaGraph] Layout calculated: ${result.nodes.length} nodes`,
-      );
-      return result;
+      return calculateLayout(schema, settings.layout);
     }, [schema, settings.layout]);
+
+    // Pre-compute warnings map for better performance
+    const warningsByTable = useMemo(() => {
+      const map = new Map<string, boolean>();
+      schema.health.warnings.forEach((w) => {
+        if (w.table) {
+          map.set(w.table, true);
+        }
+      });
+      return map;
+    }, [schema.health.warnings]);
 
     // Enhance nodes with additional data
     const enhancedNodes = useMemo(() => {
+      const searchQueryLower = settings.searchQuery?.toLowerCase();
       return initialLayout.nodes.map((node) => {
         const table = node.data?.table as SchemaTable | undefined;
         const moduleColor = table?.module
           ? moduleColors[table.module] || moduleColors.default
           : moduleColors.default;
-
-        const warnings = schema.health.warnings.filter(
-          (w) => w.table === table?.name,
-        );
 
         // Get diff data for this table if available
         const tableDiff: TableDiff | undefined = diff?.tableDiffs.get(
@@ -139,15 +142,11 @@ export const SchemaGraph = forwardRef<SchemaGraphRef, SchemaGraphProps>(
             isSelected: selectedTable === table?.name,
             isHighlighted:
               settings.highlightedTable === table?.name ||
-              (settings.searchQuery
-                ? table?.name
-                    .toLowerCase()
-                    .includes(settings.searchQuery.toLowerCase())
-                : undefined),
+              (searchQueryLower && table?.name.toLowerCase().includes(searchQueryLower)),
             showFields: settings.showFields,
             showIndexes: settings.showIndexes,
             moduleColor: settings.colorByModule ? moduleColor : undefined,
-            hasWarnings: warnings.length > 0,
+            hasWarnings: table?.name ? warningsByTable.has(table.name) : false,
             onSelect: onTableSelect,
             onNavigateToData,
             onOpenInCursor,
@@ -166,7 +165,7 @@ export const SchemaGraph = forwardRef<SchemaGraphRef, SchemaGraphProps>(
       settings.showFields,
       settings.showIndexes,
       settings.colorByModule,
-      schema.health.warnings,
+      warningsByTable,
       onTableSelect,
       onNavigateToData,
       onOpenInCursor,
@@ -175,7 +174,9 @@ export const SchemaGraph = forwardRef<SchemaGraphRef, SchemaGraphProps>(
 
     // Enhance edges with additional data
     const enhancedEdges = useMemo(() => {
-      if (!settings.showRelationships) return [];
+      if (!settings.showRelationships) {
+        return [];
+      }
 
       return initialLayout.edges.map((edge) => ({
         ...edge,
@@ -184,6 +185,11 @@ export const SchemaGraph = forwardRef<SchemaGraphRef, SchemaGraphProps>(
           showCardinality: settings.showCardinality,
           isHighlighted:
             selectedTable === edge.source || selectedTable === edge.target,
+        },
+        // Ensure edges are visible
+        style: {
+          ...edge.style,
+          opacity: edge.style?.opacity ?? 1,
         },
       }));
     }, [
@@ -345,14 +351,18 @@ export const SchemaGraph = forwardRef<SchemaGraphRef, SchemaGraphProps>(
       exportAsImage,
     }));
 
-    // Compute background color from CSS variable
+    // Compute background color from CSS variable (memoized)
     const backgroundColor = useMemo(() => {
       if (typeof window === "undefined") return "#ffffff";
-      const element = document.documentElement;
-      const computedColor = getComputedStyle(element).getPropertyValue(
-        "--color-border-muted",
-      );
-      return computedColor.trim() || "#ffffff";
+      try {
+        const element = document.documentElement;
+        const computedColor = getComputedStyle(element).getPropertyValue(
+          "--color-border-muted",
+        );
+        return computedColor.trim() || "#ffffff";
+      } catch {
+        return "#ffffff";
+      }
     }, []);
 
     return (
@@ -376,7 +386,7 @@ export const SchemaGraph = forwardRef<SchemaGraphRef, SchemaGraphProps>(
           maxZoom={2}
           defaultEdgeOptions={{
             type: "relationshipEdge",
-            animated: true,
+            animated: false, // Disable animation for better performance
           }}
           proOptions={{ hideAttribution: true }}
         >
@@ -423,6 +433,8 @@ export const SchemaGraph = forwardRef<SchemaGraphRef, SchemaGraphProps>(
             maskColor="rgba(0, 0, 0, 0.6)"
             pannable
             zoomable
+            nodeStrokeWidth={0}
+            nodeBorderRadius={2}
           />
         </ReactFlow>
       </div>

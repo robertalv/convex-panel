@@ -5,7 +5,16 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": ["dist/**", "build/**", ".next/**"]
+      "outputs": ["dist/**", "build/**", ".next/**"],
+      "env": [
+        "CONVEX_CLIENT_SECRET",
+        "CONVEX_ACCESS_TOKEN",
+        "CONVEX_DEPLOY_KEY",
+        "LOOPS_API_KEY",
+        "VITE_OAUTH_CLIENT_ID",
+        "VITE_CONVEX_URL",
+        "VITE_CONVEX_TOKEN_EXCHANGE_URL"
+      ]
     },
     "lint": {
       "dependsOn": ["^lint"]
@@ -18,5 +27,4 @@
       "persistent": true
     }
   }
-  
 }

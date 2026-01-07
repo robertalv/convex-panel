@@ -1,6 +1,7 @@
 // Re-export types and utilities
 export * from "./types";
 export * from "./utils";
+export * from "./utils/storage";
 
 // Note: API module is exported separately via './api' subpath
 // Import with: import { ... } from '@convex-panel/shared/api'

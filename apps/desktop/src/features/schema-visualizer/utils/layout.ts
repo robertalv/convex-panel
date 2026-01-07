@@ -196,11 +196,13 @@ function forceDirectedLayout(
     });
   });
 
-  // Create edges
+  // Create edges with handle IDs
   const edges: Edge[] = relationships.map((rel) => ({
     id: rel.id,
     source: rel.from,
     target: rel.to,
+    sourceHandle: "source",
+    targetHandle: "target",
     type: "relationshipEdge",
     data: { relationship: rel },
   }));
@@ -299,11 +301,13 @@ function hierarchicalLayout(
     });
   });
 
-  // Create edges
+  // Create edges with handle IDs
   const edges: Edge[] = relationships.map((rel) => ({
     id: rel.id,
     source: rel.from,
     target: rel.to,
+    sourceHandle: "source",
+    targetHandle: "target",
     type: "relationshipEdge",
     data: { relationship: rel },
   }));

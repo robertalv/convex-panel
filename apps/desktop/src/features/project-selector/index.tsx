@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import type { Project, Team, User } from "convex-panel";
+import type { Project, Team, User } from "@/types/desktop";
 import {
   Search,
   Grid3X3,

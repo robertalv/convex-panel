@@ -6,7 +6,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import type { Team } from "convex-panel";
+import type { Team } from "@/types/desktop";
 
 interface WelcomeBannerProps {
   userName?: string;
@@ -36,10 +36,7 @@ export function WelcomeBanner({ userName, team }: WelcomeBannerProps) {
   }, [referralUrl]);
 
   const openExternalLink = async (url: string) => {
-    if (
-      typeof window !== "undefined" &&
-      (window as any).__TAURI_INTERNALS__
-    ) {
+    if (typeof window !== "undefined" && (window as any).__TAURI_INTERNALS__) {
       try {
         const { open } = await import("@tauri-apps/plugin-shell");
         await open(url);
@@ -65,7 +62,10 @@ export function WelcomeBanner({ userName, team }: WelcomeBannerProps) {
             {referralCode ? (
               <>Share link to quintuple your resource limits</>
             ) : (
-              <>{userName ? `Welcome back, ${userName}!` : "Welcome to Convex!"} Select a project below.</>
+              <>
+                {userName ? `Welcome back, ${userName}!` : "Welcome to Convex!"}{" "}
+                Select a project below.
+              </>
             )}
           </span>
 
@@ -108,10 +108,16 @@ export function WelcomeBanner({ userName, team }: WelcomeBannerProps) {
             <div className="space-y-0.5">
               {team && (
                 <button
-                  onClick={() => openExternalLink(`https://dashboard.convex.dev/t/${team.slug}/settings/referrals`)}
+                  onClick={() =>
+                    openExternalLink(
+                      `https://dashboard.convex.dev/t/${team.slug}/settings/referrals`,
+                    )
+                  }
                   className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-[11px] text-text-base transition-colors hover:bg-surface-raised"
                 >
-                  <span className="flex items-center gap-2">View referrals</span>
+                  <span className="flex items-center gap-2">
+                    View referrals
+                  </span>
                   <ExternalLink className="h-3 w-3 text-text-disabled" />
                 </button>
               )}

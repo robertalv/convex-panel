@@ -20,7 +20,8 @@ import { useDeployment } from "@/contexts/DeploymentContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useMcpOptional } from "@/contexts/McpContext";
 import { useGitHubOptional } from "@/contexts/GitHubContext";
-import { useComponents, saveActiveTable } from "convex-panel";
+import { useComponents } from "@/features/data/hooks/useComponents";
+import { saveActiveTable } from "@/lib/storage";
 import type { ConvexComponent } from "@/features/data/types";
 import { ResizableSheet } from "@/features/data/components/ResizableSheet";
 import { useSchema } from "./hooks/useSchema";
@@ -289,24 +290,13 @@ function SchemaVisualizerContent() {
 
   // Fetch components for component selector
   const {
-    componentNames,
-    componentNameToId,
-    selectedComponent,
+    components,
     setSelectedComponent,
     selectedComponentId,
   } = useComponents({
     adminClient,
     useMockData: false,
   });
-
-  // Convert componentNames to ConvexComponent[] for the sidebar
-  const componentsAsConvexComponents: ConvexComponent[] = useMemo(() => {
-    return componentNames.map((name) => ({
-      id: name === "app" ? null : (componentNameToId.get(name) ?? name),
-      name: name === "app" ? null : name,
-      path: name === "app" ? "_App" : name,
-    }));
-  }, [componentNames, componentNameToId]);
 
   // Fetch schema data filtered by selected component
   const { schema, schemaJson, isLoading, error, refetch } = useSchema({
@@ -383,7 +373,7 @@ function SchemaVisualizerContent() {
   const [showUpdatesPanel, setShowUpdatesPanel] = useState(false);
 
   // Track the last component that had a valid schema
-  const lastValidComponentRef = useRef<string | null>(selectedComponent);
+  const lastValidComponentRef = useRef<string | null>(selectedComponentId);
 
   // Detect if we're about to revert to a previous valid component
   // This prevents showing the empty state flash before the revert happens
@@ -392,13 +382,13 @@ function SchemaVisualizerContent() {
     schema &&
     schema.tables.size === 0 &&
     lastValidComponentRef.current !== null &&
-    selectedComponent !== lastValidComponentRef.current;
+    selectedComponentId !== lastValidComponentRef.current;
 
   // If schema is empty (no tables) after loading, revert to the last valid component
   useEffect(() => {
     if (!isLoading && schema && schema.tables.size > 0) {
       // Schema has tables - this is a valid component, remember it
-      lastValidComponentRef.current = selectedComponent;
+      lastValidComponentRef.current = selectedComponentId;
     } else if (
       !isLoading &&
       schema &&
@@ -406,11 +396,11 @@ function SchemaVisualizerContent() {
       lastValidComponentRef.current !== null
     ) {
       // Schema is empty and we have a previous valid component - revert to it
-      if (selectedComponent !== lastValidComponentRef.current) {
+      if (selectedComponentId !== lastValidComponentRef.current) {
         setSelectedComponent(lastValidComponentRef.current);
       }
     }
-  }, [schema, isLoading, selectedComponent, setSelectedComponent]);
+  }, [schema, isLoading, selectedComponentId, setSelectedComponent]);
 
   // UI state - persisted via useVisualizerSettings
   const {
@@ -676,18 +666,9 @@ function SchemaVisualizerContent() {
               aggregations={aggregations}
               selectedComponentId={selectedComponentId}
               onComponentSelect={(componentId) => {
-                // Convert component ID back to component name for setSelectedComponent
-                if (componentId === null) {
-                  setSelectedComponent("app");
-                } else {
-                  // Find the component name by ID
-                  const entry = Array.from(componentNameToId.entries()).find(
-                    ([_, id]) => id === componentId,
-                  );
-                  setSelectedComponent(entry ? entry[0] : componentId);
-                }
+                setSelectedComponent(componentId);
               }}
-              components={componentsAsConvexComponents}
+              components={components}
               isOpen={true}
               onClose={() => setSidebarCollapsed(true)}
             />

@@ -16,7 +16,8 @@ import { useDeployment } from "@/contexts/DeploymentContext";
 import { useMcpOptional } from "@/contexts/McpContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useSchema } from "../schema-visualizer/hooks/useSchema";
-import { useComponents, ComponentSelector } from "convex-panel";
+import { useComponents } from "@/features/data/hooks/useComponents";
+import { ComponentSelector } from "@/components/ComponentSelector";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import type {
   HealthWarning,
@@ -43,15 +44,11 @@ export function PerformanceAdvisorView() {
   const mcp = useMcpOptional();
 
   // Components selector
-  const {
-    componentNames,
-    selectedComponent,
-    setSelectedComponent,
-    selectedComponentId,
-  } = useComponents({
-    adminClient,
-    useMockData: false,
-  });
+  const { components, setSelectedComponent, selectedComponentId } =
+    useComponents({
+      adminClient,
+      useMockData: false,
+    });
 
   // Fetch schema data
   const { schema, isLoading, error, refetch } = useSchema({
@@ -184,12 +181,12 @@ export function PerformanceAdvisorView() {
         {/* Left section */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           {/* Component selector */}
-          {componentNames.length > 1 && (
+          {components.length > 1 && (
             <>
               <ComponentSelector
-                selectedComponent={selectedComponent}
+                selectedComponentId={selectedComponentId}
                 onSelect={setSelectedComponent}
-                components={componentNames}
+                components={components}
               />
 
               {/* Divider */}

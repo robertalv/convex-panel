@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { ChevronDown, Search, CircleCheck, X } from "lucide-react";
 import { Input } from "./input";
-import { Team, Deployment } from "convex-panel";
+import { Team, Deployment } from "@/types/desktop";
 import { TierBadge } from "../TierBadge";
 import type { TeamSubscription } from "@/api/bigbrain";
 import { EnvironmentBadge } from "../EnvironmentBadge";
@@ -246,9 +246,7 @@ export function SearchableSelect({
           "bg-transparent",
           "focus:outline-none focus:ring-0",
           "transition-colors duration-fast",
-          disabled
-            ? "cursor-not-allowed opacity-50"
-            : "cursor-pointer",
+          disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
           variantClasses,
           buttonClassName,
         )}
@@ -259,11 +257,13 @@ export function SearchableSelect({
               {triggerIcon}
             </span>
           )}
-          <span className={cn("truncate", triggerIcon ? "flex-1" : "max-w-[140px]")}>
+          <span
+            className={cn("truncate", triggerIcon ? "flex-1" : "max-w-[140px]")}
+          >
             {selectedOption?.label || placeholder}
           </span>
           {selectedTeam ? (
-          <TierBadge subscription={subscription ?? null} />
+            <TierBadge subscription={subscription ?? null} />
           ) : null}
           {selectedDeployment && showEnvironmentBadge && (
             <EnvironmentBadge

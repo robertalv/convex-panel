@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { ConvexLogo } from "convex-panel";
+import { ConvexLogo } from "@/components/ui/ConvexLogo";
 import { AlertCircle } from "lucide-react";
 import { DeviceAuthFlow } from "./DeviceAuthFlow";
 import { DeployKeyForm } from "./DeployKeyForm";

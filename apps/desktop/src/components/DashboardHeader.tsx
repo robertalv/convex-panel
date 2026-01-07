@@ -1,186 +1,202 @@
-import { useState, useRef, useEffect } from 'react';
-import { Sparkles, Settings as SettingsIcon, Check, ChevronDown } from 'lucide-react';
-import { Project, Team, Deployment, ConvexLogo, UserMenu } from 'convex-panel';
+import { useState, useRef, useEffect } from "react";
+import {
+  Sparkles,
+  Settings as SettingsIcon,
+  Check,
+  ChevronDown,
+} from "lucide-react";
+import { Project, Team, Deployment } from "@/types/desktop";
+import { ConvexLogo } from "@/components/ui/ConvexLogo";
+import { UserMenu } from "@/components/layout/UserMenu";
 
 export interface DashboardHeaderProps {
-    user: { name?: string; email?: string; profilePictureUrl?: string; } | null;
-    teams: Team[];
-    projects: Project[];
-    deployments: Deployment[];
-    selectedTeam: Team | null;
-    selectedProject: Project | null;
-    selectedDeployment: Deployment | null;
-    onSelectProject: (team: Team, project: Project) => void;
-    onSelectTeam: (team: Team) => void;
-    onSelectDeployment: (deployment: Deployment) => void;
-    isDarkMode: boolean;
-    setIsDarkMode: (isDark: boolean) => void;
-    onThemeToggle: () => void;
-    onDisconnect: () => void;
+  user: { name?: string; email?: string; profilePictureUrl?: string } | null;
+  teams: Team[];
+  projects: Project[];
+  deployments: Deployment[];
+  selectedTeam: Team | null;
+  selectedProject: Project | null;
+  selectedDeployment: Deployment | null;
+  onSelectProject: (team: Team, project: Project) => void;
+  onSelectTeam: (team: Team) => void;
+  onSelectDeployment: (deployment: Deployment) => void;
+  isDarkMode: boolean;
+  setIsDarkMode: (isDark: boolean) => void;
+  onThemeToggle: () => void;
+  onDisconnect: () => void;
 }
 
 export function DashboardHeader({
-    user,
-    projects,
-    teams,
-    deployments,
-    selectedProject,
-    selectedTeam,
-    selectedDeployment,
-    onSelectProject,
-    onSelectTeam,
-    onSelectDeployment,
-    isDarkMode,
-    onThemeToggle,
-    onDisconnect
+  user,
+  projects,
+  teams,
+  deployments,
+  selectedProject,
+  selectedTeam,
+  selectedDeployment,
+  onSelectProject,
+  onSelectTeam,
+  onSelectDeployment,
+  isDarkMode,
+  onThemeToggle,
+  onDisconnect,
 }: DashboardHeaderProps) {
-    const [dropdownOpen, setDropdownOpen] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setDropdownOpen(false);
-            }
-        }
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-    // Helper to get formatted context string
-    const getContextString = () => {
-        const parts = [];
-        if (selectedTeam) parts.push(selectedTeam.name);
-        if (selectedProject) parts.push(selectedProject.name);
-        if (selectedDeployment) parts.push(selectedDeployment.name);
-        return parts.length > 0 ? parts.join(' / ') : 'Select Context';
-    };
+  // Helper to get formatted context string
+  const getContextString = () => {
+    const parts = [];
+    if (selectedTeam) parts.push(selectedTeam.name);
+    if (selectedProject) parts.push(selectedProject.name);
+    if (selectedDeployment) parts.push(selectedDeployment.name);
+    return parts.length > 0 ? parts.join(" / ") : "Select Context";
+  };
 
-    return (
-        <div className="dashboard-header-container" data-tauri-drag-region>
-            {/* Header Content - Draggable by default, interactive elements marked as no-drag */}
-            <div className="header-content-layer">
-                {/* Left Section: Logo */}
-                <div className="header-left">
-                    <div className="logo-section">
-                        <ConvexLogo className="header-logo" />
+  return (
+    <div className="dashboard-header-container" data-tauri-drag-region>
+      {/* Header Content - Draggable by default, interactive elements marked as no-drag */}
+      <div className="header-content-layer">
+        {/* Left Section: Logo */}
+        <div className="header-left">
+          <div className="logo-section">
+            <ConvexLogo className="header-logo" />
+          </div>
+        </div>
+
+        {/* Center Section: Context Dropdown */}
+        <div className="header-center">
+          <div className="context-selector-container" ref={dropdownRef}>
+            <button
+              className={`context-select-btn ${dropdownOpen ? "active" : ""}`}
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+            >
+              <span className="context-text">{getContextString()}</span>
+              <ChevronDown size={12} className="chevron" />
+            </button>
+
+            {/* Dropdown Menu */}
+            {dropdownOpen && (
+              <div className="dropdown-menu context-menu">
+                {/* Teams Section */}
+                <div className="dropdown-section">
+                  <div className="section-label">Teams</div>
+                  <div className="menu-list">
+                    {teams.map((team) => (
+                      <button
+                        key={team.id}
+                        className={`menu-item ${selectedTeam?.id === team.id ? "selected" : ""}`}
+                        onClick={() => {
+                          onSelectTeam(team);
+                        }}
+                      >
+                        <div className="team-avatar small">
+                          {team.name.substring(0, 2).toUpperCase()}
+                        </div>
+                        <span className="item-name">{team.name}</span>
+                        {selectedTeam?.id === team.id && <Check size={14} />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Projects Section */}
+                {selectedTeam && (
+                  <div className="dropdown-section">
+                    <div className="section-label">Projects</div>
+                    <div className="menu-list">
+                      {projects.length > 0 ? (
+                        projects.map((project) => (
+                          <button
+                            key={project.id}
+                            className={`menu-item ${selectedProject?.id === project.id ? "selected" : ""}`}
+                            onClick={() => {
+                              onSelectProject(selectedTeam, project);
+                            }}
+                          >
+                            <span className="item-name">{project.name}</span>
+                            {selectedProject?.id === project.id && (
+                              <Check size={14} />
+                            )}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="empty-item">No projects found</div>
+                      )}
                     </div>
-                </div>
+                  </div>
+                )}
 
-                {/* Center Section: Context Dropdown */}
-                <div className="header-center">
-                    <div className="context-selector-container" ref={dropdownRef}>
-                        <button
-                            className={`context-select-btn ${dropdownOpen ? 'active' : ''}`}
-                            onClick={() => setDropdownOpen(!dropdownOpen)}
-                        >
-                            <span className="context-text">{getContextString()}</span>
-                            <ChevronDown size={12} className="chevron" />
-                        </button>
-
-                        {/* Dropdown Menu */}
-                        {dropdownOpen && (
-                            <div className="dropdown-menu context-menu">
-                                {/* Teams Section */}
-                                <div className="dropdown-section">
-                                    <div className="section-label">Teams</div>
-                                    <div className="menu-list">
-                                        {teams.map(team => (
-                                            <button
-                                                key={team.id}
-                                                className={`menu-item ${selectedTeam?.id === team.id ? 'selected' : ''}`}
-                                                onClick={() => {
-                                                    onSelectTeam(team);
-                                                }}
-                                            >
-                                                <div className="team-avatar small">
-                                                    {team.name.substring(0, 2).toUpperCase()}
-                                                </div>
-                                                <span className="item-name">{team.name}</span>
-                                                {selectedTeam?.id === team.id && <Check size={14} />}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Projects Section */}
-                                {selectedTeam && (
-                                    <div className="dropdown-section">
-                                        <div className="section-label">Projects</div>
-                                        <div className="menu-list">
-                                            {projects.length > 0 ? (
-                                                projects.map(project => (
-                                                    <button
-                                                        key={project.id}
-                                                        className={`menu-item ${selectedProject?.id === project.id ? 'selected' : ''}`}
-                                                        onClick={() => {
-                                                            onSelectProject(selectedTeam, project);
-                                                        }}
-                                                    >
-                                                        <span className="item-name">{project.name}</span>
-                                                        {selectedProject?.id === project.id && <Check size={14} />}
-                                                    </button>
-                                                ))
-                                            ) : (
-                                                <div className="empty-item">No projects found</div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Deployments Section */}
-                                {selectedProject && (
-                                    <div className="dropdown-section">
-                                        <div className="section-label">Deployments</div>
-                                        <div className="menu-list">
-                                            {deployments.length > 0 ? (
-                                                deployments.map(deployment => (
-                                                    <button
-                                                        key={deployment.id}
-                                                        className={`menu-item ${selectedDeployment?.id === deployment.id ? 'selected' : ''}`}
-                                                        onClick={() => {
-                                                            onSelectDeployment(deployment);
-                                                            setDropdownOpen(false); // Close on final selection
-                                                        }}
-                                                    >
-                                                        <span className="item-name">{deployment.name}</span>
-                                                        <span className="deployment-type-badge">{deployment.deploymentType}</span>
-                                                        {selectedDeployment?.id === deployment.id && <Check size={14} />}
-                                                    </button>
-                                                ))
-                                            ) : (
-                                                <div className="empty-item">No deployments found</div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                {/* Deployments Section */}
+                {selectedProject && (
+                  <div className="dropdown-section">
+                    <div className="section-label">Deployments</div>
+                    <div className="menu-list">
+                      {deployments.length > 0 ? (
+                        deployments.map((deployment) => (
+                          <button
+                            key={deployment.id}
+                            className={`menu-item ${selectedDeployment?.id === deployment.id ? "selected" : ""}`}
+                            onClick={() => {
+                              onSelectDeployment(deployment);
+                              setDropdownOpen(false); // Close on final selection
+                            }}
+                          >
+                            <span className="item-name">{deployment.name}</span>
+                            <span className="deployment-type-badge">
+                              {deployment.deploymentType}
+                            </span>
+                            {selectedDeployment?.id === deployment.id && (
+                              <Check size={14} />
+                            )}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="empty-item">No deployments found</div>
+                      )}
                     </div>
-                </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
 
-                {/* Right Section: Tools & User */}
-                <div className="header-right">
-                    <button className="tool-btn" title="AI Assistant">
-                        <Sparkles size={16} />
-                    </button>
+        {/* Right Section: Tools & User */}
+        <div className="header-right">
+          <button className="tool-btn" title="AI Assistant">
+            <Sparkles size={16} />
+          </button>
 
-                    <button className="tool-btn" title="Settings">
-                        <SettingsIcon size={16} />
-                    </button>
+          <button className="tool-btn" title="Settings">
+            <SettingsIcon size={16} />
+          </button>
 
-                    <div className="divider-vertical"></div>
+          <div className="divider-vertical"></div>
 
-                    <UserMenu
-                        user={user}
-                        onLogout={onDisconnect}
-                        onThemeToggle={onThemeToggle}
-                        theme={isDarkMode ? 'dark' : 'light'}
-                    />
-                </div>
-            </div>
+          <UserMenu
+            user={user}
+            onLogout={onDisconnect}
+            onThemeToggle={onThemeToggle}
+            theme={isDarkMode ? "dark" : "light"}
+          />
+        </div>
+      </div>
 
-            <style>{`
+      <style>{`
                 .dashboard-header-container {
                     position: relative;
                     width: 100%;
@@ -395,6 +411,6 @@ export function DashboardHeader({
                     opacity: 0.6;
                 }
             `}</style>
-        </div>
-    );
+    </div>
+  );
 }

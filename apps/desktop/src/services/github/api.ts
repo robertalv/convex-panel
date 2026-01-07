@@ -45,10 +45,19 @@ async function fetchWithRetry(
   options: RequestInit,
   config: RetryConfig = DEFAULT_RETRY_CONFIG,
 ): Promise<Response> {
+  // If signal is already aborted, don't proceed
+  if (options.signal?.aborted) {
+    throw new DOMException("Aborted", "AbortError");
+  }
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
     try {
+      // Check if aborted before making request
+      if (options.signal?.aborted) {
+        throw new DOMException("Aborted", "AbortError");
+      }
+
       const response = await fetch(url, options);
 
       // Check for retryable status codes
@@ -396,36 +405,52 @@ export async function listAllBranches(
 export async function searchUserRepos(
   token: string,
   query: string,
-  options?: { perPage?: number },
+  options?: { perPage?: number; signal?: AbortSignal },
 ): Promise<GitHubRepo[]> {
   const perPage = options?.perPage ?? 30;
 
-  // GitHub Search API: search in user's repos
-  // We use `user:@me` to search only in repos the current user owns/has access to
-  // Alternatively, we could use the regular repos endpoint with a filter
-  const response = await fetchWithRetry(
-    `${GITHUB_API_URL}/search/repositories?q=${encodeURIComponent(query)}+in:name+user:@me&per_page=${perPage}&sort=updated`,
-    { headers: githubHeaders(token) },
-  );
+  try {
+    // GitHub Search API: search in user's repos
+    // We use `user:@me` to search only in repos the current user owns/has access to
+    const response = await fetchWithRetry(
+      `${GITHUB_API_URL}/search/repositories?q=${encodeURIComponent(query)}+in:name+user:@me&per_page=${perPage}&sort=updated`,
+      {
+        headers: githubHeaders(token),
+        signal: options?.signal,
+      },
+    );
 
-  if (!response.ok) {
-    // Search API might fail for certain queries, fall back to empty
-    console.warn("GitHub search failed, status:", response.status);
+    if (!response.ok) {
+      // Handle specific error cases
+      if (response.status === 403) {
+        console.warn("GitHub search rate limited or forbidden");
+        return [];
+      }
+      if (response.status === 422) {
+        console.warn("GitHub search query validation failed");
+        return [];
+      }
+      // Search API might fail for certain queries, fall back to empty
+      console.warn("GitHub search failed, status:", response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.items.map((repo: GitHubRepo) => ({
+      id: repo.id,
+      name: repo.name,
+      full_name: repo.full_name,
+      private: repo.private,
+      owner: {
+        login: repo.owner.login,
+        avatar_url: repo.owner.avatar_url,
+      },
+      default_branch: repo.default_branch,
+    }));
+  } catch (e) {
+    console.error("GitHub search error:", e);
     return [];
   }
-
-  const data = await response.json();
-  return data.items.map((repo: GitHubRepo) => ({
-    id: repo.id,
-    name: repo.name,
-    full_name: repo.full_name,
-    private: repo.private,
-    owner: {
-      login: repo.owner.login,
-      avatar_url: repo.owner.avatar_url,
-    },
-    default_branch: repo.default_branch,
-  }));
 }
 
 /**

@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { ConvexLogo } from "@/components/ui/ConvexLogo";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { UserMenu } from "./UserMenu";
-import type { Team, Project, Deployment, User } from "convex-panel";
+import type { Team, Project, Deployment, User } from "@/types/desktop";
 import type { TeamSubscription } from "@/api/bigbrain";
 import { Terminal } from "lucide-react";
 import {
@@ -129,15 +129,23 @@ export function TopBar({
     [projects],
   );
 
-  const deploymentOptions = React.useMemo(
-    () =>
-      deployments.map((d) => ({
-        value: String(d.id),
-        label: d.name,
-        sublabel: d.deploymentType,
-      })),
-    [deployments],
-  );
+  const deploymentOptions = React.useMemo(() => {
+    // Show saved deployment option even if deployments haven't loaded yet
+    if (deployments.length === 0 && selectedDeployment && deploymentsLoading) {
+      return [
+        {
+          value: String(selectedDeployment.id),
+          label: selectedDeployment.name,
+          sublabel: selectedDeployment.deploymentType,
+        },
+      ];
+    }
+    return deployments.map((d) => ({
+      value: String(d.id),
+      label: d.name,
+      sublabel: d.deploymentType,
+    }));
+  }, [deployments, selectedDeployment, deploymentsLoading]);
 
   const handleTeamChange = React.useCallback(
     (value: string) => {

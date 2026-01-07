@@ -14,7 +14,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import { ConvexReactClient } from "convex/react";
-import type { Deployment, Project, Team, User } from "convex-panel";
+import type { Deployment, Project, Team, User } from "@/types/desktop";
 import {
   Activity,
   CalendarClock,
@@ -433,13 +433,20 @@ export default function App({ convex: _initialConvex }: AppProps) {
         }
       }
     }
-  }, [
-    projects,
-    selectedProject,
-    isInitialLoad,
-    session?.accessToken,
-    loadDeployments,
-  ]);
+  }, [deployments, selectedDeployment, selectedProject]);
+
+  // Handle loading state for deployments
+  useEffect(() => {
+    if (
+      selectedProject &&
+      deploymentsLoading === true &&
+      deployments.length === 0
+    ) {
+      // Deployments are still loading - keep existing selection but mark as not loaded yet
+      // This prevents showing "No results found" during loading
+      setIsInitialLoad(true);
+    }
+  }, [selectedProject, deploymentsLoading, deployments.length]);
 
   useEffect(() => {
     if (selectedProject && session?.accessToken) {
@@ -448,31 +455,38 @@ export default function App({ convex: _initialConvex }: AppProps) {
   }, [selectedProject?.id, loadDeployments, session?.accessToken]);
 
   useEffect(() => {
-    if (selectedProject && deployments.length > 0) {
-      if (selectedDeployment) {
-        const deploymentExists = deployments.some(
-          (d) => d.id === selectedDeployment.id,
-        );
-        if (!deploymentExists) {
-          setSelectedDeployment(null);
-        } else {
-          const freshDeployment = deployments.find(
+    if (selectedProject) {
+      if (deployments.length > 0) {
+        // Deployments are loaded - validate and update selection
+        if (selectedDeployment) {
+          const deploymentExists = deployments.some(
             (d) => d.id === selectedDeployment.id,
           );
-          if (freshDeployment && freshDeployment !== selectedDeployment) {
-            setSelectedDeployment(freshDeployment);
+          if (!deploymentExists) {
+            setSelectedDeployment(null);
+          } else {
+            const freshDeployment = deployments.find(
+              (d) => d.id === selectedDeployment.id,
+            );
+            if (freshDeployment && freshDeployment !== selectedDeployment) {
+              setSelectedDeployment(freshDeployment);
+            }
+            setIsInitialLoad(false);
+            return;
           }
-          setIsInitialLoad(false);
-          return;
         }
+        // No valid selected deployment - auto-select dev or first deployment
+        const dev = deployments.find(
+          (d) => d.name.endsWith("dev") || d.deploymentType === "dev",
+        );
+        setSelectedDeployment(dev || deployments[0]);
+        setIsInitialLoad(false);
       }
-      const dev = deployments.find(
-        (d) => d.name.endsWith("dev") || d.deploymentType === "dev",
-      );
-      setSelectedDeployment(dev || deployments[0]);
-      setIsInitialLoad(false);
+    } else {
+      // No project selected - clear deployment
+      setSelectedDeployment(null);
     }
-  }, [deployments, selectedDeployment, selectedProject]);
+  }, [deployments, selectedDeployment, selectedProject, deploymentsLoading]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -672,7 +686,11 @@ export default function App({ convex: _initialConvex }: AppProps) {
                       path="/settings"
                       element={
                         <SettingsView
-                          user={headerUser}
+                          user={{
+                            name: headerUser?.name || "",
+                            email: headerUser?.email || "",
+                            profilePictureUrl: headerUser?.profilePictureUrl,
+                          }}
                           onLogout={handleDisconnect}
                           teamId={selectedTeam?.id}
                         />

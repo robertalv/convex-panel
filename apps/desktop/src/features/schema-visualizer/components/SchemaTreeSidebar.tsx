@@ -21,8 +21,8 @@ import {
   X,
 } from "lucide-react";
 import { ResizableSheet } from "@/features/data/components/ResizableSheet";
-import { ComponentSelector } from "@/features/data/components/ComponentSelector";
-import type { ConvexComponent } from "@/features/data/types";
+import { ComponentSelector } from "@/components/ComponentSelector";
+import type { ConvexComponent } from "@/types/desktop";
 import type { ParsedSchema } from "../types";
 
 interface SchemaTreeSidebarProps {

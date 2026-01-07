@@ -27,39 +27,29 @@ import type { SchemaJSON } from "../types";
 import { createSnapshot } from "../utils/schema-diff";
 import { saveSnapshot, getAllSnapshots } from "../utils/schema-storage";
 
-// Storage keys for persisting branch selection
-const STORAGE_PREFIX = "convex-panel:github-branch:";
-
-/**
- * Get the storage key for a repository's branch selection
- */
-function getBranchStorageKey(repoFullName: string): string {
-  return `${STORAGE_PREFIX}${repoFullName}`;
-}
+// Branch storage is now handled by GitHub context
+// Legacy storage functions are kept for backward compatibility but do nothing
 
 /**
  * Load persisted branch for a repository
+ * Now uses GitHub context instead of localStorage
  */
 function loadPersistedBranch(repoFullName: string | null): string | null {
-  if (!repoFullName) return null;
-  try {
-    const stored = localStorage.getItem(getBranchStorageKey(repoFullName));
-    return stored || null;
-  } catch {
-    return null;
-  }
+  // Branch is now managed by GitHub context, so we don't use localStorage anymore
+  // This function is kept for backward compatibility but returns null
+  return null;
 }
 
 /**
  * Save branch selection for a repository
+ * Now uses GitHub context instead of localStorage
  */
 function persistBranch(repoFullName: string | null, branch: string): void {
-  if (!repoFullName) return;
-  try {
-    localStorage.setItem(getBranchStorageKey(repoFullName), branch);
-  } catch (e) {
-    console.warn("[useRemoteSchemaHistory] Failed to persist branch:", e);
-  }
+  // Branch is now managed by GitHub context, so we don't use localStorage anymore
+  // This function is kept for backward compatibility but does nothing
+  console.log(
+    "[useRemoteSchemaHistory] Branch management delegated to GitHub context",
+  );
 }
 
 export interface RemoteGitCommit {

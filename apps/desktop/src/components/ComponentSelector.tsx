@@ -7,7 +7,7 @@ import { useMemo } from "react";
 import { Code } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
-import type { ConvexComponent } from "../types";
+import type { ConvexComponent } from "@/features/data/types";
 
 // Special value to represent root app (null) in SearchableSelect
 const ROOT_VALUE = "__root__";
@@ -19,7 +19,7 @@ interface ComponentSelectorProps {
   onSelect: (componentId: string | null) => void;
   /** List of available components */
   components: ConvexComponent[];
-  /** Stretch the trigger button to full width */
+  /** Stretch to full width */
   fullWidth?: boolean;
   /** Visual style variant */
   variant?: "inline" | "input";

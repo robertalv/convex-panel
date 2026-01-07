@@ -14,6 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { IconButton } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export interface TableMenuDropdownProps {
   onCustomQuery: () => void;
@@ -168,6 +169,7 @@ export function TableMenuDropdown({
         size="sm"
         tooltip="More actions"
         style={{
+          marginTop: "2px",
           backgroundColor: isOpen ? "var(--color-surface-raised)" : undefined,
         }}
       >
@@ -177,7 +179,7 @@ export function TableMenuDropdown({
       {isOpen && (
         <div
           ref={menuRef}
-          className="absolute right-0 top-full mt-1 min-w-[180px] rounded-xl shadow-lg z-50 overflow-hidden p-1"
+          className="absolute right-0 top-full mt-1 min-w-[180px] rounded-xl shadow-lg z-50 overflow-hidden p-1 space-y-0.5"
           style={{
             backgroundColor: "var(--color-surface-base)",
             border: "1px solid var(--color-border-muted)",
@@ -192,21 +194,17 @@ export function TableMenuDropdown({
                 type="button"
                 onClick={item.onClick}
                 onMouseEnter={() => setHighlightedIndex(index)}
-                className="w-full flex items-center gap-2 px-2.5 py-2 text-sm text-left rounded-lg transition-colors"
-                style={{
-                  backgroundColor: isHighlighted
-                    ? "var(--color-surface-raised)"
-                    : "transparent",
-                  color: item.destructive
-                    ? "var(--color-error-base)"
-                    : "var(--color-text-base)",
-                  marginBottom: index < menuItems.length - 1 ? "2px" : 0,
-                }}
+                className={cn(
+                  "w-full flex items-center gap-2 px-2 py-1.5 text-left rounded-lg",
+                  "text-xs transition-colors",
+                  item.destructive ? "text-error-base" : "text-text-base",
+                  isHighlighted && "bg-surface-raised",
+                  !isHighlighted && "hover:bg-surface-raised",
+                )}
               >
                 <span
+                  className="flex items-center"
                   style={{
-                    display: "flex",
-                    alignItems: "center",
                     color: item.destructive
                       ? "var(--color-error-base)"
                       : "var(--color-text-muted)",

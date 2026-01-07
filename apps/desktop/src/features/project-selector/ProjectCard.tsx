@@ -1,4 +1,4 @@
-import type { Project } from "convex-panel";
+import type { Project } from "@/types/desktop";
 import { Card } from "@/components/ui/card";
 import { ChevronRight, Folder } from "lucide-react";
 

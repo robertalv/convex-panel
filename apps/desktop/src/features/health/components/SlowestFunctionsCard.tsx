@@ -124,9 +124,11 @@ export function SlowestFunctionsCard({
 }: SlowestFunctionsCardProps) {
   // Sort by p95 latency and take top N
   const displayFunctions = useMemo(() => {
+    if (!functions || !Array.isArray(functions)) return [];
+
     return [...functions]
-      .filter((f) => f.p95Latency > 0)
-      .sort((a, b) => b.p95Latency - a.p95Latency)
+      .filter((f) => f && f.p95Latency != null && f.p95Latency > 0)
+      .sort((a, b) => (b.p95Latency || 0) - (a.p95Latency || 0))
       .slice(0, maxItems);
   }, [functions, maxItems]);
 
@@ -170,7 +172,7 @@ export function SlowestFunctionsCard({
                     {fn.name}
                   </span>
                   <span className="text-[10px] text-muted shrink-0">
-                    {fn.invocations.toLocaleString()} calls
+                    {(fn.invocations || 0).toLocaleString()} calls
                   </span>
                 </div>
 
@@ -184,7 +186,7 @@ export function SlowestFunctionsCard({
                         getBarColorClass(fn.p95Latency),
                       )}
                       style={{
-                        width: `${Math.min(100, (fn.p95Latency / maxP95) * 100)}%`,
+                        width: `${Math.min(100, ((fn.p95Latency || 0) / maxP95) * 100)}%`,
                       }}
                     />
                   </div>
@@ -194,7 +196,7 @@ export function SlowestFunctionsCard({
                     <span className="text-muted">
                       p50:{" "}
                       <span className="text-foreground font-mono">
-                        {formatLatency(fn.p50Latency)}
+                        {formatLatency(fn.p50Latency || 0)}
                       </span>
                     </span>
                     <span className="text-muted">
@@ -202,10 +204,10 @@ export function SlowestFunctionsCard({
                       <span
                         className={cn(
                           "font-medium font-mono",
-                          getLatencyColorClass(fn.p95Latency),
+                          getLatencyColorClass(fn.p95Latency || 0),
                         )}
                       >
-                        {formatLatency(fn.p95Latency)}
+                        {formatLatency(fn.p95Latency || 0)}
                       </span>
                     </span>
                   </div>

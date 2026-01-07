@@ -6,7 +6,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
-import type { User, Team, Project } from "convex-panel";
+import type { User, Team, Project } from "@/types/desktop";
 import {
   User as UserIcon,
   Settings,

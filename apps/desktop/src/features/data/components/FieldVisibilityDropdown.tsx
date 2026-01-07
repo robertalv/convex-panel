@@ -167,7 +167,10 @@ export function FieldVisibilityDropdown({
           {/* Search Input */}
           <div className="border-b border-border-muted">
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-subtle z-10 pointer-events-none" />
+              <Search
+                size={12}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none z-10"
+              />
               <Input
                 ref={inputRef}
                 type="text"
@@ -176,10 +179,11 @@ export function FieldVisibilityDropdown({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
                 className={cn(
-                  "w-full pl-8 pr-3 py-1.5",
-                  "border-0 rounded-none",
+                  "w-full h-8 pl-7 pr-7 text-xs",
+                  "bg-transparent border-0 rounded-none",
+                  "text-text-base outline-none focus:outline-none",
                   "hover:bg-transparent hover:border-0",
-                  "focus:border-0 focus:border-transparent",
+                  "focus:border-0 focus:border-transparent focus-visible:ring-0",
                 )}
               />
             </div>
@@ -188,10 +192,10 @@ export function FieldVisibilityDropdown({
           {/* Field List */}
           <div
             ref={optionsRef}
-            className="max-h-[240px] overflow-y-auto p-1 space-y-0.5"
+            className="max-h-[300px] overflow-y-auto p-1 space-y-0.5"
           >
             {filteredFields.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-text-muted text-center">
+              <div className="px-3 py-2 text-xs text-text-muted text-center">
                 No fields found
               </div>
             ) : (
@@ -215,8 +219,8 @@ export function FieldVisibilityDropdown({
                       e.stopPropagation();
                     }}
                     className={cn(
-                      "w-full flex items-center justify-between gap-2 px-2 py-1 text-left rounded-lg",
-                      "text-sm transition-colors text-text-base",
+                      "w-full flex items-center justify-between gap-2 px-2 py-1.5 text-left rounded-lg",
+                      "text-xs transition-colors text-text-base",
                       isHighlighted
                         ? "bg-surface-raised"
                         : "hover:bg-surface-raised",

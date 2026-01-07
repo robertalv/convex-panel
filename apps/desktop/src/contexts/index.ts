@@ -12,3 +12,12 @@ export {
   type TerminalSession,
 } from "./TerminalContext";
 export { GitHubProvider, useGitHub, useGitHubOptional } from "./GitHubContext";
+export {
+  SheetProvider,
+  useSheet,
+  useSheetSafe,
+  useSheetActions,
+  useSheetState,
+  type SheetContent,
+  type SheetState,
+} from "./SheetContext";

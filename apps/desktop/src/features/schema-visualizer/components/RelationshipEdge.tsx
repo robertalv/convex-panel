@@ -45,14 +45,17 @@ function RelationshipEdgeComponent({
   });
 
   // Determine edge color based on state
+  // Use explicit colors for better performance (avoid getComputedStyle on every render)
   const strokeColor = selected
     ? "#3b82f6"
     : isHighlighted
       ? "#f59e0b"
-      : "#52525b";
+      : "#71717a"; // Default gray color
 
-  const strokeWidth = selected || isHighlighted ? 2 : 1;
-  const opacity = isHighlighted === false ? 0.3 : 1;
+  // Increase default stroke width for better visibility
+  const strokeWidth = selected || isHighlighted ? 2.5 : 1.5;
+  // Increase default opacity so relationships are clearly visible
+  const opacity = isHighlighted === false ? 0.7 : 1;
 
   // Cardinality marker
   const cardinalityLabel =
@@ -136,7 +139,7 @@ export function EdgeMarkerDefinitions() {
           markerHeight="6"
           orient="auto-start-reverse"
         >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#52525b" />
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a" />
         </marker>
 
         {/* Selected arrow */}

@@ -134,6 +134,8 @@ export function GitHubProvider({
   // Search repos state
   const [searchedRepos, setSearchedRepos] = useState<GitHubRepo[]>([]);
   const [searchReposLoading, setSearchReposLoading] = useState(false);
+  const searchAbortController = useRef<AbortController | null>(null);
+  const lastSearchQuery = useRef<string>("");
 
   // Branches state
   const [branches, setBranches] = useState<
@@ -221,7 +223,7 @@ export function GitHubProvider({
     }
   }, [projectKey, prevProjectKey]);
 
-  // Load saved settings when Convex project changes OR when repos finish loading
+  // Load saved settings when Convex project changes
   useEffect(() => {
     // Skip if no Convex project
     if (!convexProject) {
@@ -236,31 +238,24 @@ export function GitHubProvider({
       return;
     }
 
-    // Skip if repos haven't loaded yet (will re-run when they do)
-    if (repos.length === 0 && reposLoading) {
-      return;
-    }
-
-    // Also skip if repos list is empty and not loading (user not authenticated or no repos)
-    if (repos.length === 0 && !reposLoading) {
-      // Mark as initialized to prevent re-running, but don't set any repo
-      initializedProjectRef.current = projectKey;
-      return;
-    }
-
-    // Mark as initialized
-    initializedProjectRef.current = projectKey;
-
     // Try to restore saved settings for this Convex project
     const savedSettings = getProjectGitHubSettings(convexProject);
 
-    if (savedSettings?.repoFullName) {
+    if (savedSettings?.fullRepo) {
+      // Use stored full repo for immediate restoration
+      console.log(
+        `[GitHubContext] Restored full repo for Convex project ${projectKey}: ${savedSettings.fullRepo.full_name}`,
+      );
+      setSelectedRepo(savedSettings.fullRepo);
+      setSelectedBranch(savedSettings.branch);
+    } else if (savedSettings?.repoFullName && repos.length > 0) {
+      // Fallback: try to find repo in current repos list
       const savedRepo = repos.find(
         (r) => r.full_name === savedSettings.repoFullName,
       );
       if (savedRepo) {
         console.log(
-          `[GitHubContext] Restored repo for Convex project ${projectKey}: ${savedSettings.repoFullName}`,
+          `[GitHubContext] Restored repo from list for Convex project ${projectKey}: ${savedSettings.repoFullName}`,
         );
         setSelectedRepo(savedRepo);
         setSelectedBranch(savedSettings.branch);
@@ -272,12 +267,46 @@ export function GitHubProvider({
         setSelectedRepo(null);
         setSelectedBranch(null);
       }
-    } else {
+    } else if (!savedSettings?.repoFullName) {
       // No saved settings for this project
       setSelectedRepo(null);
       setSelectedBranch(null);
     }
-  }, [convexProject, projectKey, repos, reposLoading]);
+
+    // Mark as initialized (immediate restoration, don't wait for repos)
+    initializedProjectRef.current = projectKey;
+  }, [convexProject, projectKey, repos]);
+
+  // Validate and update stored repo when repos list becomes available
+  useEffect(() => {
+    if (!convexProject || repos.length === 0 || !selectedRepo) {
+      return;
+    }
+
+    const savedSettings = getProjectGitHubSettings(convexProject);
+    if (!savedSettings?.repoFullName) {
+      return;
+    }
+
+    // If we have a selected repo, check if it matches the saved one and update if needed
+    if (selectedRepo.full_name === savedSettings.repoFullName) {
+      const currentRepo = repos.find(
+        (r) => r.full_name === selectedRepo.full_name,
+      );
+      if (currentRepo && currentRepo !== selectedRepo) {
+        // Update with fresh data from repos list
+        console.log(
+          `[GitHubContext] Updating repo with fresh data: ${selectedRepo.full_name}`,
+        );
+        setSelectedRepo(currentRepo);
+        saveProjectGitHubSettings(convexProject, {
+          repoFullName: currentRepo.full_name,
+          fullRepo: currentRepo,
+          branch: savedSettings.branch,
+        });
+      }
+    }
+  }, [convexProject, repos, selectedRepo]);
 
   // Start the Device Flow authentication
   const startAuth = useCallback(async () => {
@@ -374,6 +403,7 @@ export function GitHubProvider({
       if (convexProject) {
         saveProjectGitHubSettings(convexProject, {
           repoFullName: repo?.full_name ?? null,
+          fullRepo: repo, // Store full repo object for immediate restoration
           // Clear branch when repo changes
           branch: null,
         });
@@ -412,20 +442,52 @@ export function GitHubProvider({
         return [];
       }
 
+      // Skip if this is the same query as last time (avoid duplicate searches)
+      if (query === lastSearchQuery.current) {
+        return searchedRepos;
+      }
+
+      // Cancel any ongoing search
+      if (searchAbortController.current) {
+        searchAbortController.current.abort();
+      }
+
+      // Create new abort controller for this search
+      searchAbortController.current = new AbortController();
+      lastSearchQuery.current = query;
+
       setSearchReposLoading(true);
       try {
-        const results = await searchUserRepos(currentToken, query);
-        setSearchedRepos(results);
+        const results = await searchUserRepos(currentToken, query, {
+          signal: searchAbortController.current.signal,
+        });
+
+        // Only update if this search wasn't cancelled
+        if (!searchAbortController.current?.signal.aborted) {
+          setSearchedRepos(results);
+        }
         return results;
       } catch (e) {
+        if (e instanceof Error && e.name === "AbortError") {
+          console.log("Search was cancelled");
+          return [];
+        }
         console.error("Failed to search repos:", e);
-        setSearchedRepos([]);
+        // Don't clear existing results on error, just stop loading
+        if (
+          searchedRepos.length === 0 &&
+          !searchAbortController.current?.signal.aborted
+        ) {
+          setSearchedRepos([]);
+        }
         return [];
       } finally {
-        setSearchReposLoading(false);
+        if (!searchAbortController.current?.signal.aborted) {
+          setSearchReposLoading(false);
+        }
       }
     },
-    [],
+    [searchedRepos],
   );
 
   // Fetch all branches for a repository (with pagination)

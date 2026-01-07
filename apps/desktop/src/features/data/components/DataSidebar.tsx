@@ -14,7 +14,6 @@ import {
   Plus,
   X,
   Clock,
-  CodeIcon,
 } from "lucide-react";
 import type {
   TableDefinition,
@@ -22,7 +21,7 @@ import type {
   ConvexComponent,
 } from "../types";
 import { getRecentlyViewedTables } from "../utils/storage";
-import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { ComponentSelector } from "./ComponentSelector";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface DataSidebarProps {
@@ -214,22 +213,15 @@ export function DataSidebar({
     >
       {components.length > 1 && (
         <div
-          className="h-[40px] p-1"
+          className="p-2 h-[45px] flex items-center"
           style={{ borderBottom: "1px solid var(--color-border-base)" }}
         >
-          <SearchableSelect
-            value={selectedComponent ?? ""}
-            options={components.map((c) => ({
-              value: c.id ?? "",
-              label: c.id === null ? "Root (app)" : c.path,
-            }))}
-            onChange={(value) =>
-              onComponentSelect?.(value === "" ? null : value)
-            }
-            placeholder="Select component..."
-            searchPlaceholder="Search components..."
-            sublabelAsText
-            triggerIcon={<CodeIcon size={14} />}
+          <ComponentSelector
+            selectedComponentId={selectedComponent ?? null}
+            onSelect={onComponentSelect ?? (() => {})}
+            components={components}
+            fullWidth
+            variant="input"
           />
         </div>
       )}

@@ -85,14 +85,14 @@ export function FunctionActivityCard({
 
   // Transform data for Recharts stacked bar chart
   const chartData = useMemo(() => {
-    if (!data) return [];
+    if (!data || !data.timestamps || !Array.isArray(data.timestamps)) return [];
     return data.timestamps.map((timestamp, i) => ({
       time: timestamp * 1000, // Convert to milliseconds
-      Queries: data.queries[i],
-      Mutations: data.mutations[i],
-      Actions: data.actions[i],
-      Scheduled: data.scheduled[i],
-      HTTP: data.httpActions[i],
+      Queries: data.queries?.[i] ?? 0,
+      Mutations: data.mutations?.[i] ?? 0,
+      Actions: data.actions?.[i] ?? 0,
+      Scheduled: data.scheduled?.[i] ?? 0,
+      HTTP: data.httpActions?.[i] ?? 0,
     }));
   }, [data]);
 

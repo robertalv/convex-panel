@@ -5,7 +5,7 @@
  * to use for remote schema history.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   Search,
   GitBranch,
@@ -34,21 +34,85 @@ export function GitHubRepoSelector({
     selectedRepo,
     selectRepo,
     refreshRepos,
+    searchRepos,
+    searchedRepos,
+    searchReposLoading,
   } = useGitHub();
 
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchMode, setIsSearchMode] = useState(false);
 
-  // Filter repos by search query
+  // Use a ref to store the timeout to avoid dependency issues
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Track last search time to enforce minimum delay
+  const lastSearchTime = useRef<number>(0);
+  const MIN_SEARCH_DELAY = 2000; // 2 seconds minimum between searches
+
+  // Trigger debounced search when query changes
+  useEffect(() => {
+    // Clear existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // For queries < 3 chars, use client-side filtering only
+    if (searchQuery.length < 3) {
+      setIsSearchMode(false);
+      return;
+    }
+
+    // For queries >= 3 chars, use server-side search with longer debounce
+    setIsSearchMode(true);
+    timeoutRef.current = setTimeout(() => {
+      const now = Date.now();
+      const timeSinceLastSearch = now - lastSearchTime.current;
+
+      // Enforce minimum delay between searches
+      if (timeSinceLastSearch >= MIN_SEARCH_DELAY) {
+        lastSearchTime.current = now;
+        searchRepos(searchQuery).catch(console.error);
+      } else {
+        // Wait for remaining time before searching
+        const remainingDelay = MIN_SEARCH_DELAY - timeSinceLastSearch;
+        setTimeout(() => {
+          lastSearchTime.current = Date.now();
+          searchRepos(searchQuery).catch(console.error);
+        }, remainingDelay);
+      }
+    }, 1000); // Increased to 1000ms debounce
+
+    // Cleanup
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [searchQuery, searchRepos]);
+
+  // Determine which repos to show
   const filteredRepos = useMemo(() => {
+    // If in search mode and we have results from server, show searched repos
+    if (isSearchMode && searchQuery.length >= 3 && searchedRepos.length > 0) {
+      return searchedRepos;
+    }
+
+    // Always do client-side filtering as fallback or for short queries
     if (!searchQuery.trim()) return repos;
     const query = searchQuery.toLowerCase();
+
+    // Enhanced client-side filtering
     return repos.filter(
       (repo) =>
         repo.full_name.toLowerCase().includes(query) ||
-        repo.name.toLowerCase().includes(query),
+        repo.name.toLowerCase().includes(query) ||
+        repo.owner?.login?.toLowerCase().includes(query),
     );
-  }, [repos, searchQuery]);
+  }, [repos, searchedRepos, searchQuery, isSearchMode]);
+
+  // Loading state
+  const isLoading = reposLoading || (isSearchMode && searchReposLoading);
 
   const handleSelect = (repo: GitHubRepo) => {
     selectRepo(repo);
@@ -124,7 +188,7 @@ export function GitHubRepoSelector({
 
             {/* Repository list */}
             <div className="max-h-64 overflow-y-auto">
-              {reposLoading ? (
+              {isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-5 h-5 text-text-muted animate-spin" />
                 </div>

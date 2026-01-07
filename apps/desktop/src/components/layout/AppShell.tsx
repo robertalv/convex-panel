@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Sidebar, type NavItem, SIDEBAR_MIN_WIDTH } from "./Sidebar";
 import { TopBar } from "./TopBar";
-import type { Team, Project, Deployment, User } from "convex-panel";
+import type { Team, Project, Deployment, User } from "@/types/desktop";
 import type { TeamSubscription } from "@/api/bigbrain";
 import { TerminalPanel } from "../../features/terminal";
 import { useTerminalActions } from "../../contexts/TerminalContext";

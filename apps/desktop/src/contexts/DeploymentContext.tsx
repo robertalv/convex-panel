@@ -10,7 +10,7 @@ import {
 } from "react";
 import { ConvexReactClient } from "convex/react";
 import { ConvexHttpClient } from "convex/browser";
-import type { Deployment } from "convex-panel";
+import type { Deployment } from "@/types/desktop";
 import { createDeployKey } from "../api/bigbrain";
 import {
   loadDeploymentKey,

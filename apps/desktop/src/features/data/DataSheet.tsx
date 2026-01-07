@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { useSheetSafe } from "convex-panel";
+import { useSheetSafe } from "@/contexts/SheetContext";
 
 interface DataSheetProps {
   width?: string;
@@ -11,7 +11,8 @@ interface DataSheetProps {
  * Uses flex layout to push the main content when open.
  */
 export function DataSheet({ width = "500px" }: DataSheetProps) {
-  const { isOpen, closeSheet, sheetContent } = useSheetSafe();
+  const { state, closeSheet } = useSheetSafe();
+  const { isOpen, sheetContent } = state;
 
   if (!isOpen || !sheetContent) {
     return null;

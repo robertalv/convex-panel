@@ -446,10 +446,11 @@ function TableNodeComponent({ data, selected }: NodeProps) {
           </div>
         )}
 
-        {/* Add Connection handles later when we're ready to support them */}
-        {/* <Handle
+        {/* Connection handles for React Flow edges */}
+        <Handle
           type="target"
           position={Position.Left}
+          id="target"
           style={{
             width: 12,
             height: 12,
@@ -458,10 +459,11 @@ function TableNodeComponent({ data, selected }: NodeProps) {
               : "var(--color-border-strong)",
             border: "2px solid var(--color-surface-raised)",
           }}
-        /> */}
-        {/* <Handle
+        />
+        <Handle
           type="source"
           position={Position.Right}
+          id="source"
           style={{
             width: 12,
             height: 12,
@@ -470,7 +472,7 @@ function TableNodeComponent({ data, selected }: NodeProps) {
               : "var(--color-border-strong)",
             border: "2px solid var(--color-surface-raised)",
           }}
-        /> */}
+        />
 
         {/* Header */}
         <div

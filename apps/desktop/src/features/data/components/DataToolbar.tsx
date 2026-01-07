@@ -324,7 +324,7 @@ export function DataToolbar({
 
           {showExportMenu && (
             <div
-              className="absolute right-0 top-full mt-1 min-w-[180px] rounded-xl shadow-lg z-20 overflow-hidden p-1"
+              className="absolute right-0 top-full mt-1 min-w-[180px] rounded-xl shadow-lg z-20 overflow-hidden p-1 space-y-0.5"
               style={{
                 backgroundColor: "var(--color-surface-base)",
                 border: "1px solid var(--color-border-muted)",
@@ -336,8 +336,7 @@ export function DataToolbar({
                   onExport("json");
                   setShowExportMenu(false);
                 }}
-                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-left rounded-lg transition-colors hover:bg-[var(--color-surface-raised)]"
-                style={{ color: "var(--color-text-base)" }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-left rounded-lg transition-colors text-text-base hover:bg-surface-raised"
               >
                 <FileJson size={14} />
                 <span>Export as JSON</span>
@@ -348,8 +347,7 @@ export function DataToolbar({
                   onExport("csv");
                   setShowExportMenu(false);
                 }}
-                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-left rounded-lg transition-colors hover:bg-[var(--color-surface-raised)]"
-                style={{ color: "var(--color-text-base)" }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-left rounded-lg transition-colors text-text-base hover:bg-surface-raised"
               >
                 <FileSpreadsheet size={14} />
                 <span>Export as CSV</span>
