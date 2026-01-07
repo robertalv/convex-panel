@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchInsights,
   type FetchFn,
@@ -6,6 +7,7 @@ import {
 } from "@convex-panel/shared/api";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { useDeployment } from "@/contexts/DeploymentContext";
+import { STALE_TIME } from "@/contexts/QueryContext";
 
 // Use Tauri's fetch for CORS-free HTTP requests
 const desktopFetch: FetchFn = (input, init) => tauriFetch(input, init);
@@ -21,51 +23,48 @@ interface InsightsState {
   refetch: () => void;
 }
 
+// Query key factory
+export const insightsKeys = {
+  all: ["insights"] as const,
+  list: (deploymentUrl: string) =>
+    [...insightsKeys.all, "list", deploymentUrl] as const,
+};
+
 /**
  * Hook for fetching insights from the Convex BigBrain API.
- * Uses real API data only - no mock data.
+ * Uses React Query for caching.
  */
 export function useInsights(): InsightsState {
   const { deploymentUrl, authToken } = useDeployment();
+  const queryClient = useQueryClient();
 
-  const [insights, setInsights] = useState<Insight[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const enabled = Boolean(deploymentUrl && authToken);
 
-  const refetch = useCallback(async () => {
-    if (!deploymentUrl || !authToken) {
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
+  const query = useQuery({
+    queryKey: insightsKeys.list(deploymentUrl ?? ""),
+    queryFn: async () => {
       const result = await fetchInsights(
-        deploymentUrl,
-        authToken,
+        deploymentUrl!,
+        authToken!,
         desktopFetch,
       );
+      return result;
+    },
+    enabled,
+    staleTime: STALE_TIME.insights,
+    refetchOnMount: false,
+  });
 
-      setInsights(result);
-    } catch (err) {
-      console.error("[Insights] Error fetching:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch insights");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [deploymentUrl, authToken]);
-
-  // Initial fetch
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
+  const refetch = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: insightsKeys.list(deploymentUrl ?? ""),
+    });
+  }, [queryClient, deploymentUrl]);
 
   return {
-    insights,
-    isLoading,
-    error,
+    insights: query.data ?? [],
+    isLoading: query.isLoading,
+    error: query.error?.message ?? null,
     refetch,
   };
 }

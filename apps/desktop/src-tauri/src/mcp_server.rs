@@ -36,7 +36,7 @@ pub struct McpConfig {
 impl Default for McpConfig {
     fn default() -> Self {
         Self {
-            port: 0, // 0 means auto-select
+            port: 56857, // Fixed port for MCP server
             auto_start: true,
         }
     }

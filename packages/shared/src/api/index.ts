@@ -38,3 +38,42 @@ export {
   fetchServerVersion,
   fetchInsights,
 } from "./health";
+
+// Export BigBrain API functions and types
+export {
+  // Core API functions
+  callBigBrainAPI,
+  callBigBrainManagementAPI,
+  // Team & Project functions
+  getTeams,
+  getProjects,
+  getDeployments,
+  getProfile,
+  getTeamSubscription,
+  // Token & Auth functions
+  getTokenDetails,
+  getTeamFromDeployment,
+  createDeployKey,
+  // Usage & Insights functions
+  getInsightsPeriod,
+  queryUsage,
+  // Constants
+  BIG_BRAIN_URL,
+  BIG_BRAIN_DASHBOARD_PATH,
+  CONVEX_CLIENT_ID,
+  DATABRICKS_QUERY_IDS,
+  ROOT_COMPONENT_PATH,
+  // Utilities
+  extractDeploymentName as extractDeploymentNameFromUrl,
+  normalizeBearerToken,
+  // Types
+  type Team,
+  type Project,
+  type Deployment,
+  type UserProfile,
+  type TeamSubscription,
+  type TokenDetails,
+  type TeamAndProject,
+  type UsageQueryParams,
+  type InsightsPeriod,
+} from "./bigbrain";

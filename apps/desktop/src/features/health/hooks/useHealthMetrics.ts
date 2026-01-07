@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchFailureRate,
   fetchCacheHitRate,
@@ -9,6 +10,7 @@ import {
 } from "@convex-panel/shared/api";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { useDeployment } from "@/contexts/DeploymentContext";
+import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/QueryContext";
 import type { TimeSeriesDataPoint } from "../components/MetricChart";
 
 // Use Tauri's fetch for CORS-free HTTP requests in the desktop app
@@ -66,6 +68,21 @@ interface HealthMetrics {
   refetchLatency: () => void;
   refetchRequestRate: () => void;
 }
+
+// Query key factory for consistent key management
+export const healthMetricsKeys = {
+  all: ["healthMetrics"] as const,
+  failureRate: (deploymentUrl: string) =>
+    [...healthMetricsKeys.all, "failureRate", deploymentUrl] as const,
+  cacheHitRate: (deploymentUrl: string) =>
+    [...healthMetricsKeys.all, "cacheHitRate", deploymentUrl] as const,
+  schedulerLag: (deploymentUrl: string) =>
+    [...healthMetricsKeys.all, "schedulerLag", deploymentUrl] as const,
+  latency: (deploymentUrl: string) =>
+    [...healthMetricsKeys.all, "latency", deploymentUrl] as const,
+  requestRate: (deploymentUrl: string) =>
+    [...healthMetricsKeys.all, "requestRate", deploymentUrl] as const,
+};
 
 /**
  * Transform API response to TimeSeriesDataPoint array.
@@ -129,122 +146,55 @@ function getLatestValue(data: TimeSeriesDataPoint[]): number {
 
 /**
  * Hook for fetching and managing health metrics data.
- * Uses real API data only - no mock data.
+ * Uses React Query for caching and automatic refetching.
  */
 export function useHealthMetrics(): HealthMetrics {
   const { deploymentUrl, authToken } = useDeployment();
+  const queryClient = useQueryClient();
 
-  // Failure rate state
-  const [failureRateData, setFailureRateData] = useState<TimeSeriesDataPoint[]>(
-    [],
-  );
-  const [failureRateLoading, setFailureRateLoading] = useState(true);
-  const [failureRateError, setFailureRateError] = useState<string | null>(null);
+  const enabled = Boolean(deploymentUrl && authToken);
 
-  // Cache hit rate state
-  const [cacheHitRateData, setCacheHitRateData] = useState<
-    TimeSeriesDataPoint[]
-  >([]);
-  const [cacheHitRateLoading, setCacheHitRateLoading] = useState(true);
-  const [cacheHitRateError, setCacheHitRateError] = useState<string | null>(
-    null,
-  );
-
-  // Scheduler lag state
-  const [schedulerLagData, setSchedulerLagData] = useState<
-    TimeSeriesDataPoint[]
-  >([]);
-  const [schedulerLagLoading, setSchedulerLagLoading] = useState(true);
-  const [schedulerLagError, setSchedulerLagError] = useState<string | null>(
-    null,
-  );
-
-  // Latency state
-  const [latencyPercentiles, setLatencyPercentiles] =
-    useState<LatencyPercentiles>({
-      p50: 0,
-      p95: 0,
-      p99: 0,
-    });
-  const [latencyLoading, setLatencyLoading] = useState(true);
-  const [latencyError, setLatencyError] = useState<string | null>(null);
-
-  // Request rate state
-  const [requestRateData, setRequestRateData] = useState<TimeSeriesDataPoint[]>(
-    [],
-  );
-  const [requestRateLoading, setRequestRateLoading] = useState(true);
-  const [requestRateError, setRequestRateError] = useState<string | null>(null);
-
-  // Fetch failure rate
-  const refetchFailureRate = useCallback(async () => {
-    if (!deploymentUrl || !authToken) {
-      setFailureRateLoading(false);
-      return;
-    }
-
-    setFailureRateLoading(true);
-    setFailureRateError(null);
-
-    try {
+  // Failure rate query
+  const failureRateQuery = useQuery({
+    queryKey: healthMetricsKeys.failureRate(deploymentUrl ?? ""),
+    queryFn: async () => {
       const data = await fetchFailureRate(
-        deploymentUrl,
-        authToken,
+        deploymentUrl!,
+        authToken!,
         desktopFetch,
       );
-      const transformed = transformTimeSeries(data);
-      setFailureRateData(transformed);
-    } catch (err) {
-      console.error("[HealthMetrics] Failure rate error", err);
-      setFailureRateError(
-        err instanceof Error ? err.message : "Failed to fetch failure rate",
-      );
-    } finally {
-      setFailureRateLoading(false);
-    }
-  }, [deploymentUrl, authToken]);
+      return transformTimeSeries(data);
+    },
+    enabled,
+    staleTime: STALE_TIME.health,
+    refetchInterval: REFETCH_INTERVAL.health,
+    refetchOnMount: false,
+  });
 
-  // Fetch cache hit rate
-  const refetchCacheHitRate = useCallback(async () => {
-    if (!deploymentUrl || !authToken) {
-      setCacheHitRateLoading(false);
-      return;
-    }
-
-    setCacheHitRateLoading(true);
-    setCacheHitRateError(null);
-
-    try {
+  // Cache hit rate query
+  const cacheHitRateQuery = useQuery({
+    queryKey: healthMetricsKeys.cacheHitRate(deploymentUrl ?? ""),
+    queryFn: async () => {
       const data = await fetchCacheHitRate(
-        deploymentUrl,
-        authToken,
+        deploymentUrl!,
+        authToken!,
         desktopFetch,
       );
-      const transformed = transformTimeSeries(data);
-      setCacheHitRateData(transformed);
-    } catch (err) {
-      setCacheHitRateError(
-        err instanceof Error ? err.message : "Failed to fetch cache hit rate",
-      );
-    } finally {
-      setCacheHitRateLoading(false);
-    }
-  }, [deploymentUrl, authToken]);
+      return transformTimeSeries(data);
+    },
+    enabled,
+    staleTime: STALE_TIME.health,
+    refetchInterval: REFETCH_INTERVAL.health,
+    refetchOnMount: false,
+  });
 
-  // Fetch scheduler lag
-  const refetchSchedulerLag = useCallback(async () => {
-    if (!deploymentUrl || !authToken) {
-      setSchedulerLagLoading(false);
-      return;
-    }
-
-    setSchedulerLagLoading(true);
-    setSchedulerLagError(null);
-
-    try {
+  // Scheduler lag query
+  const schedulerLagQuery = useQuery({
+    queryKey: healthMetricsKeys.schedulerLag(deploymentUrl ?? ""),
+    queryFn: async () => {
       const data = await fetchSchedulerLag(
-        deploymentUrl,
-        authToken,
+        deploymentUrl!,
+        authToken!,
         desktopFetch,
       );
       // Scheduler lag returns array of [timestamp, value] directly
@@ -259,30 +209,21 @@ export function useHealthMetrics(): HealthMetrics {
             }),
           )
         : [];
-      setSchedulerLagData(transformed);
-    } catch (err) {
-      setSchedulerLagError(
-        err instanceof Error ? err.message : "Failed to fetch scheduler lag",
-      );
-    } finally {
-      setSchedulerLagLoading(false);
-    }
-  }, [deploymentUrl, authToken]);
+      return transformed;
+    },
+    enabled,
+    staleTime: STALE_TIME.health,
+    refetchInterval: REFETCH_INTERVAL.health,
+    refetchOnMount: false,
+  });
 
-  // Fetch latency percentiles
-  const refetchLatency = useCallback(async () => {
-    if (!deploymentUrl || !authToken) {
-      setLatencyLoading(false);
-      return;
-    }
-
-    setLatencyLoading(true);
-    setLatencyError(null);
-
-    try {
+  // Latency percentiles query
+  const latencyQuery = useQuery({
+    queryKey: healthMetricsKeys.latency(deploymentUrl ?? ""),
+    queryFn: async () => {
       const data = await fetchLatencyPercentiles(
-        deploymentUrl,
-        authToken,
+        deploymentUrl!,
+        authToken!,
         desktopFetch,
       );
       // Data format: [[50, [[timestamp, value]]], [95, [...]], [99, [...]]]
@@ -298,42 +239,89 @@ export function useHealthMetrics(): HealthMetrics {
         else if (percentile === 99) percentiles.p99 = latestValue;
       }
 
-      setLatencyPercentiles(percentiles);
-    } catch (err) {
-      setLatencyError(
-        err instanceof Error
-          ? err.message
-          : "Failed to fetch latency percentiles",
-      );
-    } finally {
-      setLatencyLoading(false);
-    }
-  }, [deploymentUrl, authToken]);
+      return percentiles;
+    },
+    enabled,
+    staleTime: STALE_TIME.health,
+    refetchInterval: REFETCH_INTERVAL.health,
+    refetchOnMount: false,
+  });
 
-  // Fetch request rate
-  const refetchRequestRate = useCallback(async () => {
-    if (!deploymentUrl || !authToken) {
-      setRequestRateLoading(false);
-      return;
-    }
+  // Request rate query
+  const requestRateQuery = useQuery({
+    queryKey: healthMetricsKeys.requestRate(deploymentUrl ?? ""),
+    queryFn: async () => {
+      const data = await fetchUdfRate(deploymentUrl!, authToken!, desktopFetch);
+      return transformTimeSeries(data);
+    },
+    enabled,
+    staleTime: STALE_TIME.health,
+    refetchInterval: REFETCH_INTERVAL.health,
+    refetchOnMount: false,
+  });
 
-    setRequestRateLoading(true);
-    setRequestRateError(null);
+  // Compute derived values
+  const failureRateData = failureRateQuery.data ?? [];
+  const failureRate = getLatestValue(failureRateData);
+  const failureRateTrend = useMemo(
+    () => calculateTrend(failureRateData),
+    [failureRateData],
+  );
 
-    try {
-      const data = await fetchUdfRate(deploymentUrl, authToken, desktopFetch);
-      const transformed = transformTimeSeries(data);
-      setRequestRateData(transformed);
-    } catch (err) {
-      setRequestRateError(
-        err instanceof Error ? err.message : "Failed to fetch request rate",
-      );
-    } finally {
-      setRequestRateLoading(false);
-    }
-  }, [deploymentUrl, authToken]);
+  const cacheHitRateData = cacheHitRateQuery.data ?? [];
+  const cacheHitRate = getLatestValue(cacheHitRateData);
+  const cacheHitRateTrend = useMemo(
+    () => calculateTrend(cacheHitRateData),
+    [cacheHitRateData],
+  );
 
-  // Fetch all metrics
+  const schedulerLagData = schedulerLagQuery.data ?? [];
+  const schedulerLag = getLatestValue(schedulerLagData);
+  const schedulerLagTrend = useMemo(
+    () => calculateTrend(schedulerLagData),
+    [schedulerLagData],
+  );
+
+  const latencyPercentiles = latencyQuery.data ?? { p50: 0, p95: 0, p99: 0 };
+
+  const requestRateData = requestRateQuery.data ?? [];
+  const requestRate = getLatestValue(requestRateData);
+  const requestRateTrend = useMemo(
+    () => calculateTrend(requestRateData),
+    [requestRateData],
+  );
+
+  // Refetch functions
+  const refetchFailureRate = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: healthMetricsKeys.failureRate(deploymentUrl ?? ""),
+    });
+  }, [queryClient, deploymentUrl]);
+
+  const refetchCacheHitRate = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: healthMetricsKeys.cacheHitRate(deploymentUrl ?? ""),
+    });
+  }, [queryClient, deploymentUrl]);
+
+  const refetchSchedulerLag = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: healthMetricsKeys.schedulerLag(deploymentUrl ?? ""),
+    });
+  }, [queryClient, deploymentUrl]);
+
+  const refetchLatency = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: healthMetricsKeys.latency(deploymentUrl ?? ""),
+    });
+  }, [queryClient, deploymentUrl]);
+
+  const refetchRequestRate = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: healthMetricsKeys.requestRate(deploymentUrl ?? ""),
+    });
+  }, [queryClient, deploymentUrl]);
+
   const refetch = useCallback(() => {
     refetchFailureRate();
     refetchCacheHitRate();
@@ -348,37 +336,20 @@ export function useHealthMetrics(): HealthMetrics {
     refetchRequestRate,
   ]);
 
-  // Initial fetch
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
-
-  // Compute derived values
-  const failureRate = getLatestValue(failureRateData);
-  const failureRateTrend = calculateTrend(failureRateData);
-
-  const cacheHitRate = getLatestValue(cacheHitRateData);
-  const cacheHitRateTrend = calculateTrend(cacheHitRateData);
-
-  const schedulerLag = getLatestValue(schedulerLagData);
-  const schedulerLagTrend = calculateTrend(schedulerLagData);
-
-  const requestRate = getLatestValue(requestRateData);
-  const requestRateTrend = calculateTrend(requestRateData);
-
+  // Aggregate loading and error states
   const isLoading =
-    failureRateLoading ||
-    cacheHitRateLoading ||
-    schedulerLagLoading ||
-    latencyLoading ||
-    requestRateLoading;
+    failureRateQuery.isLoading ||
+    cacheHitRateQuery.isLoading ||
+    schedulerLagQuery.isLoading ||
+    latencyQuery.isLoading ||
+    requestRateQuery.isLoading;
 
   const hasError = Boolean(
-    failureRateError ||
-    cacheHitRateError ||
-    schedulerLagError ||
-    latencyError ||
-    requestRateError,
+    failureRateQuery.error ||
+    cacheHitRateQuery.error ||
+    schedulerLagQuery.error ||
+    latencyQuery.error ||
+    requestRateQuery.error,
   );
 
   return {
@@ -386,34 +357,34 @@ export function useHealthMetrics(): HealthMetrics {
     failureRate,
     failureRateTrend,
     failureRateData,
-    failureRateLoading,
-    failureRateError,
+    failureRateLoading: failureRateQuery.isLoading,
+    failureRateError: failureRateQuery.error?.message ?? null,
 
     // Cache hit rate
     cacheHitRate,
     cacheHitRateTrend,
     cacheHitRateData,
-    cacheHitRateLoading,
-    cacheHitRateError,
+    cacheHitRateLoading: cacheHitRateQuery.isLoading,
+    cacheHitRateError: cacheHitRateQuery.error?.message ?? null,
 
     // Scheduler lag
     schedulerLag,
     schedulerLagTrend,
     schedulerLagData,
-    schedulerLagLoading,
-    schedulerLagError,
+    schedulerLagLoading: schedulerLagQuery.isLoading,
+    schedulerLagError: schedulerLagQuery.error?.message ?? null,
 
     // Latency percentiles
     latencyPercentiles,
-    latencyLoading,
-    latencyError,
+    latencyLoading: latencyQuery.isLoading,
+    latencyError: latencyQuery.error?.message ?? null,
 
     // Request rate
     requestRate,
     requestRateTrend,
     requestRateData,
-    requestRateLoading,
-    requestRateError,
+    requestRateLoading: requestRateQuery.isLoading,
+    requestRateError: requestRateQuery.error?.message ?? null,
 
     // Global state
     isLoading,

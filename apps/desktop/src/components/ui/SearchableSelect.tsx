@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { ChevronDown, Search, CircleCheck } from "lucide-react";
 import { Input } from "./input";
@@ -31,6 +32,14 @@ interface SearchableSelectProps {
   onSearchChange?: (query: string) => void;
   /** Minimum characters before triggering onSearchChange (default: 0) */
   minSearchLength?: number;
+  /** Icon to display in the trigger button (when provided, uses component-selector style) */
+  triggerIcon?: React.ReactNode;
+  /** Whether the select is disabled */
+  disabled?: boolean;
+  /** Custom className for the button element */
+  buttonClassName?: string;
+  /** Custom style for the button element */
+  buttonStyle?: React.CSSProperties;
 }
 
 export function SearchableSelect({
@@ -48,13 +57,24 @@ export function SearchableSelect({
   sublabelAsText = false,
   onSearchChange,
   minSearchLength = 0,
+  triggerIcon,
+  disabled = false,
+  buttonClassName,
+  buttonStyle,
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [highlightedIndex, setHighlightedIndex] = React.useState(0);
+  const [dropdownPosition, setDropdownPosition] = React.useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const optionsRef = React.useRef<HTMLDivElement>(null);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
 
@@ -95,9 +115,12 @@ export function SearchableSelect({
 
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
       if (
         containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
+        !containerRef.current.contains(target) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(target)
       ) {
         setIsOpen(false);
         setSearch("");
@@ -114,6 +137,35 @@ export function SearchableSelect({
   React.useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
+    }
+  }, [isOpen]);
+
+  // Calculate dropdown position when opening
+  React.useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const updatePosition = () => {
+        if (buttonRef.current) {
+          const rect = buttonRef.current.getBoundingClientRect();
+          setDropdownPosition({
+            top: rect.bottom + window.scrollY + 4, // 4px gap (mt-1)
+            left: rect.left + window.scrollX,
+            width: rect.width,
+          });
+        }
+      };
+
+      updatePosition();
+
+      // Update position on scroll/resize
+      window.addEventListener("scroll", updatePosition, true);
+      window.addEventListener("resize", updatePosition);
+
+      return () => {
+        window.removeEventListener("scroll", updatePosition, true);
+        window.removeEventListener("resize", updatePosition);
+      };
+    } else {
+      setDropdownPosition(null);
     }
   }, [isOpen]);
 
@@ -149,22 +201,49 @@ export function SearchableSelect({
   return (
     <div ref={containerRef} className={cn("relative", className)}>
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        style={buttonStyle}
         className={cn(
-          "flex items-center gap-1",
-          "pl-2 pr-1 py-0.5 rounded-lg",
+          "w-full",
+          "flex items-center justify-between rounded-lg",
           "text-sm font-medium",
-          "border border-transparent",
-          "hover:bg-surface-raised",
           "focus:outline-none focus:ring-0",
-          "cursor-pointer transition-colors duration-fast",
+          "transition-colors duration-fast",
+          disabled
+            ? "cursor-not-allowed opacity-50"
+            : "cursor-pointer",
           selectedOption ? "text-text-base" : "text-text-muted",
+          // Component-selector variant (with icon)
+          triggerIcon
+            ? cn(
+                "gap-1.5 px-2.5 py-1.5 h-[30px]",
+                "border border-border-base",
+                disabled
+                  ? "bg-transparent"
+                  : "bg-transparent hover:bg-surface-raised",
+              )
+            : cn(
+                // Default variant (minimal)
+                "gap-1 pl-2 pr-1 py-0.5",
+                "border border-transparent",
+                disabled ? "" : "hover:bg-surface-raised",
+              ),
+          buttonClassName,
         )}
       >
-        <span className="truncate max-w-[140px]">
-          {selectedOption?.label || placeholder}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {triggerIcon && (
+            <span className="text-text-muted flex-shrink-0 flex items-center">
+              {triggerIcon}
+            </span>
+          )}
+          <span className={cn("truncate", triggerIcon ? "flex-1" : "max-w-[140px]")}>
+            {selectedOption?.label || placeholder}
+          </span>
+        </div>
         {selectedTeam ? (
           <TierBadge subscription={subscription ?? null} />
         ) : null}
@@ -175,23 +254,31 @@ export function SearchableSelect({
         )}
         <ChevronDown
           className={cn(
-            "h-3 w-3 text-text-subtle transition-transform",
+            "h-3 w-3 text-text-subtle transition-transform flex-shrink-0",
             isOpen && "rotate-180",
           )}
         />
       </button>
 
-      {isOpen && (
-        <div
-          className={cn(
-            "absolute top-full left-0 mt-1 z-50",
-            "min-w-[200px] max-w-[350px]",
-            "bg-surface-base border border-border-muted rounded-xl shadow-lg",
-            "overflow-hidden",
-            "animate-fade-up",
-          )}
-          style={{ animationDuration: "150ms" }}
-        >
+      {isOpen &&
+        dropdownPosition &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className={cn(
+              "fixed z-[9999]",
+              "min-w-[200px] max-w-[350px]",
+              "bg-surface-base border border-border-muted rounded-xl shadow-lg",
+              "overflow-hidden",
+              "animate-fade-up",
+            )}
+            style={{
+              animationDuration: "150ms",
+              top: `${dropdownPosition.top}px`,
+              left: `${dropdownPosition.left}px`,
+              width: `${Math.max(dropdownPosition.width, 200)}px`,
+            }}
+          >
           <div className="border-b border-border-muted">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-subtle z-10 pointer-events-none" />
@@ -203,6 +290,8 @@ export function SearchableSelect({
                 onKeyDown={handleKeyDown}
                 placeholder={searchPlaceholder}
                 className={cn(
+                  "text-sm",
+                  "font-sans",
                   "w-full pl-8 pr-3 py-1.5",
                   "border-0 rounded-none",
                   "hover:bg-transparent hover:border-0",
@@ -264,7 +353,8 @@ export function SearchableSelect({
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

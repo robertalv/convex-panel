@@ -217,7 +217,11 @@ function TerminalInstance({
       // Kill the PTY session
       if (ptySpawnedRef.current) {
         invoke("pty_kill", { sessionId: session.id }).catch((err) => {
-          console.error("Failed to kill PTY:", err);
+          // Only log if it's not a "session not found" error (which is expected when already cleaned up)
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          if (!errorMessage.includes("Session not found")) {
+            console.error("Failed to kill PTY:", err);
+          }
         });
         ptySpawnedRef.current = false;
       }
@@ -267,7 +271,11 @@ function TerminalInstance({
               rows: xterm.rows,
               cols: xterm.cols,
             }).catch((err) => {
-              console.error("Failed to resize PTY:", err);
+              // Only log if it's not a "session not found" error (which is expected when already cleaned up)
+              const errorMessage = err instanceof Error ? err.message : String(err);
+              if (!errorMessage.includes("Session not found")) {
+                console.error("Failed to resize PTY:", err);
+              }
             });
           }
         } catch {

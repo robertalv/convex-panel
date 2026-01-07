@@ -8,6 +8,7 @@ import { TerminalPanel } from "../../features/terminal";
 import { useTerminalActions } from "../../contexts/TerminalContext";
 import { useMcpOptional } from "../../contexts/McpContext";
 import { useHotkeys } from "react-hotkeys-hook";
+import { useBackgroundPrefetch } from "../../hooks/useBackgroundPrefetch";
 
 const STORAGE_KEYS = {
   sidebarWidth: "convex-desktop-sidebar-width",
@@ -110,6 +111,9 @@ export function AppShell({
   const { toggleTerminal } = useTerminalActions();
   const mcp = useMcpOptional();
   const hasProjectPath = Boolean(mcp?.projectPath);
+
+  // Prefetch health data in the background after the app loads
+  useBackgroundPrefetch({ delay: 1500 });
 
   useHotkeys(
     "ctrl+`",

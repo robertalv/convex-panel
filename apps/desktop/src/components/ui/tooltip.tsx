@@ -19,7 +19,7 @@ const TooltipContent = React.forwardRef<
       className={cn(
         // Base styles
         "z-50 overflow-hidden rounded-md px-3 py-1.5",
-        "bg-surface-overlay text-sm text-text-base",
+        "bg-surface-overlay text-xs text-text-base",
         "border border-border-base shadow-md",
         // Animation
         "animate-fade-up",

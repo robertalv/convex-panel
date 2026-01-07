@@ -1,52 +1,40 @@
 {
-    "compilerOptions": {
-        "target": "es2015",
-        "lib": [
-            "dom",
-            "dom.iterable",
-            "esnext"
-        ],
-        "allowJs": true,
-        "skipLibCheck": true,
-        "esModuleInterop": true,
-        "allowSyntheticDefaultImports": true,
-        "strict": true,
-        "forceConsistentCasingInFileNames": true,
-        "noFallthroughCasesInSwitch": true,
-        "module": "esnext",
-        "moduleResolution": "node",
-        "resolveJsonModule": true,
-        "isolatedModules": true,
-        "jsx": "react-jsx",
-        "baseUrl": ".",
-        "paths": {
-            "convex-panel/shared": [
-                "./packages/shared/src"
-            ],
-            "convex-panel/react": [
-                "./packages/panel/src/react/index.tsx"
-            ],
-            "convex-panel/nextjs": [
-                "./packages/panel/src/nextjs/index.tsx"
-            ],
-            "convex-panel": [
-                "./packages/panel/src"
-            ],
-            "convex-panel/convex-component": [
-                "./packages/convex-component/src"
-            ]
-        }
+  "compilerOptions": {
+    "target": "es2015",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "convex-panel/shared": ["./packages/shared/src"],
+      "@convex-panel/shared": ["./packages/shared/src"],
+      "@convex-panel/shared/api": ["./packages/shared/src/api"],
+      "convex-panel/react": ["./packages/panel/src/react/index.tsx"],
+      "convex-panel/nextjs": ["./packages/panel/src/nextjs/index.tsx"],
+      "convex-panel": ["./packages/panel/src"],
+      "convex-panel/convex-component": ["./packages/convex-component/src"]
+    }
+  },
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/panel"
     },
-    "files": [],
-    "references": [
-        {
-            "path": "./packages/panel"
-        },
-        {
-            "path": "./packages/shared"
-        },
-        {
-            "path": "./packages/convex-component"
-        },
-    ]
+    {
+      "path": "./packages/shared"
+    },
+    {
+      "path": "./packages/convex-component"
+    }
+  ]
 }

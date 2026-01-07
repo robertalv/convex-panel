@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { useDeployment } from "@/contexts/DeploymentContext";
+import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/QueryContext";
 import {
   callConvexQuery,
   SYSTEM_QUERIES,
@@ -41,145 +43,94 @@ interface DeploymentStatus {
   refetchLastPush: () => void;
 }
 
+// Query key factory
+export const deploymentStatusKeys = {
+  all: ["deploymentStatus"] as const,
+  state: (deploymentUrl: string) =>
+    [...deploymentStatusKeys.all, "state", deploymentUrl] as const,
+  version: (deploymentUrl: string) =>
+    [...deploymentStatusKeys.all, "version", deploymentUrl] as const,
+  lastPush: (deploymentUrl: string) =>
+    [...deploymentStatusKeys.all, "lastPush", deploymentUrl] as const,
+};
+
 /**
  * Hook for fetching deployment status information.
  * Includes deployment state (running/paused), version, and last push event.
- * Uses real API data only - no mock data.
+ * Uses React Query for caching and automatic refetching.
  */
 export function useDeploymentStatus(): DeploymentStatus {
   const { deploymentUrl, authToken } = useDeployment();
+  const queryClient = useQueryClient();
 
-  // Deployment state
-  const [state, setState] = useState<"running" | "paused" | "unknown">(
-    "unknown",
-  );
-  const [stateLoading, setStateLoading] = useState(true);
-  const [stateError, setStateError] = useState<string | null>(null);
+  const enabled = Boolean(deploymentUrl && authToken);
 
-  // Version
-  const [version, setVersion] = useState<string | null>(null);
-  const [versionLoading, setVersionLoading] = useState(true);
-  const [versionError, setVersionError] = useState<string | null>(null);
-
-  // NPM update check
-  const [hasUpdate, setHasUpdate] = useState(false);
-  const [latestVersion, setLatestVersion] = useState<string | null>(null);
-
-  // Last push
-  const [lastPush, setLastPush] = useState<Date | null>(null);
-  const [lastPushLoading, setLastPushLoading] = useState(true);
-  const [lastPushError, setLastPushError] = useState<string | null>(null);
-
-  // Fetch deployment state
-  const refetchState = useCallback(async () => {
-    if (!deploymentUrl || !authToken) {
-      setStateLoading(false);
-      return;
-    }
-
-    setStateLoading(true);
-    setStateError(null);
-
-    try {
+  // Deployment state query
+  const stateQuery = useQuery({
+    queryKey: deploymentStatusKeys.state(deploymentUrl ?? ""),
+    queryFn: async () => {
       const result = (await callConvexQuery(
-        deploymentUrl,
-        authToken,
+        deploymentUrl!,
+        authToken!,
         SYSTEM_QUERIES.DEPLOYMENT_STATE,
         {},
         desktopFetch,
       )) as { state: "running" | "paused" } | null;
 
-      if (result && result.state) {
-        setState(result.state);
-      } else {
-        setState("unknown");
-      }
-    } catch (err) {
-      console.error("[DeploymentStatus] State fetch error:", err);
-      setStateError(
-        err instanceof Error ? err.message : "Failed to fetch state",
-      );
-      setState("unknown");
-    } finally {
-      setStateLoading(false);
-    }
-  }, [deploymentUrl, authToken]);
+      return result?.state ?? "unknown";
+    },
+    enabled,
+    staleTime: STALE_TIME.health,
+    refetchInterval: REFETCH_INTERVAL.health,
+    refetchOnMount: false,
+  });
 
-  // Fetch version
-  const refetchVersion = useCallback(async () => {
-    if (!deploymentUrl || !authToken) {
-      setVersionLoading(false);
-      return;
-    }
-
-    setVersionLoading(true);
-    setVersionError(null);
-
-    try {
+  // Version query
+  const versionQuery = useQuery({
+    queryKey: deploymentStatusKeys.version(deploymentUrl ?? ""),
+    queryFn: async () => {
       const result = (await callConvexQuery(
-        deploymentUrl,
-        authToken,
+        deploymentUrl!,
+        authToken!,
         SYSTEM_QUERIES.GET_VERSION,
         {},
         desktopFetch,
       )) as string | null;
 
-      setVersion(result || null);
-    } catch (err) {
-      console.error("[DeploymentStatus] Version fetch error:", err);
-      setVersionError(
-        err instanceof Error ? err.message : "Failed to fetch version",
-      );
-    } finally {
-      setVersionLoading(false);
-    }
-  }, [deploymentUrl, authToken]);
+      return result || null;
+    },
+    enabled,
+    staleTime: STALE_TIME.health,
+    refetchOnMount: false,
+  });
 
-  // Fetch last push event
-  const refetchLastPush = useCallback(async () => {
-    if (!deploymentUrl || !authToken) {
-      setLastPushLoading(false);
-      return;
-    }
-
-    setLastPushLoading(true);
-    setLastPushError(null);
-
-    try {
+  // Last push query
+  const lastPushQuery = useQuery({
+    queryKey: deploymentStatusKeys.lastPush(deploymentUrl ?? ""),
+    queryFn: async () => {
       const result = (await callConvexQuery(
-        deploymentUrl,
-        authToken,
+        deploymentUrl!,
+        authToken!,
         SYSTEM_QUERIES.LAST_PUSH_EVENT,
         {},
         desktopFetch,
       )) as { _creationTime?: number } | null;
 
       if (result && result._creationTime) {
-        setLastPush(new Date(result._creationTime));
-      } else {
-        setLastPush(null);
+        return new Date(result._creationTime);
       }
-    } catch (err) {
-      console.error("[DeploymentStatus] Last push fetch error:", err);
-      setLastPushError(
-        err instanceof Error ? err.message : "Failed to fetch last push",
-      );
-    } finally {
-      setLastPushLoading(false);
-    }
-  }, [deploymentUrl, authToken]);
+      return null;
+    },
+    enabled,
+    staleTime: STALE_TIME.health,
+    refetchOnMount: false,
+  });
 
-  // Fetch all
-  const refetch = useCallback(() => {
-    refetchState();
-    refetchVersion();
-    refetchLastPush();
-  }, [refetchState, refetchVersion, refetchLastPush]);
+  const version = versionQuery.data ?? null;
 
-  // Initial fetch
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
+  // NPM update check (local state since it's not a Convex query)
+  const [hasUpdate, setHasUpdate] = useState(false);
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
 
   // Check for npm updates when version is available
   useEffect(() => {
@@ -229,24 +180,54 @@ export function useDeploymentStatus(): DeploymentStatus {
     };
   }, [version]);
 
-  const isLoading = stateLoading || versionLoading || lastPushLoading;
-  const hasError = Boolean(stateError || versionError || lastPushError);
+  // Refetch functions
+  const refetchState = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: deploymentStatusKeys.state(deploymentUrl ?? ""),
+    });
+  }, [queryClient, deploymentUrl]);
+
+  const refetchVersion = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: deploymentStatusKeys.version(deploymentUrl ?? ""),
+    });
+  }, [queryClient, deploymentUrl]);
+
+  const refetchLastPush = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: deploymentStatusKeys.lastPush(deploymentUrl ?? ""),
+    });
+  }, [queryClient, deploymentUrl]);
+
+  const refetch = useCallback(() => {
+    refetchState();
+    refetchVersion();
+    refetchLastPush();
+  }, [refetchState, refetchVersion, refetchLastPush]);
+
+  // Aggregate loading and error states
+  const isLoading =
+    stateQuery.isLoading || versionQuery.isLoading || lastPushQuery.isLoading;
+
+  const hasError = Boolean(
+    stateQuery.error || versionQuery.error || lastPushQuery.error,
+  );
 
   return {
-    state,
-    stateLoading,
-    stateError,
+    state: stateQuery.data ?? "unknown",
+    stateLoading: stateQuery.isLoading,
+    stateError: stateQuery.error?.message ?? null,
 
     version,
-    versionLoading,
-    versionError,
+    versionLoading: versionQuery.isLoading,
+    versionError: versionQuery.error?.message ?? null,
 
     hasUpdate,
     latestVersion,
 
-    lastPush,
-    lastPushLoading,
-    lastPushError,
+    lastPush: lastPushQuery.data ?? null,
+    lastPushLoading: lastPushQuery.isLoading,
+    lastPushError: lastPushQuery.error?.message ?? null,
 
     isLoading,
     hasError,

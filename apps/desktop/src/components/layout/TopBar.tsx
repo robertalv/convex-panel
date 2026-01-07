@@ -11,6 +11,8 @@ import {
   useTerminalState,
 } from "../../contexts/TerminalContext";
 import { useMcpOptional } from "../../contexts/McpContext";
+import { useIsFullscreen } from "../../hooks/useIsFullscreen";
+import { McpStatusIndicator } from "./McpStatusIndicator";
 
 interface TopBarProps {
   user: User | null;
@@ -115,6 +117,8 @@ export function TopBar({
   className,
   deploymentsLoading = false,
 }: TopBarProps) {
+  const isFullscreen = useIsFullscreen();
+
   const teamOptions = React.useMemo(
     () => teams.map((t) => ({ value: String(t.id), label: t.name })),
     [teams],
@@ -163,7 +167,8 @@ export function TopBar({
     <header
       className={cn(
         "flex items-center justify-between",
-        "h-10 pl-18 pr-3",
+        "h-10 pr-3",
+        isFullscreen ? "pl-3" : "pl-18",
         "bg-background-raised border-b border-border-muted",
         "select-none",
         className,
@@ -172,7 +177,7 @@ export function TopBar({
     >
       {/* Left: Logo + Breadcrumb selectors */}
       <div className="flex items-center gap-1">
-        <ConvexLogo size={20} className="flex-shrink-0" />
+        <ConvexLogo size={20} className="shrink-0" />
 
         <SearchableSelect
           value={selectedTeam ? String(selectedTeam.id) : ""}
@@ -211,6 +216,9 @@ export function TopBar({
       <div className="flex items-center gap-2">
         {/* Terminal Toggle Button - only visible when a project is selected */}
         {selectedProject && <TerminalButton onOpenSettings={onOpenSettings} />}
+
+        {/* MCP Connection Status Indicator */}
+        <McpStatusIndicator />
 
         <UserMenu
           user={user}

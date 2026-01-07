@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchRecentErrors, type FetchFn } from "@convex-panel/shared/api";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { useDeployment } from "@/contexts/DeploymentContext";
+import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/QueryContext";
 
 // Use Tauri's fetch for CORS-free HTTP requests
 const desktopFetch: FetchFn = (input, init) => tauriFetch(input, init);
@@ -26,57 +28,54 @@ interface RecentErrorsState {
   refetch: () => void;
 }
 
+// Query key factory for consistent key management
+export const recentErrorsKeys = {
+  all: ["recentErrors"] as const,
+  byHours: (deploymentUrl: string, hoursBack: number) =>
+    [...recentErrorsKeys.all, deploymentUrl, hoursBack] as const,
+};
+
 /**
  * Hook for fetching recent errors from the deployment.
- * Uses real API data only - no mock data.
+ * Uses React Query for caching and automatic refetching.
  */
 export function useRecentErrors(hoursBack: number = 1): RecentErrorsState {
   const { deploymentUrl, authToken } = useDeployment();
+  const queryClient = useQueryClient();
 
-  const [errorCount, setErrorCount] = useState(0);
-  const [topErrors, setTopErrors] = useState<ErrorSummary[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const enabled = Boolean(deploymentUrl && authToken);
 
-  const refetch = useCallback(async () => {
-    if (!deploymentUrl || !authToken) {
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
+  const query = useQuery({
+    queryKey: recentErrorsKeys.byHours(deploymentUrl ?? "", hoursBack),
+    queryFn: async () => {
       const result = await fetchRecentErrors(
-        deploymentUrl,
-        authToken,
+        deploymentUrl!,
+        authToken!,
         hoursBack,
         desktopFetch,
       );
+      return {
+        errorCount: result.count,
+        topErrors: result.topErrors,
+      };
+    },
+    enabled,
+    staleTime: STALE_TIME.health,
+    refetchInterval: REFETCH_INTERVAL.health,
+    refetchOnMount: false,
+  });
 
-      setErrorCount(result.count);
-      setTopErrors(result.topErrors);
-    } catch (err) {
-      console.error("[RecentErrors] Error fetching:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch recent errors",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, [deploymentUrl, authToken, hoursBack]);
-
-  // Initial fetch
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
+  const refetch = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: recentErrorsKeys.byHours(deploymentUrl ?? "", hoursBack),
+    });
+  }, [queryClient, deploymentUrl, hoursBack]);
 
   return {
-    errorCount,
-    topErrors,
-    isLoading,
-    error,
+    errorCount: query.data?.errorCount ?? 0,
+    topErrors: query.data?.topErrors ?? [],
+    isLoading: query.isLoading,
+    error: query.error?.message ?? null,
     refetch,
   };
 }

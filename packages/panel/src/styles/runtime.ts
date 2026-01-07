@@ -27,9 +27,6 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
 .sticky {
   position: sticky;
 }
-.top-1\\/2 {
-  top: calc(1/2 * 100%);
-}
 .isolate {
   isolation: isolate;
 }
@@ -87,10 +84,6 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
 .border-collapse {
   border-collapse: collapse;
 }
-.-translate-y-1\\/2 {
-  --tw-translate-y: calc(calc(1/2 * 100%) * -1);
-  translate: var(--tw-translate-x) var(--tw-translate-y);
-}
 .transform {
   transform: var(--tw-rotate-x,) var(--tw-rotate-y,) var(--tw-rotate-z,) var(--tw-skew-x,) var(--tw-skew-y,);
 }
@@ -137,12 +130,6 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
 .text-center {
   text-align: center;
 }
-.text-\\[9px\\] {
-  font-size: 9px;
-}
-.text-\\[10px\\] {
-  font-size: 10px;
-}
 .break-all {
   word-break: break-all;
 }
@@ -182,12 +169,6 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   transition-property: opacity;
   transition-timing-function: var(--tw-ease, ease);
   transition-duration: var(--tw-duration, 0s);
-}
-.focus\\:outline-none {
-  &:focus {
-    --tw-outline-style: none;
-    outline-style: none;
-  }
 }
 .cp-skeleton {
   background-color: var(--color-panel-border);
@@ -2770,21 +2751,6 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
 .cp-terminal-toggle-wrapper:hover .cp-terminal-shortcut {
   opacity: 1;
 }
-@property --tw-translate-x {
-  syntax: "*";
-  inherits: false;
-  initial-value: 0;
-}
-@property --tw-translate-y {
-  syntax: "*";
-  inherits: false;
-  initial-value: 0;
-}
-@property --tw-translate-z {
-  syntax: "*";
-  inherits: false;
-  initial-value: 0;
-}
 @property --tw-rotate-x {
   syntax: "*";
   inherits: false;
@@ -2871,9 +2837,6 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
 @layer properties {
   @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
     *, ::before, ::after, ::backdrop {
-      --tw-translate-x: 0;
-      --tw-translate-y: 0;
-      --tw-translate-z: 0;
       --tw-rotate-x: initial;
       --tw-rotate-y: initial;
       --tw-rotate-z: initial;

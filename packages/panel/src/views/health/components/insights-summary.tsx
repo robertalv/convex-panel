@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { CheckCircle2, ExternalLink } from "lucide-react";
 import { Card } from "../../../components/shared/card";
 import { fetchInsights } from "../../../utils/api/health";
 import type { Insight } from "../../../utils/api/types";
 import { InsightsSummaryListItem } from "./insights-summary-list-item";
+import { InsightBreakdownSheet } from "./insight-breakdown-sheet";
 import { useInsightsPeriod } from "../../../utils/api/insights";
 import { getTeamTokenFromEnv } from "../../../utils/api/utils";
 import { getTokenDetails } from "../../../utils/api/teams";
@@ -13,10 +14,20 @@ export const InsightsSummary: React.FC<{
   authToken: string;
   teamAccessToken?: string;
   useMockData?: boolean;
-}> = ({ deploymentUrl, authToken, teamAccessToken, useMockData = false }) => {
+  /** Container element for the breakdown sheet */
+  container?: HTMLElement | null;
+}> = ({
+  deploymentUrl,
+  authToken,
+  teamAccessToken,
+  useMockData = false,
+  container,
+}) => {
   const [insights, setInsights] = useState<Insight[] | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedInsight, setSelectedInsight] = useState<Insight | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!deploymentUrl || !authToken) {
@@ -367,11 +378,23 @@ export const InsightsSummary: React.FC<{
             style={{ display: "flex", width: "100%", flexDirection: "column" }}
           >
             {insights.map((insight, idx) => (
-              <InsightsSummaryListItem key={idx} insight={insight} />
+              <InsightsSummaryListItem
+                key={idx}
+                insight={insight}
+                onSelect={setSelectedInsight}
+              />
             ))}
           </div>
         )}
       </div>
+
+      {/* Breakdown Sheet */}
+      <InsightBreakdownSheet
+        isOpen={selectedInsight !== null}
+        onClose={() => setSelectedInsight(null)}
+        insight={selectedInsight}
+        container={container || containerRef.current}
+      />
     </Card>
   );
 };

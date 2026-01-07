@@ -1,20 +1,29 @@
-import { Team, Project, Deployment } from "convex-panel";
+/**
+ * BigBrain API for Desktop
+ *
+ * This module re-exports BigBrain API functions from @convex-panel/shared
+ * and adapts them to work with the desktop app's custom fetch function.
+ */
+
 import type { DashboardFetch } from "../lib/convex/dashboardCommonAdapter";
-export type { Team, Project, Deployment };
+import type { PlanType } from "@convex-panel/shared";
+import {
+  getTeams as sharedGetTeams,
+  getProjects as sharedGetProjects,
+  getDeployments as sharedGetDeployments,
+  getProfile as sharedGetProfile,
+  getTeamSubscription as sharedGetTeamSubscription,
+  createDeployKey as sharedCreateDeployKey,
+  type Team,
+  type Project,
+  type Deployment,
+  type UserProfile,
+} from "@convex-panel/shared/api";
 
-export interface UserProfile {
-  name?: string;
-  email?: string;
-  profilePictureUrl?: string;
-}
+// Re-export types
+export type { Team, Project, Deployment, UserProfile };
 
-export type PlanType =
-  | "CONVEX_BASE"
-  | "CONVEX_STARTER_PLUS"
-  | "CONVEX_PROFESSIONAL"
-  | "CONVEX_BUSINESS"
-  | string;
-
+// Extended subscription types for desktop
 export interface SubscriptionPlan {
   id: string;
   name: string;
@@ -27,92 +36,46 @@ export interface TeamSubscription {
   plan: SubscriptionPlan;
 }
 
-const BIG_BRAIN_URL = "https://api.convex.dev";
-
+/**
+ * Fetch all teams the user has access to
+ */
 export async function getTeams(
   accessToken: string,
   fetchFn: DashboardFetch,
 ): Promise<Team[]> {
-  const response = await fetchFn(`${BIG_BRAIN_URL}/api/dashboard/teams`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Convex-Client": "convex-panel-desktop",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch teams: ${response.status}`);
-  }
-
-  return response.json();
+  return sharedGetTeams(accessToken, fetchFn);
 }
 
+/**
+ * Fetch all projects for a team
+ */
 export async function getProjects(
   accessToken: string,
   teamId: number,
   fetchFn: DashboardFetch,
 ): Promise<Project[]> {
-  const response = await fetchFn(
-    `${BIG_BRAIN_URL}/api/dashboard/teams/${teamId}/projects`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Convex-Client": "convex-panel-desktop",
-      },
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch projects: ${response.status}`);
-  }
-
-  return response.json();
+  return sharedGetProjects(accessToken, teamId, fetchFn);
 }
 
+/**
+ * Fetch all deployments for a project
+ */
 export async function getDeployments(
   accessToken: string,
   projectId: number,
   fetchFn: DashboardFetch,
 ): Promise<Deployment[]> {
-  const response = await fetchFn(
-    `${BIG_BRAIN_URL}/api/dashboard/projects/${projectId}/instances`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Convex-Client": "convex-panel-desktop",
-      },
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch deployments: ${response.status}`);
-  }
-
-  const deployments: Deployment[] = await response.json();
-
-  // Ensure each deployment has a URL - construct from name if not provided by API
-  return deployments.map((deployment) => ({
-    ...deployment,
-    url: deployment.url ?? `https://${deployment.name}.convex.cloud`,
-  }));
+  return sharedGetDeployments(accessToken, projectId, fetchFn);
 }
 
+/**
+ * Fetch user profile
+ */
 export async function getProfile(
   accessToken: string,
   fetchFn: DashboardFetch,
 ): Promise<UserProfile> {
-  const response = await fetchFn(`${BIG_BRAIN_URL}/api/dashboard/profile`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Convex-Client": "convex-panel-desktop",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch profile: ${response.status}`);
-  }
-
-  return response.json();
+  return sharedGetProfile(accessToken, fetchFn);
 }
 
 /**
@@ -124,28 +87,8 @@ export async function getTeamSubscription(
   teamId: number,
   fetchFn: DashboardFetch,
 ): Promise<TeamSubscription | null> {
-  try {
-    const response = await fetchFn(
-      `${BIG_BRAIN_URL}/api/dashboard/teams/${teamId}/get_orb_subscription`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Convex-Client": "convex-panel-desktop",
-        },
-      },
-    );
-
-    if (!response.ok) {
-      // 404 or other errors typically mean free plan
-      return null;
-    }
-
-    const data = await response.json();
-    return data as TeamSubscription;
-  } catch {
-    // Error fetching subscription, assume free plan
-    return null;
-  }
+  const result = await sharedGetTeamSubscription(accessToken, teamId, fetchFn);
+  return result as TeamSubscription | null;
 }
 
 /**
@@ -167,46 +110,5 @@ export async function createDeployKey(
   keyName: string,
   fetchFn: DashboardFetch,
 ): Promise<{ key: string }> {
-  // Management API uses /v1 not /api/v1
-  const url = `${BIG_BRAIN_URL}/v1/deployments/${deploymentName}/create_deploy_key`;
-
-  console.log("[createDeployKey] Request:", {
-    url,
-    deploymentName,
-    keyName,
-    tokenPrefix: accessToken?.substring(0, 20) + "...",
-  });
-
-  // Management API uses Bearer token with access token
-  const response = await fetchFn(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      "Convex-Client": "convex-panel-desktop",
-    },
-    body: JSON.stringify({
-      name: keyName,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "Unknown error");
-    console.error("[createDeployKey] Failed:", {
-      status: response.status,
-      errorText,
-    });
-    throw new Error(
-      `Failed to create deploy key: ${response.status} - ${errorText}`,
-    );
-  }
-
-  // API returns { deployKey: string } per generatedManagementApi.ts
-  const result: { deployKey: string } = await response.json();
-  console.log("[createDeployKey] Success:", {
-    hasKey: Boolean(result.deployKey),
-  });
-
-  // Normalize to { key: string } for internal use
-  return { key: result.deployKey };
+  return sharedCreateDeployKey(accessToken, deploymentName, keyName, fetchFn);
 }

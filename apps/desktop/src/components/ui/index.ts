@@ -22,3 +22,13 @@ export {
   TooltipProvider,
   TooltipWithKeybind,
 } from "./tooltip";
+export { ToolbarButton, type ToolbarButtonProps } from "./button";
+export {
+  Menu,
+  MenuItem,
+  MenuDivider,
+  MenuTrigger,
+  type MenuProps,
+  type MenuItemProps,
+  type MenuTriggerProps,
+} from "./menu";

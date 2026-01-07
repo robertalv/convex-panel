@@ -1,11 +1,14 @@
 /**
  * useSchema Hook
- * Fetches and parses Convex schema data with indexes and relationships
+ * Fetches and parses Convex schema data with indexes and relationships.
+ * Uses React Query for caching with 5-minute stale time.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SchemaJSON, ParsedSchema } from "../types";
 import { parseSchema } from "../utils/schema-parser";
+import { STALE_TIME } from "@/contexts/QueryContext";
 
 interface UseSchemaOptions {
   adminClient: any | null;
@@ -20,31 +23,37 @@ interface UseSchemaReturn {
   refetch: () => void;
 }
 
+// Query key factory for consistent key management
+export const schemaKeys = {
+  all: ["schema"] as const,
+  detail: (componentId: string | null) =>
+    [...schemaKeys.all, componentId ?? "root"] as const,
+};
+
 /**
- * Hook to fetch and parse Convex schema with full index information
+ * Hook to fetch and parse Convex schema with full index information.
+ * Uses React Query for caching - schema data is cached for 5 minutes.
  */
 export function useSchema({
   adminClient,
   componentId = null,
 }: UseSchemaOptions): UseSchemaReturn {
-  const [schema, setSchema] = useState<ParsedSchema | null>(null);
-  const [schemaJson, setSchemaJson] = useState<SchemaJSON | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [refetchCount, setRefetchCount] = useState(0);
+  const queryClient = useQueryClient();
 
-  const fetchSchema = useCallback(async () => {
-    if (!adminClient) {
-      setError("No admin client available");
-      return;
-    }
+  const normalizedComponentId =
+    componentId === "app" || componentId === null ? null : componentId;
 
-    setIsLoading(true);
-    setError(null);
+  const enabled = Boolean(adminClient);
 
-    try {
-      const normalizedComponentId =
-        componentId === "app" || componentId === null ? null : componentId;
+  const query = useQuery({
+    queryKey: schemaKeys.detail(normalizedComponentId),
+    queryFn: async (): Promise<{
+      schema: ParsedSchema;
+      schemaJson: SchemaJSON;
+    }> => {
+      if (!adminClient) {
+        throw new Error("No admin client available");
+      }
 
       // Fetch schema using the Convex system query
       const schemas = await adminClient.query(
@@ -54,44 +63,33 @@ export function useSchema({
 
       if (schemas?.active) {
         const parsed = JSON.parse(schemas.active) as SchemaJSON;
-        setSchemaJson(parsed);
-
-        // Parse schema into visualization-ready format
         const visualizationSchema = parseSchema(parsed);
-        setSchema(visualizationSchema);
+        return { schema: visualizationSchema, schemaJson: parsed };
       } else {
         // No active schema - create empty schema
         const emptySchema: SchemaJSON = {
           tables: [],
           schemaValidation: false,
         };
-        setSchemaJson(emptySchema);
-        setSchema(parseSchema(emptySchema));
+        return { schema: parseSchema(emptySchema), schemaJson: emptySchema };
       }
-    } catch (err: any) {
-      console.error("Error fetching schema:", err);
-      setError(err?.message || "Failed to fetch schema");
-      setSchema(null);
-      setSchemaJson(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [adminClient, componentId]);
-
-  // Fetch schema when dependencies change
-  useEffect(() => {
-    fetchSchema();
-  }, [fetchSchema, refetchCount]);
+    },
+    enabled,
+    staleTime: STALE_TIME.schemas,
+    refetchOnMount: false,
+  });
 
   const refetch = useCallback(() => {
-    setRefetchCount((c) => c + 1);
-  }, []);
+    queryClient.invalidateQueries({
+      queryKey: schemaKeys.detail(normalizedComponentId),
+    });
+  }, [queryClient, normalizedComponentId]);
 
   return {
-    schema,
-    schemaJson,
-    isLoading,
-    error,
+    schema: query.data?.schema ?? null,
+    schemaJson: query.data?.schemaJson ?? null,
+    isLoading: query.isLoading,
+    error: query.error?.message ?? null,
     refetch,
   };
 }

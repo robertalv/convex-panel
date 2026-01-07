@@ -136,6 +136,7 @@ export const HealthView: React.FC<{
             authToken={authToken}
             teamAccessToken={teamAccessToken}
             useMockData={useMockData}
+            container={containerRef}
           />
         </div>
       </div>

@@ -4,6 +4,7 @@ import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { panelStyles, injectPanelStyles } from "convex-panel";
 import { HashRouter } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { QueryProvider } from "@/contexts/QueryContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import App from "./App";
 
@@ -18,18 +19,20 @@ const convex = convexUrl ? new ConvexReactClient(convexUrl) : null;
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <TooltipProvider>
-        <HashRouter>
-          {convex ? (
-            <ConvexProvider client={convex}>
-              <App convex={convex} />
-            </ConvexProvider>
-          ) : (
-            <App convex={null} />
-          )}
-        </HashRouter>
-      </TooltipProvider>
-    </ThemeProvider>
+    <QueryProvider>
+      <ThemeProvider>
+        <TooltipProvider>
+          <HashRouter>
+            {convex ? (
+              <ConvexProvider client={convex}>
+                <App convex={convex} />
+              </ConvexProvider>
+            ) : (
+              <App convex={null} />
+            )}
+          </HashRouter>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryProvider>
   </React.StrictMode>,
 );

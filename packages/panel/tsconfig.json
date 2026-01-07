@@ -3,14 +3,14 @@
   "compilerOptions": {
     "outDir": "./dist",
     "baseUrl": ".",
+    "moduleResolution": "bundler",
     "paths": {
-      "convex-panel/shared": [
-        "../shared/src"
-      ]
+      "convex-panel/shared": ["../shared/src"],
+      "convex-panel/shared/*": ["../shared/src/*"],
+      "@convex-panel/shared": ["../shared/src"],
+      "@convex-panel/shared/*": ["../shared/src/*"]
     },
     "types": ["vite/client", "node"]
   },
-  "include": [
-    "./src/**/*"
-  ]
+  "include": ["./src/**/*"]
 }

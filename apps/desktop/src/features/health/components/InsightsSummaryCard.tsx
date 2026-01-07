@@ -12,6 +12,8 @@ interface InsightsSummaryCardProps {
   error?: string | null;
   /** Retry callback */
   onRetry?: () => void;
+  /** Callback when an insight is clicked */
+  onInsightClick?: (insight: Insight) => void;
   /** Additional CSS classes */
   className?: string;
 }
@@ -149,6 +151,7 @@ export function InsightsSummaryCard({
   loading = false,
   error = null,
   onRetry,
+  onInsightClick,
   className,
 }: InsightsSummaryCardProps) {
   return (
@@ -175,10 +178,12 @@ export function InsightsSummaryCard({
             return (
               <div
                 key={idx}
+                onClick={() => onInsightClick?.(insight)}
                 className={cn(
                   "grid grid-cols-[60px_1fr_1.5fr] gap-2 py-2 items-center",
                   idx < Math.min(insights.length, 5) - 1 &&
                     "border-b border-border",
+                  onInsightClick && "cursor-pointer hover:bg-overlay transition-colors rounded px-1",
                 )}
               >
                 <SeverityBadge severity={severity} />

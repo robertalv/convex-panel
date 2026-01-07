@@ -15,8 +15,11 @@ export interface Project {
 export interface Deployment {
   id: number;
   name: string;
-  deploymentType: "prod" | "dev";
+  deploymentType: "prod" | "dev" | "preview";
   projectId: number;
+  kind?: "cloud" | "local";
+  creator?: number;
+  previewIdentifier?: string | null;
   url?: string;
 }
 

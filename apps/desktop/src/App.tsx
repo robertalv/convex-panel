@@ -741,18 +741,6 @@ export default function App({ convex: _initialConvex }: AppProps) {
     return <LoadingScreen theme={theme} />;
   }
 
-  // Show transition animation when transitioning to main app
-  if (isTransitioning) {
-    return (
-      <LoginTransition
-        theme={theme}
-        onComplete={() => setIsTransitioning(false)}
-      >
-        {mainAppContent}
-      </LoginTransition>
-    );
-  }
-
   // Auth screen - not connected
   if (!isConnected) {
     return (
@@ -776,6 +764,18 @@ export default function App({ convex: _initialConvex }: AppProps) {
     );
   }
 
-  // Main app - connected (no transition)
-  return mainAppContent;
+  // Main app - connected
+  // Render mainAppContent always in the same tree position to prevent remounting
+  // LoginTransition renders as an overlay on top when transitioning
+  return (
+    <>
+      {mainAppContent}
+      {isTransitioning && (
+        <LoginTransition
+          theme={theme}
+          onComplete={() => setIsTransitioning(false)}
+        />
+      )}
+    </>
+  );
 }
