@@ -12,16 +12,18 @@ import {
   Code2,
   X,
   ExternalLink,
-  FileCode,
   Loader2,
   AlertTriangle,
   ArrowRight,
 } from "lucide-react";
+import Editor, { DiffEditor, type BeforeMount } from "@monaco-editor/react";
 import { useDeployment } from "@/contexts/DeploymentContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useMcpOptional } from "@/contexts/McpContext";
 import { useGitHubOptional } from "@/contexts/GitHubContext";
 import { useComponents, saveActiveTable } from "convex-panel";
+import type { ConvexComponent } from "@/features/data/types";
+import { ResizableSheet } from "@/features/data/components/ResizableSheet";
 import { useSchema } from "./hooks/useSchema";
 import { useSchemaDiff } from "./hooks/useSchemaDiff";
 import { useGitSchemaHistory } from "./hooks/useGitSchemaHistory";
@@ -44,7 +46,13 @@ import type {
   LayoutAlgorithm,
   ExportFormat,
   SchemaTable,
+  SchemaDiff,
+  ParsedSchema,
 } from "./types";
+import {
+  generateFullSchemaCode,
+  generateSchemaFromTable,
+} from "./utils/code-generator";
 
 // Default sidebar width
 const DEFAULT_SIDEBAR_WIDTH = 260;
@@ -67,190 +75,187 @@ const defaultSettings: VisualizationSettings = {
 };
 
 /**
- * Resizable divider component
- */
-function ResizeDivider({
-  onResize,
-  orientation = "vertical",
-}: {
-  onResize: (delta: number) => void;
-  orientation?: "vertical" | "horizontal";
-}) {
-  const isDragging = useRef(false);
-  const startPos = useRef(0);
-
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      isDragging.current = true;
-      startPos.current = orientation === "vertical" ? e.clientX : e.clientY;
-
-      const handleMouseMove = (e: MouseEvent) => {
-        if (!isDragging.current) return;
-        const currentPos = orientation === "vertical" ? e.clientX : e.clientY;
-        const delta = currentPos - startPos.current;
-        startPos.current = currentPos;
-        onResize(delta);
-      };
-
-      const handleMouseUp = () => {
-        isDragging.current = false;
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-      };
-
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-    },
-    [onResize, orientation],
-  );
-
-  return (
-    <div
-      className={`
-        ${orientation === "vertical" ? "w-1 cursor-col-resize" : "h-1 cursor-row-resize"}
-        transition-colors flex-shrink-0
-      `}
-      style={{
-        backgroundColor: "var(--color-border-base)",
-      }}
-      onMouseDown={handleMouseDown}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = "var(--color-border-strong)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = "var(--color-border-base)";
-      }}
-    />
-  );
-}
-
-/**
- * Code panel component showing schema code
+ * Code panel component showing schema code with Monaco Editor
+ * Supports both regular view and diff view when comparing schemas
  */
 function SchemaCodePanel({
   table,
-  width,
+  schema,
+  diff,
   onClose,
   onOpenInCursor,
 }: {
   table: SchemaTable | null;
-  width: number;
+  schema: ParsedSchema | null;
+  diff: SchemaDiff | null;
   onClose: () => void;
   onOpenInCursor?: () => void;
 }) {
-  // Generate TypeScript-like schema code for the selected table
+  const { resolvedTheme } = useTheme();
+
+  // Generate TypeScript-like schema code for the selected table or full schema
   const schemaCode = useMemo(() => {
-    if (!table) {
-      return "// Select a table to view its schema";
+    if (table) {
+      // Generate code for single table
+      return `// Schema for table: ${table.name}\nimport { defineTable } from "convex/server";\nimport { v } from "convex/values";\n\n${generateSchemaFromTable(table)}`;
     }
+    if (schema) {
+      // Generate full schema code
+      return generateFullSchemaCode(schema);
+    }
+    return "// Select a table to view its schema";
+  }, [table, schema]);
 
-    const lines: string[] = [];
-    lines.push(`// Schema for table: ${table.name}`);
-    lines.push("");
-    lines.push(`export const ${table.name} = defineTable({`);
-
-    for (const field of table.fields) {
-      const optional = field.optional ? ".optional()" : "";
-      let typeStr: string = field.type;
-
-      if (field.type === "id" && field.referencedTable) {
-        typeStr = `v.id("${field.referencedTable}")`;
-      } else if (field.type === "array") {
-        const elementType = field.arrayElementType?.type || "any";
-        if (elementType === "id" && field.arrayElementType?.referencedTable) {
-          typeStr = `v.array(v.id("${field.arrayElementType.referencedTable}"))`;
-        } else {
-          typeStr = `v.array(v.${elementType}())`;
-        }
-      } else if (field.type === "object") {
-        typeStr = "v.object({...})";
-      } else {
-        typeStr = `v.${field.type}()`;
+  // Generate original code for diff view (from the "from" snapshot)
+  const originalCode = useMemo(() => {
+    if (!diff) return "";
+    if (table) {
+      // Find the table in the "from" schema
+      const oldTable = diff.from.schema.tables.get(table.name);
+      if (oldTable) {
+        return `// Schema for table: ${oldTable.name}\nimport { defineTable } from "convex/server";\nimport { v } from "convex/values";\n\n${generateSchemaFromTable(oldTable)}`;
       }
-
-      lines.push(`  ${field.name}: ${typeStr}${optional},`);
+      return "// Table does not exist in previous version";
     }
+    return generateFullSchemaCode(diff.from.schema);
+  }, [diff, table]);
 
-    lines.push("})");
+  // Configure Monaco before it mounts
+  const handleEditorWillMount: BeforeMount = useCallback((monaco) => {
+    // Define custom themes with transparent background
+    monaco.editor.defineTheme("convex-light", {
+      base: "vs",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": "#00000000",
+      },
+    });
 
-    // Add indexes
-    if (table.indexes.length > 0) {
-      lines.push("");
-      lines.push("// Indexes");
-      for (const index of table.indexes) {
-        if (index.type === "db") {
-          lines.push(
-            `  .index("${index.name}", [${index.fields.map((f) => `"${f}"`).join(", ")}])`,
-          );
-        } else if (index.type === "search") {
-          lines.push(
-            `  .searchIndex("${index.name}", { searchField: "${index.searchField}", filterFields: [${index.filterFields?.map((f) => `"${f}"`).join(", ") || ""}] })`,
-          );
-        } else if (index.type === "vector") {
-          lines.push(
-            `  .vectorIndex("${index.name}", { vectorField: "${index.vectorField}", dimensions: ${index.dimensions}, filterFields: [${index.filterFields?.map((f) => `"${f}"`).join(", ") || ""}] })`,
-          );
-        }
-      }
-    }
+    monaco.editor.defineTheme("convex-dark", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": "#00000000",
+      },
+    });
+  }, []);
 
-    return lines.join("\n");
-  }, [table]);
+  // Monaco editor options
+  const editorOptions = useMemo(
+    () => ({
+      automaticLayout: true,
+      minimap: { enabled: false },
+      scrollBeyondLastLine: false,
+      lineNumbers: "on" as const,
+      lineNumbersMinChars: 3,
+      lineDecorationsWidth: 0,
+      overviewRulerBorder: false,
+      contextmenu: true,
+      bracketPairColorization: { enabled: true },
+      guides: { bracketPairs: true, indentation: true },
+      renderLineHighlight: "line" as const,
+      fontSize: 12,
+      fontFamily:
+        'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+      tabSize: 2,
+      insertSpaces: true,
+      wordWrap: "on" as const,
+      folding: true,
+      readOnly: true,
+      scrollbar: {
+        vertical: "auto" as const,
+        horizontal: "auto" as const,
+        verticalScrollbarSize: 10,
+        horizontalScrollbarSize: 10,
+      },
+      padding: { top: 12, bottom: 12 },
+    }),
+    [],
+  );
+
+  const isDiffMode = diff !== null;
+  const monacoTheme = resolvedTheme === "dark" ? "convex-dark" : "convex-light";
 
   return (
-    <div
-      className="flex flex-col h-full"
-      style={{
-        width,
-        backgroundColor: "var(--color-surface-base)",
-        borderLeft: "1px solid var(--color-border-base)",
-      }}
-    >
-      {/* Header */}
-      <div
-        className="flex items-center justify-between px-3 py-2"
-        style={{ borderBottom: "1px solid var(--color-border-base)" }}
-      >
-        <div
-          className="flex items-center gap-2 text-sm"
-          style={{ color: "var(--color-text-muted)" }}
-        >
-          <FileCode size={14} style={{ color: "var(--color-text-subtle)" }} />
-          <span>{table?.name || "Schema"}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          {onOpenInCursor && (
-            <button
-              onClick={onOpenInCursor}
-              className="p-1.5 rounded transition-colors"
-              style={{ color: "var(--color-text-subtle)" }}
-              title="Open in Cursor"
-            >
-              <ExternalLink size={14} />
-            </button>
-          )}
+    <ResizableSheet
+      id="schema-code-panel"
+      side="right"
+      defaultWidth={DEFAULT_CODE_PANEL_WIDTH}
+      minWidth={MIN_CODE_PANEL_WIDTH}
+      maxWidth={MAX_CODE_PANEL_WIDTH}
+      title={table?.name || "Schema"}
+      subtitle={
+        isDiffMode ? `${diff.from.label} → ${diff.to.label}` : undefined
+      }
+      onClose={onClose}
+      headerActions={
+        onOpenInCursor ? (
           <button
-            onClick={onClose}
+            onClick={onOpenInCursor}
             className="p-1.5 rounded transition-colors"
             style={{ color: "var(--color-text-subtle)" }}
-            title="Close code panel"
+            title="Open in Cursor"
           >
-            <X size={14} />
+            <ExternalLink size={14} />
           </button>
-        </div>
+        ) : undefined
+      }
+    >
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {isDiffMode ? (
+          <DiffEditor
+            original={originalCode}
+            modified={schemaCode}
+            language="typescript"
+            theme={monacoTheme}
+            options={{
+              ...editorOptions,
+              renderSideBySide: true,
+              enableSplitViewResizing: true,
+              originalEditable: false,
+            }}
+            beforeMount={handleEditorWillMount}
+            loading={
+              <div
+                className="flex items-center justify-center h-full"
+                style={{ backgroundColor: "var(--color-surface-base)" }}
+              >
+                <span
+                  className="text-sm"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  Loading diff editor...
+                </span>
+              </div>
+            }
+          />
+        ) : (
+          <Editor
+            height="100%"
+            language="typescript"
+            value={schemaCode}
+            theme={monacoTheme}
+            options={editorOptions}
+            beforeMount={handleEditorWillMount}
+            loading={
+              <div
+                className="flex items-center justify-center h-full"
+                style={{ backgroundColor: "var(--color-surface-base)" }}
+              >
+                <span
+                  className="text-sm"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  Loading editor...
+                </span>
+              </div>
+            }
+          />
+        )}
       </div>
-
-      {/* Code content */}
-      <div className="flex-1 overflow-auto">
-        <pre
-          className="p-4 text-xs font-mono whitespace-pre-wrap"
-          style={{ color: "var(--color-text-muted)" }}
-        >
-          {schemaCode}
-        </pre>
-      </div>
-    </div>
+    </ResizableSheet>
   );
 }
 
@@ -296,6 +301,7 @@ function SchemaVisualizerContent() {
   // Fetch components for component selector
   const {
     componentNames,
+    componentNameToId,
     selectedComponent,
     setSelectedComponent,
     selectedComponentId,
@@ -303,6 +309,15 @@ function SchemaVisualizerContent() {
     adminClient,
     useMockData: false,
   });
+
+  // Convert componentNames to ConvexComponent[] for the sidebar
+  const componentsAsConvexComponents: ConvexComponent[] = useMemo(() => {
+    return componentNames.map((name) => ({
+      id: name === "app" ? null : (componentNameToId.get(name) ?? name),
+      name: name === "app" ? null : name,
+      path: name === "app" ? "_App" : name,
+    }));
+  }, [componentNames, componentNameToId]);
 
   // Fetch schema data filtered by selected component
   const { schema, schemaJson, isLoading, error, refetch } = useSchema({
@@ -409,11 +424,7 @@ function SchemaVisualizerContent() {
   }, [schema, isLoading, selectedComponent, setSelectedComponent]);
 
   // UI state
-  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [codePanelWidth, setCodePanelWidth] = useState(
-    DEFAULT_CODE_PANEL_WIDTH,
-  );
   const [codePanelOpen, setCodePanelOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -429,25 +440,6 @@ function SchemaVisualizerContent() {
     if (!schema || !selectedTable) return null;
     return schema.tables.get(selectedTable) || null;
   }, [schema, selectedTable]);
-
-  // Handle sidebar resize
-  const handleSidebarResize = useCallback((delta: number) => {
-    setSidebarWidth((prev) => {
-      const newWidth = prev + delta;
-      return Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, newWidth));
-    });
-  }, []);
-
-  // Handle code panel resize
-  const handleCodePanelResize = useCallback((delta: number) => {
-    setCodePanelWidth((prev) => {
-      const newWidth = prev - delta; // Negative because we're resizing from left edge
-      return Math.max(
-        MIN_CODE_PANEL_WIDTH,
-        Math.min(MAX_CODE_PANEL_WIDTH, newWidth),
-      );
-    });
-  }, []);
 
   // Handle layout change
   const handleLayoutChange = useCallback((layout: LayoutAlgorithm) => {
@@ -691,14 +683,28 @@ function SchemaVisualizerContent() {
               onNavigateToData={handleNavigateToData}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
-              width={sidebarWidth}
+              defaultWidth={DEFAULT_SIDEBAR_WIDTH}
+              minWidth={MIN_SIDEBAR_WIDTH}
+              maxWidth={MAX_SIDEBAR_WIDTH}
               filterPresets={filterPresets}
               aggregations={aggregations}
-              selectedComponent={selectedComponent}
-              onComponentSelect={setSelectedComponent}
-              components={componentNames}
+              selectedComponentId={selectedComponentId}
+              onComponentSelect={(componentId) => {
+                // Convert component ID back to component name for setSelectedComponent
+                if (componentId === null) {
+                  setSelectedComponent("app");
+                } else {
+                  // Find the component name by ID
+                  const entry = Array.from(componentNameToId.entries()).find(
+                    ([_, id]) => id === componentId,
+                  );
+                  setSelectedComponent(entry ? entry[0] : componentId);
+                }
+              }}
+              components={componentsAsConvexComponents}
+              isOpen={true}
+              onClose={() => setSidebarCollapsed(true)}
             />
-            <ResizeDivider onResize={handleSidebarResize} />
           </>
         )}
 
@@ -769,19 +775,17 @@ function SchemaVisualizerContent() {
 
         {/* Code panel */}
         {codePanelOpen && (
-          <>
-            <ResizeDivider onResize={handleCodePanelResize} />
-            <SchemaCodePanel
-              table={selectedTableData}
-              width={codePanelWidth}
-              onClose={() => setCodePanelOpen(false)}
-              onOpenInCursor={
-                mcp?.projectPath && selectedTable
-                  ? () => handleOpenInCursor(selectedTable)
-                  : undefined
-              }
-            />
-          </>
+          <SchemaCodePanel
+            table={selectedTableData}
+            schema={schema}
+            diff={diffMode.enabled ? diff : null}
+            onClose={() => setCodePanelOpen(false)}
+            onOpenInCursor={
+              mcp?.projectPath && selectedTable
+                ? () => handleOpenInCursor(selectedTable)
+                : undefined
+            }
+          />
         )}
       </div>
 

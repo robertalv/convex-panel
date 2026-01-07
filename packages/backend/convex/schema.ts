@@ -17,6 +17,11 @@ const schema = defineSchema({
     updatedAt: v.number(),
   })
     .index("by_postId", ["postId"]),
+  schemaVisualizer: defineTable({
+    schema: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }),
 });
 
 export default schema;

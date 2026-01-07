@@ -385,6 +385,7 @@ export function VisualizerToolbar({
                     }}
                     placeholder="From..."
                     searchPlaceholder="Search commits..."
+                    sublabelAsText={true}
                   />
 
                   <ChevronRight
@@ -437,6 +438,7 @@ export function VisualizerToolbar({
                     }}
                     placeholder="To..."
                     searchPlaceholder="Search commits..."
+                    sublabelAsText={true}
                   />
 
                   {/* View mode selector */}
