@@ -12,7 +12,9 @@
     "tauri:build": "tauri build"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.62.0",
+    "@convex-panel/shared": "workspace:*",
+    "@monaco-editor/react": "^4.6.0",
+    "@pierre/diffs": "^1.0.4",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-label": "^2.1.8",
@@ -24,6 +26,7 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tailwindcss/vite": "^4.1.17",
+    "@tanstack/react-query": "^5.62.0",
     "@tauri-apps/plugin-http": "~2",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-web-links": "^0.12.0",
@@ -33,7 +36,6 @@
     "class-variance-authority": "^0.7.1",
     "classnames": "^2.5.1",
     "clsx": "^2.1.1",
-    "@convex-panel/shared": "workspace:*",
     "convex": "^1.21.0",
     "convex-panel": "workspace:*",
     "date-fns": "^4.1.0",
@@ -48,8 +50,7 @@
     "recharts": "^2.15.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.0.2",
-    "tailwindcss": "^4.1.17",
-    "@monaco-editor/react": "^4.6.0"
+    "tailwindcss": "^4.1.17"
   },
   "devDependencies": {
     "@tauri-apps/api": "^2.0.0",

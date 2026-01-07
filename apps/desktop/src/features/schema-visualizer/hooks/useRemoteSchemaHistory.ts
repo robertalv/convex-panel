@@ -27,6 +27,41 @@ import type { SchemaJSON } from "../types";
 import { createSnapshot } from "../utils/schema-diff";
 import { saveSnapshot, getAllSnapshots } from "../utils/schema-storage";
 
+// Storage keys for persisting branch selection
+const STORAGE_PREFIX = "convex-panel:github-branch:";
+
+/**
+ * Get the storage key for a repository's branch selection
+ */
+function getBranchStorageKey(repoFullName: string): string {
+  return `${STORAGE_PREFIX}${repoFullName}`;
+}
+
+/**
+ * Load persisted branch for a repository
+ */
+function loadPersistedBranch(repoFullName: string | null): string | null {
+  if (!repoFullName) return null;
+  try {
+    const stored = localStorage.getItem(getBranchStorageKey(repoFullName));
+    return stored || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Save branch selection for a repository
+ */
+function persistBranch(repoFullName: string | null, branch: string): void {
+  if (!repoFullName) return;
+  try {
+    localStorage.setItem(getBranchStorageKey(repoFullName), branch);
+  } catch (e) {
+    console.warn("[useRemoteSchemaHistory] Failed to persist branch:", e);
+  }
+}
+
 export interface RemoteGitCommit {
   sha: string;
   shortSha: string;
@@ -100,7 +135,7 @@ export function useRemoteSchemaHistory({
   // Use provided repo or context repo
   const selectedRepo = repo ?? contextRepo;
 
-  // Core state
+  // Core state - initialize branch from localStorage if available
   const [commits, setCommits] = useState<RemoteGitCommit[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +143,9 @@ export function useRemoteSchemaHistory({
     Array<{ name: string; sha: string }>
   >([]);
   const [branchesLoading, setBranchesLoading] = useState(false);
-  const [currentBranch, setCurrentBranch] = useState<string | null>(null);
+  const [currentBranch, setCurrentBranch] = useState<string | null>(() =>
+    loadPersistedBranch(selectedRepo?.full_name ?? null),
+  );
   const [schemaFilePath, setSchemaFilePath] = useState<string | null>(
     schemaPath || null,
   );
@@ -197,7 +234,10 @@ export function useRemoteSchemaHistory({
    * Fetch commits that modified the schema file
    */
   const fetchSchemaCommits = useCallback(
-    async (filePath: string): Promise<RemoteGitCommit[]> => {
+    async (
+      filePath: string,
+      branch?: string | null,
+    ): Promise<RemoteGitCommit[]> => {
       if (!selectedRepo || !filePath) return [];
 
       const token = await getStoredToken();
@@ -205,12 +245,19 @@ export function useRemoteSchemaHistory({
 
       try {
         const [owner, repoName] = selectedRepo.full_name.split("/");
+        console.log(
+          `[useRemoteSchemaHistory] Fetching commits for ${owner}/${repoName}, path: ${filePath}, branch: ${branch || "(default)"}, maxCommits: ${maxCommits}`,
+        );
         const commits = await getFileCommits(
           token,
           owner,
           repoName,
           filePath,
           maxCommits,
+          branch || undefined,
+        );
+        console.log(
+          `[useRemoteSchemaHistory] GitHub API returned ${commits.length} commits`,
         );
         return commits.map(convertCommit);
       } catch (e) {
@@ -375,19 +422,28 @@ export function useRemoteSchemaHistory({
       setBranches(branchData);
       setBranchesLoading(false);
 
+      // Determine which branch to use for fetching commits
+      let branchToUse = currentBranch;
+
       // Set branch if not already set
-      if (!currentBranch && branchData.length > 0) {
+      if (!branchToUse && branchData.length > 0) {
         // Try to use initialBranch if it exists in the remote
         if (initialBranch) {
           const branchExists = branchData.some((b) => b.name === initialBranch);
           if (branchExists) {
+            branchToUse = initialBranch;
             setCurrentBranch(initialBranch);
+            persistBranch(selectedRepo?.full_name ?? null, initialBranch);
           } else {
             // Fall back to default branch
-            setCurrentBranch(selectedRepo?.default_branch || "main");
+            branchToUse = selectedRepo?.default_branch || "main";
+            setCurrentBranch(branchToUse);
+            persistBranch(selectedRepo?.full_name ?? null, branchToUse);
           }
         } else {
-          setCurrentBranch(selectedRepo?.default_branch || "main");
+          branchToUse = selectedRepo?.default_branch || "main";
+          setCurrentBranch(branchToUse);
+          persistBranch(selectedRepo?.full_name ?? null, branchToUse);
         }
       }
 
@@ -416,8 +472,8 @@ export function useRemoteSchemaHistory({
         }
       }
 
-      // Fetch commits using the determined path
-      const schemaCommits = await fetchSchemaCommits(pathToUse);
+      // Fetch commits using the determined path and branch
+      const schemaCommits = await fetchSchemaCommits(pathToUse, branchToUse);
 
       // Final check before updating state
       if (!isMountedRef.current || refreshIdRef.current !== thisRefreshId) {
@@ -427,7 +483,7 @@ export function useRemoteSchemaHistory({
       setCommits(schemaCommits);
 
       console.log(
-        `[useRemoteSchemaHistory] Found ${schemaCommits.length} commits`,
+        `[useRemoteSchemaHistory] Found ${schemaCommits.length} commits on branch ${branchToUse}`,
       );
     } catch (e) {
       // Only update error if this refresh is still valid
@@ -456,13 +512,18 @@ export function useRemoteSchemaHistory({
   ]);
 
   /**
-   * Set the current branch - triggers async refresh
+   * Set the current branch - triggers async refresh and persists to localStorage
    */
-  const setBranch = useCallback((branch: string) => {
-    setCurrentBranch(branch);
-    // Use async refresh trigger instead of calling refresh() synchronously
-    setPendingRefresh(true);
-  }, []);
+  const setBranch = useCallback(
+    (branch: string) => {
+      setCurrentBranch(branch);
+      // Persist to localStorage for this repo
+      persistBranch(selectedRepo?.full_name ?? null, branch);
+      // Use async refresh trigger instead of calling refresh() synchronously
+      setPendingRefresh(true);
+    },
+    [selectedRepo?.full_name],
+  );
 
   /**
    * Set the schema file path
@@ -491,7 +552,8 @@ export function useRemoteSchemaHistory({
       setCommits([]);
       setBranches([]);
       setBranchesLoading(false);
-      setCurrentBranch(null);
+      // Load persisted branch for the new repo, or null if not set
+      setCurrentBranch(loadPersistedBranch(selectedRepo?.full_name ?? null));
       setSchemaFilePath(schemaPath || null);
       setAvailableSchemaFiles([]);
       setError(null);
@@ -499,7 +561,7 @@ export function useRemoteSchemaHistory({
       // Invalidate any pending refreshes
       refreshIdRef.current += 1;
     }
-  }, [selectedRepo?.id, schemaPath]);
+  }, [selectedRepo?.id, selectedRepo?.full_name, schemaPath]);
 
   // Clear state when disconnected
   useEffect(() => {

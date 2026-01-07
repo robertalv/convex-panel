@@ -256,6 +256,7 @@ export async function getFileContent(
 
 /**
  * Get commit history for a file
+ * @param sha - Branch name or commit SHA to start listing commits from
  */
 export async function getFileCommits(
   token: string,
@@ -263,11 +264,18 @@ export async function getFileCommits(
   repo: string,
   path: string,
   perPage = 30,
+  sha?: string,
 ): Promise<GitHubCommit[]> {
-  const response = await fetchWithRetry(
-    `${GITHUB_API_URL}/repos/${owner}/${repo}/commits?path=${encodeURIComponent(path)}&per_page=${perPage}`,
-    { headers: githubHeaders(token) },
-  );
+  const url = new URL(`${GITHUB_API_URL}/repos/${owner}/${repo}/commits`);
+  url.searchParams.set("path", path);
+  url.searchParams.set("per_page", perPage.toString());
+  if (sha) {
+    url.searchParams.set("sha", sha);
+  }
+
+  const response = await fetchWithRetry(url.toString(), {
+    headers: githubHeaders(token),
+  });
 
   if (!response.ok) {
     throw new Error("Failed to fetch commit history");

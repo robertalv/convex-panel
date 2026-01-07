@@ -405,7 +405,7 @@ function TableNodeComponent({ data, selected }: NodeProps) {
   return (
     <>
       <div
-        className="relative overflow-hidden transition-all duration-200"
+        className="relative overflow-hidden transition-all duration-20"
         style={{
           backgroundColor: hasDiffStatus
             ? diffColor?.bg
@@ -413,7 +413,7 @@ function TableNodeComponent({ data, selected }: NodeProps) {
           borderWidth: hasDiffStatus ? 3 : 2,
           borderStyle: "solid",
           borderColor,
-          borderRadius: "var(--radius-lg)",
+          borderRadius: "var(--radius)",
           minWidth: 240,
           maxWidth: 300,
           opacity: isHighlighted === false ? 0.4 : 1,
@@ -446,8 +446,8 @@ function TableNodeComponent({ data, selected }: NodeProps) {
           </div>
         )}
 
-        {/* Connection handles */}
-        <Handle
+        {/* Add Connection handles later when we're ready to support them */}
+        {/* <Handle
           type="target"
           position={Position.Left}
           style={{
@@ -458,8 +458,8 @@ function TableNodeComponent({ data, selected }: NodeProps) {
               : "var(--color-border-strong)",
             border: "2px solid var(--color-surface-raised)",
           }}
-        />
-        <Handle
+        /> */}
+        {/* <Handle
           type="source"
           position={Position.Right}
           style={{
@@ -470,7 +470,7 @@ function TableNodeComponent({ data, selected }: NodeProps) {
               : "var(--color-border-strong)",
             border: "2px solid var(--color-surface-raised)",
           }}
-        />
+        /> */}
 
         {/* Header */}
         <div
@@ -508,7 +508,7 @@ function TableNodeComponent({ data, selected }: NodeProps) {
             className="flex-shrink-0"
           />
           <span
-            className="flex-1 font-medium text-sm truncate"
+            className="flex-1 font-medium text-sm truncate font-mono"
             style={{ color: "var(--color-text-base)" }}
           >
             {table.name}
@@ -547,7 +547,7 @@ function TableNodeComponent({ data, selected }: NodeProps) {
           <div style={{ borderTop: "1px solid var(--color-border-base)" }}>
             {/* Fields */}
             {showFields && displayFields.length > 0 && (
-              <div className="py-1">
+              <div className="py-1 px-1 space-y-1">
                 {displayFields.map((field) => (
                   <FieldRow
                     key={field.name}
@@ -584,6 +584,7 @@ function TableNodeComponent({ data, selected }: NodeProps) {
                 >
                   Indexes
                 </div>
+                <div className="px-1 space-y-1">
                 {displayIndexes.map((index) => (
                   <IndexRow
                     key={index.name}
@@ -593,6 +594,7 @@ function TableNodeComponent({ data, selected }: NodeProps) {
                     diffStatus={indexDiffMap.get(index.name)?.status}
                   />
                 ))}
+                </div>
                 {hiddenIndexCount > 0 && (
                   <div
                     className="px-3 py-1 text-[10px] italic"

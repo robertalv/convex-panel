@@ -101,9 +101,18 @@
   --color-info-muted: rgba(7, 191, 232, 0.15);
   --color-info-text: rgb(7, 191, 232);
 
+  /* Diff colors - matching OpenCode's mint/ember palette for better visibility */
+  /* Dark mode: mint-dark-11 (#9dde99) and ember-dark-9 (#fc533a) */
+  --color-diff-add-text: #9dde99;
+  --color-diff-add-bg: rgba(157, 222, 153, 0.25);
+  --color-diff-add-line-bg: rgba(157, 222, 153, 0.16);
+  --color-diff-delete-text: #fc533a;
+  --color-diff-delete-bg: rgba(252, 83, 58, 0.25);
+  --color-diff-delete-line-bg: rgba(252, 83, 58, 0.16);
+
   /* ========================================
    * TYPOGRAPHY
-   * ======================================== */
+   * ========================================*/
   --font-sans:
     "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "SF Mono", "Fira Code", "JetBrains Mono", Consolas, monospace;
@@ -292,6 +301,15 @@
   --color-info-base: rgb(7, 191, 232);
   --color-info-muted: rgba(7, 191, 232, 0.12);
   --color-info-text: rgb(0, 155, 200);
+
+  /* Diff colors for light theme - matching OpenCode's mint/ember palette */
+  /* Light mode: mint-light-11 (#318430) and ember-light-10 (#ef442a) */
+  --color-diff-add-text: #318430;
+  --color-diff-add-bg: rgba(49, 132, 48, 0.2);
+  --color-diff-add-line-bg: rgba(49, 132, 48, 0.12);
+  --color-diff-delete-text: #ef442a;
+  --color-diff-delete-bg: rgba(239, 68, 42, 0.2);
+  --color-diff-delete-line-bg: rgba(239, 68, 42, 0.12);
 
   /* Light shadows */
   --shadow-sm: 0 1px 2px 0 rgba(30, 28, 25, 0.05);
@@ -786,10 +804,11 @@ body {
   background-color: var(--color-surface-raised) !important;
 }
 
-/* Dark mode background pattern */
+/* Dark mode background pattern - ensure dots are clearly visible */
 .dark .react-flow__background pattern circle,
 :root:not(.light) .react-flow__background pattern circle {
-  fill: var(--color-border-muted) !important;
+  /* Use a stronger default gray fallback so dots stand out on dark bg */
+  fill: var(--color-border-muted, #4b5563) !important;
 }
 
 /* ========================================
@@ -819,7 +838,8 @@ body {
 }
 
 .light .react-flow__background pattern circle {
-  fill: var(--color-border-base) !important;
+  /* Slightly darker than light background so dots are visible */
+  fill: var(--color-border-base, #9ca3af) !important;
 }
 
 /* ========================================

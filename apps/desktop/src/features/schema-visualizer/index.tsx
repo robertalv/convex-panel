@@ -9,7 +9,6 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { useNavigate } from "react-router-dom";
 import {
   PanelLeftOpen,
-  Code2,
   X,
   ExternalLink,
   Loader2,
@@ -30,6 +29,7 @@ import { useGitSchemaHistory } from "./hooks/useGitSchemaHistory";
 import { useLocalSchema } from "./hooks/useLocalSchema";
 import { useRemoteSchemaHistory } from "./hooks/useRemoteSchemaHistory";
 import { useSchemaUpdates } from "./hooks/useSchemaUpdates";
+import { useVisualizerSettings } from "./hooks/useVisualizerSettings";
 import {
   SchemaTreeSidebar,
   type FilterPreset,
@@ -42,7 +42,6 @@ import { UnifiedDiffView } from "./components/UnifiedDiffView";
 import { SideBySideView } from "./components/SideBySideView";
 import { GitHubAuthModal } from "@/components/GitHubAuthModal";
 import type {
-  VisualizationSettings,
   LayoutAlgorithm,
   ExportFormat,
   SchemaTable,
@@ -63,16 +62,6 @@ const MAX_SIDEBAR_WIDTH = 400;
 const DEFAULT_CODE_PANEL_WIDTH = 400;
 const MIN_CODE_PANEL_WIDTH = 300;
 const MAX_CODE_PANEL_WIDTH = 600;
-
-// Default visualization settings
-const defaultSettings: VisualizationSettings = {
-  layout: "hierarchical",
-  showFields: true,
-  showIndexes: true,
-  showRelationships: true,
-  showCardinality: true,
-  colorByModule: true,
-};
 
 /**
  * Code panel component showing schema code with Monaco Editor
@@ -423,14 +412,20 @@ function SchemaVisualizerContent() {
     }
   }, [schema, isLoading, selectedComponent, setSelectedComponent]);
 
-  // UI state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [codePanelOpen, setCodePanelOpen] = useState(false);
+  // UI state - persisted via useVisualizerSettings
+  const {
+    settings,
+    setLayout,
+    sidebarCollapsed,
+    setSidebarCollapsed,
+    codePanelOpen,
+    setCodePanelOpen,
+    showHealthPanel,
+    setShowHealthPanel,
+  } = useVisualizerSettings();
+
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [settings, setSettings] =
-    useState<VisualizationSettings>(defaultSettings);
-  const [showHealthPanel, setShowHealthPanel] = useState(false);
   const [filterPresets] = useState<FilterPreset[]>([]);
   const [aggregations] = useState<AggregationDef[]>([]);
   const graphRef = useRef<SchemaGraphRef>(null);
@@ -442,9 +437,12 @@ function SchemaVisualizerContent() {
   }, [schema, selectedTable]);
 
   // Handle layout change
-  const handleLayoutChange = useCallback((layout: LayoutAlgorithm) => {
-    setSettings((prev) => ({ ...prev, layout }));
-  }, []);
+  const handleLayoutChange = useCallback(
+    (layout: LayoutAlgorithm) => {
+      setLayout(layout);
+    },
+    [setLayout],
+  );
 
   // Handle export
   const handleExport = useCallback(
@@ -598,34 +596,20 @@ function SchemaVisualizerContent() {
             // Save the commit as a snapshot
             await saveRemoteSnapshot(commit);
             await refreshSnapshots();
-            // Need to get fresh snapshots after saving
-            // The snapshot ID format is: github-{shortSha}-{timestamp}
-            // We need to find it by the commit hash in the label
-            // Use a small delay to ensure the snapshot is persisted
-            await new Promise((resolve) => setTimeout(resolve, 100));
-            // Re-fetch snapshots to get the newly saved one
-            const { getAllSnapshots } = await import("./utils/schema-storage");
-            const allSnapshots = await getAllSnapshots("github");
-            const matchingSnapshot = allSnapshots.find(
-              (s) => s.commitHash === commit.sha,
-            );
-            if (matchingSnapshot) {
-              if (target === "from") {
-                setDiffMode({
-                  enabled: true,
-                  fromSnapshotId: matchingSnapshot.id,
-                });
-              } else {
-                setDiffMode({
-                  enabled: true,
-                  toSnapshotId: matchingSnapshot.id,
-                });
-              }
+
+            // Use the same format as dropdown options: github:${sha}
+            const commitValue = `github:${commit.sha}`;
+
+            if (target === "from") {
+              setDiffMode({
+                enabled: true,
+                fromSnapshotId: commitValue,
+              });
             } else {
-              console.warn(
-                "[SchemaVisualizer] Could not find snapshot for commit:",
-                commit.shortSha,
-              );
+              setDiffMode({
+                enabled: true,
+                toSnapshotId: commitValue,
+              });
             }
           } catch (err) {
             console.error(
@@ -653,6 +637,8 @@ function SchemaVisualizerContent() {
           // Debounce is handled in the SearchableSelect component
           github?.searchRepos(query);
         }}
+        isCodePanelOpen={codePanelOpen}
+        onToggleCodePanel={() => setCodePanelOpen(true)}
       />
 
       {/* Main content area */}
@@ -711,8 +697,18 @@ function SchemaVisualizerContent() {
         {/* Graph area */}
         <div className="flex-1 relative">
           {/* Render different views based on diff mode */}
-          {diffMode.enabled && diffMode.viewMode === "unified" && diff ? (
-            <UnifiedDiffView diff={diff} />
+          {diffMode.enabled &&
+          (diffMode.viewMode === "unified" || diffMode.viewMode === "split") &&
+          diff ? (
+            <UnifiedDiffView
+              diff={diff}
+              diffStyle={diffMode.viewMode === "split" ? "split" : "unified"}
+              onDiffStyleChange={(style) =>
+                setDiffMode({
+                  viewMode: style === "split" ? "split" : "unified",
+                })
+              }
+            />
           ) : diffMode.enabled &&
             diffMode.viewMode === "side-by-side" &&
             diff ? (
@@ -750,27 +746,6 @@ function SchemaVisualizerContent() {
               />
             </ReactFlowProvider>
           )}
-
-          {/* Code panel toggle - only show for visual-overlay mode */}
-          {!codePanelOpen &&
-            !(
-              diffMode.enabled &&
-              (diffMode.viewMode === "unified" ||
-                diffMode.viewMode === "side-by-side")
-            ) && (
-              <button
-                onClick={() => setCodePanelOpen(true)}
-                className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors z-10"
-                style={{
-                  backgroundColor: "var(--color-surface-overlay)",
-                  border: "1px solid var(--color-border-base)",
-                  color: "var(--color-text-muted)",
-                }}
-              >
-                <Code2 size={14} />
-                Code
-              </button>
-            )}
         </div>
 
         {/* Code panel */}

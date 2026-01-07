@@ -374,7 +374,11 @@ export interface SchemaDiff {
 }
 
 /** Diff view mode for visualization */
-export type DiffViewMode = "side-by-side" | "unified" | "visual-overlay";
+export type DiffViewMode =
+  | "side-by-side"
+  | "unified"
+  | "visual-overlay"
+  | "split";
 
 /** Diff mode settings for the visualizer */
 export interface DiffModeSettings {

@@ -28,7 +28,6 @@ import "@xyflow/react/dist/style.css";
 
 import { TableNode } from "./TableNode";
 import { RelationshipEdge, EdgeMarkerDefinitions } from "./RelationshipEdge";
-import { DiffLegend } from "./DiffLegend";
 import type {
   ParsedSchema,
   SchemaTable,
@@ -377,16 +376,16 @@ export const SchemaGraph = forwardRef<SchemaGraphRef, SchemaGraphProps>(
           maxZoom={2}
           defaultEdgeOptions={{
             type: "relationshipEdge",
-            animated: false,
+            animated: true,
           }}
           proOptions={{ hideAttribution: true }}
         >
           <Background
-            variant={BackgroundVariant.Dots}
+            variant={BackgroundVariant.Lines}
             color={backgroundColor}
             gap={20}
             size={2}
-            style={{ opacity: 1 }}
+            style={{ opacity: 0.5 }}
           />
           {onCollapseSidebar && (
             <button
@@ -426,15 +425,6 @@ export const SchemaGraph = forwardRef<SchemaGraphRef, SchemaGraphProps>(
             zoomable
           />
         </ReactFlow>
-
-        {/* Diff legend - shown when diff mode is active */}
-        {diff && (
-          <DiffLegend
-            summary={diff.summary}
-            position="top-left"
-            compact={false}
-          />
-        )}
       </div>
     );
   },

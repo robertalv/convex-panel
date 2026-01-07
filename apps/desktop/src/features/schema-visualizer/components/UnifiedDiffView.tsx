@@ -1,141 +1,161 @@
 /**
  * UnifiedDiffView Component
- * Shows a unified text-based diff of schema.ts code between two versions
+ * Shows a unified/split diff of schema.ts code between two versions
+ * Styled to match the session-review component from opencode
+ * Uses @pierre/diffs for beautiful diff rendering
  */
 
-import { useMemo } from "react";
-import { ArrowRight, Plus, Minus, Equal } from "lucide-react";
+import { useMemo, useState, useCallback } from "react";
+import { FileCode2, ChevronsUpDown } from "lucide-react";
+import { IconButton } from "@/components/ui/button";
 import type { SchemaDiff } from "../types";
 import { generateFullSchemaCode } from "../utils/code-generator";
+import { PierreDiff } from "./PierreDiff";
+import "./UnifiedDiffView.css";
 
 interface UnifiedDiffViewProps {
   diff: SchemaDiff;
-}
-
-interface DiffLine {
-  type: "added" | "removed" | "unchanged" | "header";
-  content: string;
-  lineNumber?: { from?: number; to?: number };
+  /** Diff display style: unified or split */
+  diffStyle?: "unified" | "split";
+  /** Callback when diff style changes */
+  onDiffStyleChange?: (style: "unified" | "split") => void;
 }
 
 /**
- * Simple diff algorithm to compare two code strings line by line
+ * DiffChanges indicator component - shows +X -Y counts
  */
-function computeLineDiff(fromCode: string, toCode: string): DiffLine[] {
+function DiffChanges({
+  additions,
+  deletions,
+}: {
+  additions: number;
+  deletions: number;
+}) {
+  if (additions === 0 && deletions === 0) return null;
+
+  return (
+    <div data-component="diff-changes">
+      {additions > 0 && (
+        <span data-slot="diff-changes-additions">+{additions}</span>
+      )}
+      {deletions > 0 && (
+        <span data-slot="diff-changes-deletions">-{deletions}</span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * RadioGroup-style toggle for diff style selection
+ */
+function DiffStyleToggle({
+  value,
+  onChange,
+}: {
+  value: "unified" | "split";
+  onChange: (value: "unified" | "split") => void;
+}) {
+  return (
+    <div
+      className="flex items-center rounded-lg p-0.5"
+      style={{ backgroundColor: "var(--color-surface-raised)" }}
+    >
+      <IconButton
+        onClick={() => onChange("unified")}
+        variant="ghost"
+        size="sm"
+        className="w-auto h-7 px-2 text-xs font-medium"
+        style={{
+          backgroundColor:
+            value === "unified"
+              ? "var(--color-surface-base)"
+              : "transparent",
+          color:
+            value === "unified"
+              ? "var(--color-text-base)"
+              : "var(--color-text-muted)",
+          boxShadow:
+            value === "unified" ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+        }}
+      >
+        Unified
+      </IconButton>
+      <IconButton
+        onClick={() => onChange("split")}
+        variant="ghost"
+        size="sm"
+        className="w-auto h-7 px-2 text-xs font-medium"
+        style={{
+          backgroundColor:
+            value === "split" ? "var(--color-surface-base)" : "transparent",
+          color:
+            value === "split"
+              ? "var(--color-text-base)"
+              : "var(--color-text-muted)",
+          boxShadow:
+            value === "split" ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+        }}
+      >
+        Split
+      </IconButton>
+    </div>
+  );
+}
+
+/**
+ * Count additions and deletions between two code strings
+ */
+function countChanges(
+  fromCode: string,
+  toCode: string,
+): { additions: number; deletions: number } {
   const fromLines = fromCode.split("\n");
   const toLines = toCode.split("\n");
-  const result: DiffLine[] = [];
 
-  // Use LCS (Longest Common Subsequence) based diff
-  const lcs = computeLCS(fromLines, toLines);
+  // Simple line-based diff counting using Set comparison
+  const fromSet = new Set(fromLines);
+  const toSet = new Set(toLines);
 
-  let fromIdx = 0;
-  let toIdx = 0;
-  let fromLineNum = 1;
-  let toLineNum = 1;
+  let additions = 0;
+  let deletions = 0;
 
-  for (const common of lcs) {
-    // Add removed lines (from "from" that aren't in common)
-    while (fromIdx < fromLines.length && fromLines[fromIdx] !== common) {
-      result.push({
-        type: "removed",
-        content: fromLines[fromIdx],
-        lineNumber: { from: fromLineNum },
-      });
-      fromIdx++;
-      fromLineNum++;
-    }
-
-    // Add added lines (from "to" that aren't in common)
-    while (toIdx < toLines.length && toLines[toIdx] !== common) {
-      result.push({
-        type: "added",
-        content: toLines[toIdx],
-        lineNumber: { to: toLineNum },
-      });
-      toIdx++;
-      toLineNum++;
-    }
-
-    // Add the common line
-    if (fromIdx < fromLines.length && toIdx < toLines.length) {
-      result.push({
-        type: "unchanged",
-        content: common,
-        lineNumber: { from: fromLineNum, to: toLineNum },
-      });
-      fromIdx++;
-      toIdx++;
-      fromLineNum++;
-      toLineNum++;
+  for (const line of toLines) {
+    if (!fromSet.has(line)) {
+      additions++;
     }
   }
 
-  // Add remaining removed lines
-  while (fromIdx < fromLines.length) {
-    result.push({
-      type: "removed",
-      content: fromLines[fromIdx],
-      lineNumber: { from: fromLineNum },
-    });
-    fromIdx++;
-    fromLineNum++;
+  for (const line of fromLines) {
+    if (!toSet.has(line)) {
+      deletions++;
+    }
   }
 
-  // Add remaining added lines
-  while (toIdx < toLines.length) {
-    result.push({
-      type: "added",
-      content: toLines[toIdx],
-      lineNumber: { to: toLineNum },
-    });
-    toIdx++;
-    toLineNum++;
-  }
-
-  return result;
+  return { additions, deletions };
 }
 
-/**
- * Compute Longest Common Subsequence of two string arrays
- */
-function computeLCS(a: string[], b: string[]): string[] {
-  const m = a.length;
-  const n = b.length;
-  const dp: number[][] = Array(m + 1)
-    .fill(null)
-    .map(() => Array(n + 1).fill(0));
+export function UnifiedDiffView({
+  diff,
+  diffStyle = "unified",
+  onDiffStyleChange,
+}: UnifiedDiffViewProps) {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const [internalDiffStyle, setInternalDiffStyle] = useState<
+    "unified" | "split"
+  >(diffStyle);
 
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (a[i - 1] === b[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1;
+  const currentDiffStyle = onDiffStyleChange ? diffStyle : internalDiffStyle;
+  const handleDiffStyleChange = useCallback(
+    (style: "unified" | "split") => {
+      if (onDiffStyleChange) {
+        onDiffStyleChange(style);
       } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+        setInternalDiffStyle(style);
       }
-    }
-  }
+    },
+    [onDiffStyleChange],
+  );
 
-  // Backtrack to find the LCS
-  const lcs: string[] = [];
-  let i = m;
-  let j = n;
-  while (i > 0 && j > 0) {
-    if (a[i - 1] === b[j - 1]) {
-      lcs.unshift(a[i - 1]);
-      i--;
-      j--;
-    } else if (dp[i - 1][j] > dp[i][j - 1]) {
-      i--;
-    } else {
-      j--;
-    }
-  }
-
-  return lcs;
-}
-
-export function UnifiedDiffView({ diff }: UnifiedDiffViewProps) {
   // Generate code for both schemas
   const fromCode = useMemo(
     () => generateFullSchemaCode(diff.from.schema),
@@ -146,178 +166,97 @@ export function UnifiedDiffView({ diff }: UnifiedDiffViewProps) {
     [diff.to.schema],
   );
 
-  // Compute line-by-line diff
-  const diffLines = useMemo(
-    () => computeLineDiff(fromCode, toCode),
+  // Count changes
+  const stats = useMemo(
+    () => countChanges(fromCode, toCode),
     [fromCode, toCode],
   );
 
-  // Count changes
-  const stats = useMemo(() => {
-    let added = 0;
-    let removed = 0;
-    for (const line of diffLines) {
-      if (line.type === "added") added++;
-      if (line.type === "removed") removed++;
-    }
-    return { added, removed };
-  }, [diffLines]);
+  const hasChanges = stats.additions > 0 || stats.deletions > 0;
 
   return (
-    <div
-      className="h-full flex flex-col"
-      style={{ backgroundColor: "var(--color-background-base)" }}
-    >
+    <div data-component="unified-diff-view">
       {/* Header */}
-      <div
-        className="flex items-center justify-between px-4 py-3"
-        style={{
-          borderBottom: "1px solid var(--color-border-base)",
-          backgroundColor: "var(--color-surface-base)",
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <span
-            className="text-sm font-medium px-2 py-1 rounded"
-            style={{
-              backgroundColor: "var(--color-surface-raised)",
-              color: "var(--color-text-base)",
-            }}
+      <div data-slot="diff-header">
+        <div data-slot="diff-title">Schema Changes</div>
+        <div data-slot="diff-actions">
+          {onDiffStyleChange && (
+            <DiffStyleToggle
+              value={currentDiffStyle}
+              onChange={handleDiffStyleChange}
+            />
+          )}
+          {/* TODO: Add collapse button when we have multiple file support */}
+          {/* <button
+            data-slot="collapse-button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            type="button"
           >
-            {diff.from.label}
-          </span>
-          <ArrowRight size={16} style={{ color: "var(--color-text-muted)" }} />
-          <span
-            className="text-sm font-medium px-2 py-1 rounded"
-            style={{
-              backgroundColor: "var(--color-surface-raised)",
-              color: "var(--color-text-base)",
-            }}
-          >
-            {diff.to.label}
-          </span>
-        </div>
-
-        {/* Stats */}
-        <div className="flex items-center gap-4">
-          {stats.added > 0 && (
-            <span
-              className="flex items-center gap-1 text-xs font-medium"
-              style={{ color: "#22c55e" }}
-            >
-              <Plus size={12} />
-              {stats.added} added
-            </span>
-          )}
-          {stats.removed > 0 && (
-            <span
-              className="flex items-center gap-1 text-xs font-medium"
-              style={{ color: "#ef4444" }}
-            >
-              <Minus size={12} />
-              {stats.removed} removed
-            </span>
-          )}
-          {stats.added === 0 && stats.removed === 0 && (
-            <span
-              className="flex items-center gap-1 text-xs"
-              style={{ color: "var(--color-text-muted)" }}
-            >
-              <Equal size={12} />
-              No changes
-            </span>
-          )}
+            <ChevronsUpDown size={14} />
+            {isExpanded ? "Collapse" : "Expand"}
+          </button> */}
         </div>
       </div>
 
-      {/* Diff content */}
-      <div className="flex-1 overflow-auto">
-        <pre
-          className="text-xs font-mono p-0 m-0"
-          style={{ minWidth: "max-content" }}
+      {/* Container */}
+      <div data-slot="diff-container">
+        {/* File accordion item */}
+        <div
+          data-slot="diff-accordion-item"
+          data-expanded={isExpanded ? "" : undefined}
         >
-          {diffLines.map((line, idx) => (
-            <DiffLineRow key={idx} line={line} />
-          ))}
-        </pre>
-      </div>
-    </div>
-  );
-}
+          {/* File trigger */}
+          <button
+            data-slot="diff-trigger"
+            onClick={() => setIsExpanded(!isExpanded)}
+            type="button"
+          >
+            <div data-slot="diff-trigger-content">
+              <div data-slot="diff-file-info">
+                <FileCode2 size={16} data-slot="diff-file-icon" />
+                <div data-slot="diff-file-name-container">
+                  <span data-slot="diff-directory">convex/&lrm;</span>
+                  <span data-slot="diff-filename">schema.ts</span>
+                </div>
+              </div>
+              <div data-slot="diff-trigger-actions">
+                <DiffChanges
+                  additions={stats.additions}
+                  deletions={stats.deletions}
+                />
+                <ChevronsUpDown size={16} data-slot="diff-chevron" />
+              </div>
+            </div>
+          </button>
 
-function DiffLineRow({ line }: { line: DiffLine }) {
-  const bgColor =
-    line.type === "added"
-      ? "rgba(34, 197, 94, 0.15)"
-      : line.type === "removed"
-        ? "rgba(239, 68, 68, 0.15)"
-        : "transparent";
+          {/* Diff content */}
+          <div data-slot="diff-content">
+            {!hasChanges ? (
+              <div data-slot="diff-empty">No changes detected</div>
+            ) : (
+              <div data-slot="diff-editor-container">
+                <PierreDiff
+                  oldContent={fromCode}
+                  newContent={toCode}
+                  fileName="schema.ts"
+                  diffStyle={currentDiffStyle}
+                  showLineNumbers={true}
+                />
+              </div>
+            )}
+          </div>
+        </div>
 
-  const borderColor =
-    line.type === "added"
-      ? "rgba(34, 197, 94, 0.5)"
-      : line.type === "removed"
-        ? "rgba(239, 68, 68, 0.5)"
-        : "transparent";
-
-  const icon =
-    line.type === "added" ? (
-      <Plus size={12} style={{ color: "#22c55e" }} />
-    ) : line.type === "removed" ? (
-      <Minus size={12} style={{ color: "#ef4444" }} />
-    ) : (
-      <span style={{ width: 12 }} />
-    );
-
-  return (
-    <div
-      className="flex items-stretch"
-      style={{
-        backgroundColor: bgColor,
-        borderLeft: `3px solid ${borderColor}`,
-        minHeight: "20px",
-      }}
-    >
-      {/* Line numbers */}
-      <div
-        className="flex items-center justify-end gap-1 px-2 select-none"
-        style={{
-          minWidth: "80px",
-          color: "var(--color-text-subtle)",
-          backgroundColor: "var(--color-surface-base)",
-          borderRight: "1px solid var(--color-border-base)",
-        }}
-      >
-        <span style={{ width: "28px", textAlign: "right" }}>
-          {line.lineNumber?.from || ""}
-        </span>
-        <span style={{ width: "28px", textAlign: "right" }}>
-          {line.lineNumber?.to || ""}
-        </span>
-      </div>
-
-      {/* Icon */}
-      <div
-        className="flex items-center justify-center px-1"
-        style={{ width: "24px" }}
-      >
-        {icon}
-      </div>
-
-      {/* Content */}
-      <div
-        className="flex-1 px-2 py-0.5"
-        style={{
-          color:
-            line.type === "removed"
-              ? "#ef4444"
-              : line.type === "added"
-                ? "#22c55e"
-                : "var(--color-text-base)",
-          whiteSpace: "pre",
-        }}
-      >
-        {line.content}
+        {/* Version labels footer */}
+        <div data-slot="diff-footer">
+          <span>
+            From: <span data-slot="diff-footer-label">{diff.from.label}</span>
+          </span>
+          <span>→</span>
+          <span>
+            To: <span data-slot="diff-footer-label">{diff.to.label}</span>
+          </span>
+        </div>
       </div>
     </div>
   );

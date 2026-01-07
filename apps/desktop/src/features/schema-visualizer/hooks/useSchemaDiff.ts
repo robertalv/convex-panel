@@ -23,6 +23,43 @@ import {
 } from "../utils/schema-storage";
 import { parseSchema } from "../utils/schema-parser";
 
+// Storage key for persisting diff mode settings
+const DIFF_MODE_STORAGE_KEY = "convex-panel:schema-visualizer:diff-mode";
+
+/**
+ * Load persisted diff mode settings from localStorage
+ */
+function loadPersistedDiffMode(): DiffModeSettings | null {
+  try {
+    const stored = localStorage.getItem(DIFF_MODE_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Validate the parsed object has expected structure
+      if (
+        typeof parsed === "object" &&
+        typeof parsed.enabled === "boolean" &&
+        typeof parsed.viewMode === "string"
+      ) {
+        return parsed as DiffModeSettings;
+      }
+    }
+  } catch (e) {
+    console.warn("[useSchemaDiff] Failed to load persisted diff mode:", e);
+  }
+  return null;
+}
+
+/**
+ * Save diff mode settings to localStorage
+ */
+function persistDiffMode(settings: DiffModeSettings): void {
+  try {
+    localStorage.setItem(DIFF_MODE_STORAGE_KEY, JSON.stringify(settings));
+  } catch (e) {
+    console.warn("[useSchemaDiff] Failed to persist diff mode:", e);
+  }
+}
+
 export interface UseSchemaDiffOptions {
   /** Current deployed schema JSON */
   deployedSchema: SchemaJSON | null;
@@ -83,8 +120,11 @@ export function useSchemaDiff({
   localSchema,
   hasLocalSchema = false,
 }: UseSchemaDiffOptions): UseSchemaDiffReturn {
-  const [diffMode, setDiffModeState] =
-    useState<DiffModeSettings>(DEFAULT_DIFF_MODE);
+  // Initialize diff mode from localStorage or use default
+  const [diffMode, setDiffModeState] = useState<DiffModeSettings>(() => {
+    const persisted = loadPersistedDiffMode();
+    return persisted ?? DEFAULT_DIFF_MODE;
+  });
   const [storedSnapshots, setStoredSnapshots] = useState<StoredSnapshot[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -135,14 +175,22 @@ export function useSchemaDiff({
     return result;
   }, [storedSnapshots, hasLocalSchema, localSchema]);
 
-  // Update diff mode settings
+  // Update diff mode settings and persist to localStorage
   const setDiffMode = useCallback((settings: Partial<DiffModeSettings>) => {
-    setDiffModeState((prev) => ({ ...prev, ...settings }));
+    setDiffModeState((prev) => {
+      const newState = { ...prev, ...settings };
+      persistDiffMode(newState);
+      return newState;
+    });
   }, []);
 
-  // Toggle diff mode
+  // Toggle diff mode and persist
   const toggleDiffMode = useCallback(() => {
-    setDiffModeState((prev) => ({ ...prev, enabled: !prev.enabled }));
+    setDiffModeState((prev) => {
+      const newState = { ...prev, enabled: !prev.enabled };
+      persistDiffMode(newState);
+      return newState;
+    });
   }, []);
 
   // Save current deployed schema as a snapshot
@@ -206,6 +254,17 @@ export function useSchemaDiff({
       return null;
     }
 
+    // Helper to find snapshot by ID or commitHash
+    const findSnapshot = (snapshotId: string): StoredSnapshot | undefined => {
+      // If ID starts with "github:", look up by commit hash
+      if (snapshotId.startsWith("github:")) {
+        const sha = snapshotId.replace("github:", "");
+        return storedSnapshots.find((s) => s.commitHash === sha);
+      }
+      // Otherwise look up by ID
+      return storedSnapshots.find((s) => s.id === snapshotId);
+    };
+
     // Get the "from" snapshot
     let fromSnapshot: SchemaSnapshot;
 
@@ -222,9 +281,7 @@ export function useSchemaDiff({
       };
     } else {
       // Get from stored snapshots
-      const fromStored = storedSnapshots.find(
-        (s) => s.id === diffMode.fromSnapshotId,
-      );
+      const fromStored = findSnapshot(diffMode.fromSnapshotId);
       if (!fromStored) {
         return null;
       }
@@ -271,9 +328,7 @@ export function useSchemaDiff({
       };
     } else if (diffMode.toSnapshotId) {
       // Compare to a specific snapshot
-      const toStored = storedSnapshots.find(
-        (s) => s.id === diffMode.toSnapshotId,
-      );
+      const toStored = findSnapshot(diffMode.toSnapshotId);
       if (!toStored) {
         return null;
       }

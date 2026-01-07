@@ -13,6 +13,7 @@ import {
   GitCompare,
   ChevronRight,
   Github,
+  Code2,
 } from "lucide-react";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import type { RemoteGitCommit } from "../hooks/useRemoteSchemaHistory";
@@ -24,6 +25,7 @@ import type {
   DiffModeSettings,
   DiffViewMode,
 } from "../types";
+import { IconButton } from "@/components/ui/button";
 
 interface VisualizerToolbarProps {
   settings: VisualizationSettings;
@@ -64,6 +66,9 @@ interface VisualizerToolbarProps {
   onRepoChange?: (repoFullName: string) => void;
   /** Callback for server-side repository search (triggers after 3+ chars) */
   onRepoSearch?: (query: string) => void;
+  /** Code panel toggle button state and handler */
+  isCodePanelOpen?: boolean;
+  onToggleCodePanel?: () => void;
 }
 
 const layoutOptions: {
@@ -85,8 +90,8 @@ const exportOptions: { value: ExportFormat; label: string }[] = [
 
 const viewModeOptions: { value: DiffViewMode; label: string }[] = [
   { value: "visual-overlay", label: "Visual Overlay" },
-  { value: "side-by-side", label: "Side by Side" },
   { value: "unified", label: "Unified" },
+  { value: "split", label: "Split" },
 ];
 
 /**
@@ -191,6 +196,8 @@ export function VisualizerToolbar({
   onConnectGitHub,
   onRepoChange,
   onRepoSearch,
+  isCodePanelOpen = false,
+  onToggleCodePanel,
 }: VisualizerToolbarProps) {
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const exportTriggerRef = useRef<HTMLButtonElement>(null);
@@ -611,6 +618,26 @@ export function VisualizerToolbar({
             backgroundColor: "var(--color-border-base)",
           }}
         />
+
+        {/* Code panel toggle - only for visual overlay mode and when closed */}
+        {!isCodePanelOpen &&
+          !(
+            diffMode?.enabled &&
+            (diffMode.viewMode === "unified" ||
+              diffMode.viewMode === "split" ||
+              diffMode.viewMode === "side-by-side")
+          ) &&
+          onToggleCodePanel && (
+            <IconButton
+              onClick={onToggleCodePanel}
+              variant="ghost"
+              size="sm"
+              tooltip="Show generated schema code"
+              aria-label="Show generated schema code"
+            >
+              <Code2 size={14} />
+            </IconButton>
+          )}
 
         {/* Export */}
         <div style={{ position: "relative" }}>
