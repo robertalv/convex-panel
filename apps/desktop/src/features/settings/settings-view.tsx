@@ -15,6 +15,7 @@ import { ProfileSettings } from "./components/profile-settings";
 import { TerminalSettings } from "./components/terminal-settings";
 import { DeployKeySettings } from "./components/deploy-key-settings";
 import { DesktopIntegrations } from "./components/desktop-integrations";
+import { NetworkSettings } from "./components/network-settings";
 
 // Combined section types from panel and desktop
 export type SettingsSection =
@@ -24,6 +25,7 @@ export type SettingsSection =
   | "integrations"
   | "terminal"
   | "deploy-key-sync"
+  | "network"
   // Panel sections (deployment-related)
   | "environment-variables"
   | "url-deploy-key"
@@ -55,6 +57,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
       { id: "integrations", label: "Integrations" },
       { id: "terminal", label: "Terminal" },
       { id: "deploy-key-sync", label: "Deploy Key Sync" },
+      { id: "network", label: "Network" },
     ],
   },
   {
@@ -181,6 +184,8 @@ export function SettingsView({
         return <TerminalSettings />;
       case "deploy-key-sync":
         return <DeployKeySettings />;
+      case "network":
+        return <NetworkSettings />;
 
       // Panel sections
       case "environment-variables":

@@ -50,7 +50,7 @@ export function WelcomeScreen({
 
   return (
     <GradientBackground className={resolvedTheme}>
-      <div 
+      <div
         className="min-h-screen flex flex-col items-center justify-center p-6"
         style={{ maxWidth: "960px", maxHeight: "600px" }}
       >

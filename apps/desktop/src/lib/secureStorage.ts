@@ -240,3 +240,82 @@ export async function listCachedDeploymentKeys(): Promise<
 
   return results;
 }
+
+// ============================================================================
+// OAuth token helpers for credential fallback
+// ============================================================================
+
+/**
+ * Get OAuth access token from localStorage
+ * This token can be used as a fallback when deploy key generation fails
+ */
+export function getOAuthTokenFromStorage(): string | null {
+  if (typeof localStorage === "undefined") return null;
+
+  try {
+    const oauthData = localStorage.getItem("convex-panel:oauth-token");
+    if (oauthData) {
+      const parsed = JSON.parse(oauthData);
+      return parsed.access_token || parsed.accessToken || null;
+    }
+  } catch (err) {
+    console.warn("[secureStorage] Failed to read OAuth token:", err);
+  }
+
+  return null;
+}
+
+/**
+ * Check if OAuth token is expired
+ */
+export function isOAuthTokenExpired(): boolean {
+  if (typeof localStorage === "undefined") return true;
+
+  try {
+    const oauthData = localStorage.getItem("convex-panel:oauth-token");
+    if (oauthData) {
+      const parsed = JSON.parse(oauthData);
+      const expiresAt = parsed.expires_at;
+      if (expiresAt) {
+        // Add 5 minute buffer before actual expiration
+        return Date.now() >= expiresAt - 5 * 60 * 1000;
+      }
+    }
+  } catch (err) {
+    console.warn(
+      "[secureStorage] Failed to check OAuth token expiration:",
+      err,
+    );
+  }
+
+  return true;
+}
+
+/**
+ * Get OAuth token metadata
+ */
+export function getOAuthTokenMetadata(): {
+  hasToken: boolean;
+  isExpired: boolean;
+  expiresAt?: number;
+} {
+  if (typeof localStorage === "undefined") {
+    return { hasToken: false, isExpired: true };
+  }
+
+  try {
+    const oauthData = localStorage.getItem("convex-panel:oauth-token");
+    if (oauthData) {
+      const parsed = JSON.parse(oauthData);
+      const expiresAt = parsed.expires_at;
+      const isExpired = expiresAt
+        ? Date.now() >= expiresAt - 5 * 60 * 1000
+        : true;
+      return { hasToken: true, isExpired, expiresAt };
+    }
+  } catch (err) {
+    console.warn("[secureStorage] Failed to get OAuth token metadata:", err);
+  }
+
+  return { hasToken: false, isExpired: true };
+}

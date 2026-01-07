@@ -272,7 +272,8 @@ function TerminalInstance({
               cols: xterm.cols,
             }).catch((err) => {
               // Only log if it's not a "session not found" error (which is expected when already cleaned up)
-              const errorMessage = err instanceof Error ? err.message : String(err);
+              const errorMessage =
+                err instanceof Error ? err.message : String(err);
               if (!errorMessage.includes("Session not found")) {
                 console.error("Failed to resize PTY:", err);
               }
@@ -434,6 +435,64 @@ export function TerminalPanel({
 
     return Object.keys(env).length > 0 ? env : undefined;
   }, [deployment.cliDeployKey, deployment.deploymentUrl]);
+
+  // Determine credential status for UI display
+  const credentialStatus = useMemo(() => {
+    if (deployment.cliDeployKeyError) {
+      return {
+        color: "var(--color-panel-error)",
+        text: "Auth Error",
+        title: `Error: ${deployment.cliDeployKeyError}`,
+      };
+    }
+
+    if (deployment.cliDeployKeyLoading) {
+      return {
+        color: "var(--color-panel-text-muted)",
+        text: "Loading...",
+        title: "Loading credentials...",
+      };
+    }
+
+    if (deployment.cliDeployKey) {
+      if (deployment.cliDeployKeyIsManual) {
+        return {
+          color: "var(--color-panel-success)",
+          text: "Manual Key",
+          title: "Using manually set deploy key",
+        };
+      }
+
+      // Check if this is an OAuth token being used as fallback
+      // OAuth tokens typically don't contain pipe characters like deploy keys do
+      const isOAuthFallback = !deployment.cliDeployKey.includes("|");
+
+      if (isOAuthFallback) {
+        return {
+          color: "var(--color-panel-success)",
+          text: "OAuth Token",
+          title: "Using OAuth access token as credential (auto-fallback)",
+        };
+      }
+
+      return {
+        color: "var(--color-panel-success)",
+        text: "Authenticated",
+        title: "Terminal has Convex credentials",
+      };
+    }
+
+    return {
+      color: "var(--color-panel-text-muted)",
+      text: "No credentials",
+      title: "No Convex credentials available",
+    };
+  }, [
+    deployment.cliDeployKey,
+    deployment.cliDeployKeyError,
+    deployment.cliDeployKeyLoading,
+    deployment.cliDeployKeyIsManual,
+  ]);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId);
 
@@ -806,38 +865,16 @@ export function TerminalPanel({
               gap: "6px",
               padding: "2px 8px",
               fontSize: "11px",
-              color: deployment.cliDeployKeyError
-                ? "var(--color-panel-error)"
-                : deployment.cliDeployKeyLoading
-                  ? "var(--color-panel-text-muted)"
-                  : deployment.cliDeployKey
-                    ? "var(--color-panel-success)"
-                    : "var(--color-panel-text-muted)",
+              color: credentialStatus.color,
             }}
-            title={
-              deployment.cliDeployKeyError
-                ? `Error: ${deployment.cliDeployKeyError}`
-                : deployment.cliDeployKeyLoading
-                  ? "Loading credentials..."
-                  : deployment.cliDeployKey
-                    ? deployment.cliDeployKeyIsManual
-                      ? "Using manually set deploy key"
-                      : "Terminal has Convex credentials"
-                    : "No Convex credentials"
-            }
+            title={credentialStatus.title}
           >
             <span
               style={{
                 width: "6px",
                 height: "6px",
                 borderRadius: "50%",
-                backgroundColor: deployment.cliDeployKeyError
-                  ? "var(--color-panel-error)"
-                  : deployment.cliDeployKeyLoading
-                    ? "var(--color-panel-text-muted)"
-                    : deployment.cliDeployKey
-                      ? "var(--color-panel-success)"
-                      : "var(--color-panel-text-muted)",
+                backgroundColor: credentialStatus.color,
               }}
               className={
                 deployment.cliDeployKeyLoading
@@ -845,19 +882,9 @@ export function TerminalPanel({
                   : undefined
               }
             />
-            <span>
-              {deployment.cliDeployKeyError
-                ? "Auth Error"
-                : deployment.cliDeployKeyLoading
-                  ? "Loading..."
-                  : deployment.cliDeployKey
-                    ? deployment.cliDeployKeyIsManual
-                      ? "Manual Key"
-                      : "Authenticated"
-                    : "No credentials"}
-            </span>
-            {/* Set Key button - show on error */}
-            {deployment.cliDeployKeyError &&
+            <span>{credentialStatus.text}</span>
+            {/* Set Key button - show on error or when no credentials */}
+            {(deployment.cliDeployKeyError || !deployment.cliDeployKey) &&
               !deployment.cliDeployKeyLoading && (
                 <button
                   type="button"
@@ -865,7 +892,7 @@ export function TerminalPanel({
                   title="Set deploy key manually"
                   style={{
                     padding: "2px 6px",
-                    border: "1px solid var(--color-panel-error)",
+                    border: `1px solid ${deployment.cliDeployKeyError ? "var(--color-panel-error)" : "var(--color-panel-text-muted)"}`,
                     backgroundColor: "transparent",
                     borderRadius: "4px",
                     cursor: "pointer",
@@ -874,17 +901,23 @@ export function TerminalPanel({
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "4px",
-                    color: "var(--color-panel-error)",
+                    color: deployment.cliDeployKeyError
+                      ? "var(--color-panel-error)"
+                      : "var(--color-panel-text-muted)",
                     fontSize: "10px",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      "var(--color-panel-error)";
+                    const color = deployment.cliDeployKeyError
+                      ? "var(--color-panel-error)"
+                      : "var(--color-panel-accent)";
+                    e.currentTarget.style.backgroundColor = color;
                     e.currentTarget.style.color = "white";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = "transparent";
-                    e.currentTarget.style.color = "var(--color-panel-error)";
+                    e.currentTarget.style.color = deployment.cliDeployKeyError
+                      ? "var(--color-panel-error)"
+                      : "var(--color-panel-text-muted)";
                   }}
                 >
                   <Key size={10} />

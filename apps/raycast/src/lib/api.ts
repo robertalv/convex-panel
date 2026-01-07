@@ -1,0 +1,583 @@
+/**
+ * Convex API Client for Raycast
+ *
+ * Provides API functions for interacting with Convex deployments
+ * and the BigBrain management API.
+ */
+
+import {
+  getTeams,
+  getProjects,
+  getDeployments,
+  getProfile,
+  type Team,
+  type Project,
+  type Deployment,
+  type UserProfile,
+} from "./bigbrain";
+
+// Re-export BigBrain API functions and types
+export { getTeams, getProjects, getDeployments, getProfile };
+export type { Team, Project, Deployment, UserProfile };
+
+const CONVEX_CLIENT_ID = "convex-panel-raycast-1.0.0";
+
+// ============================================================================
+// Deployment API (Functions, Tables, Documents)
+// ============================================================================
+
+export interface FunctionSpec {
+  identifier: string;
+  functionType: "query" | "mutation" | "action";
+  visibility: { kind: "public" } | { kind: "internal" };
+  args?: string;
+  returns?: string;
+}
+
+export interface ModuleFunctions {
+  path: string;
+  functions: FunctionSpec[];
+}
+
+export interface TableInfo {
+  name: string;
+  documentCount?: number;
+}
+
+export interface Document {
+  _id: string;
+  _creationTime: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Get deployment URL from deployment name
+ */
+export function getDeploymentUrl(deploymentName: string): string {
+  return `https://${deploymentName}.convex.cloud`;
+}
+
+/**
+ * Fetch all functions from a deployment using system query
+ */
+export async function getFunctions(
+  deploymentName: string,
+  accessToken: string,
+): Promise<ModuleFunctions[]> {
+  const url = getDeploymentUrl(deploymentName);
+
+  // Use system query to get function API spec
+  const response = await fetch(`${url}/api/query`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Convex ${accessToken}`,
+      "Convex-Client": CONVEX_CLIENT_ID,
+    },
+    body: JSON.stringify({
+      path: "_system/cli/modules:apiSpec",
+      args: {},
+      format: "json",
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to list functions: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const apiSpec = data.value ?? data;
+
+  return parseApiSpec(apiSpec);
+}
+
+/**
+ * Parse the apiSpec response into ModuleFunctions grouped by module path
+ */
+function parseApiSpec(apiSpec: unknown): ModuleFunctions[] {
+  if (!Array.isArray(apiSpec)) return [];
+
+  // Group functions by module path
+  const moduleMap = new Map<string, FunctionSpec[]>();
+
+  for (const fn of apiSpec) {
+    if (!fn || typeof fn !== "object") continue;
+
+    const identifier = (fn as Record<string, unknown>).identifier as string;
+    if (!identifier) continue;
+
+    // Extract module path from identifier (e.g., "messages:send" -> "messages")
+    const colonIndex = identifier.indexOf(":");
+    const modulePath =
+      colonIndex > -1 ? identifier.substring(0, colonIndex) : identifier;
+
+    // Get and normalize function type (API returns "Query", "Mutation", "Action" with capital letters)
+    const rawFunctionType = (fn as Record<string, unknown>)
+      .functionType as string;
+    if (!rawFunctionType) continue;
+
+    // Skip HTTP actions for now (they have different structure)
+    if (rawFunctionType === "HttpAction") continue;
+
+    // Normalize to lowercase
+    const functionType = rawFunctionType.toLowerCase() as
+      | "query"
+      | "mutation"
+      | "action";
+
+    // Get visibility (include both public and internal functions)
+    const visibility = (fn as Record<string, unknown>).visibility as
+      | { kind: string }
+      | undefined;
+    const visibilityKind =
+      visibility?.kind === "public" ? "public" : "internal";
+
+    const funcSpec: FunctionSpec = {
+      identifier,
+      functionType,
+      visibility: { kind: visibilityKind },
+      args: (fn as Record<string, unknown>).args as string | undefined,
+      returns: (fn as Record<string, unknown>).returns as string | undefined,
+    };
+
+    const existing = moduleMap.get(modulePath);
+    if (existing) {
+      existing.push(funcSpec);
+    } else {
+      moduleMap.set(modulePath, [funcSpec]);
+    }
+  }
+
+  // Convert map to array
+  const result: ModuleFunctions[] = [];
+  for (const [path, functions] of moduleMap.entries()) {
+    result.push({ path, functions });
+  }
+
+  // Sort by module path
+  result.sort((a, b) => a.path.localeCompare(b.path));
+
+  return result;
+}
+
+/**
+ * Get all tables from a deployment using the shapes2 API
+ */
+export async function getTables(
+  deploymentName: string,
+  accessToken: string,
+): Promise<TableInfo[]> {
+  const url = getDeploymentUrl(deploymentName);
+
+  // Primary approach: Use /api/shapes2 endpoint which returns table schemas
+  const shapesResponse = await fetch(`${url}/api/shapes2`, {
+    method: "GET",
+    headers: {
+      Authorization: `Convex ${accessToken}`,
+      "Convex-Client": CONVEX_CLIENT_ID,
+    },
+  });
+
+  if (shapesResponse.ok) {
+    const shapesData = await shapesResponse.json();
+
+    if (shapesData && typeof shapesData === "object") {
+      // shapes2 returns an object where keys are table names
+      const tableNames = Object.keys(shapesData)
+        .filter((name) => !name.startsWith("_"))
+        .sort();
+
+      return tableNames.map((name) => ({ name }));
+    }
+  }
+
+  // Fallback: Use system query to get table mapping
+  const response = await fetch(`${url}/api/query`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Convex ${accessToken}`,
+      "Convex-Client": CONVEX_CLIENT_ID,
+    },
+    body: JSON.stringify({
+      path: "_system/frontend/getTableMapping",
+      args: { componentId: null },
+      format: "json",
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get tables: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  // getTableMapping returns { value: { tableId: tableName, ... } }
+  let tableNames: string[] = [];
+
+  const mapping = data.value ?? data;
+  if (mapping && typeof mapping === "object") {
+    tableNames = Object.values(mapping) as string[];
+  }
+
+  return tableNames
+    .filter((name) => typeof name === "string" && !name.startsWith("_"))
+    .sort()
+    .map((name) => ({ name }));
+}
+
+/**
+ * Get documents from a table
+ */
+export async function getDocuments(
+  deploymentName: string,
+  accessToken: string,
+  tableName: string,
+  options?: {
+    limit?: number;
+    cursor?: string;
+  },
+): Promise<{ documents: Document[]; nextCursor?: string; isDone?: boolean }> {
+  const url = getDeploymentUrl(deploymentName);
+  const numItems = options?.limit ?? 25;
+
+  // Build pagination options in the format expected by the system query
+  const paginationOpts = {
+    cursor: options?.cursor ?? null,
+    numItems,
+    id: Date.now(),
+  };
+
+  const response = await fetch(`${url}/api/query`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Convex ${accessToken}`,
+      "Convex-Client": CONVEX_CLIENT_ID,
+    },
+    body: JSON.stringify({
+      path: "_system/frontend/paginatedTableDocuments:default",
+      args: {
+        paginationOpts,
+        table: tableName,
+        filters: null,
+        componentId: null,
+      },
+      format: "json",
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    throw new Error(`Failed to get documents: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json();
+  const result = data.value ?? data;
+
+  // Handle the response format: { page: Document[], continueCursor: string | null, isDone: boolean }
+  const documents = Array.isArray(result.page) ? result.page : [];
+
+  return {
+    documents: documents as Document[],
+    nextCursor: result.isDone
+      ? undefined
+      : (result.continueCursor ?? undefined),
+    isDone: result.isDone,
+  };
+}
+
+/**
+ * Run a Convex function
+ */
+export async function runFunction(
+  deploymentName: string,
+  accessToken: string,
+  functionPath: string,
+  functionType: "query" | "mutation" | "action",
+  args: Record<string, unknown> = {},
+): Promise<{ result: unknown; executionTime: number }> {
+  const url = getDeploymentUrl(deploymentName);
+  const startTime = Date.now();
+
+  const endpoint =
+    functionType === "query"
+      ? "query"
+      : functionType === "mutation"
+        ? "mutation"
+        : "action";
+
+  const response = await fetch(`${url}/api/${endpoint}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Convex ${accessToken}`,
+      "Convex-Client": CONVEX_CLIENT_ID,
+    },
+    body: JSON.stringify({
+      path: functionPath,
+      args,
+      format: "json",
+    }),
+  });
+
+  const executionTime = Date.now() - startTime;
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "Unknown error");
+    throw new Error(
+      `Function execution failed: ${response.status} - ${errorText}`,
+    );
+  }
+
+  const data = await response.json();
+
+  // Handle error responses from Convex
+  if (data.status === "error" || data.errorMessage) {
+    throw new Error(data.errorMessage || "Function execution failed");
+  }
+
+  return {
+    result: data.value ?? data,
+    executionTime,
+  };
+}
+
+/**
+ * Format a document ID for display
+ */
+export function formatDocumentId(id: string): string {
+  // Convex document IDs are typically long, show abbreviated version
+  if (id.length > 20) {
+    return `${id.substring(0, 8)}...${id.substring(id.length - 8)}`;
+  }
+  return id;
+}
+
+/**
+ * Format a value for display
+ */
+export function formatValue(value: unknown, maxLength = 100): string {
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+  if (typeof value === "string") {
+    if (value.length > maxLength) {
+      return `"${value.substring(0, maxLength)}..."`;
+    }
+    return `"${value}"`;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.length} items]`;
+  }
+  if (typeof value === "object") {
+    const keys = Object.keys(value);
+    return `{${keys.length} fields}`;
+  }
+  return String(value);
+}
+
+// ============================================================================
+// Logs API
+// ============================================================================
+
+export interface LogEntry {
+  id: string;
+  timestamp: number;
+  functionPath: string;
+  functionType: "query" | "mutation" | "action" | "http";
+  status: "success" | "failure";
+  executionTimeMs: number;
+  cached: boolean;
+  requestId: string;
+  errorMessage?: string;
+  logLines: string[];
+  usage: {
+    databaseReadBytes: number;
+    databaseWriteBytes: number;
+    storageReadBytes: number;
+    storageWriteBytes: number;
+    memoryUsedMb: number;
+  };
+  raw: unknown;
+}
+
+export interface GetLogsResponse {
+  logs: LogEntry[];
+  nextCursor?: string | number;
+}
+
+/**
+ * Get function execution logs from a deployment
+ */
+export async function getLogs(
+  deploymentName: string,
+  accessToken: string,
+  options?: {
+    cursor?: string | number;
+    limit?: number;
+    functionFilter?: string;
+  },
+): Promise<GetLogsResponse> {
+  const url = getDeploymentUrl(deploymentName);
+  const cursor = options?.cursor ?? 0;
+  const limit = options?.limit ?? 50;
+
+  // Build URL with query params - use stream_udf_execution for real-time logs
+  const logsUrl = new URL(`${url}/api/stream_udf_execution`);
+  logsUrl.searchParams.set("cursor", String(cursor));
+  if (limit) logsUrl.searchParams.set("limit", String(limit));
+
+  const response = await fetch(logsUrl.toString(), {
+    method: "GET",
+    headers: {
+      Authorization: `Convex ${accessToken}`,
+      "Content-Type": "application/json",
+      "Convex-Client": CONVEX_CLIENT_ID,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    throw new Error(`Failed to get logs: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json();
+  const entries = data.entries || [];
+
+  // Parse and normalize log entries
+  const logs: LogEntry[] = entries.map((entry: Record<string, unknown>) => {
+    // Normalize timestamp (handle both seconds and milliseconds)
+    let timestamp = entry.timestamp as number;
+    if (timestamp && timestamp < 1e12) {
+      timestamp = timestamp * 1000; // Convert seconds to milliseconds
+    }
+
+    // Get function type and normalize
+    const rawType = (entry.udf_type || entry.udfType || "query") as string;
+    const functionType = rawType.toLowerCase() as
+      | "query"
+      | "mutation"
+      | "action"
+      | "http";
+
+    // Get function path
+    const functionPath = (entry.identifier ||
+      entry.udf_path ||
+      "unknown") as string;
+
+    // Determine status
+    let status: "success" | "failure" = "success";
+    if (entry.error || entry.error_message) {
+      status = "failure";
+    } else if (entry.success === false) {
+      status = "failure";
+    }
+
+    // Normalize execution time (API returns seconds, we want ms)
+    let executionTimeMs = 0;
+    const execTime = entry.execution_time || entry.executionTime;
+    if (typeof execTime === "number") {
+      executionTimeMs = execTime < 100 ? execTime * 1000 : execTime;
+    }
+
+    // Parse log lines
+    const logLines: string[] = [];
+    if (Array.isArray(entry.log_lines)) {
+      for (const line of entry.log_lines) {
+        if (typeof line === "string") {
+          logLines.push(line);
+        } else if (Array.isArray(line)) {
+          // Format: [level, message] or [level, ...args]
+          logLines.push(line.slice(1).join(" "));
+        } else if (line && typeof line === "object") {
+          logLines.push(JSON.stringify(line));
+        }
+      }
+    }
+
+    // Parse usage stats
+    const usageStats = entry.usage_stats as Record<string, number> | undefined;
+    const usage = {
+      databaseReadBytes: usageStats?.database_read_bytes ?? 0,
+      databaseWriteBytes: usageStats?.database_write_bytes ?? 0,
+      storageReadBytes: usageStats?.storage_read_bytes ?? 0,
+      storageWriteBytes: usageStats?.storage_write_bytes ?? 0,
+      memoryUsedMb: usageStats?.memory_used_mb ?? 0,
+    };
+
+    return {
+      id: (entry.execution_id ||
+        entry.request_id ||
+        `${timestamp}-${functionPath}`) as string,
+      timestamp: timestamp || Date.now(),
+      functionPath,
+      functionType,
+      status,
+      executionTimeMs: Math.round(executionTimeMs),
+      cached: Boolean(entry.cached_result || entry.cached),
+      requestId: (entry.request_id || entry.execution_id || "") as string,
+      errorMessage: (entry.error || entry.error_message) as string | undefined,
+      logLines,
+      usage,
+      raw: entry,
+    };
+  });
+
+  // Sort by timestamp descending (newest first)
+  logs.sort((a, b) => b.timestamp - a.timestamp);
+
+  return {
+    logs,
+    nextCursor: data.new_cursor || data.newCursor,
+  };
+}
+
+/**
+ * Format bytes for display
+ */
+export function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  const value = bytes / Math.pow(1024, i);
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[i]}`;
+}
+
+/**
+ * Format execution time for display
+ */
+export function formatExecutionTime(ms: number): string {
+  if (ms < 1) return "<1ms";
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  return `${(ms / 1000).toFixed(2)}s`;
+}
+
+/**
+ * Format timestamp for display
+ */
+export function formatTimestamp(timestamp: number): string {
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
+
+/**
+ * Format relative time for display
+ */
+export function formatRelativeTime(timestamp: number): string {
+  const now = Date.now();
+  const diff = now - timestamp;
+
+  if (diff < 1000) return "just now";
+  if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`;
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return `${Math.floor(diff / 86400000)}d ago`;
+}

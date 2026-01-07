@@ -2,8 +2,63 @@ mod secure_store;
 mod mcp_server;
 mod pty;
 
-use tauri::{Manager, Emitter};
-use tauri::menu::{Menu, MenuItem, Submenu, PredefinedMenuItem};
+use tauri::{Manager, Emitter, AppHandle, include_image};
+use tauri::menu::{Menu, MenuItem, IconMenuItem, Submenu, PredefinedMenuItem};
+use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent};
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
+
+// Network test status stored globally for tray updates
+#[derive(Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct NetworkTestStatus {
+    pub websocket: String,
+    pub http: String,
+    pub sse: String,
+    pub proxied_websocket: String,
+    pub overall: String,
+}
+
+static NETWORK_STATUS: Lazy<Mutex<NetworkTestStatus>> = Lazy::new(|| {
+    Mutex::new(NetworkTestStatus::default())
+});
+
+// Store menu item references for dynamic updates
+static TRAY_MENU_ITEMS: Lazy<Mutex<Option<TrayMenuItems>>> = Lazy::new(|| {
+    Mutex::new(None)
+});
+
+struct TrayMenuItems {
+    ws_status: MenuItem<tauri::Wry>,
+    http_status: MenuItem<tauri::Wry>,
+    sse_status: MenuItem<tauri::Wry>,
+    proxy_status: MenuItem<tauri::Wry>,
+}
+
+/// Update network test status from frontend and update tray menu
+#[tauri::command]
+fn update_network_status(status: NetworkTestStatus) -> Result<(), String> {
+    // Store the status
+    {
+        let mut network_status = NETWORK_STATUS.lock().unwrap();
+        *network_status = status.clone();
+    }
+    
+    // Update tray menu items
+    if let Some(items) = TRAY_MENU_ITEMS.lock().unwrap().as_ref() {
+        let _ = items.ws_status.set_text(format!("WebSocket: {}", status.websocket));
+        let _ = items.http_status.set_text(format!("HTTP: {}", status.http));
+        let _ = items.sse_status.set_text(format!("SSE: {}", status.sse));
+        let _ = items.proxy_status.set_text(format!("Proxied WS: {}", status.proxied_websocket));
+    }
+    
+    Ok(())
+}
+
+/// Get current network test status
+#[tauri::command]
+fn get_network_status() -> NetworkTestStatus {
+    NETWORK_STATUS.lock().unwrap().clone()
+}
 
 /// Command to expand the window to near-fullscreen (maximized)
 #[tauri::command]
@@ -310,7 +365,10 @@ pub fn run() {
             pty::pty_resize,
             pty::pty_kill,
             pty::pty_get_session,
-            pty::pty_list_sessions
+            pty::pty_list_sessions,
+            // Network status commands
+            update_network_status,
+            get_network_status
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
@@ -428,6 +486,71 @@ pub fn run() {
                     }
                 }
             });
+
+
+            // Create system tray with network status menu
+            // Status items are initially "Pending" and will be updated by frontend via update_network_status
+            let ws_status_item = MenuItem::with_id(app, "ws_status", "WebSocket: Pending", false, None::<&str>)?;
+            let http_status_item = MenuItem::with_id(app, "http_status", "HTTP: Pending", false, None::<&str>)?;
+            let sse_status_item = MenuItem::with_id(app, "sse_status", "SSE: Pending", false, None::<&str>)?;
+            let proxy_status_item = MenuItem::with_id(app, "proxy_status", "Proxied WS: Pending", false, None::<&str>)?;
+            
+            // Store menu items for later updates
+            {
+                let mut items = TRAY_MENU_ITEMS.lock().unwrap();
+                *items = Some(TrayMenuItems {
+                    ws_status: ws_status_item.clone(),
+                    http_status: http_status_item.clone(),
+                    sse_status: sse_status_item.clone(),
+                    proxy_status: proxy_status_item.clone(),
+                });
+            }
+            
+            // Load menu icon for "Show Convex Panel" item
+            let menu_icon = include_image!("icons/menu-icon.png");
+            
+            let tray_menu = Menu::with_items(app, &[
+                &MenuItem::with_id(app, "network_header", "Network Status", false, None::<&str>)?,
+                &PredefinedMenuItem::separator(app)?,
+                &ws_status_item,
+                &http_status_item,
+                &sse_status_item,
+                &proxy_status_item,
+                &PredefinedMenuItem::separator(app)?,
+                &MenuItem::with_id(app, "run_tests", "Run Network Tests", true, None::<&str>)?,
+                &PredefinedMenuItem::separator(app)?,
+                &IconMenuItem::with_id(app, "show_window", "Show Convex Panel", true, Some(menu_icon), None::<&str>)?,
+                &PredefinedMenuItem::quit(app, Some("Quit"))?,
+            ])?;
+
+            // Load tray icon - embedded at compile time for menu bar
+            let icon = include_image!("icons/tray-icon.png");
+
+            let window_for_tray = window.clone();
+            let _tray = TrayIconBuilder::new()
+                .icon(icon)
+                .icon_as_template(true) // Makes it adapt to light/dark menu bar
+                .menu(&tray_menu)
+                .tooltip("Convex Panel - Network Status")
+                .on_menu_event(move |_app, event| {
+                    match event.id().as_ref() {
+                        "show_window" => {
+                            let _ = window_for_tray.show();
+                            let _ = window_for_tray.set_focus();
+                        }
+                        "run_tests" => {
+                            let _ = window_for_tray.emit("run-network-tests", ());
+                        }
+                        _ => {}
+                    }
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+                        // Show the tray menu on left click
+                        let _ = tray.app_handle().emit("tray-click", ());
+                    }
+                })
+                .build(app)?;
 
             // set background color only when building for macOS
             #[cfg(target_os = "macos")]

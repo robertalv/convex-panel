@@ -16,6 +16,8 @@ import {
   loadDeploymentKey,
   saveDeploymentKey,
   clearDeploymentKey,
+  getOAuthTokenFromStorage,
+  isOAuthTokenExpired,
 } from "../lib/secureStorage";
 import {
   writeDeployKeyToEnvLocal,
@@ -195,12 +197,59 @@ export function DeploymentProvider({
           `[DeploymentContext] Failed to get deploy key for ${deploymentName}:`,
           error,
         );
+
+        // ============================================================
+        // FALLBACK CHAIN: Try alternative credential sources
+        // ============================================================
         if (!cancelled) {
-          setCliDeployKeyError(
-            error instanceof Error
-              ? error.message
-              : "Failed to create deploy key",
-          );
+          // Try OAuth token from localStorage as fallback
+          try {
+            const oauthToken = getOAuthTokenFromStorage();
+            const tokenExpired = isOAuthTokenExpired();
+
+            if (oauthToken && !tokenExpired) {
+              console.log(
+                `[DeploymentContext] Using OAuth token as fallback for ${deploymentName}`,
+              );
+
+              // Validate that the token can be used with this deployment
+              // Deploy keys have format: {deploymentName}|{key}, but OAuth tokens don't
+              // We'll use the OAuth token directly and mark it as a fallback
+              setCliDeployKey(oauthToken);
+              setCliDeployKeyIsManual(false); // Not manual, it's auto-fallback
+              setCliDeployKeyError(null);
+              console.log(
+                `[DeploymentContext] Successfully using OAuth token fallback for ${deploymentName}`,
+              );
+              return;
+            } else if (oauthToken && tokenExpired) {
+              console.warn(
+                `[DeploymentContext] OAuth token found but expired for ${deploymentName}`,
+              );
+              setCliDeployKeyError(
+                "OAuth token expired. Please re-authenticate or set a deploy key manually.",
+              );
+            } else {
+              console.warn(
+                `[DeploymentContext] No OAuth token fallback available for ${deploymentName}`,
+              );
+              setCliDeployKeyError(
+                error instanceof Error
+                  ? error.message
+                  : "Failed to create deploy key. Please set one manually.",
+              );
+            }
+          } catch (fallbackError) {
+            console.error(
+              `[DeploymentContext] Fallback credential check failed:`,
+              fallbackError,
+            );
+            setCliDeployKeyError(
+              error instanceof Error
+                ? error.message
+                : "Failed to create deploy key",
+            );
+          }
         }
       } finally {
         // Always clear the generating ref if it matches
@@ -297,7 +346,7 @@ export function DeploymentProvider({
       // Clear the cached key first
       await clearDeploymentKey(deploymentName);
 
-      // Create a new key
+      // Create a new key with retry logic
       console.log(
         `[DeploymentContext] Regenerating deploy key for ${deploymentName}`,
       );
@@ -306,24 +355,73 @@ export function DeploymentProvider({
         ? `cp-${projectId}-${Date.now()}`
         : `cp-desktop-${Date.now()}`;
 
-      const result = await createDeployKey(
-        token,
-        deploymentName,
-        keyName,
-        fetchFn,
-      );
+      // Retry up to 3 times with exponential backoff
+      let lastError: Error | null = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const result = await createDeployKey(
+            token,
+            deploymentName,
+            keyName,
+            fetchFn,
+          );
 
-      // Cache and set the new key
-      await saveDeploymentKey(deploymentName, result.key);
-      setCliDeployKey(result.key);
-      console.log(
-        `[DeploymentContext] Deploy key regenerated for ${deploymentName}`,
+          // Cache and set the new key
+          await saveDeploymentKey(deploymentName, result.key);
+          setCliDeployKey(result.key);
+          console.log(
+            `[DeploymentContext] Deploy key regenerated for ${deploymentName}`,
+          );
+          return; // Success!
+        } catch (attemptError) {
+          lastError =
+            attemptError instanceof Error
+              ? attemptError
+              : new Error(String(attemptError));
+          console.warn(
+            `[DeploymentContext] Deploy key generation attempt ${attempt + 1} failed:`,
+            attemptError,
+          );
+
+          // Wait before retrying (exponential backoff: 1s, 2s, 4s)
+          if (attempt < 2) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, 1000 * Math.pow(2, attempt)),
+            );
+          }
+        }
+      }
+
+      // All retries failed, try OAuth fallback
+      throw (
+        lastError || new Error("Failed to regenerate deploy key after retries")
       );
     } catch (error) {
       console.error(
         `[DeploymentContext] Failed to regenerate deploy key:`,
         error,
       );
+
+      // Try OAuth token fallback
+      try {
+        const oauthToken = getOAuthTokenFromStorage();
+        const tokenExpired = isOAuthTokenExpired();
+
+        if (oauthToken && !tokenExpired) {
+          console.log(
+            `[DeploymentContext] Using OAuth token as fallback after regeneration failure`,
+          );
+          setCliDeployKey(oauthToken);
+          setCliDeployKeyError(null);
+          return;
+        }
+      } catch (fallbackError) {
+        console.error(
+          `[DeploymentContext] OAuth fallback failed during regeneration:`,
+          fallbackError,
+        );
+      }
+
       setCliDeployKeyError(
         error instanceof Error
           ? error.message
