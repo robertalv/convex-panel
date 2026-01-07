@@ -3,7 +3,7 @@
  * Collapsible tree view showing tables, columns, indexes, and views/presets
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -30,6 +30,9 @@ interface SchemaTreeSidebarProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   width: number;
+  onWidthChange?: (width: number) => void;
+  minWidth?: number;
+  maxWidth?: number;
   filterPresets?: FilterPreset[];
   aggregations?: AggregationDef[];
   onAddFilterPreset?: () => void;
@@ -164,6 +167,9 @@ export function SchemaTreeSidebar({
   searchQuery,
   onSearchChange,
   width,
+  onWidthChange,
+  minWidth = 180,
+  maxWidth = 400,
   filterPresets = [],
   aggregations = [],
   onAddFilterPreset,
@@ -180,9 +186,57 @@ export function SchemaTreeSidebar({
     views: true,
   });
 
+  // Resize state
+  const isDragging = useRef(false);
+  const startPos = useRef(0);
+  const startWidth = useRef(0);
+
   const toggleExpanded = (key: string) => {
     setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
   };
+
+  // Handle resize drag
+  const handleResizeMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (!onWidthChange) return;
+      e.preventDefault();
+      isDragging.current = true;
+      startPos.current = e.clientX;
+      startWidth.current = width;
+      document.body.style.cursor = "ew-resize";
+      document.body.style.userSelect = "none";
+    },
+    [onWidthChange, width],
+  );
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current || !onWidthChange) return;
+      // For left-side sidebar, dragging right increases width
+      const delta = e.clientX - startPos.current;
+      const newWidth = Math.min(
+        maxWidth,
+        Math.max(minWidth, startWidth.current + delta),
+      );
+      onWidthChange(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (isDragging.current) {
+        isDragging.current = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [onWidthChange, minWidth, maxWidth]);
 
   // Filter tables based on search query
   const filteredTables = useMemo(() => {
@@ -243,13 +297,41 @@ export function SchemaTreeSidebar({
 
   return (
     <div
-      className="flex flex-col h-full"
+      className="flex flex-col h-full relative"
       style={{
         width,
+        minWidth: width,
+        maxWidth: width,
         backgroundColor: "var(--color-surface-base)",
         borderRight: "1px solid var(--color-border-base)",
       }}
     >
+      {/* Resize handle on right edge */}
+      {onWidthChange && (
+        <div
+          onMouseDown={handleResizeMouseDown}
+          className="absolute z-10 transition-colors"
+          style={{
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: "4px",
+            cursor: "ew-resize",
+            backgroundColor: "transparent",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLDivElement).style.backgroundColor =
+              "var(--color-border-strong)";
+          }}
+          onMouseLeave={(e) => {
+            if (!isDragging.current) {
+              (e.currentTarget as HTMLDivElement).style.backgroundColor =
+                "transparent";
+            }
+          }}
+        />
+      )}
+
       {/* Component selector - only show when multiple components exist */}
       {components.length > 1 && (
         <div

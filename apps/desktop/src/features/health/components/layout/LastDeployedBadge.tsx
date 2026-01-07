@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Rocket, Clock, CheckCircle2, ArrowUp } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, isValid } from "date-fns";
 
 interface LastDeployedBadgeProps {
   /** Last deployment date */
@@ -53,6 +53,18 @@ export function LastDeployedBadge({
     return "patch";
   };
 
+  // Normalize lastDeployed into a safe Date instance (or null)
+  const normalizedLastDeployed: Date | null = (() => {
+    if (!lastDeployed) return null;
+    // Already a Date and valid
+    if (lastDeployed instanceof Date) {
+      return isValid(lastDeployed) ? lastDeployed : null;
+    }
+    // Handle unexpected runtime types (e.g. string or number)
+    const candidate = new Date(lastDeployed as any);
+    return isValid(candidate) ? candidate : null;
+  })();
+
   if (isLoading) {
     return (
       <span
@@ -71,11 +83,11 @@ export function LastDeployedBadge({
     );
   }
 
-  const timeAgo = lastDeployed
-    ? formatDistanceToNow(lastDeployed, { addSuffix: true })
+  const timeAgo = normalizedLastDeployed
+    ? formatDistanceToNow(normalizedLastDeployed, { addSuffix: true })
     : null;
-  const isRecent = lastDeployed
-    ? Date.now() - lastDeployed.getTime() < 60 * 60 * 1000
+  const isRecent = normalizedLastDeployed
+    ? Date.now() - normalizedLastDeployed.getTime() < 60 * 60 * 1000
     : false; // Less than 1 hour
 
   return (
@@ -99,7 +111,9 @@ export function LastDeployedBadge({
             : "var(--color-text-muted)",
         }}
         title={
-          lastDeployed ? `Last deployed: ${lastDeployed.toLocaleString()}` : ""
+          normalizedLastDeployed
+            ? `Last deployed: ${normalizedLastDeployed.toLocaleString()}`
+            : ""
         }
       >
         {showIcon &&
@@ -108,7 +122,7 @@ export function LastDeployedBadge({
           ) : (
             <Rocket size={iconSize} />
           ))}
-        {lastDeployed ? (
+        {normalizedLastDeployed ? (
           <span>Deployed {timeAgo}</span>
         ) : (
           <span>No deployments</span>

@@ -8,6 +8,7 @@ import {
   Table2,
   LayoutList,
   Braces,
+  Code2,
   Filter,
   Download,
   Plus,
@@ -27,6 +28,7 @@ import type {
 } from "../types";
 import { FieldVisibilityDropdown } from "./FieldVisibilityDropdown";
 import { SortPanel } from "./SortPanel";
+import { TableMenuDropdown } from "./TableMenuDropdown";
 import { ToolbarButton, IconButton } from "@/components/ui/button";
 
 interface DataToolbarProps {
@@ -61,6 +63,13 @@ interface DataToolbarProps {
   // Sidebar collapse
   onCollapseSidebar?: () => void;
   sidebarCollapsed?: boolean;
+  // Table menu actions
+  onCustomQuery?: () => void;
+  onSchema?: () => void;
+  onIndexes?: () => void;
+  onMetrics?: () => void;
+  onClearTable?: () => void;
+  onDeleteTable?: () => void;
 }
 
 const viewModes: { mode: DataViewMode; icon: typeof Table2; label: string }[] =
@@ -68,6 +77,7 @@ const viewModes: { mode: DataViewMode; icon: typeof Table2; label: string }[] =
     { mode: "table", icon: Table2, label: "Table" },
     { mode: "list", icon: LayoutList, label: "List" },
     { mode: "json", icon: Braces, label: "JSON" },
+    { mode: "raw", icon: Code2, label: "Raw" },
   ];
 
 export function DataToolbar({
@@ -97,6 +107,12 @@ export function DataToolbar({
   columnMeta = {},
   onCollapseSidebar,
   sidebarCollapsed = false,
+  onCustomQuery,
+  onSchema,
+  onIndexes,
+  onMetrics,
+  onClearTable,
+  onDeleteTable,
 }: DataToolbarProps) {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showFieldVisibility, setShowFieldVisibility] = useState(false);
@@ -263,10 +279,7 @@ export function DataToolbar({
 
             {/* Delete button */}
             {onDeleteSelected && (
-              <ToolbarButton
-                onClick={onDeleteSelected}
-                variant="destructive"
-              >
+              <ToolbarButton onClick={onDeleteSelected} variant="destructive">
                 <Trash2 size={12} />
                 <span>{deleteLabel}</span>
               </ToolbarButton>
@@ -354,6 +367,19 @@ export function DataToolbar({
           <Plus size={14} />
           <span>Add Document</span>
         </ToolbarButton>
+
+        {/* Table menu dropdown */}
+        {onCustomQuery && onSchema && onIndexes && onMetrics && (
+          <TableMenuDropdown
+            onCustomQuery={onCustomQuery}
+            onSchema={onSchema}
+            onIndexes={onIndexes}
+            onMetrics={onMetrics}
+            onClearTable={onClearTable}
+            onDeleteTable={onDeleteTable}
+            disabled={!selectedTable}
+          />
+        )}
       </div>
     </div>
   );

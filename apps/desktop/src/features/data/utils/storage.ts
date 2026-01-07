@@ -196,7 +196,7 @@ export function updateRecentlyViewedTable(tableName: string): void {
 /**
  * Save the current view mode
  */
-export function saveViewMode(mode: "table" | "list" | "json"): void {
+export function saveViewMode(mode: "table" | "list" | "json" | "raw"): void {
   try {
     localStorage.setItem(STORAGE_KEYS.VIEW_MODE, mode);
   } catch (e) {
@@ -207,10 +207,15 @@ export function saveViewMode(mode: "table" | "list" | "json"): void {
 /**
  * Get the saved view mode
  */
-export function getViewMode(): "table" | "list" | "json" {
+export function getViewMode(): "table" | "list" | "json" | "raw" {
   try {
     const mode = localStorage.getItem(STORAGE_KEYS.VIEW_MODE);
-    if (mode === "table" || mode === "list" || mode === "json") {
+    if (
+      mode === "table" ||
+      mode === "list" ||
+      mode === "json" ||
+      mode === "raw"
+    ) {
       return mode;
     }
     return "table";

@@ -6,17 +6,27 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Code, ChevronDown, Search, X, CircleCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { ConvexComponent } from "../types";
 
 interface ComponentSelectorProps {
-  selectedComponent: string | null;
-  onSelect: (component: string | null) => void;
-  components?: string[];
+  /** Currently selected component ID (null = root app) */
+  selectedComponentId: string | null;
+  /** Called when a component is selected */
+  onSelect: (componentId: string | null) => void;
+  /** List of available components */
+  components: ConvexComponent[];
+  /** Stretch the trigger button to full width */
+  fullWidth?: boolean;
+  /** Visual style variant */
+  variant?: "inline" | "input";
 }
 
 export function ComponentSelector({
-  selectedComponent,
+  selectedComponentId,
   onSelect,
-  components = ["app"],
+  components,
+  fullWidth = false,
+  variant = "inline",
 }: ComponentSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -25,27 +35,37 @@ export function ComponentSelector({
   const inputRef = useRef<HTMLInputElement>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
 
-  // Filter and deduplicate components
+  // Filter components by search query
   const filteredComponents = useMemo(() => {
-    const uniqueComponents = Array.from(new Set(components)).filter(
-      (c) => c && c.trim() !== "",
-    );
-
-    if (!searchQuery.trim()) return uniqueComponents;
+    if (!searchQuery.trim()) return components;
 
     const query = searchQuery.toLowerCase();
-    return uniqueComponents.filter((c) => c.toLowerCase().includes(query));
+    return components.filter(
+      (c) =>
+        c.path.toLowerCase().includes(query) ||
+        (c.name && c.name.toLowerCase().includes(query)),
+    );
   }, [components, searchQuery]);
 
   // Get display label for a component
-  const getDisplayLabel = (component: string) => {
-    return component === "app" ? "Root (app)" : component;
+  const getDisplayLabel = (component: ConvexComponent) => {
+    if (component.id === null) {
+      return "Root (app)";
+    }
+    return component.path || component.name || component.id;
   };
 
   // Get selected component display
+  const selectedComponent = useMemo(() => {
+    return (
+      components.find((c) => c.id === selectedComponentId) ||
+      components.find((c) => c.id === null)
+    );
+  }, [components, selectedComponentId]);
+
   const selectedLabel = selectedComponent
     ? getDisplayLabel(selectedComponent)
-    : getDisplayLabel("app");
+    : "Root (app)";
 
   // Reset highlight when filtered options change
   useEffect(() => {
@@ -110,33 +130,42 @@ export function ComponentSelector({
     }
   };
 
-  // Handle selection
-  const handleSelect = (component: string) => {
-    onSelect(component === "app" ? null : component);
+  // Handle selection - pass the component ID (null for root app)
+  const handleSelect = (component: ConvexComponent) => {
+    onSelect(component.id);
     setIsOpen(false);
     setSearchQuery("");
     setHighlightedIndex(0);
   };
 
+  const isInputVariant = variant === "input";
+
   return (
-    <div ref={containerRef} className="relative">
+    <div
+      ref={containerRef}
+      className={cn(
+        "relative",
+        fullWidth && "w-full",
+        isInputVariant && "flex-1 min-w-0",
+      )}
+    >
       {/* Trigger button */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
           "flex items-center gap-1",
-          "pl-2 pr-1 py-0.5 rounded-lg",
-          "text-sm font-medium",
-          "border border-transparent",
-          "hover:bg-surface-raised",
+          fullWidth && "w-full justify-between",
+          isInputVariant
+            ? "px-2.5 py-1.5 h-[30px] rounded-lg text-sm font-medium border border-border-base bg-transparent hover:bg-surface-raised"
+            : "pl-2 pr-1 py-0.5 rounded-lg text-sm font-medium border border-transparent hover:bg-surface-raised",
           "focus:outline-none focus:ring-0",
           "cursor-pointer transition-colors duration-fast",
           "text-text-base",
         )}
       >
         <Code size={14} className="text-text-muted" />
-        <span className="truncate max-w-[140px]">{selectedLabel}</span>
+        <span className="truncate flex-1 min-w-0 text-left">{selectedLabel}</span>
         <ChevronDown
           className={cn(
             "h-3 w-3 text-text-subtle transition-transform",
@@ -194,14 +223,12 @@ export function ComponentSelector({
               </div>
             ) : (
               filteredComponents.map((component, index) => {
-                const isSelected =
-                  (component === "app" && selectedComponent === null) ||
-                  component === selectedComponent;
+                const isSelected = component.id === selectedComponentId;
                 const isHighlighted = index === highlightedIndex;
 
                 return (
                   <button
-                    key={component}
+                    key={component.id ?? "root"}
                     type="button"
                     data-index={index}
                     onClick={() => handleSelect(component)}
@@ -217,14 +244,14 @@ export function ComponentSelector({
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <Code
                         size={12}
-                        className="text-text-muted flex-shrink-0"
+                        className="text-text-muted shrink-0"
                       />
                       <span className="truncate">
                         {getDisplayLabel(component)}
                       </span>
                     </div>
                     {isSelected && (
-                      <CircleCheck className="h-4 w-4 flex-shrink-0 stroke-brand-base" />
+                      <CircleCheck className="h-4 w-4 shrink-0 stroke-brand-base" />
                     )}
                   </button>
                 );

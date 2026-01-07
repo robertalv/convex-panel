@@ -39,6 +39,20 @@ export {
   fetchInsights,
 } from "./health";
 
+// Export function discovery utilities
+export {
+  fetchFunctionSpec,
+  fetchComponents,
+  fetchSourceCode,
+  discoverFunctions,
+  groupFunctionsByPath,
+  filterFunctionsByType,
+  findFunctionByIdentifier,
+  type ModuleFunction,
+  type FunctionGroup,
+  type UdfType,
+} from "./functions";
+
 // Export BigBrain API functions and types
 export {
   // Core API functions

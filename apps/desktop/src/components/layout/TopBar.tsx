@@ -217,9 +217,6 @@ export function TopBar({
         {/* Terminal Toggle Button - only visible when a project is selected */}
         {selectedProject && <TerminalButton onOpenSettings={onOpenSettings} />}
 
-        {/* MCP Connection Status Indicator */}
-        <McpStatusIndicator />
-
         <UserMenu
           user={user}
           selectedTeam={selectedTeam}
@@ -228,6 +225,9 @@ export function TopBar({
           onThemeChange={onThemeChange}
           onLogout={onDisconnect}
         />
+
+        {/* MCP Connection Status Indicator */}
+        <McpStatusIndicator />
       </div>
     </header>
   );

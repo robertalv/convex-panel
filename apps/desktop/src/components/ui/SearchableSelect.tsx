@@ -1,7 +1,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { ChevronDown, Search, CircleCheck } from "lucide-react";
+import { ChevronDown, Search, CircleCheck, X } from "lucide-react";
 import { Input } from "./input";
 import { Team, Deployment } from "convex-panel";
 import { TierBadge } from "../TierBadge";
@@ -40,6 +40,8 @@ interface SearchableSelectProps {
   buttonClassName?: string;
   /** Custom style for the button element */
   buttonStyle?: React.CSSProperties;
+  /** Visual style variant for the trigger button */
+  variant?: "ghost" | "outline" | "primary" | "secondary";
 }
 
 export function SearchableSelect({
@@ -61,6 +63,7 @@ export function SearchableSelect({
   disabled = false,
   buttonClassName,
   buttonStyle,
+  variant = "ghost",
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
@@ -198,6 +201,36 @@ export function SearchableSelect({
     setHighlightedIndex(0);
   };
 
+  const variantClasses = React.useMemo(() => {
+    switch (variant) {
+      case "outline":
+        return cn(
+          "border border-border-base",
+          disabled ? "" : "hover:bg-surface-raised",
+          "text-text-base",
+        );
+      case "secondary":
+        return cn(
+          "border border-border-base",
+          "bg-surface-raised text-text-base",
+          disabled ? "" : "hover:bg-surface-overlay",
+        );
+      case "primary":
+        return cn(
+          "border border-transparent",
+          "bg-brand-base text-white",
+          disabled ? "" : "hover:bg-brand-hover",
+        );
+      case "ghost":
+      default:
+        return cn(
+          "border border-transparent",
+          disabled ? "" : "hover:bg-surface-raised",
+          selectedOption ? "text-text-base" : "text-text-muted",
+        );
+    }
+  }, [variant, disabled, selectedOption]);
+
   return (
     <div ref={containerRef} className={cn("relative", className)}>
       <button
@@ -207,54 +240,40 @@ export function SearchableSelect({
         disabled={disabled}
         style={buttonStyle}
         className={cn(
-          "w-full",
-          "flex items-center justify-between rounded-lg",
+          "flex items-center justify-between gap-1.5 min-w-fit",
+          "px-2.5 py-1.5 h-[30px] rounded-lg",
           "text-sm font-medium",
+          "bg-transparent",
           "focus:outline-none focus:ring-0",
           "transition-colors duration-fast",
           disabled
             ? "cursor-not-allowed opacity-50"
             : "cursor-pointer",
-          selectedOption ? "text-text-base" : "text-text-muted",
-          // Component-selector variant (with icon)
-          triggerIcon
-            ? cn(
-                "gap-1.5 px-2.5 py-1.5 h-[30px]",
-                "border border-border-base",
-                disabled
-                  ? "bg-transparent"
-                  : "bg-transparent hover:bg-surface-raised",
-              )
-            : cn(
-                // Default variant (minimal)
-                "gap-1 pl-2 pr-1 py-0.5",
-                "border border-transparent",
-                disabled ? "" : "hover:bg-surface-raised",
-              ),
+          variantClasses,
           buttonClassName,
         )}
       >
         <div className="flex items-center gap-1.5">
           {triggerIcon && (
-            <span className="text-text-muted flex-shrink-0 flex items-center">
+            <span className="text-text-muted shrink-0 flex items-center">
               {triggerIcon}
             </span>
           )}
           <span className={cn("truncate", triggerIcon ? "flex-1" : "max-w-[140px]")}>
             {selectedOption?.label || placeholder}
           </span>
-        </div>
-        {selectedTeam ? (
+          {selectedTeam ? (
           <TierBadge subscription={subscription ?? null} />
-        ) : null}
-        {selectedDeployment && showEnvironmentBadge && (
-          <EnvironmentBadge
-            deploymentType={selectedDeployment.deploymentType}
-          />
-        )}
+          ) : null}
+          {selectedDeployment && showEnvironmentBadge && (
+            <EnvironmentBadge
+              deploymentType={selectedDeployment.deploymentType}
+            />
+          )}
+        </div>
         <ChevronDown
           className={cn(
-            "h-3 w-3 text-text-subtle transition-transform flex-shrink-0",
+            "h-3 w-3 text-text-subtle transition-transform shrink-0",
             isOpen && "rotate-180",
           )}
         />
@@ -266,8 +285,8 @@ export function SearchableSelect({
           <div
             ref={dropdownRef}
             className={cn(
-              "fixed z-[9999]",
-              "min-w-[200px] max-w-[350px]",
+              "fixed z-9999",
+              "min-w-[280px] max-w-[400px]",
               "bg-surface-base border border-border-muted rounded-xl shadow-lg",
               "overflow-hidden",
               "animate-fade-up",
@@ -276,86 +295,97 @@ export function SearchableSelect({
               animationDuration: "150ms",
               top: `${dropdownPosition.top}px`,
               left: `${dropdownPosition.left}px`,
-              width: `${Math.max(dropdownPosition.width, 200)}px`,
+              width: `${dropdownPosition.width}px`,
             }}
           >
-          <div className="border-b border-border-muted">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-subtle z-10 pointer-events-none" />
-              <Input
-                ref={inputRef}
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={searchPlaceholder}
-                className={cn(
-                  "text-sm",
-                  "font-sans",
-                  "w-full pl-8 pr-3 py-1.5",
-                  "border-0 rounded-none",
-                  "hover:bg-transparent hover:border-0",
-                  "focus:border-0 focus:border-transparent",
-                )}
-              />
-            </div>
-          </div>
-
-          <div
-            ref={optionsRef}
-            className="max-h-[240px] overflow-y-auto p-1 space-y-0.5"
-          >
-            {loading ? (
-              <div className="px-3 py-2 text-sm text-text-muted text-center">
-                Loading...
-              </div>
-            ) : filteredOptions.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-text-muted text-center">
-                No results found
-              </div>
-            ) : (
-              filteredOptions.map((option, index) => (
-                <button
-                  key={option.value !== "" ? option.value : `option-${index}`}
-                  type="button"
-                  data-index={index}
-                  onClick={() => handleSelect(option.value)}
-                  onMouseEnter={() => setHighlightedIndex(index)}
+            <div className="border-b border-border-muted">
+              <div className="relative">
+                <Search
+                  size={12}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none z-10"
+                />
+                <Input
+                  ref={inputRef}
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={searchPlaceholder}
                   className={cn(
-                    "w-full flex items-center justify-between gap-2 px-2 py-1 text-left rounded-lg",
-                    "text-sm transition-colors text-text-base",
-                    option.value === value
-                      ? ""
-                      : index === highlightedIndex
-                        ? "bg-surface-raised"
-                        : "hover:bg-surface-raised",
+                    "w-full h-8 pl-7 pr-7 text-xs",
+                    "bg-transparent border-0 rounded-none",
+                    "text-text-base outline-none focus:outline-none",
+                    "hover:bg-transparent hover:border-0",
+                    "focus:border-0 focus:border-transparent focus-visible:ring-0",
                   )}
-                >
-                  <div className="flex flex-row items-center gap-1.5 min-w-0 flex-1">
-                    <div className="truncate flex-1 min-w-0">
-                      {option.label}
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-base"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div
+              ref={optionsRef}
+              className="max-h-[300px] overflow-y-auto p-1 space-y-0.5"
+            >
+              {loading ? (
+                <div className="px-3 py-2 text-xs text-text-muted text-center">
+                  Loading...
+                </div>
+              ) : filteredOptions.length === 0 ? (
+                <div className="px-3 py-2 text-xs text-text-muted text-center">
+                  No results found
+                </div>
+              ) : (
+                filteredOptions.map((option, index) => (
+                  <button
+                    key={option.value !== "" ? option.value : `option-${index}`}
+                    type="button"
+                    data-index={index}
+                    onClick={() => handleSelect(option.value)}
+                    onMouseEnter={() => setHighlightedIndex(index)}
+                    className={cn(
+                      "w-full flex items-center justify-between gap-2 px-2 py-1.5 text-left rounded-lg",
+                      "text-xs transition-colors text-text-base",
+                      option.value === value
+                        ? ""
+                        : index === highlightedIndex
+                          ? "bg-surface-raised"
+                          : "hover:bg-surface-raised",
+                    )}
+                  >
+                    <div className="flex flex-row items-center gap-1.5 min-w-0 flex-1">
+                      <div className="truncate flex-1 min-w-0">
+                        {option.label}
+                      </div>
+                      {option.sublabel &&
+                        (sublabelAsText ? (
+                          <span className="text-[11px] text-text-muted truncate">
+                            {option.sublabel}
+                          </span>
+                        ) : (
+                          <EnvironmentBadge
+                            deploymentType={option.sublabel as "prod" | "dev"}
+                          />
+                        ))}
                     </div>
-                    {option.sublabel &&
-                      (sublabelAsText ? (
-                        <span className="text-xs text-text-muted truncate">
-                          {option.sublabel}
-                        </span>
-                      ) : (
-                        <EnvironmentBadge
-                          deploymentType={option.sublabel as "prod" | "dev"}
-                        />
-                      ))}
-                  </div>
-                  {option.value === value && (
-                    <CircleCheck className="h-4 w-4 flex-shrink-0 stroke-brand-base" />
-                  )}
-                </button>
-              ))
-            )}
-          </div>
-        </div>,
-        document.body,
-      )}
+                    {option.value === value && (
+                      <CircleCheck className="h-4 w-4 shrink-0 stroke-brand-base" />
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

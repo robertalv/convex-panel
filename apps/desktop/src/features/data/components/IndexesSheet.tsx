@@ -5,7 +5,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  X,
   Database,
   Search,
   Sparkles,
@@ -14,6 +13,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { IndexDefinition } from "../types";
+import { ResizableSheet } from "./ResizableSheet";
 
 interface IndexesSheetProps {
   tableName: string;
@@ -170,42 +170,15 @@ export function IndexesSheet({
   const vectorIndexes = indexes.filter((idx) => idx.type === "vector");
 
   return (
-    <div
-      className="flex flex-col h-full"
-      style={{ backgroundColor: "var(--color-surface-base)" }}
+    <ResizableSheet
+      id="indexes-sheet"
+      title="Indexes"
+      subtitle={tableName}
+      onClose={onClose}
+      defaultWidth={400}
+      minWidth={300}
+      maxWidth={600}
     >
-      {/* Header */}
-      <div
-        className="flex items-center justify-between px-4 py-3 flex-shrink-0"
-        style={{
-          borderBottom: "1px solid var(--color-border-base)",
-          backgroundColor: "var(--color-surface-raised)",
-        }}
-      >
-        <div>
-          <h3
-            className="text-sm font-medium"
-            style={{ color: "var(--color-text-base)" }}
-          >
-            Indexes
-          </h3>
-          <p
-            className="text-xs mt-0.5 font-mono"
-            style={{ color: "var(--color-text-muted)" }}
-          >
-            {tableName}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex items-center justify-center w-7 h-7 rounded transition-colors hover:bg-[var(--color-surface-base)]"
-          style={{ color: "var(--color-text-muted)" }}
-        >
-          <X size={16} />
-        </button>
-      </div>
-
       {/* Content */}
       <div className="flex-1 overflow-auto">
         {isLoading ? (
@@ -318,7 +291,7 @@ export function IndexesSheet({
           )}
         </div>
       </div>
-    </div>
+    </ResizableSheet>
   );
 }
 

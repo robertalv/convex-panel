@@ -1,11 +1,14 @@
 /**
  * DocumentEditor Component
- * Shared component for adding and editing documents with JSON editor
+ * Shared component for adding and editing documents with Monaco JSON editor
  */
 
-import { useState, useCallback, useEffect } from "react";
-import { X, Save, AlertCircle, Loader2 } from "lucide-react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { Save, AlertCircle, Loader2 } from "lucide-react";
+import Editor, { type BeforeMount, type OnMount } from "@monaco-editor/react";
+import { useTheme } from "@/contexts/ThemeContext";
 import type { TableSchema } from "../types";
+import { ResizableSheet } from "./ResizableSheet";
 
 interface DocumentEditorProps {
   mode: "add" | "edit";
@@ -87,6 +90,35 @@ function generateDocumentTemplate(schema?: TableSchema): string {
   return JSON.stringify(template, null, 2);
 }
 
+// Monaco editor options for JSON editing
+const editorOptions = {
+  automaticLayout: true,
+  minimap: { enabled: false },
+  scrollBeyondLastLine: false,
+  lineNumbers: "on" as const,
+  lineNumbersMinChars: 3,
+  lineDecorationsWidth: 0,
+  overviewRulerBorder: false,
+  contextmenu: true,
+  bracketPairColorization: { enabled: true },
+  guides: { bracketPairs: true, indentation: true },
+  renderLineHighlight: "line" as const,
+  fontSize: 13,
+  fontFamily:
+    'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+  tabSize: 2,
+  insertSpaces: true,
+  wordWrap: "on" as const,
+  folding: true,
+  scrollbar: {
+    vertical: "auto" as const,
+    horizontal: "auto" as const,
+    verticalScrollbarSize: 10,
+    horizontalScrollbarSize: 10,
+  },
+  padding: { top: 12, bottom: 12 },
+};
+
 export function DocumentEditor({
   mode,
   tableName,
@@ -103,6 +135,9 @@ export function DocumentEditor({
   });
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const { resolvedTheme } = useTheme();
+  const saveRef = useRef<() => void>(() => {});
 
   // Reset document text when initial document changes
   useEffect(() => {
@@ -138,17 +173,23 @@ export function DocumentEditor({
     }
   }, [documentText, onSave, onClose]);
 
+  // Keep saveRef updated
+  useEffect(() => {
+    saveRef.current = handleSave;
+  }, [handleSave]);
+
   // Handle text change with live validation
-  const handleTextChange = useCallback((value: string) => {
-    setDocumentText(value);
+  const handleEditorChange = useCallback((value: string | undefined) => {
+    const newValue = value || "";
+    setDocumentText(newValue);
 
     // Clear error when user starts typing
-    if (value.trim() === "") {
+    if (newValue.trim() === "") {
       setError(null);
     } else {
       // Validate but only show error if it's egregiously wrong
-      const validation = validateJSON(value);
-      if (!validation.valid && value.trim().length > 2) {
+      const validation = validateJSON(newValue);
+      if (!validation.valid && newValue.trim().length > 2) {
         // Only show parsing errors, not structure errors while typing
         if (
           validation.error?.includes("Unexpected") ||
@@ -164,71 +205,142 @@ export function DocumentEditor({
     }
   }, []);
 
+  // Configure Monaco before it mounts
+  const handleEditorWillMount: BeforeMount = useCallback((monaco: any) => {
+    // Define custom themes with transparent background
+    monaco.editor.defineTheme("convex-light", {
+      base: "vs",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": "#00000000",
+      },
+    });
+
+    monaco.editor.defineTheme("convex-dark", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": "#00000000",
+      },
+    });
+  }, []);
+
+  // Handle editor mount - add keybindings
+  const handleEditorDidMount: OnMount = useCallback(
+    (editor: any, monaco: any) => {
+      // Add Cmd+Enter keybinding to save
+      editor.addAction({
+        id: "saveDocument",
+        label: "Save Document",
+        keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+        run: () => {
+          saveRef.current?.();
+        },
+      });
+
+      // Add Cmd+S keybinding to save
+      editor.addAction({
+        id: "saveDocumentCmdS",
+        label: "Save Document",
+        keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS],
+        run: () => {
+          saveRef.current?.();
+        },
+      });
+
+      // Focus the editor
+      editor.focus();
+    },
+    [],
+  );
+
   const title =
     mode === "add" ? `Add document to ${tableName}` : `Edit document`;
 
-  return (
-    <div
-      className="flex flex-col h-full"
-      style={{ backgroundColor: "var(--color-surface-base)" }}
-    >
-      {/* Header */}
-      <div
-        className="flex items-center justify-between px-4 py-3 flex-shrink-0"
-        style={{
-          borderBottom: "1px solid var(--color-border-base)",
-          backgroundColor: "var(--color-surface-raised)",
-        }}
-      >
-        <h3
-          className="text-sm font-medium truncate"
-          style={{ color: "var(--color-text-base)" }}
-        >
-          {title}
-        </h3>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex items-center justify-center w-7 h-7 rounded transition-colors hover:bg-[var(--color-surface-base)]"
-          style={{ color: "var(--color-text-muted)" }}
-        >
-          <X size={16} />
-        </button>
-      </div>
+  // Build schema hint text
+  const schemaHint =
+    schema?.fields && schema.fields.length > 0
+      ? schema.fields
+          .filter(
+            (f) => f.fieldName !== "_id" && f.fieldName !== "_creationTime",
+          )
+          .map((f) => `${f.fieldName}${f.optional ? "?" : ""}`)
+          .join(", ")
+      : null;
 
+  return (
+    <ResizableSheet
+      id="document-editor"
+      title={title}
+      onClose={onClose}
+      defaultWidth={400}
+      minWidth={350}
+      maxWidth={700}
+    >
       {/* Schema hint */}
-      {schema?.fields && schema.fields.length > 0 && (
+      {schemaHint && (
         <div
-          className="px-4 py-2 text-xs flex-shrink-0"
+          className="px-4 h-[37px] flex items-center text-xs"
           style={{
             backgroundColor: "var(--color-surface-raised)",
             borderBottom: "1px solid var(--color-border-base)",
             color: "var(--color-text-muted)",
           }}
         >
-          <span className="font-medium">Fields:</span>{" "}
-          {schema.fields
-            .filter(
-              (f) => f.fieldName !== "_id" && f.fieldName !== "_creationTime",
-            )
-            .map((f) => `${f.fieldName}${f.optional ? "?" : ""}`)
-            .join(", ")}
+          <span className="font-medium">Fields:</span> {schemaHint}
         </div>
       )}
 
-      {/* Editor */}
-      <div className="flex-1 min-h-0 p-4 overflow-hidden">
-        <textarea
+      {/* Editor hint */}
+      <div
+        className="flex items-center justify-between px-4 py-2 flex-shrink-0"
+        style={{
+          backgroundColor: "var(--color-surface-raised)",
+          borderBottom: "1px solid var(--color-border-base)",
+        }}
+      >
+        <span
+          className="text-xs font-medium"
+          style={{ color: "var(--color-text-muted)" }}
+        >
+          JSON Document
+        </span>
+        <span className="text-xs" style={{ color: "var(--color-text-subtle)" }}>
+          Cmd+Enter to save
+        </span>
+      </div>
+
+      {/* Monaco Editor */}
+      <div
+        className="flex-1 min-h-0 overflow-hidden"
+        style={{ backgroundColor: "var(--color-background-raised)" }}
+      >
+        <Editor
+          height="100%"
+          defaultLanguage="json"
           value={documentText}
-          onChange={(e) => handleTextChange(e.target.value)}
-          className="w-full h-full p-3 rounded-md font-mono text-sm resize-none"
-          style={{
-            backgroundColor: "var(--color-surface-raised)",
-            color: "var(--color-text-base)",
-            border: `1px solid ${error ? "var(--color-error-base)" : "var(--color-border-base)"}`,
-          }}
-          placeholder="Enter document JSON..."
-          spellCheck={false}
+          theme={resolvedTheme === "dark" ? "convex-dark" : "convex-light"}
+          options={editorOptions}
+          beforeMount={handleEditorWillMount}
+          onMount={handleEditorDidMount}
+          onChange={handleEditorChange}
+          loading={
+            <div
+              className="flex items-center justify-center h-full"
+              style={{
+                backgroundColor: "var(--color-background-raised)",
+              }}
+            >
+              <span
+                className="text-sm"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                Loading editor...
+              </span>
+            </div>
+          }
         />
       </div>
 
@@ -290,7 +402,7 @@ export function DocumentEditor({
           )}
         </button>
       </div>
-    </div>
+    </ResizableSheet>
   );
 }
 

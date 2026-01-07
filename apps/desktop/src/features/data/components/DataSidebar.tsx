@@ -16,7 +16,11 @@ import {
   Clock,
   CodeIcon,
 } from "lucide-react";
-import type { TableDefinition, RecentlyViewedTable } from "../types";
+import type {
+  TableDefinition,
+  RecentlyViewedTable,
+  ConvexComponent,
+} from "../types";
 import { getRecentlyViewedTables } from "../utils/storage";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,11 +30,10 @@ interface DataSidebarProps {
   selectedTable: string;
   onSelectTable: (tableName: string) => void;
   isLoading: boolean;
-  width: number;
-  // Component selection
+  // Component selection - uses component IDs (null = root app)
   selectedComponent?: string | null;
-  onComponentSelect?: (component: string | null) => void;
-  components?: string[];
+  onComponentSelect?: (componentId: string | null) => void;
+  components?: ConvexComponent[];
   // Table creation
   onCreateTable?: (tableName: string) => Promise<void>;
 }
@@ -121,7 +124,6 @@ export function DataSidebar({
   selectedTable,
   onSelectTable,
   isLoading,
-  width,
   selectedComponent,
   onComponentSelect,
   components = [],
@@ -205,26 +207,24 @@ export function DataSidebar({
 
   return (
     <div
-      className="flex flex-col h-full"
+      className="flex flex-col h-full w-full"
       style={{
-        width,
         backgroundColor: "var(--color-surface-base)",
-        borderRight: "1px solid var(--color-border-base)",
       }}
     >
       {components.length > 1 && (
         <div
-          className="p-1.75"
+          className="h-[40px] p-1"
           style={{ borderBottom: "1px solid var(--color-border-base)" }}
         >
           <SearchableSelect
-            value={selectedComponent || "app"}
+            value={selectedComponent ?? ""}
             options={components.map((c) => ({
-              value: c,
-              label: c === "app" ? "Root (app)" : c,
+              value: c.id ?? "",
+              label: c.id === null ? "Root (app)" : c.path,
             }))}
             onChange={(value) =>
-              onComponentSelect?.(value === "app" ? null : value)
+              onComponentSelect?.(value === "" ? null : value)
             }
             placeholder="Select component..."
             searchPlaceholder="Search components..."

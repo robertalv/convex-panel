@@ -15,6 +15,7 @@ import { useTableData } from "./hooks/useTableData";
 import { useComponents } from "./hooks/useComponents";
 import { useTableExport } from "./hooks/useTableExport";
 import { useIndexes } from "./hooks/useIndexes";
+import { useFunctions } from "./hooks/useFunctions";
 
 // Components
 import { DataSidebar } from "./components/DataSidebar";
@@ -23,11 +24,20 @@ import { FilterPanel } from "./components/FilterPanel";
 import { DocumentEditor } from "./components/DocumentEditor";
 import { SchemaSheet } from "./components/SchemaSheet";
 import { IndexesSheet } from "./components/IndexesSheet";
+import {
+  CustomQuerySheet,
+  type FunctionRunnerLayout,
+} from "./components/CustomQuerySheet";
+import { MetricsSheet } from "./components/MetricsSheet";
+import { ClearTableConfirmation } from "./components/ClearTableConfirmation";
+import { ConfirmDialog } from "./components/ConfirmDialog";
+import { ResizableSheet } from "./components/ResizableSheet";
 
 // Views
 import { TableView } from "./components/views/TableView";
 import { ListView } from "./components/views/ListView";
 import { JsonView } from "./components/views/JsonView";
+import { RawView } from "./components/views/RawView";
 
 // Types
 import type {
@@ -46,57 +56,14 @@ const DEFAULT_SIDEBAR_WIDTH = 240;
 const MIN_SIDEBAR_WIDTH = 180;
 const MAX_SIDEBAR_WIDTH = 400;
 
-/**
- * Resizable divider component
- */
-function ResizeDivider({ onResize }: { onResize: (delta: number) => void }) {
-  const isDragging = useRef(false);
-  const startPos = useRef(0);
-
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      isDragging.current = true;
-      startPos.current = e.clientX;
-
-      const handleMouseMove = (e: MouseEvent) => {
-        if (!isDragging.current) return;
-        const currentPos = e.clientX;
-        const delta = currentPos - startPos.current;
-        startPos.current = currentPos;
-        onResize(delta);
-      };
-
-      const handleMouseUp = () => {
-        isDragging.current = false;
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-      };
-
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-    },
-    [onResize],
-  );
-
-  return (
-    <div
-      className="w-1 cursor-col-resize transition-colors flex-shrink-0"
-      style={{
-        backgroundColor: "var(--color-border-base)",
-      }}
-      onMouseDown={handleMouseDown}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = "var(--color-border-strong)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = "var(--color-border-base)";
-      }}
-    />
-  );
-}
-
-type SheetType = "add" | "edit" | "schema" | "indexes" | null;
+type SheetType =
+  | "add"
+  | "edit"
+  | "schema"
+  | "indexes"
+  | "customQuery"
+  | "metrics"
+  | null;
 
 interface SheetState {
   type: SheetType;
@@ -133,15 +100,23 @@ function DataViewContent() {
   const [displayError, setDisplayError] = useState<string | null>(null);
 
   // Sidebar state
-  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Function runner layout state
+  const [functionRunnerLayout, setFunctionRunnerLayout] =
+    useState<FunctionRunnerLayout>("side");
+
+  // Dialog state for clear/delete table
+  const [isClearTableDialogOpen, setIsClearTableDialogOpen] = useState(false);
+  const [isDeleteTableDialogOpen, setIsDeleteTableDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Get initial table from URL
   const initialTable = searchParams.get("table");
   const initialDocId = searchParams.get("doc");
 
   // Components hook (for multi-component apps)
-  const { componentNames, selectedComponentId, setSelectedComponent } =
+  const { components, selectedComponentId, setSelectedComponent } =
     useComponents({
       adminClient,
       useMockData,
@@ -190,6 +165,12 @@ function DataViewContent() {
     tableName: selectedTable,
     componentId: selectedComponentId,
     enabled: !!selectedTable && showFilters,
+  });
+
+  // Functions hook - fetch available functions for the function runner
+  const { functions: availableFunctions } = useFunctions({
+    adminClient,
+    useMockData,
   });
 
   // Handle table selection with URL sync
@@ -389,6 +370,40 @@ function DataViewContent() {
     setSelectedIds([]);
   }, []);
 
+  // Handle delete table
+  const handleDeleteTable = useCallback(async () => {
+    if (!selectedTable || !deploymentUrl || !authToken) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`${deploymentUrl}/api/delete_tables`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Convex ${authToken}`,
+        },
+        body: JSON.stringify({
+          tableNames: [selectedTable],
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete table: ${response.statusText}`);
+      }
+
+      // Close dialog and refresh
+      setIsDeleteTableDialogOpen(false);
+      setSelectedTable("");
+      await refreshData();
+    } catch (err) {
+      setDisplayError(
+        err instanceof Error ? err.message : "Failed to delete table",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [selectedTable, deploymentUrl, authToken, setSelectedTable, refreshData]);
+
   // Get current schema for selected table
   const currentSchema = selectedTable ? tables[selectedTable] : undefined;
 
@@ -580,6 +595,22 @@ function DataViewContent() {
             onPatchDocument={handlePatchDocument}
           />
         );
+      case "raw":
+        return (
+          <RawView
+            documents={sortedDocuments}
+            isLoading={isLoading}
+            isLoadingMore={isLoadingMore}
+            hasMore={hasMore}
+            observerTarget={observerTarget}
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+            onEdit={handleOpenEdit}
+            onClone={handleCloneDocument}
+            onDelete={handleDeleteDocument}
+            onPatchDocument={handlePatchDocument}
+          />
+        );
       case "table":
       default:
         return (
@@ -648,6 +679,32 @@ function DataViewContent() {
             onClose={() => setSheetState({ type: null })}
           />
         );
+      case "customQuery":
+        return (
+          <CustomQuerySheet
+            tableName={selectedTable}
+            adminClient={adminClient}
+            deploymentUrl={deploymentUrl || undefined}
+            accessToken={authToken || undefined}
+            componentId={selectedComponentId}
+            onClose={() => setSheetState({ type: null })}
+            availableFunctions={availableFunctions}
+            availableComponents={components}
+            onComponentChange={setSelectedComponent}
+            layoutMode={functionRunnerLayout}
+            onLayoutModeChange={setFunctionRunnerLayout}
+          />
+        );
+      case "metrics":
+        return (
+          <MetricsSheet
+            tableName={selectedTable}
+            deploymentUrl={deploymentUrl || undefined}
+            accessToken={authToken || undefined}
+            componentId={selectedComponentId}
+            onClose={() => setSheetState({ type: null })}
+          />
+        );
       default:
         return null;
     }
@@ -676,29 +733,24 @@ function DataViewContent() {
 
       {/* Sidebar */}
       {!sidebarCollapsed && (
-        <>
+        <ResizableSheet
+          id="data-sidebar"
+          side="left"
+          defaultWidth={DEFAULT_SIDEBAR_WIDTH}
+          minWidth={MIN_SIDEBAR_WIDTH}
+          maxWidth={MAX_SIDEBAR_WIDTH}
+          showHeader={false}
+        >
           <DataSidebar
             tables={tables}
             selectedTable={selectedTable}
             onSelectTable={handleSelectTable}
             isLoading={isLoading && Object.keys(tables).length === 0}
-            width={sidebarWidth}
             selectedComponent={selectedComponentId}
             onComponentSelect={setSelectedComponent}
-            components={componentNames}
+            components={components}
           />
-          <ResizeDivider
-            onResize={(delta) => {
-              setSidebarWidth((prev) => {
-                const newWidth = prev + delta;
-                return Math.max(
-                  MIN_SIDEBAR_WIDTH,
-                  Math.min(MAX_SIDEBAR_WIDTH, newWidth),
-                );
-              });
-            }}
-          />
-        </>
+        </ResizableSheet>
       )}
 
       {/* Main content area */}
@@ -754,6 +806,12 @@ function DataViewContent() {
           columnMeta={columnMeta}
           onCollapseSidebar={() => setSidebarCollapsed(true)}
           sidebarCollapsed={sidebarCollapsed}
+          onCustomQuery={() => setSheetState({ type: "customQuery" })}
+          onSchema={() => setSheetState({ type: "schema" })}
+          onIndexes={() => setSheetState({ type: "indexes" })}
+          onMetrics={() => setSheetState({ type: "metrics" })}
+          onClearTable={() => setIsClearTableDialogOpen(true)}
+          onDeleteTable={() => setIsDeleteTableDialogOpen(true)}
         />
 
         {/* Filter panel (collapsible) */}
@@ -778,32 +836,76 @@ function DataViewContent() {
         {/* View content */}
         <div
           className={cn(
-            "flex-1 min-h-0 overflow-hidden",
+            "flex-1 min-h-0 overflow-hidden flex",
             showFilters && "border-t border-border-base",
+            // Bottom layout: stack vertically
+            sheetState.type === "customQuery" &&
+              functionRunnerLayout === "bottom" &&
+              "flex-col",
           )}
         >
-          {renderView()}
+          {/* Main view - hide when function runner is fullscreen */}
+          {!(
+            sheetState.type === "customQuery" &&
+            functionRunnerLayout === "fullscreen"
+          ) && (
+            <div className="flex-1 min-h-0 overflow-hidden">{renderView()}</div>
+          )}
+
+          {/* Bottom layout: Function runner at bottom */}
+          {sheetState.type === "customQuery" &&
+            functionRunnerLayout === "bottom" && (
+              <ResizableSheet
+                id="custom-query-bottom"
+                side="bottom"
+                defaultHeight={320}
+                minHeight={200}
+                maxHeight={600}
+                showHeader={false}
+              >
+                {renderSheet()}
+              </ResizableSheet>
+            )}
+
+          {/* Fullscreen layout: Function runner takes entire space */}
+          {sheetState.type === "customQuery" &&
+            functionRunnerLayout === "fullscreen" && (
+              <div
+                className="flex-1 h-full w-full"
+                style={{
+                  animation: "fadeIn 0.15s ease-out",
+                }}
+              >
+                {renderSheet()}
+              </div>
+            )}
         </div>
       </div>
 
-      {/* Sheet panel (slides in from right) */}
-      {sheetState.type && (
-        <div
-          className="flex-shrink-0"
-          style={{
-            width: "400px",
-            minWidth: "400px",
-            maxWidth: "400px",
-            height: "100%",
-            borderLeft: "1px solid var(--color-border-base)",
-            animation: "slideInRight 0.2s ease-out",
-          }}
-        >
-          {renderSheet()}
-        </div>
-      )}
+      {/* Sheet panel (slides in from right) - for side layout and non-customQuery sheets */}
+      {sheetState.type &&
+        !(
+          sheetState.type === "customQuery" &&
+          (functionRunnerLayout === "bottom" ||
+            functionRunnerLayout === "fullscreen")
+        ) && (
+          <ResizableSheet
+            id={
+              sheetState.type === "customQuery"
+                ? "custom-query-side"
+                : `sheet-${sheetState.type}`
+            }
+            side="right"
+            defaultWidth={400}
+            minWidth={350}
+            maxWidth={800}
+            showHeader={false}
+          >
+            {renderSheet()}
+          </ResizableSheet>
+        )}
 
-      {/* Keyframe animation */}
+      {/* Keyframe animations */}
       <style>{`
         @keyframes slideInRight {
           from {
@@ -815,7 +917,62 @@ function DataViewContent() {
             opacity: 1;
           }
         }
+        @keyframes slideInUp {
+          from {
+            transform: translateY(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
       `}</style>
+
+      {/* Clear Table Confirmation Dialog */}
+      <ClearTableConfirmation
+        isOpen={isClearTableDialogOpen}
+        onClose={() => setIsClearTableDialogOpen(false)}
+        onConfirm={() => {
+          setIsClearTableDialogOpen(false);
+          refreshData();
+        }}
+        tableName={selectedTable}
+        numRows={documentCount}
+        adminClient={adminClient}
+        componentId={selectedComponentId}
+        onError={(err) => setDisplayError(err)}
+      />
+
+      {/* Delete Table Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={isDeleteTableDialogOpen}
+        onClose={() => setIsDeleteTableDialogOpen(false)}
+        onConfirm={handleDeleteTable}
+        title={`Delete table "${selectedTable}"?`}
+        message={
+          <div className="space-y-2">
+            <p>
+              This will permanently delete the table{" "}
+              <strong>{selectedTable}</strong> and all its documents.
+            </p>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+              This action cannot be undone.
+            </p>
+          </div>
+        }
+        confirmLabel="Delete Table"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

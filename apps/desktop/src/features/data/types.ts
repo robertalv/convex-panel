@@ -133,7 +133,7 @@ export interface PageArgs {
 // View Types
 // ============================================
 
-export type DataViewMode = "table" | "list" | "json";
+export type DataViewMode = "table" | "list" | "json" | "raw";
 
 // ============================================
 // Hook Types
@@ -177,16 +177,44 @@ export interface UseTableDataReturn {
   refreshData: () => Promise<void>;
 }
 
+// ============================================
+// Component Types (for multi-component apps)
+// ============================================
+
+/**
+ * Represents a Convex component (for multi-component apps).
+ * The root app has id: null, name: null, and path: "_App"
+ */
+export interface ConvexComponent {
+  /** The actual component ID for API calls (null = root app) */
+  id: string | null;
+  /** Component name if available */
+  name: string | null;
+  /** Display path (e.g., "_App", "betterAuth") */
+  path: string;
+  /** Component state */
+  state?: "active" | "unmounted";
+}
+
+/** Placeholder for root app in UI */
+export const ROOT_APP_PLACEHOLDER = "_App";
+
 export interface UseComponentsProps {
   adminClient: any;
   useMockData?: boolean;
 }
 
 export interface UseComponentsReturn {
+  /** List of all components (including root app) */
+  components: ConvexComponent[];
+  /** @deprecated Use selectedComponentId instead */
   componentNames: string[];
+  /** The selected component ID (null = root app) */
   selectedComponentId: string | null;
-  selectedComponent: string | null;
-  setSelectedComponent: (component: string | null) => void;
+  /** The selected component object (null if not found) */
+  selectedComponent: ConvexComponent | null;
+  /** Set selected component by ID (null = root app) */
+  setSelectedComponent: (componentId: string | null) => void;
   isLoading: boolean;
 }
 
