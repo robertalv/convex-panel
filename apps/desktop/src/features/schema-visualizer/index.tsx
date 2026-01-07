@@ -22,7 +22,6 @@ import { useMcpOptional } from "@/contexts/McpContext";
 import { useGitHubOptional } from "@/contexts/GitHubContext";
 import { useComponents } from "@/features/data/hooks/useComponents";
 import { saveActiveTable } from "@/lib/storage";
-import type { ConvexComponent } from "@/features/data/types";
 import { ResizableSheet } from "@/features/data/components/ResizableSheet";
 import { useSchema } from "./hooks/useSchema";
 import { useSchemaDiff } from "./hooks/useSchemaDiff";

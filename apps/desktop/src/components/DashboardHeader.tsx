@@ -38,6 +38,7 @@ export function DashboardHeader({
   onSelectTeam,
   onSelectDeployment,
   isDarkMode,
+  setIsDarkMode,
   onThemeToggle,
   onDisconnect,
 }: DashboardHeaderProps) {
@@ -189,8 +190,19 @@ export function DashboardHeader({
 
           <UserMenu
             user={user}
+            selectedTeam={selectedTeam}
+            selectedProject={selectedProject}
             onLogout={onDisconnect}
-            onThemeToggle={onThemeToggle}
+            onThemeChange={(theme) => {
+              if (theme === "dark") {
+                setIsDarkMode(true);
+              } else if (theme === "light") {
+                setIsDarkMode(false);
+              } else {
+                // system - toggle for now
+                onThemeToggle();
+              }
+            }}
             theme={isDarkMode ? "dark" : "light"}
           />
         </div>

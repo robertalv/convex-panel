@@ -209,7 +209,7 @@ export function useGlobalLocalStorage<T>(
   const { initializeWithValue = true } = options;
 
   const serializer = useCallback<(value: T) => string>(
-    (value) => {
+    (value: T) => {
       if (options.serializer) {
         return options.serializer(value);
       }
@@ -219,7 +219,7 @@ export function useGlobalLocalStorage<T>(
   );
 
   const deserializer = useCallback<(value: string) => T>(
-    (value) => {
+    (value: string) => {
       if (options.deserializer) {
         return options.deserializer(value);
       }

@@ -14,7 +14,6 @@ export const InsightsSummary: React.FC<{
   authToken: string;
   teamAccessToken?: string;
   useMockData?: boolean;
-  /** Container element for the breakdown sheet */
   container?: HTMLElement | null;
 }> = ({
   deploymentUrl,

@@ -34,7 +34,7 @@ import { saveSnapshot, getAllSnapshots } from "../utils/schema-storage";
  * Load persisted branch for a repository
  * Now uses GitHub context instead of localStorage
  */
-function loadPersistedBranch(repoFullName: string | null): string | null {
+function loadPersistedBranch(_repoFullName: string | null): string | null {
   // Branch is now managed by GitHub context, so we don't use localStorage anymore
   // This function is kept for backward compatibility but returns null
   return null;
@@ -44,7 +44,7 @@ function loadPersistedBranch(repoFullName: string | null): string | null {
  * Save branch selection for a repository
  * Now uses GitHub context instead of localStorage
  */
-function persistBranch(repoFullName: string | null, branch: string): void {
+function persistBranch(_repoFullName: string | null, _branch: string): void {
   // Branch is now managed by GitHub context, so we don't use localStorage anymore
   // This function is kept for backward compatibility but does nothing
   console.log(
