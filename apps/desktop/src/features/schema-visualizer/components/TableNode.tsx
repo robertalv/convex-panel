@@ -25,7 +25,7 @@ import type {
   DiffStatus,
   FieldDiff,
   IndexDiff,
-} from "@convex-panel/shared";
+} from "../types";
 import { formatFieldType, getFieldTypeShort } from "../utils/schema-parser";
 
 interface TableNodeData {

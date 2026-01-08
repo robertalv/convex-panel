@@ -13,7 +13,7 @@ import type {
   SchemaDiff,
   DiffModeSettings,
   ParsedSchema,
-} from "@convex-panel/shared";
+} from "../types";
 import { diffSchemas, createSnapshot } from "../utils/schema-diff";
 import {
   saveSnapshot,

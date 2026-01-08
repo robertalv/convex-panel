@@ -4,7 +4,7 @@ import {
   fetchUdfExecutionStats,
   type FetchFn,
   type FunctionExecutionStats,
-} from "../utils/api";
+} from "@convex-panel/shared/api";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { useDeployment } from "@/contexts/DeploymentContext";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/QueryContext";

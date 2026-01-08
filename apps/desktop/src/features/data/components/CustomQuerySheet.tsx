@@ -28,7 +28,7 @@ import {
   type ModuleFunction,
   type SelectedFunction,
 } from "./FunctionSelector";
-import type { ConvexComponent } from "@convex-panel/shared";
+import type { ConvexComponent } from "../types";
 
 /** Layout mode for the Function Runner */
 export type FunctionRunnerLayout = "side" | "bottom" | "fullscreen";

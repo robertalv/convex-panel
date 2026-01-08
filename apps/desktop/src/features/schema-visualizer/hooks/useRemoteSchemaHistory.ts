@@ -23,7 +23,7 @@ import {
 } from "../../../services/github/api";
 import { getStoredToken } from "../../../services/github/auth";
 import type { GitHubCommit, GitHubRepo } from "../../../services/github/types";
-import type { SchemaJSON } from "@convex-panel/shared";
+import type { SchemaJSON } from "../types";
 import { createSnapshot } from "../utils/schema-diff";
 import { saveSnapshot, getAllSnapshots } from "../utils/schema-storage";
 

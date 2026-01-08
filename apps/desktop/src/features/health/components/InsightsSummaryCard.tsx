@@ -1,7 +1,7 @@
 import { RefreshCw, CheckCircle2, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HealthCard } from "./HealthCard";
-import type { Insight } from "../utils/api";
+import type { Insight } from "@convex-panel/shared/api";
 
 interface InsightsSummaryCardProps {
   /** List of insights from BigBrain API */

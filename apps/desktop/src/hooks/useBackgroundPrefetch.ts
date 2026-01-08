@@ -24,7 +24,7 @@ import {
   callConvexQuery,
   SYSTEM_QUERIES,
   type FetchFn,
-} from "../utils/api";
+} from "@convex-panel/shared/api";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 
 // Use Tauri's fetch for CORS-free HTTP requests

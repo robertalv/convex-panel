@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider, useReactFlow, type Viewport } from "@xyflow/react";
-import type { SchemaDiff, VisualizationSettings } from "@convex-panel/shared";
+import type { SchemaDiff, VisualizationSettings } from "../types";
 import { SchemaGraph } from "./SchemaGraph";
 
 interface SideBySideViewProps {

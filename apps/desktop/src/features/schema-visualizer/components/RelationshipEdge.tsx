@@ -10,7 +10,7 @@ import {
   getBezierPath,
   type EdgeProps,
 } from "@xyflow/react";
-import type { SchemaRelationship } from "@convex-panel/shared";
+import type { SchemaRelationship } from "../types";
 
 interface RelationshipEdgeData {
   relationship: SchemaRelationship;

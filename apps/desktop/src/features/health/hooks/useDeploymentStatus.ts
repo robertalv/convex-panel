@@ -7,7 +7,7 @@ import {
   callConvexQuery,
   SYSTEM_QUERIES,
   type FetchFn,
-} from "../utils/api";
+} from "@convex-panel/shared/api";
 
 // Use Tauri's fetch for CORS-free HTTP requests
 const desktopFetch: FetchFn = (input, init) => tauriFetch(input, init);

@@ -7,7 +7,7 @@ import type {
   FilterExpression,
   SortConfig,
   RecentlyViewedTable,
-} from "@convex-panel/shared";
+} from "../types";
 
 const MAX_FILTER_HISTORY = 25;
 

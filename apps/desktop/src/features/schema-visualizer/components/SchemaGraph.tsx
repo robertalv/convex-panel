@@ -34,7 +34,7 @@ import type {
   VisualizationSettings,
   SchemaDiff,
   TableDiff,
-} from "@convex-panel/shared";
+} from "../types";
 import { calculateLayout } from "../utils/layout";
 
 // Register custom node and edge types

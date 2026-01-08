@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { readTextFile, exists } from "@tauri-apps/plugin-fs";
 import { useMcpOptional } from "@/contexts/McpContext";
-import type { SchemaJSON, TableDefinitionJSON, ValidatorJSON } from "@convex-panel/shared";
+import type { SchemaJSON, TableDefinitionJSON, ValidatorJSON } from "../types";
 import { getSchemaFilePath } from "../utils/code-generator";
 
 export interface LocalSchemaState {

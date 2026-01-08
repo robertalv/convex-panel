@@ -18,8 +18,8 @@ import type {
   SortConfig,
   UseTableDataProps,
   UseTableDataReturn,
-} from "@convex-panel/shared";
-import { createDefaultFilterExpression } from "@convex-panel/shared";
+} from "../types";
+import { createDefaultFilterExpression } from "../types";
 import {
   saveActiveTable,
   getActiveTable,

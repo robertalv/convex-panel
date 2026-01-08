@@ -27,12 +27,10 @@
     "lint": "eslint src/**/*.ts*"
   },
   "peerDependencies": {
-    "react": "^18.0.0",
-    "convex": ">=0.9.0"
+    "react": "^18.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.0.0",
-    "convex": "^1.21.0",
     "tsup": "^8.0.2",
     "typescript": "^5.9.3"
   }

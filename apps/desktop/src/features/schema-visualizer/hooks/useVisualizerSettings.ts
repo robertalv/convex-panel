@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useEffect } from "react";
-import type { VisualizationSettings, LayoutAlgorithm } from "@convex-panel/shared";
+import type { VisualizationSettings, LayoutAlgorithm } from "../types";
 
 // Storage key for persisting visualizer settings
 const SETTINGS_STORAGE_KEY = "convex-panel:schema-visualizer:settings";

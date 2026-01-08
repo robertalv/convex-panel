@@ -15,7 +15,7 @@ import type {
   DiffSummary,
   DiffStatus,
   SchemaJSON,
-} from "@convex-panel/shared";
+} from "../types";
 import { parseSchema } from "./schema-parser";
 
 /**

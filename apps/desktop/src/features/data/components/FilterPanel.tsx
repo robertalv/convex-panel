@@ -11,7 +11,7 @@ import type {
   FilterExpression,
   TableSchema,
   Index,
-} from "@convex-panel/shared";
+} from "../types";
 import { FilterNavigationButtons } from "@/components/ui/FilterNavigationButtons";
 import { useFilterHistory } from "../hooks/useFilterHistory";
 import { generateFilterId } from "../utils/storage";
