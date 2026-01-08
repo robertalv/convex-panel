@@ -32,3 +32,4 @@ export {
   type MenuItemProps,
   type MenuTriggerProps,
 } from "./menu";
+export { TreeItem, type TreeItemProps } from "./TreeItem";
