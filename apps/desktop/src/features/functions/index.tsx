@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
-import Editor from "@monaco-editor/react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import Editor, { type BeforeMount } from "@monaco-editor/react";
 import { PanelLeftOpen, ToggleLeft, ToggleRight } from "lucide-react";
 import { useDeployment } from "@/contexts/DeploymentContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useFunctions } from "./hooks/useFunctions";
 import { useFunctionLogStream } from "./hooks/useFunctionLogStream";
 import { EmptyFunctionsState } from "./components/EmptyFunctionsState";
@@ -32,6 +33,7 @@ type TabType = "statistics" | "code" | "logs";
 const FunctionsView: React.FC = () => {
   const { deployment, deploymentUrl, authToken, adminClient, useMockData } =
     useDeployment();
+  const { resolvedTheme } = useTheme();
   const [selectedFunction, setSelectedFunction] =
     useState<ModuleFunction | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("statistics");
@@ -92,6 +94,27 @@ const FunctionsView: React.FC = () => {
   const [showFunctionRunner, setShowFunctionRunner] = useState(false);
   const [functionRunnerLayout, setFunctionRunnerLayout] =
     useState<FunctionRunnerLayout>("side");
+
+  // Setup Monaco themes before mount
+  const handleEditorWillMount: BeforeMount = useCallback((monaco) => {
+    monaco.editor.defineTheme("convex-light", {
+      base: "vs",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": "#00000000", // Transparent to use CSS --color-background-base
+      },
+    });
+
+    monaco.editor.defineTheme("convex-dark", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": "#00000000", // Transparent to use CSS --color-background-base
+      },
+    });
+  }, []);
 
   // Convert ModuleFunction[] to FunctionItem[] for sidebar
   const sidebarFunctions: FunctionItem[] = groupedFunctions.flatMap((group) =>
@@ -639,6 +662,7 @@ const FunctionsView: React.FC = () => {
                       flexDirection: "column",
                       overflow: "hidden",
                       minHeight: 0,
+                      backgroundColor: "var(--color-background-base)",
                     }}
                   >
                     <div
@@ -683,7 +707,12 @@ const FunctionsView: React.FC = () => {
                               height="100%"
                               defaultLanguage="typescript"
                               value={sourceCode}
-                              theme="convex-dark"
+                              theme={
+                                resolvedTheme === "dark"
+                                  ? "convex-dark"
+                                  : "convex-light"
+                              }
+                              beforeMount={handleEditorWillMount}
                               options={{
                                 readOnly: true,
                                 minimap: { enabled: false },
