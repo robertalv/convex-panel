@@ -117,39 +117,59 @@ async fn notify_deployment_push(
         state.last_push_timestamp = Some(timestamp);
     }
 
-    let title = "🚀 Deployment Updated";
-    let body = format!(
-        "{}{}",
-        deployment_name,
-        version.as_ref().map(|v| format!(" (v{})", v)).unwrap_or_default()
-    );
+    let title = "Deployment Updated";
+    let subtitle = deployment_name.clone();
+    let body = version.as_ref()
+        .map(|v| format!("Version {}", v))
+        .unwrap_or_else(|| "Deployment completed successfully".to_string());
 
-    println!("[Rust] Sending deployment notification: {} - {}", title, body);
+    println!("[Rust] Sending deployment notification: {} - {} - {}", title, subtitle, body);
 
     #[cfg(target_os = "macos")]
     {
-        // Use osascript for dev mode compatibility on macOS
-        let script = format!(
-            "display notification \"{}\" with title \"{}\" sound name \"Glass\"",
-            body.replace("\"", "\\\""),
-            title.replace("\"", "\\\"")
-        );
-
-        match std::process::Command::new("osascript")
-            .arg("-e")
-            .arg(&script)
+        // Use terminal-notifier if available (better for dev), otherwise osascript
+        // First try terminal-notifier
+        match std::process::Command::new("terminal-notifier")
+            .arg("-title")
+            .arg(&title)
+            .arg("-subtitle")
+            .arg(&subtitle)
+            .arg("-message")
+            .arg(&body)
+            .arg("-sound")
+            .arg("Glass")
             .output()
         {
-            Ok(output) => {
-                if output.status.success() {
-                    println!("[Rust] ✓ Deployment notification sent via osascript");
-                    return Ok(());
-                } else {
-                    eprintln!("[Rust] osascript failed: {:?}", String::from_utf8_lossy(&output.stderr));
-                }
+            Ok(output) if output.status.success() => {
+                println!("[Rust] ✓ Notification sent via terminal-notifier");
+                return Ok(());
             }
-            Err(e) => {
-                eprintln!("[Rust] Failed to execute osascript: {}", e);
+            Ok(_) | Err(_) => {
+                // terminal-notifier not available, use osascript with subtitle
+                let script = format!(
+                    "display notification \"{}\" with title \"{}\" subtitle \"{}\" sound name \"Glass\"",
+                    body.replace("\"", "\\\""),
+                    title.replace("\"", "\\\""),
+                    subtitle.replace("\"", "\\\"")
+                );
+
+                match std::process::Command::new("osascript")
+                    .arg("-e")
+                    .arg(&script)
+                    .output()
+                {
+                    Ok(output) => {
+                        if output.status.success() {
+                            println!("[Rust] ✓ Deployment notification sent via osascript");
+                            return Ok(());
+                        } else {
+                            eprintln!("[Rust] osascript failed: {:?}", String::from_utf8_lossy(&output.stderr));
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[Rust] Failed to execute osascript: {}", e);
+                    }
+                }
             }
         }
     }
@@ -157,7 +177,7 @@ async fn notify_deployment_push(
     // Fallback to Tauri notification API (cross-platform)
     let mut notification = app.notification()
         .builder()
-        .title(title)
+        .title(&format!("{} - {}", title, subtitle))
         .body(&body);
 
     #[cfg(target_os = "macos")]
@@ -191,18 +211,46 @@ fn clear_deployment_history() -> Result<(), String> {
 async fn send_test_notification(app: AppHandle) -> Result<(), String> {
     println!("[Rust] Attempting to send test notification...");
     
-    let title = "✅ Test Notification";
+    let title = "Test Notification";
+    let subtitle = "Convex Panel";
     let body = "Notifications are working correctly!";
     
     #[cfg(target_os = "macos")]
     {
-        // Use osascript for dev mode compatibility on macOS
-        println!("[Rust] macOS: Using osascript for dev mode compatibility...");
+        // Use terminal-notifier for better banner support in dev mode
+        println!("[Rust] macOS: Trying terminal-notifier first...");
         
+        match std::process::Command::new("terminal-notifier")
+            .arg("-title")
+            .arg(title)
+            .arg("-subtitle")
+            .arg(subtitle)
+            .arg("-message")
+            .arg(body)
+            .arg("-sound")
+            .arg("Glass")
+            .output()
+        {
+            Ok(output) if output.status.success() => {
+                println!("[Rust] ✓ Notification sent via terminal-notifier");
+                return Ok(());
+            }
+            Ok(output) => {
+                eprintln!("[Rust] terminal-notifier failed: {:?}", String::from_utf8_lossy(&output.stderr));
+                println!("[Rust] Falling back to osascript...");
+            }
+            Err(e) => {
+                eprintln!("[Rust] terminal-notifier not available: {}", e);
+                println!("[Rust] Falling back to osascript...");
+            }
+        }
+        
+        // Fallback to osascript
         let script = format!(
-            "display notification \"{}\" with title \"{}\" sound name \"Glass\"",
+            "display notification \"{}\" with title \"{}\" subtitle \"{}\" sound name \"Glass\"",
             body.replace("\"", "\\\""),
-            title.replace("\"", "\\\"")
+            title.replace("\"", "\\\""),
+            subtitle.replace("\"", "\\\"")
         );
         
         match std::process::Command::new("osascript")
@@ -227,7 +275,7 @@ async fn send_test_notification(app: AppHandle) -> Result<(), String> {
     // Fallback to Tauri notification API
     let mut notification = app.notification()
         .builder()
-        .title(title)
+        .title(&format!("{} - {}", title, subtitle))
         .body(body);
 
     #[cfg(target_os = "macos")]
