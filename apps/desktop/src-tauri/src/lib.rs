@@ -151,6 +151,25 @@ fn clear_deployment_history() -> Result<(), String> {
     Ok(())
 }
 
+/// Send a test notification (for settings page)
+#[tauri::command]
+async fn send_test_notification(app: AppHandle) -> Result<(), String> {
+    let notification = app.notification()
+        .builder()
+        .title("Test Notification")
+        .body("This is a test notification from Convex Panel");
+
+    #[cfg(target_os = "macos")]
+    let notification = notification.sound("default");
+
+    notification.show().map_err(|e| {
+        eprintln!("Failed to show notification: {}", e);
+        e.to_string()
+    })?;
+
+    Ok(())
+}
+
 /// Command to expand the window to near-fullscreen (maximized)
 #[tauri::command]
 fn expand_window(window: tauri::Window) -> Result<(), String> {
@@ -464,7 +483,8 @@ pub fn run() {
             // Deployment notification commands
             notify_deployment_push,
             get_recent_deployments,
-            clear_deployment_history
+            clear_deployment_history,
+            send_test_notification
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

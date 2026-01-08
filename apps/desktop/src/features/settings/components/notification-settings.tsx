@@ -4,6 +4,7 @@ import {
   requestPermission,
   sendNotification,
 } from "@tauri-apps/plugin-notification";
+import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -87,22 +88,63 @@ export function NotificationSettings() {
         return;
       }
 
-      console.log("[Notifications] Sending test notification...");
-      await sendNotification({
-        title: "Test Notification",
-        body: "This is a test notification from Convex Panel",
-      });
+      console.log(
+        "[Notifications] Sending test notification via Rust backend...",
+      );
+      console.log("[Notifications] Invoking send_test_notification command...");
 
-      console.log("[Notifications] Test notification sent successfully");
-      setTestNotificationStatus({
-        type: "success",
-        message: "Test notification sent successfully!",
-      });
+      // Try using the Rust backend notification API for better macOS compatibility
+      try {
+        const result = await invoke("send_test_notification");
+        console.log("[Notifications] Rust backend response:", result);
+        console.log(
+          "[Notifications] ✓ Test notification sent via Rust backend successfully",
+        );
+        setTestNotificationStatus({
+          type: "success",
+          message:
+            "Test notification sent successfully! Check your notification center.",
+        });
+      } catch (rustError) {
+        console.warn(
+          "[Notifications] Rust backend failed, trying direct API:",
+          rustError,
+        );
+        console.error(
+          "[Notifications] Rust error details:",
+          JSON.stringify(rustError),
+        );
+        // Fallback to direct API
+        console.log(
+          "[Notifications] Attempting direct sendNotification API...",
+        );
+        const notifResult = await sendNotification({
+          title: "Test Notification",
+          body: "This is a test notification from Convex Panel",
+        });
+        console.log("[Notifications] Direct API result:", notifResult);
+        console.log(
+          "[Notifications] ✓ Test notification sent via direct API successfully",
+        );
+        setTestNotificationStatus({
+          type: "success",
+          message:
+            "Test notification sent successfully! Check your notification center.",
+        });
+      }
 
-      // Clear success message after 3 seconds
-      setTimeout(() => setTestNotificationStatus(null), 3000);
+      // Clear success message after 5 seconds
+      setTimeout(() => setTestNotificationStatus(null), 5000);
     } catch (error) {
-      console.error("[Notifications] Failed to send test notification:", error);
+      console.error(
+        "[Notifications] ✗ Failed to send test notification:",
+        error,
+      );
+      console.error("[Notifications] Error type:", typeof error);
+      console.error(
+        "[Notifications] Error details:",
+        JSON.stringify(error, null, 2),
+      );
       setTestNotificationStatus({
         type: "error",
         message: `Failed to send notification: ${error instanceof Error ? error.message : String(error)}`,
