@@ -123,6 +123,7 @@ export function useDeploymentStatus(): DeploymentStatus {
     },
     enabled,
     staleTime: STALE_TIME.health,
+    refetchInterval: REFETCH_INTERVAL.health,
     refetchOnMount: false,
   });
 

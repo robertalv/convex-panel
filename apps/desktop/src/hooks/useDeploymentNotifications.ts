@@ -33,6 +33,13 @@ export function useDeploymentNotifications() {
 
     // Skip if this is the first load (don't notify for existing deployments)
     if (isInitialLoad.current) {
+      console.log(
+        "[Deployment Notifications] Initial load, setting baseline:",
+        {
+          deployment: deployment.name,
+          timestamp: new Date(pushTimestamp).toISOString(),
+        },
+      );
       lastNotifiedTimestamp.current = pushTimestamp;
       isInitialLoad.current = false;
       return;
@@ -43,15 +50,27 @@ export function useDeploymentNotifications() {
       lastNotifiedTimestamp.current === null ||
       pushTimestamp > lastNotifiedTimestamp.current
     ) {
+      console.log("[Deployment Notifications] New deployment detected:", {
+        deployment: deployment.name,
+        timestamp: new Date(pushTimestamp).toISOString(),
+        version: version || "unknown",
+      });
+
       // Send notification
       void invoke("notify_deployment_push", {
         deploymentName: deployment.name || "Unnamed Deployment",
         deploymentUrl,
         timestamp: pushTimestamp,
         version: version || null,
-      }).catch((error) => {
-        console.error("Failed to send deployment notification:", error);
-      });
+      })
+        .then(() => {
+          console.log(
+            "[Deployment Notifications] Notification sent successfully",
+          );
+        })
+        .catch((error) => {
+          console.error("Failed to send deployment notification:", error);
+        });
 
       // Update last notified timestamp
       lastNotifiedTimestamp.current = pushTimestamp;
