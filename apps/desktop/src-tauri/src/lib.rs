@@ -117,45 +117,23 @@ async fn notify_deployment_push(
         state.last_push_timestamp = Some(timestamp);
     }
 
-    let title = "Deployment Updated";
+    let title = "🚀 Deployment Updated";
     let body = format!(
-        "{} was just deployed{}",
+        "{}{}",
         deployment_name,
         version.as_ref().map(|v| format!(" (v{})", v)).unwrap_or_default()
     );
 
+    println!("[Rust] Sending deployment notification: {} - {}", title, body);
+
     #[cfg(target_os = "macos")]
     {
-        // Use osascript for better dev mode compatibility with icon support
-        let icon_path = app.path()
-            .app_data_dir()
-            .ok()
-            .and_then(|mut p| {
-                // Try to find icon in app bundle
-                p.pop(); // Remove app data dir name
-                p.push("Resources");
-                p.push("icon.png");
-                if p.exists() {
-                    Some(p.to_string_lossy().to_string())
-                } else {
-                    None
-                }
-            });
-
-        // Build osascript command with icon if available
-        let script = if let Some(icon) = icon_path {
-            format!(
-                "display notification \"{}\" with title \"{}\" sound name \"default\"",
-                body.replace("\"", "\\\""),
-                title.replace("\"", "\\\"")
-            )
-        } else {
-            format!(
-                "display notification \"{}\" with title \"{}\" sound name \"default\"",
-                body.replace("\"", "\\\""),
-                title.replace("\"", "\\\"")
-            )
-        };
+        // Use osascript for dev mode compatibility on macOS
+        let script = format!(
+            "display notification \"{}\" with title \"{}\" sound name \"Glass\"",
+            body.replace("\"", "\\\""),
+            title.replace("\"", "\\\"")
+        );
 
         match std::process::Command::new("osascript")
             .arg("-e")
@@ -168,12 +146,10 @@ async fn notify_deployment_push(
                     return Ok(());
                 } else {
                     eprintln!("[Rust] osascript failed: {:?}", String::from_utf8_lossy(&output.stderr));
-                    println!("[Rust] Falling back to Tauri notification API...");
                 }
             }
             Err(e) => {
                 eprintln!("[Rust] Failed to execute osascript: {}", e);
-                println!("[Rust] Falling back to Tauri notification API...");
             }
         }
     }
@@ -215,17 +191,16 @@ fn clear_deployment_history() -> Result<(), String> {
 async fn send_test_notification(app: AppHandle) -> Result<(), String> {
     println!("[Rust] Attempting to send test notification...");
     
-    let title = "Test Notification";
-    let body = "This is a test notification from Convex Panel";
+    let title = "✅ Test Notification";
+    let body = "Notifications are working correctly!";
     
     #[cfg(target_os = "macos")]
     {
-        // In dev mode, try osascript as a fallback since Tauri notifications
-        // don't work well with unsigned dev builds on macOS
-        println!("[Rust] macOS: Trying osascript for better dev mode compatibility...");
+        // Use osascript for dev mode compatibility on macOS
+        println!("[Rust] macOS: Using osascript for dev mode compatibility...");
         
         let script = format!(
-            "display notification \"{}\" with title \"{}\" sound name \"default\"",
+            "display notification \"{}\" with title \"{}\" sound name \"Glass\"",
             body.replace("\"", "\\\""),
             title.replace("\"", "\\\"")
         );
@@ -241,12 +216,10 @@ async fn send_test_notification(app: AppHandle) -> Result<(), String> {
                     return Ok(());
                 } else {
                     eprintln!("[Rust] osascript failed: {:?}", String::from_utf8_lossy(&output.stderr));
-                    println!("[Rust] Falling back to Tauri notification API...");
                 }
             }
             Err(e) => {
                 eprintln!("[Rust] Failed to execute osascript: {}", e);
-                println!("[Rust] Falling back to Tauri notification API...");
             }
         }
     }

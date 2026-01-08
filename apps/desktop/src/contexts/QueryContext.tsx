@@ -29,8 +29,8 @@ const STALE_TIME = {
 
 // Refetch intervals for auto-refresh while view is active
 const REFETCH_INTERVAL = {
-  // Health metrics refresh every 30 seconds
-  health: 30 * 1000,
+  // Health metrics refresh every 5 seconds for faster notifications
+  health: 5 * 1000,
   // Function stats refresh every 30 seconds
   functionStats: 30 * 1000,
 };
