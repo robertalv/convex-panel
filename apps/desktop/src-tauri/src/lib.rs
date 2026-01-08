@@ -117,18 +117,77 @@ async fn notify_deployment_push(
         state.last_push_timestamp = Some(timestamp);
     }
 
-    // Send system notification
-    let notification = app.notification()
-        .builder()
-        .title("Deployment Updated")
-        .body(format!(
-            "{} was just deployed{}",
-            deployment_name,
-            version.as_ref().map(|v| format!(" (v{})", v)).unwrap_or_default()
-        ));
+    let title = "Deployment Updated";
+    let body = format!(
+        "{} was just deployed{}",
+        deployment_name,
+        version.as_ref().map(|v| format!(" (v{})", v)).unwrap_or_default()
+    );
 
     #[cfg(target_os = "macos")]
-    let notification = notification.sound("default");
+    {
+        // Use osascript for better dev mode compatibility with icon support
+        let icon_path = app.path()
+            .app_data_dir()
+            .ok()
+            .and_then(|mut p| {
+                // Try to find icon in app bundle
+                p.pop(); // Remove app data dir name
+                p.push("Resources");
+                p.push("icon.png");
+                if p.exists() {
+                    Some(p.to_string_lossy().to_string())
+                } else {
+                    None
+                }
+            });
+
+        // Build osascript command with icon if available
+        let script = if let Some(icon) = icon_path {
+            format!(
+                "display notification \"{}\" with title \"{}\" sound name \"default\"",
+                body.replace("\"", "\\\""),
+                title.replace("\"", "\\\"")
+            )
+        } else {
+            format!(
+                "display notification \"{}\" with title \"{}\" sound name \"default\"",
+                body.replace("\"", "\\\""),
+                title.replace("\"", "\\\"")
+            )
+        };
+
+        match std::process::Command::new("osascript")
+            .arg("-e")
+            .arg(&script)
+            .output()
+        {
+            Ok(output) => {
+                if output.status.success() {
+                    println!("[Rust] ✓ Deployment notification sent via osascript");
+                    return Ok(());
+                } else {
+                    eprintln!("[Rust] osascript failed: {:?}", String::from_utf8_lossy(&output.stderr));
+                    println!("[Rust] Falling back to Tauri notification API...");
+                }
+            }
+            Err(e) => {
+                eprintln!("[Rust] Failed to execute osascript: {}", e);
+                println!("[Rust] Falling back to Tauri notification API...");
+            }
+        }
+    }
+
+    // Fallback to Tauri notification API (cross-platform)
+    let mut notification = app.notification()
+        .builder()
+        .title(title)
+        .body(&body);
+
+    #[cfg(target_os = "macos")]
+    {
+        notification = notification.sound("default");
+    }
 
     notification.show().map_err(|e| e.to_string())?;
 
@@ -156,14 +215,24 @@ fn clear_deployment_history() -> Result<(), String> {
 async fn send_test_notification(app: AppHandle) -> Result<(), String> {
     println!("[Rust] Attempting to send test notification...");
     
+    let title = "Test Notification";
+    let body = "This is a test notification from Convex Panel";
+    
     #[cfg(target_os = "macos")]
     {
         // In dev mode, try osascript as a fallback since Tauri notifications
         // don't work well with unsigned dev builds on macOS
         println!("[Rust] macOS: Trying osascript for better dev mode compatibility...");
+        
+        let script = format!(
+            "display notification \"{}\" with title \"{}\" sound name \"default\"",
+            body.replace("\"", "\\\""),
+            title.replace("\"", "\\\"")
+        );
+        
         match std::process::Command::new("osascript")
             .arg("-e")
-            .arg("display notification \"This is a test notification from Convex Panel\" with title \"Test Notification\" sound name \"default\"")
+            .arg(&script)
             .output()
         {
             Ok(output) => {
@@ -185,8 +254,8 @@ async fn send_test_notification(app: AppHandle) -> Result<(), String> {
     // Fallback to Tauri notification API
     let mut notification = app.notification()
         .builder()
-        .title("Test Notification")
-        .body("This is a test notification from Convex Panel");
+        .title(title)
+        .body(body);
 
     #[cfg(target_os = "macos")]
     {
