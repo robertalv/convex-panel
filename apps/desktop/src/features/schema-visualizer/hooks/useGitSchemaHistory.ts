@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Command } from "@tauri-apps/plugin-shell";
-import type { SchemaJSON } from "../types";
+import type { SchemaJSON } from "@convex-panel/shared";
 import { createSnapshot } from "../utils/schema-diff";
 import { saveSnapshot, getAllSnapshots } from "../utils/schema-storage";
 

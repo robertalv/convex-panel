@@ -15,7 +15,7 @@ import {
   CircleCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { SortConfig } from "../types";
+import type { SortConfig } from "@convex-panel/shared";
 import { ToolbarButton } from "@/components/ui/button";
 
 interface SortPanelProps {

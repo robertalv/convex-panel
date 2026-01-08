@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { ModuleFunction } from "../components/FunctionSelector";
-import { discoverFunctions } from "@convex-panel/shared/api";
+import { discoverFunctions } from "../utils/api";
 
 export interface UseFunctionsProps {
   adminClient: any;

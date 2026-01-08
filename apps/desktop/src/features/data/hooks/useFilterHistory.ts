@@ -5,7 +5,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import type { FilterExpression } from "../types";
+import type { FilterExpression } from "@convex-panel/shared";
 import { getFilterHistory, appendToFilterHistory } from "../utils/storage";
 
 /**

@@ -4,7 +4,7 @@ import {
   fetchInsights,
   type FetchFn,
   type Insight,
-} from "@convex-panel/shared/api";
+} from "../utils/api";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { useDeployment } from "@/contexts/DeploymentContext";
 import { STALE_TIME } from "@/contexts/QueryContext";

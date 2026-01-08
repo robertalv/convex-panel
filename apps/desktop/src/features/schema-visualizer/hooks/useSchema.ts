@@ -6,7 +6,7 @@
 
 import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { SchemaJSON, ParsedSchema } from "../types";
+import type { SchemaJSON, ParsedSchema } from "@convex-panel/shared";
 import { parseSchema } from "../utils/schema-parser";
 import { STALE_TIME } from "@/contexts/QueryContext";
 

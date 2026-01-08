@@ -19,7 +19,7 @@ import type {
   TableDefinition,
   RecentlyViewedTable,
   ConvexComponent,
-} from "../types";
+} from "@convex-panel/shared";
 import { getRecentlyViewedTables } from "../utils/storage";
 import { ComponentSelector } from "./ComponentSelector";
 import { Skeleton } from "@/components/ui/skeleton";

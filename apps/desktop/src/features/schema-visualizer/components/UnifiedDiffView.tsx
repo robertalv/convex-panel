@@ -8,7 +8,7 @@
 import { useMemo, useState, useCallback } from "react";
 import { FileCode2, ChevronsUpDown } from "lucide-react";
 import { IconButton } from "@/components/ui/button";
-import type { SchemaDiff } from "../types";
+import type { SchemaDiff } from "@convex-panel/shared";
 import { generateFullSchemaCode } from "../utils/code-generator";
 import { PierreDiff } from "./PierreDiff";
 import "./UnifiedDiffView.css";

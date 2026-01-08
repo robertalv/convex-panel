@@ -4,7 +4,7 @@ import type {
   Insight,
   OccRecentEvent,
   BytesReadRecentEvent,
-} from "@convex-panel/shared/api";
+} from "../utils/api";
 import { cn } from "@/lib/utils";
 import { IconButton } from "@/components/ui/button";
 import { MetricChart, TimeSeriesDataPoint } from "./MetricChart";

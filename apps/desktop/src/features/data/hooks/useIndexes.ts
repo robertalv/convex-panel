@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { Index } from "../types";
+import type { Index } from "@convex-panel/shared";
 
 interface UseIndexesProps {
   adminClient: any;

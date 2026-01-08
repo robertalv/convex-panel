@@ -12,7 +12,7 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import type { IndexDefinition } from "../types";
+import type { IndexDefinition } from "@convex-panel/shared";
 import { ResizableSheet } from "./ResizableSheet";
 
 interface IndexesSheetProps {

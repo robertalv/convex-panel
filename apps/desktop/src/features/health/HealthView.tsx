@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
-import type { Insight } from "@convex-panel/shared/api";
+import type { Insight } from "../utils/api";
 
 // Hooks
 import { useHealthMetrics } from "./hooks/useHealthMetrics";

@@ -24,7 +24,7 @@ import type {
   SchemaHealth,
   DiffModeSettings,
   DiffViewMode,
-} from "../types";
+} from "@convex-panel/shared";
 import { IconButton } from "@/components/ui/button";
 
 interface VisualizerToolbarProps {

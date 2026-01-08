@@ -3,7 +3,7 @@
  * IndexedDB-based storage for schema snapshots and diff history
  */
 
-import type { SchemaSnapshot, SchemaJSON } from "../types";
+import type { SchemaSnapshot, SchemaJSON } from "@convex-panel/shared";
 
 const DB_NAME = "convex-schema-visualizer";
 const DB_VERSION = 1;

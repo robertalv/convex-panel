@@ -8,7 +8,7 @@ import type {
   SchemaField,
   WarningAction,
   ParsedSchema,
-} from "../types";
+} from "@convex-panel/shared";
 
 /**
  * Generate complete schema.ts file content from a ParsedSchema

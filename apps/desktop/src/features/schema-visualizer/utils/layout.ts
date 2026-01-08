@@ -9,7 +9,7 @@ import type {
   SchemaRelationship,
   LayoutAlgorithm,
   ParsedSchema,
-} from "../types";
+} from "@convex-panel/shared";
 
 const NODE_WIDTH = 280;
 const NODE_HEIGHT = 200; // Base height, actual varies by field count

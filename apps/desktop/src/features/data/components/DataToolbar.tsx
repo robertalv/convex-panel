@@ -25,7 +25,7 @@ import type {
   ExportFormat,
   FilterExpression,
   SortConfig,
-} from "../types";
+} from "@convex-panel/shared";
 import { FieldVisibilityDropdown } from "./FieldVisibilityDropdown";
 import { SortPanel } from "./SortPanel";
 import { TableMenuDropdown } from "./TableMenuDropdown";

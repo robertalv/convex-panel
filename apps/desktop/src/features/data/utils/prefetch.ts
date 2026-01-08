@@ -7,12 +7,12 @@
 import { queryClient, STALE_TIME } from "@/contexts/QueryContext";
 import { tableDataKeys } from "../hooks/useTableData";
 import { getActiveTable } from "../utils/storage";
-import { createDefaultFilterExpression } from "../types";
+import { createDefaultFilterExpression } from "@convex-panel/shared";
 import type {
   TableDefinition,
   TableDocument,
   FilterExpression,
-} from "../types";
+} from "@convex-panel/shared";
 
 const PAGE_SIZE = 50;
 

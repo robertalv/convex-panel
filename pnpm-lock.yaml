@@ -765,6 +765,9 @@ importers:
       '@types/react':
         specifier: ^18.0.0
         version: 18.3.27
+      convex:
+        specifier: ^1.21.0
+        version: 1.29.3(react@18.3.1)
       tsup:
         specifier: ^8.0.2
         version: 8.5.1(@swc/core@1.15.3)(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)
@@ -12544,6 +12547,13 @@ snapshots:
   convex-test@0.0.40(convex@1.29.3(react@19.2.1)):
     dependencies:
       convex: 1.29.3(react@19.2.1)
+
+  convex@1.29.3(react@18.3.1):
+    dependencies:
+      esbuild: 0.25.4
+      prettier: 3.6.2
+    optionalDependencies:
+      react: 18.3.1
 
   convex@1.29.3(react@19.2.1):
     dependencies:

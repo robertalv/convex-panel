@@ -55,46 +55,7 @@ export interface ConvexComponent {
   state?: "active" | "unmounted";
 }
 
-// ============================================================================
-// Table & Schema Types
-// ============================================================================
-
-export interface TableField {
-  fieldName: string;
-  optional: boolean;
-  shape: {
-    type: string;
-    fields?: TableField[];
-    tableName?: string;
-    value?: any;
-    float64Range?: {
-      hasSpecialValues: boolean;
-    };
-    shape?: {
-      type: string;
-      tableName?: string;
-      value?: any;
-      fields?: TableField[];
-    };
-  };
-}
-
-export interface TableSchema {
-  type: string;
-  fields: TableField[];
-}
-
-export interface TableDefinition {
-  [key: string]: TableSchema;
-}
-
-export interface TableDocument {
-  _id: string;
-  _creationTime?: number;
-  [key: string]: any;
-}
-
-// Sort and Filter types are exported from filters.ts
+// Table & Schema Types are exported from tables.ts
 
 // ============================================================================
 // View Types

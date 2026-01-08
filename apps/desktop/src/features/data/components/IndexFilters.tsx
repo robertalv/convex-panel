@@ -20,13 +20,13 @@ import type {
   SearchIndexFilter,
   IndexFilterClause,
   SearchIndexFilterClause,
-} from "../types";
+} from "@convex-panel/shared";
 import { getIndexFields } from "../hooks/useIndexes";
 import {
   DEFAULT_INDEX,
   BY_ID_INDEX,
   createDefaultFilterExpression,
-} from "../types";
+} from "@convex-panel/shared";
 import {
   ToggleRight,
   ToggleLeft,

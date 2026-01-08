@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import Editor, { type BeforeMount } from "@monaco-editor/react";
 import { useTheme } from "@/contexts/ThemeContext";
-import type { TableSchema, TableField } from "../types";
+import type { TableSchema, TableField } from "@convex-panel/shared";
 import { ResizableSheet } from "./ResizableSheet";
 
 interface SchemaSheetProps {

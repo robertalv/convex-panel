@@ -8,8 +8,8 @@ import type {
   UseComponentsProps,
   UseComponentsReturn,
   ConvexComponent,
-} from "../types";
-import { ROOT_APP_PLACEHOLDER } from "../types";
+} from "@convex-panel/shared";
+import { ROOT_APP_PLACEHOLDER } from "@convex-panel/shared";
 
 /** Root app component (always present) */
 const ROOT_APP_COMPONENT: ConvexComponent = {

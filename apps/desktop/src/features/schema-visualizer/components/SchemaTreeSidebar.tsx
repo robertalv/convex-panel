@@ -23,7 +23,7 @@ import {
 import { ResizableSheet } from "@/features/data/components/ResizableSheet";
 import { ComponentSelector } from "@/components/ComponentSelector";
 import type { ConvexComponent } from "@/types/desktop";
-import type { ParsedSchema } from "../types";
+import type { ParsedSchema } from "@convex-panel/shared";
 
 interface SchemaTreeSidebarProps {
   schema: ParsedSchema | null;

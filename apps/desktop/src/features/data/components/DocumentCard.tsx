@@ -6,7 +6,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { TIMESTAMP_COLOR } from "@convex-panel/shared";
-import type { TableDocument, TableSchema } from "../types";
+import type { TableDocument, TableSchema } from "@convex-panel/shared";
 import {
   formatValue,
   getValueColor,

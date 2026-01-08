@@ -18,7 +18,7 @@ import {
   type Project,
   type Deployment,
   type UserProfile,
-} from "@convex-panel/shared/api";
+} from "../utils/api";
 
 // Re-export types
 export type { Team, Project, Deployment, UserProfile };

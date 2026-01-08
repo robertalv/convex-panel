@@ -7,7 +7,7 @@ import { useMemo } from "react";
 import { Code } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
-import type { ConvexComponent } from "../types";
+import type { ConvexComponent } from "@convex-panel/shared";
 
 // Special value to represent root app (null) in SearchableSelect
 const ROOT_VALUE = "__root__";

@@ -16,7 +16,7 @@ import {
   type ParsedSchema,
   type FieldType,
   inferModule,
-} from "../types";
+} from "@convex-panel/shared";
 
 import {
   createAddIndexAction,

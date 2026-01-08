@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from "react";
-import type { TableDocument, ExportFormat } from "../types";
+import type { TableDocument, ExportFormat } from "@convex-panel/shared";
 import { documentsToCSV, downloadFile } from "../utils/formatters";
 
 interface UseTableExportProps {

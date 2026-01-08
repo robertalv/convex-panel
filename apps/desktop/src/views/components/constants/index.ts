@@ -1,0 +1,2 @@
+export { CATEGORIES } from './categories';
+

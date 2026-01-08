@@ -7,7 +7,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Save, AlertCircle, Loader2 } from "lucide-react";
 import Editor, { type BeforeMount, type OnMount } from "@monaco-editor/react";
 import { useTheme } from "@/contexts/ThemeContext";
-import type { TableSchema } from "../types";
+import type { TableSchema } from "@convex-panel/shared";
 import { ResizableSheet } from "./ResizableSheet";
 
 interface DocumentEditorProps {
