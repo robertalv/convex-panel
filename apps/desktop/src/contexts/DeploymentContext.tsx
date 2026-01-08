@@ -141,10 +141,20 @@ export function DeploymentProvider({
       return;
     }
 
-    // Avoid duplicate requests for the same deployment
-    if (generatingKeyRef.current === deploymentName) {
+    // If we already have a key for this deployment, no need to reload
+    if (cliDeployKey && generatingKeyRef.current === deploymentName) {
       console.log(
-        "[DeploymentContext] Already processing deploy key for",
+        "[DeploymentContext] Already have deploy key for",
+        deploymentName,
+        "- skipping",
+      );
+      return;
+    }
+
+    // Avoid duplicate requests for the same deployment if still loading
+    if (!cliDeployKey && generatingKeyRef.current === deploymentName) {
+      console.log(
+        "[DeploymentContext] Already loading deploy key for",
         deploymentName,
       );
       return;
@@ -298,9 +308,17 @@ export function DeploymentProvider({
     loadOrCreateDeployKey();
 
     return () => {
+      console.log(
+        `[DeploymentContext] Cleanup for ${deploymentName}, cancelled = true`,
+      );
       cancelled = true;
-      // Reset loading state on cleanup to prevent stuck "Loading..." state
-      setCliDeployKeyLoading(false);
+      // Only clear generatingKeyRef if it matches this deployment
+      if (generatingKeyRef.current === deploymentName) {
+        console.log(
+          `[DeploymentContext] Clearing generatingKeyRef for ${deploymentName}`,
+        );
+        generatingKeyRef.current = null;
+      }
     };
   }, [deployment?.name, deployment?.projectId, accessToken, fetchFn]);
 

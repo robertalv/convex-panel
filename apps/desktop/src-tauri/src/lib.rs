@@ -154,20 +154,58 @@ fn clear_deployment_history() -> Result<(), String> {
 /// Send a test notification (for settings page)
 #[tauri::command]
 async fn send_test_notification(app: AppHandle) -> Result<(), String> {
-    let notification = app.notification()
+    println!("[Rust] Attempting to send test notification...");
+    
+    #[cfg(target_os = "macos")]
+    {
+        // In dev mode, try osascript as a fallback since Tauri notifications
+        // don't work well with unsigned dev builds on macOS
+        println!("[Rust] macOS: Trying osascript for better dev mode compatibility...");
+        match std::process::Command::new("osascript")
+            .arg("-e")
+            .arg("display notification \"This is a test notification from Convex Panel\" with title \"Test Notification\" sound name \"default\"")
+            .output()
+        {
+            Ok(output) => {
+                if output.status.success() {
+                    println!("[Rust] ✓ osascript notification sent successfully");
+                    return Ok(());
+                } else {
+                    eprintln!("[Rust] osascript failed: {:?}", String::from_utf8_lossy(&output.stderr));
+                    println!("[Rust] Falling back to Tauri notification API...");
+                }
+            }
+            Err(e) => {
+                eprintln!("[Rust] Failed to execute osascript: {}", e);
+                println!("[Rust] Falling back to Tauri notification API...");
+            }
+        }
+    }
+    
+    // Fallback to Tauri notification API
+    let mut notification = app.notification()
         .builder()
         .title("Test Notification")
         .body("This is a test notification from Convex Panel");
 
     #[cfg(target_os = "macos")]
-    let notification = notification.sound("default");
+    {
+        notification = notification.sound("default");
+    }
 
-    notification.show().map_err(|e| {
-        eprintln!("Failed to show notification: {}", e);
-        e.to_string()
-    })?;
-
-    Ok(())
+    println!("[Rust] Calling notification.show()...");
+    let result = notification.show();
+    
+    match result {
+        Ok(_) => {
+            println!("[Rust] ✓ Notification.show() succeeded");
+            Ok(())
+        },
+        Err(e) => {
+            eprintln!("[Rust] ✗ Failed to show notification: {}", e);
+            Err(e.to_string())
+        }
+    }
 }
 
 /// Command to expand the window to near-fullscreen (maximized)
