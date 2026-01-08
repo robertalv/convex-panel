@@ -5,6 +5,7 @@ mod pty;
 use tauri::{Manager, Emitter, AppHandle, include_image};
 use tauri::menu::{Menu, MenuItem, IconMenuItem, Submenu, PredefinedMenuItem};
 use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent};
+use tauri_plugin_notification::NotificationExt;
 use std::sync::Mutex;
 use std::collections::VecDeque;
 use once_cell::sync::Lazy;
