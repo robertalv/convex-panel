@@ -1,7 +1,10 @@
 import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { isPermissionGranted } from "@tauri-apps/plugin-notification";
 import { useDeployment } from "@/contexts/DeploymentContext";
 import { useDeploymentStatus } from "@/features/health/hooks/useDeploymentStatus";
+
+const STORAGE_KEY = "convex-panel-notifications-enabled";
 
 interface DeploymentPush {
   deployment_name: string;
@@ -24,6 +27,20 @@ export function useDeploymentNotifications() {
   const isInitialLoad = useRef(true);
 
   useEffect(() => {
+    // Check if notifications are enabled in settings
+    const notificationsEnabled = (() => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        return stored ? JSON.parse(stored) : true;
+      } catch {
+        return true;
+      }
+    })();
+
+    if (!notificationsEnabled) {
+      return;
+    }
+
     // Don't notify on initial load or if no deployment
     if (!deployment || !deploymentUrl || !lastPush) {
       return;
@@ -56,13 +73,24 @@ export function useDeploymentNotifications() {
         version: version || "unknown",
       });
 
-      // Send notification
-      void invoke("notify_deployment_push", {
-        deploymentName: deployment.name || "Unnamed Deployment",
-        deploymentUrl,
-        timestamp: pushTimestamp,
-        version: version || null,
-      })
+      // Check permission before sending
+      void isPermissionGranted()
+        .then((granted) => {
+          if (!granted) {
+            console.warn(
+              "[Deployment Notifications] Permission not granted, skipping notification",
+            );
+            return;
+          }
+
+          // Send notification
+          return invoke("notify_deployment_push", {
+            deploymentName: deployment.name || "Unnamed Deployment",
+            deploymentUrl,
+            timestamp: pushTimestamp,
+            version: version || null,
+          });
+        })
         .then(() => {
           console.log(
             "[Deployment Notifications] Notification sent successfully",

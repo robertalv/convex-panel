@@ -102,6 +102,14 @@
     "dialog:allow-open",
     "fs:default",
     "fs:allow-read",
-    "fs:allow-exists"
+    "fs:allow-exists",
+    "notification:default",
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission",
+    "notification:allow-show",
+    "notification:allow-create-channel",
+    "notification:allow-delete-channel",
+    "notification:allow-list-channels",
+    "notification:allow-permission-state"
   ]
 }

@@ -16,12 +16,14 @@ import { TerminalSettings } from "./components/terminal-settings";
 import { DeployKeySettings } from "./components/deploy-key-settings";
 import { DesktopIntegrations } from "./components/desktop-integrations";
 import { NetworkSettings } from "./components/network-settings";
+import { NotificationSettings } from "./components/notification-settings";
 
 // Combined section types from panel and desktop
 export type SettingsSection =
   // Desktop-specific sections
   | "appearance"
   | "profile"
+  | "notifications"
   | "integrations"
   | "terminal"
   | "deploy-key-sync"
@@ -48,6 +50,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
     items: [
       { id: "appearance", label: "Appearance" },
       { id: "profile", label: "Profile" },
+      { id: "notifications", label: "Notifications" },
     ],
   },
   {
@@ -178,6 +181,8 @@ export function SettingsView({
         return <AppearanceSettings theme={theme} onThemeChange={setTheme} />;
       case "profile":
         return <ProfileSettings user={user} onLogout={onLogout} />;
+      case "notifications":
+        return <NotificationSettings />;
       case "integrations":
         return <DesktopIntegrations />;
       case "terminal":
