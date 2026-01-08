@@ -64,6 +64,7 @@ import { McpProvider, useMcpOptional } from "./contexts/McpContext";
 import { GitHubProvider } from "./contexts/GitHubContext";
 import { AboutDialog } from "./components/AboutDialog";
 import { EnhancedProjectOnboardingDialog } from "./components/EnhancedProjectOnboardingDialog";
+import { DeploymentNotificationListener } from "./components/DeploymentNotificationListener";
 
 interface AppProps {
   convex?: ConvexReactClient | null;
@@ -706,6 +707,8 @@ export default function App({ convex: _initialConvex }: AppProps) {
                   />
                 )}
               </AppShell>
+              {/* Listen for deployment pushes and send notifications */}
+              <DeploymentNotificationListener />
               {/* Enhanced onboarding for deploy key setup - needs DeploymentContext */}
               <EnhancedOnboardingWrapper
                 deploymentName={selectedDeployment?.name}

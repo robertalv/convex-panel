@@ -1,0 +1,89 @@
+import { useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { useDeployment } from "@/contexts/DeploymentContext";
+import { useDeploymentStatus } from "@/features/health/hooks/useDeploymentStatus";
+
+interface DeploymentPush {
+  deployment_name: string;
+  deployment_url: string;
+  timestamp: number;
+  version: string | null;
+}
+
+/**
+ * Hook that monitors deployment pushes and sends system notifications
+ * when new deployments are detected.
+ *
+ * Uses the lastPush timestamp from useDeploymentStatus to detect changes
+ * and triggers Tauri system notifications via the tray icon.
+ */
+export function useDeploymentNotifications() {
+  const { deployment, deploymentUrl } = useDeployment();
+  const { lastPush, version } = useDeploymentStatus();
+  const lastNotifiedTimestamp = useRef<number | null>(null);
+  const isInitialLoad = useRef(true);
+
+  useEffect(() => {
+    // Don't notify on initial load or if no deployment
+    if (!deployment || !deploymentUrl || !lastPush) {
+      return;
+    }
+
+    const pushTimestamp = lastPush.getTime();
+
+    // Skip if this is the first load (don't notify for existing deployments)
+    if (isInitialLoad.current) {
+      lastNotifiedTimestamp.current = pushTimestamp;
+      isInitialLoad.current = false;
+      return;
+    }
+
+    // Check if this is a new push
+    if (
+      lastNotifiedTimestamp.current === null ||
+      pushTimestamp > lastNotifiedTimestamp.current
+    ) {
+      // Send notification
+      void invoke("notify_deployment_push", {
+        deploymentName: deployment.name || "Unnamed Deployment",
+        deploymentUrl,
+        timestamp: pushTimestamp,
+        version: version || null,
+      }).catch((error) => {
+        console.error("Failed to send deployment notification:", error);
+      });
+
+      // Update last notified timestamp
+      lastNotifiedTimestamp.current = pushTimestamp;
+    }
+  }, [deployment, deploymentUrl, lastPush, version]);
+
+  // Reset when deployment changes
+  useEffect(() => {
+    isInitialLoad.current = true;
+    lastNotifiedTimestamp.current = null;
+  }, [deploymentUrl]);
+}
+
+/**
+ * Get recent deployment push history from the tray
+ */
+export async function getRecentDeployments(): Promise<DeploymentPush[]> {
+  try {
+    return await invoke<DeploymentPush[]>("get_recent_deployments");
+  } catch (error) {
+    console.error("Failed to get recent deployments:", error);
+    return [];
+  }
+}
+
+/**
+ * Clear deployment notification history
+ */
+export async function clearDeploymentHistory(): Promise<void> {
+  try {
+    await invoke("clear_deployment_history");
+  } catch (error) {
+    console.error("Failed to clear deployment history:", error);
+  }
+}

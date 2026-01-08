@@ -6,6 +6,7 @@ use tauri::{Manager, Emitter, AppHandle, include_image};
 use tauri::menu::{Menu, MenuItem, IconMenuItem, Submenu, PredefinedMenuItem};
 use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent};
 use std::sync::Mutex;
+use std::collections::VecDeque;
 use once_cell::sync::Lazy;
 
 // Network test status stored globally for tray updates
@@ -20,6 +21,28 @@ pub struct NetworkTestStatus {
 
 static NETWORK_STATUS: Lazy<Mutex<NetworkTestStatus>> = Lazy::new(|| {
     Mutex::new(NetworkTestStatus::default())
+});
+
+// Deployment push notification tracking
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub struct DeploymentPush {
+    pub deployment_name: String,
+    pub deployment_url: String,
+    pub timestamp: i64,
+    pub version: Option<String>,
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct DeploymentNotificationState {
+    pub recent_pushes: VecDeque<DeploymentPush>,
+    pub last_push_timestamp: Option<i64>,
+}
+
+static DEPLOYMENT_STATE: Lazy<Mutex<DeploymentNotificationState>> = Lazy::new(|| {
+    Mutex::new(DeploymentNotificationState {
+        recent_pushes: VecDeque::with_capacity(10),
+        last_push_timestamp: None,
+    })
 });
 
 // Store menu item references for dynamic updates
@@ -58,6 +81,73 @@ fn update_network_status(status: NetworkTestStatus) -> Result<(), String> {
 #[tauri::command]
 fn get_network_status() -> NetworkTestStatus {
     NETWORK_STATUS.lock().unwrap().clone()
+}
+
+// ============================================================================
+// Deployment Notification Commands
+// ============================================================================
+
+/// Track a new deployment push and send a system notification
+#[tauri::command]
+async fn notify_deployment_push(
+    app: AppHandle,
+    deployment_name: String,
+    deployment_url: String,
+    timestamp: i64,
+    version: Option<String>,
+) -> Result<(), String> {
+    let push = DeploymentPush {
+        deployment_name: deployment_name.clone(),
+        deployment_url,
+        timestamp,
+        version: version.clone(),
+    };
+
+    // Update state
+    {
+        let mut state = DEPLOYMENT_STATE.lock().unwrap();
+        
+        // Add to recent pushes (keep last 10)
+        state.recent_pushes.push_front(push.clone());
+        if state.recent_pushes.len() > 10 {
+            state.recent_pushes.pop_back();
+        }
+        
+        state.last_push_timestamp = Some(timestamp);
+    }
+
+    // Send system notification
+    let notification = app.notification()
+        .builder()
+        .title("Deployment Updated")
+        .body(format!(
+            "{} was just deployed{}",
+            deployment_name,
+            version.as_ref().map(|v| format!(" (v{})", v)).unwrap_or_default()
+        ));
+
+    #[cfg(target_os = "macos")]
+    let notification = notification.sound("default");
+
+    notification.show().map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Get recent deployment pushes
+#[tauri::command]
+fn get_recent_deployments() -> Vec<DeploymentPush> {
+    let state = DEPLOYMENT_STATE.lock().unwrap();
+    state.recent_pushes.iter().cloned().collect()
+}
+
+/// Clear deployment notification history
+#[tauri::command]
+fn clear_deployment_history() -> Result<(), String> {
+    let mut state = DEPLOYMENT_STATE.lock().unwrap();
+    state.recent_pushes.clear();
+    state.last_push_timestamp = None;
+    Ok(())
 }
 
 /// Command to expand the window to near-fullscreen (maximized)
@@ -334,6 +424,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             expand_window, 
             set_window_size,
@@ -368,7 +459,11 @@ pub fn run() {
             pty::pty_list_sessions,
             // Network status commands
             update_network_status,
-            get_network_status
+            get_network_status,
+            // Deployment notification commands
+            notify_deployment_push,
+            get_recent_deployments,
+            clear_deployment_history
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
