@@ -5,7 +5,7 @@ import { useDeployment } from "@/contexts/DeploymentContext";
 import { useFunctions } from "./hooks/useFunctions";
 import { useFunctionLogStream } from "./hooks/useFunctionLogStream";
 import { EmptyFunctionsState } from "./components/EmptyFunctionsState";
-import { HealthCard } from "./components/HealthCard";
+import { HealthCard } from "@/components/ui";
 import { FunctionsSidebar } from "./components/FunctionsSidebar";
 import { FunctionsToolbar } from "./components/FunctionsToolbar";
 import { FunctionExecutionDetailSheet } from "./components/FunctionExecutionDetailSheet";

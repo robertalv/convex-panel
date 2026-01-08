@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { HealthCard } from "./HealthCard";
+import { HealthCard } from "@/components/ui";
 
 interface LatencyPercentiles {
   p50: number;

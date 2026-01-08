@@ -1,6 +1,6 @@
 import { RefreshCw, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { HealthCard } from "./HealthCard";
+import { HealthCard } from "@/components/ui";
 import type { ErrorSummary } from "../hooks/useRecentErrors";
 
 interface RecentErrorsCardProps {

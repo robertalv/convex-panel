@@ -1,6 +1,6 @@
 import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { HealthCard } from "./HealthCard";
+import { HealthCard } from "@/components/ui";
 import { FunctionList } from "./base/FunctionList";
 import { EmptyState } from "./base/EmptyState";
 import type { FunctionStat } from "../hooks/useFunctionHealth";

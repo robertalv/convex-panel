@@ -1,5 +1,5 @@
 // Base card components
-export { HealthCard } from "./HealthCard";
+export { HealthCard } from "@/components/ui";
 export { BigMetric } from "./BigMetric";
 export { MetricChart, type TimeSeriesDataPoint } from "./MetricChart";
 

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { RefreshCw, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { HealthCard } from "./HealthCard";
+import { HealthCard } from "@/components/ui";
 import type { FunctionStat } from "../hooks/useFunctionHealth";
 
 interface TopErrorsCardProps {

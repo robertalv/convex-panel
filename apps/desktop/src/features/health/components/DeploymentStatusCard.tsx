@@ -1,6 +1,6 @@
 import { Server, Clock, Pause, Play, Activity, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { HealthCard } from "./HealthCard";
+import { HealthCard } from "@/components/ui";
 
 interface DeploymentStatusCardProps {
   /** Current deployment state */

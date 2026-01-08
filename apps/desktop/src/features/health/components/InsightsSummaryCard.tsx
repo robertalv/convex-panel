@@ -1,6 +1,6 @@
 import { RefreshCw, CheckCircle2, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { HealthCard } from "./HealthCard";
+import { HealthCard } from "@/components/ui";
 import type { Insight } from "@convex-panel/shared/api";
 
 interface InsightsSummaryCardProps {

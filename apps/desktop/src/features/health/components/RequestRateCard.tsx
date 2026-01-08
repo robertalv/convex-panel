@@ -1,4 +1,4 @@
-import { HealthCard } from "./HealthCard";
+import { HealthCard } from "@/components/ui";
 import { MetricChart, type TimeSeriesDataPoint } from "./MetricChart";
 import { BigMetric } from "./BigMetric";
 

@@ -7,7 +7,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { HealthCard } from "./HealthCard";
+import { HealthCard } from "@/components/ui";
 import { MetricChart, type TimeSeriesDataPoint } from "./MetricChart";
 
 interface SchedulerLagCardProps {

@@ -1,6 +1,6 @@
 import React from "react";
 import { ArrowLeft } from "lucide-react";
-import { HealthCard } from "./HealthCard";
+import { HealthCard } from "@/components/ui";
 
 export const EmptyFunctionsState: React.FC = () => {
   // Generate empty chart path (flat line)

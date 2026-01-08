@@ -10,7 +10,7 @@ import {
 } from "recharts";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { HealthCard } from "./HealthCard";
+import { HealthCard } from "@/components/ui";
 import type {
   FunctionActivityData,
   FunctionActivitySeries,
