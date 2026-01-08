@@ -18,12 +18,11 @@ import type { Deployment, Project, Team, User } from "@/types/desktop";
 import {
   Activity,
   CalendarClock,
+  Code2,
   FileStack,
-  FunctionSquare,
   Gauge,
   LayoutDashboard,
   Network,
-  PlaySquare,
   ScrollText,
 } from "lucide-react";
 import { useBigBrain } from "./hooks/useBigBrain";
@@ -43,7 +42,7 @@ import {
 } from "./lib/secureStorage";
 import { HealthView } from "./features/health";
 import { DataView } from "./features/data";
-import { FunctionsView } from "./features/functions";
+import FunctionsView from "./features/functions";
 import { RunnerView } from "./features/runner";
 import { FilesView } from "./features/files";
 import { SchedulesView } from "./features/schedules";
@@ -103,15 +102,8 @@ const NAV_ITEMS: NavItem[] = [
     id: "functions",
     label: "Functions",
     path: "/functions",
-    icon: FunctionSquare,
+    icon: Code2,
     shortcut: "⌘5",
-  },
-  {
-    id: "runner",
-    label: "Runner",
-    path: "/runner",
-    icon: PlaySquare,
-    shortcut: "⌘6",
   },
   {
     id: "files",

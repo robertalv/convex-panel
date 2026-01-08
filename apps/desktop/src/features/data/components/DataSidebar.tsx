@@ -3,16 +3,8 @@
  * Tree-style sidebar for table selection, matching SchemaTreeSidebar style
  */
 
-import * as React from "react";
 import { useState, useMemo, useEffect } from "react";
-import {
-  Database,
-  Table2,
-  Search,
-  Plus,
-  X,
-  Clock,
-} from "lucide-react";
+import { Database, Table2, Search, Plus, X, Clock } from "lucide-react";
 import type {
   TableDefinition,
   RecentlyViewedTable,

@@ -229,6 +229,80 @@ export interface AggregatedFunctionStats {
 }
 
 /**
+ * Function execution JSON from API
+ * Raw response format from Convex streaming endpoints
+ */
+export interface FunctionExecutionJson {
+  udf_type: string;
+  component_path?: string;
+  identifier: string;
+  log_lines?: any[];
+  timestamp: number;
+  cached_result?: boolean;
+  execution_time: number;
+  success?: any;
+  error?: string;
+  request_id: string;
+  caller?: string;
+  parent_execution_id?: string;
+  execution_id: string;
+  usage_stats: {
+    database_read_bytes: number;
+    database_write_bytes: number;
+    database_read_documents: number;
+    storage_read_bytes: number;
+    storage_write_bytes: number;
+    vector_index_read_bytes?: number;
+    vector_index_write_bytes?: number;
+    memory_used_mb: number;
+  };
+  return_bytes?: number;
+  occ_info?: {
+    table_name: string;
+    document_id: string;
+    write_source: string;
+    retry_count: number;
+  };
+  execution_timestamp?: number;
+  identity_type: string;
+  environment?: string;
+}
+
+/**
+ * Processed function execution log
+ * Normalized format for UI consumption
+ */
+export interface FunctionExecutionLog {
+  id: string;
+  functionIdentifier: string;
+  functionName: string;
+  udfType: "query" | "mutation" | "action" | "httpAction";
+  componentPath?: string;
+  timestamp: number;
+  startedAt: number;
+  completedAt: number;
+  durationMs: number;
+  success: boolean;
+  error?: string;
+  logLines: string[];
+  usageStats: FunctionExecutionJson["usage_stats"];
+  requestId: string;
+  executionId: string;
+  caller?: string;
+  environment?: string;
+  identityType: string;
+  returnBytes?: number;
+  cachedResult?: boolean;
+  raw: FunctionExecutionJson;
+}
+
+/**
+ * Multi-select value type for filtering
+ * Can be an array of selected values or 'all' for select all
+ */
+export type MultiSelectValue = string[] | "all";
+
+/**
  * Log entry from Convex
  */
 export interface LogEntry {

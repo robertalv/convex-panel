@@ -13,7 +13,7 @@ import {
 import { useMcpOptional } from "../../contexts/McpContext";
 import { useIsFullscreen } from "../../hooks/useIsFullscreen";
 import { McpStatusIndicator } from "./McpStatusIndicator";
-import { NetworkStatusIndicator } from "./NetworkStatusIndicator";
+// import { NetworkStatusIndicator } from "./NetworkStatusIndicator";
 
 interface TopBarProps {
   user: User | null;

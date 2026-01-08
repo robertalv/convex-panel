@@ -4,16 +4,11 @@
  */
 
 import { useState, useMemo } from "react";
-import {
-  Zap,
-  Search,
-  X,
-  Code2,
-  GitBranch,
-  Globe,
-  Database,
-} from "lucide-react";
+import { Zap, Search, X, CodeXml } from "lucide-react";
 import { TreeItem } from "@/components/ui/TreeItem";
+import { FunctionIcon } from "@/components/ui/FunctionIcon";
+import { ComponentSelector } from "@/components/ComponentSelector";
+import type { ConvexComponent } from "@/types/desktop";
 
 /**
  * Function type definitions
@@ -22,9 +17,10 @@ export type FunctionType = "query" | "mutation" | "action" | "httpAction";
 
 export interface FunctionItem {
   name: string;
+  identifier: string;
   type: FunctionType;
   lastDeploy?: string;
-  source?: string;
+  source?: string; // module/file path
 }
 
 interface FunctionGroup {
@@ -33,31 +29,52 @@ interface FunctionGroup {
   functions: FunctionItem[];
 }
 
+interface ModuleGroup {
+  module: string;
+  functions: FunctionItem[];
+}
+
+export type OrganizationMode = "byType" | "byModule";
+
 interface FunctionsSidebarProps {
   functions: FunctionItem[];
   selectedFunction: string | null;
   onSelectFunction: (functionName: string | null) => void;
   isLoading?: boolean;
+  /** Component selection - selected component ID (null = root app) */
+  selectedComponentId?: string | null;
+  /** Called when component changes - receives component ID (null = root app) */
+  onComponentSelect?: (componentId: string | null) => void;
+  /** List of available components (ConvexComponent objects) */
+  components?: ConvexComponent[];
+  /** Organization mode */
+  organizationMode?: OrganizationMode;
 }
 
 /**
  * Get icon for function type
  */
 function getFunctionTypeIcon(type: FunctionType) {
-  switch (type) {
-    case "query":
-      return (
-        <Database size={12} style={{ color: "var(--color-info-base)" }} />
-      );
-    case "mutation":
-      return (
-        <GitBranch size={12} style={{ color: "var(--color-warning-base)" }} />
-      );
-    case "action":
-      return <Code2 size={12} style={{ color: "var(--color-brand-base)" }} />;
-    case "httpAction":
-      return <Globe size={12} style={{ color: "var(--color-success-base)" }} />;
-  }
+  const colorMap: Record<FunctionType, string> = {
+    query: "var(--color-info-base)",
+    mutation: "var(--color-warning-base)",
+    action: "var(--color-brand-base)",
+    httpAction: "var(--color-success-base)",
+  };
+
+  return <FunctionIcon size={12} style={{ color: colorMap[type] }} />;
+}
+
+/**
+ * Extract module name from source path
+ */
+function getModuleName(source: string | undefined): string {
+  if (!source) return "unknown";
+  // Remove .js extension and get the base name
+  const name = source.replace(/\.js$/, "");
+  // If it has a path, get the last part
+  const parts = name.split("/");
+  return parts[parts.length - 1] || "unknown";
 }
 
 export function FunctionsSidebar({
@@ -65,14 +82,13 @@ export function FunctionsSidebar({
   selectedFunction,
   onSelectFunction,
   isLoading = false,
+  selectedComponentId,
+  onComponentSelect,
+  components = [],
+  organizationMode = "byModule",
 }: FunctionsSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({
-    queries: true,
-    mutations: true,
-    actions: true,
-    httpActions: true,
-  });
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const toggleExpanded = (key: string) => {
     setExpanded((prev) => ({
@@ -81,10 +97,10 @@ export function FunctionsSidebar({
     }));
   };
 
-  // Filter and group functions
-  const groupedFunctions = useMemo(() => {
+  // Filter and group functions by type
+  const groupedByType = useMemo(() => {
     const filtered = functions.filter((fn) =>
-      fn.name.toLowerCase().includes(searchQuery.toLowerCase())
+      fn.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
 
     const groups: FunctionGroup[] = [
@@ -113,6 +129,49 @@ export function FunctionsSidebar({
     return groups.filter((group) => group.functions.length > 0);
   }, [functions, searchQuery]);
 
+  // Filter and group functions by module
+  const groupedByModule = useMemo(() => {
+    const filtered = functions.filter((fn) =>
+      fn.name.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
+
+    // Group by module
+    const moduleMap = new Map<string, FunctionItem[]>();
+    filtered.forEach((fn) => {
+      const module = getModuleName(fn.source);
+      if (!moduleMap.has(module)) {
+        moduleMap.set(module, []);
+      }
+      moduleMap.get(module)!.push(fn);
+    });
+
+    // Convert to array and sort
+    const groups: ModuleGroup[] = Array.from(moduleMap.entries())
+      .map(([module, funcs]) => ({
+        module,
+        functions: funcs.sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .sort((a, b) => a.module.localeCompare(b.module));
+
+    return groups;
+  }, [functions, searchQuery]);
+
+  // Auto-expand all groups when mode or functions change
+  useMemo(() => {
+    const newExpanded: Record<string, boolean> = {};
+    if (organizationMode === "byType") {
+      groupedByType.forEach((group) => {
+        const key = group.type + "s";
+        newExpanded[key] = true;
+      });
+    } else {
+      groupedByModule.forEach((group) => {
+        newExpanded[group.module] = true;
+      });
+    }
+    setExpanded(newExpanded);
+  }, [organizationMode, groupedByType, groupedByModule]);
+
   const totalFunctions = functions.length;
 
   return (
@@ -122,6 +181,22 @@ export function FunctionsSidebar({
         backgroundColor: "var(--color-surface-base)",
       }}
     >
+      {/* Component selector - only show when multiple components exist */}
+      {components.length > 1 && (
+        <div
+          className="p-2 h-[45px] flex items-center"
+          style={{ borderBottom: "1px solid var(--color-border-base)" }}
+        >
+          <ComponentSelector
+            selectedComponentId={selectedComponentId ?? null}
+            onSelect={onComponentSelect || (() => {})}
+            components={components}
+            fullWidth
+            variant="input"
+          />
+        </div>
+      )}
+
       {/* Search input */}
       <div
         className="p-2"
@@ -148,8 +223,14 @@ export function FunctionsSidebar({
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 hover:opacity-80"
+              className="absolute right-2 top-1/2 -translate-y-1/2"
               style={{ color: "var(--color-text-muted)" }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = "var(--color-text-base)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = "var(--color-text-muted)";
+              }}
             >
               <X size={12} />
             </button>
@@ -159,7 +240,7 @@ export function FunctionsSidebar({
 
       {/* Tree content */}
       <div
-        className="flex-1 overflow-y-auto"
+        className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent"
         style={{ scrollbarColor: "var(--color-border-strong) transparent" }}
       >
         {isLoading ? (
@@ -169,7 +250,60 @@ export function FunctionsSidebar({
           >
             Loading functions...
           </div>
-        ) : groupedFunctions.length === 0 ? (
+        ) : organizationMode === "byType" ? (
+          // By Type View
+          groupedByType.length === 0 ? (
+            <div
+              className="px-4 py-3 text-xs"
+              style={{ color: "var(--color-text-muted)" }}
+            >
+              {searchQuery ? "No functions match search" : "No functions found"}
+            </div>
+          ) : (
+            <>
+              {groupedByType.map((group) => {
+                const groupKey = group.type + "s";
+                return (
+                  <div key={group.type}>
+                    {/* Group header */}
+                    <TreeItem
+                      label={group.label}
+                      icon={
+                        <Zap
+                          size={14}
+                          style={{ color: "var(--color-text-muted)" }}
+                        />
+                      }
+                      depth={0}
+                      isExpandable
+                      isExpanded={expanded[groupKey]}
+                      onToggle={() => toggleExpanded(groupKey)}
+                      rightContent={
+                        <span className="text-[10px]">
+                          {group.functions.length}
+                        </span>
+                      }
+                    />
+
+                    {/* Functions in this group */}
+                    {expanded[groupKey] &&
+                      group.functions.map((fn) => (
+                        <TreeItem
+                          key={fn.identifier}
+                          label={fn.name}
+                          icon={getFunctionTypeIcon(fn.type)}
+                          depth={1}
+                          isSelected={selectedFunction === fn.name}
+                          onClick={() => onSelectFunction(fn.name)}
+                        />
+                      ))}
+                  </div>
+                );
+              })}
+            </>
+          )
+        ) : // By Module View
+        groupedByModule.length === 0 ? (
           <div
             className="px-4 py-3 text-xs"
             style={{ color: "var(--color-text-muted)" }}
@@ -178,23 +312,22 @@ export function FunctionsSidebar({
           </div>
         ) : (
           <>
-            {groupedFunctions.map((group) => {
-              const groupKey = group.type + "s"; // queries, mutations, etc.
+            {groupedByModule.map((group) => {
               return (
-                <div key={group.type}>
-                  {/* Group header */}
+                <div key={group.module}>
+                  {/* Module header */}
                   <TreeItem
-                    label={group.label}
+                    label={group.module}
                     icon={
-                      <Zap
+                      <CodeXml
                         size={14}
                         style={{ color: "var(--color-text-muted)" }}
                       />
                     }
                     depth={0}
                     isExpandable
-                    isExpanded={expanded[groupKey]}
-                    onToggle={() => toggleExpanded(groupKey)}
+                    isExpanded={expanded[group.module]}
+                    onToggle={() => toggleExpanded(group.module)}
                     rightContent={
                       <span className="text-[10px]">
                         {group.functions.length}
@@ -202,21 +335,16 @@ export function FunctionsSidebar({
                     }
                   />
 
-                  {/* Functions in this group */}
-                  {expanded[groupKey] &&
+                  {/* Functions in this module */}
+                  {expanded[group.module] &&
                     group.functions.map((fn) => (
                       <TreeItem
-                        key={fn.name}
+                        key={fn.identifier}
                         label={fn.name}
                         icon={getFunctionTypeIcon(fn.type)}
                         depth={1}
                         isSelected={selectedFunction === fn.name}
                         onClick={() => onSelectFunction(fn.name)}
-                        rightContent={
-                          fn.lastDeploy && (
-                            <span className="text-[10px]">{fn.lastDeploy}</span>
-                          )
-                        }
                       />
                     ))}
                 </div>

@@ -53,6 +53,13 @@ export {
   type UdfType,
 } from "./functions";
 
+// Export log streaming and processing functions
+export {
+  streamUdfExecution,
+  streamFunctionLogs,
+  processFunctionLogs,
+} from "./logs";
+
 // Export BigBrain API functions and types
 export {
   // Core API functions

@@ -33,3 +33,4 @@ export {
   type MenuTriggerProps,
 } from "./menu";
 export { TreeItem, type TreeItemProps } from "./TreeItem";
+export { FunctionIcon } from "./FunctionIcon";
