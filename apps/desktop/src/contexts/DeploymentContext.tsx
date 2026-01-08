@@ -126,23 +126,27 @@ export function DeploymentProvider({
       deploymentName,
       hasAccessToken: Boolean(token),
       accessTokenPrefix: token ? token.substring(0, 20) + "..." : null,
+      currentKey: cliDeployKey ? "present" : "null",
+      generatingFor: generatingKeyRef.current,
     });
 
-    // Reset state when deployment changes
-    setCliDeployKey(null);
-    setCliDeployKeyError(null);
-
-    // If no deployment or no access token, nothing to do
+    // If no deployment or no access token, clear state and return
     if (!deploymentName || !token) {
       console.log(
-        "[DeploymentContext] Missing deployment or token, skipping deploy key generation",
+        "[DeploymentContext] Missing deployment or token, clearing deploy key state",
       );
+      setCliDeployKey(null);
+      setCliDeployKeyError(null);
       setCliDeployKeyLoading(false);
       return;
     }
 
     // Avoid duplicate requests for the same deployment
     if (generatingKeyRef.current === deploymentName) {
+      console.log(
+        "[DeploymentContext] Already processing deploy key for",
+        deploymentName,
+      );
       return;
     }
 
@@ -151,25 +155,39 @@ export function DeploymentProvider({
     const loadOrCreateDeployKey = async () => {
       generatingKeyRef.current = deploymentName;
       setCliDeployKeyLoading(true);
+      console.log(
+        `[DeploymentContext] Starting loadOrCreateDeployKey for ${deploymentName}`,
+      );
 
       try {
         // First, try to load cached key
+        console.log(
+          `[DeploymentContext] Attempting to load cached key for ${deploymentName}`,
+        );
         const cachedKey = await loadDeploymentKey(deploymentName);
 
         if (cachedKey) {
           console.log(
-            `[DeploymentContext] Using cached deploy key for ${deploymentName}`,
+            `[DeploymentContext] ✓ Found cached deploy key for ${deploymentName} (length: ${cachedKey.length})`,
           );
           if (!cancelled) {
             setCliDeployKey(cachedKey);
             setCliDeployKeyLoading(false);
+            setCliDeployKeyError(null);
+          } else {
+            console.log(
+              `[DeploymentContext] Component unmounted, discarding cached key for ${deploymentName}`,
+            );
           }
           return;
         }
 
-        // No cached key, create a new one
         console.log(
-          `[DeploymentContext] Creating new deploy key for ${deploymentName}`,
+          `[DeploymentContext] No cached key found for ${deploymentName}, creating new one`,
+        );
+
+        console.log(
+          `[DeploymentContext] No cached key found for ${deploymentName}, creating new one`,
         );
         // Use format: cp-{projectId}-{timestamp}
         const projectId = deployment?.projectId;
@@ -177,6 +195,9 @@ export function DeploymentProvider({
           ? `cp-${projectId}-${Date.now()}`
           : `cp-desktop-${Date.now()}`;
 
+        console.log(
+          `[DeploymentContext] Creating deploy key with name: ${keyName}`,
+        );
         const result = await createDeployKey(
           token,
           deploymentName,
@@ -185,16 +206,24 @@ export function DeploymentProvider({
         );
 
         if (!cancelled) {
+          console.log(
+            `[DeploymentContext] ✓ Deploy key created successfully for ${deploymentName}, saving to cache`,
+          );
           // Cache the key for future use
           await saveDeploymentKey(deploymentName, result.key);
           setCliDeployKey(result.key);
+          setCliDeployKeyError(null);
           console.log(
-            `[DeploymentContext] Deploy key created and cached for ${deploymentName}`,
+            `[DeploymentContext] ✓ Deploy key cached and set for ${deploymentName}`,
+          );
+        } else {
+          console.log(
+            `[DeploymentContext] Component unmounted, discarding new key for ${deploymentName}`,
           );
         }
       } catch (error) {
         console.error(
-          `[DeploymentContext] Failed to get deploy key for ${deploymentName}:`,
+          `[DeploymentContext] ✗ Failed to get deploy key for ${deploymentName}:`,
           error,
         );
 
@@ -204,12 +233,15 @@ export function DeploymentProvider({
         if (!cancelled) {
           // Try OAuth token from localStorage as fallback
           try {
+            console.log(
+              `[DeploymentContext] Attempting OAuth token fallback for ${deploymentName}`,
+            );
             const oauthToken = getOAuthTokenFromStorage();
             const tokenExpired = isOAuthTokenExpired();
 
             if (oauthToken && !tokenExpired) {
               console.log(
-                `[DeploymentContext] Using OAuth token as fallback for ${deploymentName}`,
+                `[DeploymentContext] ✓ Using OAuth token as fallback for ${deploymentName}`,
               );
 
               // Validate that the token can be used with this deployment

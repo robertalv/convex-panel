@@ -14,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Bell, TestTube2 } from "lucide-react";
+import { Bell, TestTube2, CheckCircle, XCircle } from "lucide-react";
 
 const STORAGE_KEY = "convex-panel-notifications-enabled";
 
@@ -26,6 +26,11 @@ export function NotificationSettings() {
   });
   const [isCheckingPermission, setIsCheckingPermission] = useState(true);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+  const [isSendingTest, setIsSendingTest] = useState(false);
+  const [testNotificationStatus, setTestNotificationStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // Check permission on mount
   useEffect(() => {
@@ -63,13 +68,47 @@ export function NotificationSettings() {
   };
 
   const handleTestNotification = async () => {
+    setIsSendingTest(true);
+    setTestNotificationStatus(null);
+
     try {
+      console.log("[Notifications] Checking permission before sending test...");
+      const granted = await isPermissionGranted();
+      console.log("[Notifications] Permission granted:", granted);
+
+      if (!granted) {
+        console.error("[Notifications] Permission not granted");
+        setTestNotificationStatus({
+          type: "error",
+          message:
+            "Notification permission not granted. Please grant permission first.",
+        });
+        setIsSendingTest(false);
+        return;
+      }
+
+      console.log("[Notifications] Sending test notification...");
       await sendNotification({
         title: "Test Notification",
         body: "This is a test notification from Convex Panel",
       });
+
+      console.log("[Notifications] Test notification sent successfully");
+      setTestNotificationStatus({
+        type: "success",
+        message: "Test notification sent successfully!",
+      });
+
+      // Clear success message after 3 seconds
+      setTimeout(() => setTestNotificationStatus(null), 3000);
     } catch (error) {
-      console.error("Failed to send test notification:", error);
+      console.error("[Notifications] Failed to send test notification:", error);
+      setTestNotificationStatus({
+        type: "error",
+        message: `Failed to send notification: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    } finally {
+      setIsSendingTest(false);
     }
   };
 
@@ -244,11 +283,32 @@ export function NotificationSettings() {
                 Send a test notification to verify everything is working
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Button onClick={handleTestNotification} variant="outline">
+            <CardContent className="space-y-3">
+              <Button
+                onClick={handleTestNotification}
+                variant="outline"
+                disabled={isSendingTest}
+              >
                 <Bell className="h-4 w-4 mr-2" />
-                Send Test Notification
+                {isSendingTest ? "Sending..." : "Send Test Notification"}
               </Button>
+
+              {testNotificationStatus && (
+                <div
+                  className={`flex items-center gap-2 p-3 rounded-md text-sm ${
+                    testNotificationStatus.type === "success"
+                      ? "bg-green-50 dark:bg-green-950 text-green-900 dark:text-green-100"
+                      : "bg-red-50 dark:bg-red-950 text-red-900 dark:text-red-100"
+                  }`}
+                >
+                  {testNotificationStatus.type === "success" ? (
+                    <CheckCircle className="h-4 w-4 flex-shrink-0" />
+                  ) : (
+                    <XCircle className="h-4 w-4 flex-shrink-0" />
+                  )}
+                  <span>{testNotificationStatus.message}</span>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
