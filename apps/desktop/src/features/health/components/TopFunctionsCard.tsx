@@ -62,7 +62,7 @@ export function TopFunctionsCard({
       className={className}
       action={onRetry && <RefreshButton onClick={onRetry} />}
     >
-      {functions.length === 0 ? (
+      {!functions || functions.length === 0 ? (
         <EmptyState
           variant="empty"
           title="No data yet"

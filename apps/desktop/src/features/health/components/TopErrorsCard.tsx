@@ -137,6 +137,7 @@ export function TopErrorsCard({
 }: TopErrorsCardProps) {
   // Filter and sort by error count
   const displayFunctions = useMemo(() => {
+    if (!functions || !Array.isArray(functions)) return [];
     return [...functions]
       .filter((f) => f.errors > 0)
       .sort((a, b) => b.errors - a.errors)
