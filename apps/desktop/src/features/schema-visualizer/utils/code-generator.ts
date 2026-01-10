@@ -305,13 +305,30 @@ export function findTableDefinitionInSchema(
   // tableName: defineTable({...})
   // or tableName: defineTable({...}).index(...)
 
+  console.log("[findTableDefinitionInSchema] Looking for table:", tableName);
+
   const tablePattern = new RegExp(
     `(\\s*${tableName}\\s*:\\s*defineTable\\s*\\()`,
     "g",
   );
 
   const match = tablePattern.exec(schemaContent);
-  if (!match) return null;
+  if (!match) {
+    console.error(
+      "[findTableDefinitionInSchema] Could not match table pattern for:",
+      tableName,
+    );
+    console.log(
+      "[findTableDefinitionInSchema] Schema preview:",
+      schemaContent.slice(0, 500),
+    );
+    return null;
+  }
+
+  console.log(
+    "[findTableDefinitionInSchema] Found table at index:",
+    match.index,
+  );
 
   const start = match.index;
   let depth = 0;
@@ -320,6 +337,9 @@ export function findTableDefinitionInSchema(
   let end = start;
 
   // Find the end of the table definition (including chained methods)
+  // We start AFTER "defineTable(" so depth starts at 0
+  // The first { will make it 1, the closing } will make it 0
+  // Then the ) that closes defineTable( will make it -1, which is our signal
   for (let i = match.index + match[0].length; i < schemaContent.length; i++) {
     const char = schemaContent[i];
     const prevChar = schemaContent[i - 1];
@@ -344,19 +364,21 @@ export function findTableDefinitionInSchema(
       depth--;
     }
 
-    // When we exit the defineTable call, look for chained methods
-    if (depth === 0) {
+    // When depth goes to -1, we've exited the defineTable(...) call
+    if (depth === -1) {
+      // We're at the ) that closes defineTable(
       // Check if there's a chained method call
       const rest = schemaContent.slice(i + 1);
       const chainMatch = rest.match(/^\s*\./);
       if (chainMatch) {
         // Continue to include the chained method
         i += chainMatch[0].length;
-        depth = 0;
+        depth = 0; // Reset depth for the chained method
         continue;
       }
 
-      // Look for comma or end of object
+      // No more chained methods, we're done
+      // Look for comma or end of line
       const afterMatch = rest.match(/^\s*[,\n]/);
       if (afterMatch) {
         end = i + 1 + afterMatch[0].length;
@@ -367,44 +389,156 @@ export function findTableDefinitionInSchema(
     }
   }
 
+  const content = schemaContent.slice(start, end);
+  console.log(
+    "[findTableDefinitionInSchema] Extracted table definition:",
+    content.slice(0, 200),
+  );
+
   return {
     start,
     end,
-    content: schemaContent.slice(start, end),
+    content,
   };
 }
 
 /**
+ * Result of inserting an index into schema
+ */
+export type SchemaModificationResult = {
+  success: boolean;
+  modifiedContent: string;
+  lineNumber: number; // 1-based line number where the change was made
+};
+
+/**
  * Insert an index into a table definition in schema.ts content
+ * Returns the modified content and the line number where the index was inserted
  */
 export function insertIndexIntoSchema(
   schemaContent: string,
   tableName: string,
   indexCode: string,
-): string | null {
+): SchemaModificationResult | null {
+  console.log("[insertIndexIntoSchema] Inserting index:", {
+    tableName,
+    indexCode,
+  });
+
   const tableLocation = findTableDefinitionInSchema(schemaContent, tableName);
-  if (!tableLocation) return null;
-
-  // Look for the pattern: defineTable({...}) possibly followed by .index() calls
-  // We want to insert before the trailing comma
-
-  // Find the last closing paren that's part of a method chain
-  let insertPos = tableLocation.end;
-
-  // Check if there's a trailing comma
-  const trailingMatch = schemaContent
-    .slice(tableLocation.start, tableLocation.end)
-    .match(/\)\s*,?\s*$/);
-  if (trailingMatch) {
-    insertPos =
-      tableLocation.start + tableLocation.content.lastIndexOf(")") + 1;
+  if (!tableLocation) {
+    console.error("[insertIndexIntoSchema] Table location not found");
+    return null;
   }
+
+  const tableContent = tableLocation.content;
+  console.log("[insertIndexIntoSchema] Table content:", tableContent);
+
+  // Strategy: Find where to insert by looking for the pattern:
+  // defineTable({...})  <- we want to insert after this )
+  // OR
+  // defineTable({...}).index(...).index(...)  <- we want to insert after the last )
+
+  // First, find the closing ) of defineTable({...})
+  // This is the ) that closes the defineTable( call
+  let depth = 0;
+  let defineTableStart = tableContent.indexOf("defineTable(");
+  if (defineTableStart === -1) {
+    console.error("[insertIndexIntoSchema] Could not find defineTable(");
+    return null;
+  }
+
+  // Start after "defineTable("
+  let pos = defineTableStart + "defineTable(".length;
+  let defineTableEnd = -1;
+
+  // Track depth to find the matching closing paren
+  while (pos < tableContent.length) {
+    const char = tableContent[pos];
+
+    if (char === "(" || char === "{" || char === "[") {
+      depth++;
+    } else if (char === ")" || char === "}" || char === "]") {
+      depth--;
+
+      // When we hit depth -1, we've found the closing ) of defineTable(
+      if (depth === -1) {
+        defineTableEnd = pos;
+        break;
+      }
+    }
+
+    pos++;
+  }
+
+  if (defineTableEnd === -1) {
+    console.error(
+      "[insertIndexIntoSchema] Could not find closing ) of defineTable",
+    );
+    return null;
+  }
+
+  console.log(
+    "[insertIndexIntoSchema] Found defineTable closing ) at:",
+    defineTableEnd,
+  );
+
+  // Now look for any chained .index() calls after this position
+  let insertOffset = defineTableEnd + 1; // Start after the )
+
+  // Keep matching .index() chains
+  let searchPos = insertOffset;
+  while (true) {
+    const segment = tableContent.slice(searchPos);
+    const indexMatch = segment.match(/^\s*\.index\([^)]*\)/);
+
+    if (!indexMatch) {
+      break; // No more .index() calls
+    }
+
+    searchPos = searchPos + indexMatch[0].length;
+    console.log(
+      "[insertIndexIntoSchema] Found chained .index() ending at:",
+      searchPos,
+    );
+  }
+
+  insertOffset = searchPos;
+  console.log("[insertIndexIntoSchema] Final insertion offset:", insertOffset);
+  console.log(
+    "[insertIndexIntoSchema] Character at insert:",
+    JSON.stringify(tableContent[insertOffset]),
+  );
+
+  // Calculate absolute position in the schema content
+  const insertPos = tableLocation.start + insertOffset;
 
   // Insert the index code
   const before = schemaContent.slice(0, insertPos);
   const after = schemaContent.slice(insertPos);
 
-  return `${before}\n    ${indexCode}${after}`;
+  // Calculate proper indentation by looking at the defineTable line
+  const beforeLines = before.split("\n");
+  const tableDefLine = beforeLines.find((line) =>
+    line.includes(`${tableName}:`),
+  );
+  const baseIndent = tableDefLine?.match(/^(\s*)/)?.[1] || "";
+  const indent = baseIndent + "  "; // Add 2 spaces for chained method
+
+  console.log("[insertIndexIntoSchema] Using indent:", JSON.stringify(indent));
+
+  const modifiedContent = `${before}\n${indent}${indexCode}${after}`;
+
+  // Calculate the line number where the index was inserted
+  const lineNumber = before.split("\n").length + 1;
+
+  console.log("[insertIndexIntoSchema] Success! Inserted at line:", lineNumber);
+
+  return {
+    success: true,
+    modifiedContent,
+    lineNumber,
+  };
 }
 
 /**

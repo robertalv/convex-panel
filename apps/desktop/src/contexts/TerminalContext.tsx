@@ -352,62 +352,6 @@ export function TerminalProvider({ children }: TerminalProviderProps) {
     [],
   );
 
-  // Listen for MCP terminal command events
-  useEffect(() => {
-    const handleMcpCommand = (
-      event: CustomEvent<{
-        command: string;
-        cwd?: string;
-        newSession?: boolean;
-        sessionName?: string;
-      }>,
-    ) => {
-      const { command, cwd, newSession, sessionName } = event.detail;
-
-      let targetSessionId: string;
-
-      if (newSession) {
-        // Create a new session for this command
-        targetSessionId = createSession(sessionName, cwd);
-      } else {
-        // Use active session or create one if none exists
-        targetSessionId = activeSessionId ?? createSession(sessionName, cwd);
-      }
-
-      // Open terminal and switch to the session
-      openTerminal();
-      switchSession(targetSessionId);
-
-      // Write the command to the terminal
-      // The actual execution happens in the TerminalPanel
-      writeToTerminal(targetSessionId, `$ ${command}\n`);
-
-      // Dispatch an event for the terminal panel to execute the command
-      window.dispatchEvent(
-        new CustomEvent("terminal-execute-command", {
-          detail: { sessionId: targetSessionId, command, cwd },
-        }),
-      );
-    };
-
-    window.addEventListener(
-      "mcp-terminal-command",
-      handleMcpCommand as EventListener,
-    );
-    return () => {
-      window.removeEventListener(
-        "mcp-terminal-command",
-        handleMcpCommand as EventListener,
-      );
-    };
-  }, [
-    activeSessionId,
-    createSession,
-    openTerminal,
-    switchSession,
-    writeToTerminal,
-  ]);
-
   return (
     <TerminalActionsContext.Provider value={actions}>
       <TerminalStateContext.Provider value={state}>

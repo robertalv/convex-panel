@@ -32,6 +32,7 @@ const {
   router: eventsRouter,
   broadcastToRepo,
 } = require("./src/handlers/events");
+const versionRouter = require("./src/handlers/version");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -140,6 +141,7 @@ app.get("/", (req, res) => {
       githubAppRepos: "/v1/github/app/repos",
       githubWebhook: "/v1/github/webhook",
       eventsSubscribe: "/v1/events/subscribe",
+      version: "/v1/version",
     },
   });
 });
@@ -155,6 +157,9 @@ app.use("/github/webhook", webhookRouter);
 
 app.use("/v1/events", eventsRouter);
 app.use("/events", eventsRouter);
+
+app.use("/v1/version", versionRouter);
+app.use("/version", versionRouter);
 
 // =============================================================================
 // Convex OAuth Token Exchange (existing functionality)

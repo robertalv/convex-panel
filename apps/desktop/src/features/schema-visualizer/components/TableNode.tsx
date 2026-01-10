@@ -305,7 +305,7 @@ function TableContextMenu({
             }}
           >
             <ExternalLink size={12} />
-            Open in Cursor
+            Open in Editor
           </button>
         )}
         {!onNavigateToData && !onOpenInCursor && (
@@ -587,15 +587,15 @@ function TableNodeComponent({ data, selected }: NodeProps) {
                   Indexes
                 </div>
                 <div className="px-1 space-y-1">
-                {displayIndexes.map((index) => (
-                  <IndexRow
-                    key={index.name}
-                    name={index.name}
-                    type={index.type}
-                    staged={index.staged}
-                    diffStatus={indexDiffMap.get(index.name)?.status}
-                  />
-                ))}
+                  {displayIndexes.map((index) => (
+                    <IndexRow
+                      key={index.name}
+                      name={index.name}
+                      type={index.type}
+                      staged={index.staged}
+                      diffStatus={indexDiffMap.get(index.name)?.status}
+                    />
+                  ))}
                 </div>
                 {hiddenIndexCount > 0 && (
                   <div

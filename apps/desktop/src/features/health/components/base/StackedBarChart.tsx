@@ -8,7 +8,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 
 export interface StackedBarDataPoint {
   /** Timestamp in milliseconds or seconds */
@@ -95,7 +95,10 @@ export function StackedBarChart({
           {showXAxis && (
             <XAxis
               dataKey="time"
-              tickFormatter={(t) => format(new Date(t), "HH:mm")}
+              tickFormatter={(t) => {
+                const date = new Date(t);
+                return isValid(date) ? format(date, "HH:mm") : "";
+              }}
               tick={{ fontSize: 10, fill: "oklch(0.55 0.02 285)" }}
               axisLine={false}
               tickLine={false}
@@ -114,10 +117,16 @@ export function StackedBarChart({
             content={({ active, payload }) => {
               if (!active || !payload?.[0]) return null;
               const point = payload[0].payload;
+              const timeDate = new Date(point.time);
+              const formattedTime = point.label
+                ? point.label
+                : isValid(timeDate)
+                  ? format(timeDate, "HH:mm:ss")
+                  : "Invalid time";
               return (
                 <div className="rounded-lg border border-border-base bg-surface-overlay px-2.5 py-1.5 shadow-md">
                   <p className="text-xs text-text-muted mb-1">
-                    {point.label ?? format(new Date(point.time), "HH:mm:ss")}
+                    {formattedTime}
                   </p>
                   <div className="space-y-0.5">
                     <p className="text-xs">

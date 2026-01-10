@@ -119,3 +119,20 @@ export function useTheme() {
   }
   return context;
 }
+
+/**
+ * Safe version of useTheme that returns default values if context is unavailable
+ * Compatible with panel package expectations
+ */
+export function useThemeSafe() {
+  const context = useContext(ThemeContext);
+  if (context === undefined) {
+    return {
+      theme: "dark" as ResolvedTheme,
+      resolvedTheme: "dark" as ResolvedTheme,
+      setTheme: () => {},
+      toggleTheme: () => {},
+    };
+  }
+  return context;
+}

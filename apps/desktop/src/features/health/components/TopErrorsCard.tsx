@@ -8,7 +8,7 @@ interface TopErrorsCardProps {
   /** List of functions with errors, sorted by error count */
   functions: FunctionStat[];
   /** Total error count */
-  totalErrors: number;
+  totalErrors?: number;
   /** Maximum number of functions to display */
   maxItems?: number;
   /** Whether data is loading */
@@ -164,14 +164,14 @@ export function TopErrorsCard({
           <span
             className={cn(
               "text-2xl font-semibold font-mono",
-              totalErrors === 0
+              (totalErrors ?? 0) === 0
                 ? "text-success"
-                : totalErrors < 10
+                : (totalErrors ?? 0) < 10
                   ? "text-warning"
                   : "text-error",
             )}
           >
-            {totalErrors.toLocaleString()}
+            {(totalErrors ?? 0).toLocaleString()}
           </span>
           <span className="text-xs text-muted">total errors (1h)</span>
         </div>

@@ -17,7 +17,6 @@ export * from "./FeaturePanel";
 export * from "./GitHubAuthModal";
 export * from "./GitHubRepoSelector";
 export * from "./GitHubStatusBadge";
-export * from "./OpenInEditor";
 export * from "./TierBadge";
 export * from "./AboutDialog";
 export { getPlanInfo } from "./getPlanInfo";

@@ -1,4 +1,4 @@
-import { GradientBackground } from "./GradientBackground";
+import { GradientBackground } from "../shared/GradientBackground";
 import { Spinner } from "@/components/ui/spinner";
 
 interface LoadingScreenProps {

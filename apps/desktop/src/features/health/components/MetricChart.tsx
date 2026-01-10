@@ -8,7 +8,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 
 export interface TimeSeriesDataPoint {
   /** Timestamp in milliseconds or seconds */
@@ -127,7 +127,10 @@ export function MetricChart({
           {showXAxis && (
             <XAxis
               dataKey="time"
-              tickFormatter={(t) => format(new Date(t), "HH:mm")}
+              tickFormatter={(t) => {
+                const date = new Date(t);
+                return isValid(date) ? format(date, "HH:mm") : "";
+              }}
               tick={{ fontSize: 10, fill: "var(--color-text-muted)" }}
               axisLine={false}
               tickLine={false}
@@ -150,10 +153,14 @@ export function MetricChart({
               const formattedValue = formatTooltipValue
                 ? formatTooltipValue(point.value)
                 : point.value?.toFixed(2);
+              const timeDate = new Date(point.time);
+              const formattedTime = isValid(timeDate)
+                ? format(timeDate, "HH:mm:ss")
+                : "Invalid time";
               return (
                 <div className="rounded-lg border border-border bg-overlay px-2.5 py-1.5 shadow-md">
                   <p className="text-xs text-muted">
-                    {format(new Date(point.time), "HH:mm:ss")}
+                    {formattedTime}
                   </p>
                   <p className="text-sm font-medium text-foreground font-mono">
                     {formattedValue}

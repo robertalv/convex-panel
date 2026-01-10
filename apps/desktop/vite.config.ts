@@ -33,6 +33,9 @@ function getGitRepoUrl(): string {
 export default defineConfig({
   plugins: [react(), tailwindcss()],
 
+  // Always use relative paths for Tauri builds (needed for tauri:// protocol in production)
+  base: "./",
+
   // Prevent vite from obscuring rust errors
   clearScreen: false,
 
@@ -59,18 +62,40 @@ export default defineConfig({
     // Tauri uses Chromium on Windows and WebKit on macOS and Linux
     target:
       process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari14",
-    // Don't minify for debug builds
-    minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,
-    // Produce sourcemaps for debug builds
-    sourcemap: !!process.env.TAURI_ENV_DEBUG,
+    // Production builds: minify and no sourcemaps, debug builds: no minify and sourcemaps
+    minify:
+      process.env.NODE_ENV === "production"
+        ? "esbuild"
+        : !process.env.TAURI_ENV_DEBUG
+          ? "esbuild"
+          : false,
+    // Produce sourcemaps for debug builds, but not for production
+    sourcemap:
+      process.env.NODE_ENV === "production"
+        ? false
+        : !!process.env.TAURI_ENV_DEBUG,
+    // Production optimizations
+    ...(process.env.NODE_ENV === "production" && {
+      chunkSizeWarningLimit: 1000,
+    }),
     rollupOptions: {
-      // Tauri plugins are resolved at runtime by Tauri, not bundled
-      external: [
-        "@tauri-apps/plugin-shell",
-        "@tauri-apps/plugin-fs",
-        "@tauri-apps/plugin-dialog",
-        "@tauri-apps/plugin-http",
-      ],
+      // Production chunk splitting for better caching
+      ...(process.env.NODE_ENV === "production" && {
+        output: {
+          manualChunks: {
+            "react-vendor": ["react", "react-dom", "react-router-dom"],
+            "convex-vendor": ["convex", "convex/react"],
+            "ui-vendor": [
+              "@radix-ui/react-dialog",
+              "@radix-ui/react-dropdown-menu",
+              "@radix-ui/react-popover",
+              "@radix-ui/react-select",
+              "@radix-ui/react-tabs",
+              "@radix-ui/react-tooltip",
+            ],
+          },
+        },
+      }),
     },
   },
 

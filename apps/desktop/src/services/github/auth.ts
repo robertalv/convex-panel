@@ -11,7 +11,6 @@
  * 4. Token is stored securely in system keyring
  */
 
-import { invoke } from "@tauri-apps/api/core";
 import type {
   DeviceCodeResponse,
   TokenPollResponse,
@@ -30,20 +29,18 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
  * Generate or retrieve a unique device ID
  */
 export async function getDeviceId(): Promise<string> {
-  try {
-    const existing = await invoke<string | null>("get_secret", {
-      key: DEVICE_ID_KEY,
-    });
+  if (typeof localStorage !== "undefined") {
+    const existing = localStorage.getItem(DEVICE_ID_KEY);
     if (existing) {
       return existing;
     }
-  } catch (e) {
-    // No existing device ID
   }
 
   // Generate a new UUID
   const deviceId = crypto.randomUUID();
-  await invoke("set_secret", { key: DEVICE_ID_KEY, value: deviceId });
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem(DEVICE_ID_KEY, deviceId);
+  }
   return deviceId;
 }
 
@@ -101,50 +98,47 @@ export async function pollForToken(
  * Store the GitHub token securely
  */
 export async function storeToken(token: string): Promise<void> {
-  await invoke("set_secret", { key: GITHUB_TOKEN_KEY, value: token });
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem(GITHUB_TOKEN_KEY, token);
+    console.log("[GitHub Auth] Token stored");
+  }
 }
 
 /**
  * Retrieve the stored GitHub token
  */
 export async function getStoredToken(): Promise<string | null> {
-  try {
-    const token = await invoke<string | null>("get_secret", {
-      key: GITHUB_TOKEN_KEY,
-    });
-    return token;
-  } catch (e) {
-    console.error("Failed to get stored token:", e);
-    return null;
-  }
+  if (typeof localStorage === "undefined") return null;
+  return localStorage.getItem(GITHUB_TOKEN_KEY);
 }
 
 /**
  * Delete the stored GitHub token (logout)
  */
 export async function deleteToken(): Promise<void> {
-  await invoke("delete_secret", { key: GITHUB_TOKEN_KEY });
-  await invoke("delete_secret", { key: GITHUB_USER_KEY });
+  if (typeof localStorage !== "undefined") {
+    localStorage.removeItem(GITHUB_TOKEN_KEY);
+    localStorage.removeItem(GITHUB_USER_KEY);
+  }
 }
 
 /**
  * Store user info locally
  */
 export async function storeUser(user: GitHubUser): Promise<void> {
-  await invoke("set_secret", {
-    key: GITHUB_USER_KEY,
-    value: JSON.stringify(user),
-  });
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem(GITHUB_USER_KEY, JSON.stringify(user));
+  }
 }
 
 /**
  * Get stored user info
  */
 export async function getStoredUser(): Promise<GitHubUser | null> {
+  if (typeof localStorage === "undefined") return null;
+
   try {
-    const userJson = await invoke<string | null>("get_secret", {
-      key: GITHUB_USER_KEY,
-    });
+    const userJson = localStorage.getItem(GITHUB_USER_KEY);
     if (userJson) {
       return JSON.parse(userJson);
     }

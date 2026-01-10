@@ -35,3 +35,4 @@ export {
 export { TreeItem, type TreeItemProps } from "./TreeItem";
 export { FunctionIcon } from "./FunctionIcon";
 export { HealthCard } from "./health-card/HealthCard";
+export { Icon, type IconProps } from "./Icon";

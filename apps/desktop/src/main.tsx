@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { QueryProvider } from "@/contexts/QueryContext";
 import { NetworkTestProvider } from "@/contexts/NetworkTestContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
 import App from "./App";
 
 // Import new Tailwind-based styles
@@ -33,6 +34,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <App convex={null} />
               )}
             </HashRouter>
+            <Toaster />
           </TooltipProvider>
         </NetworkTestProvider>
       </ThemeProvider>

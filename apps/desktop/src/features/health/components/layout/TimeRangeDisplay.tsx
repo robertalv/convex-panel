@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Clock, Calendar } from "lucide-react";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 
 type TimeRange = "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "custom";
 
@@ -43,7 +43,7 @@ export function TimeRangeDisplay({
   className,
 }: TimeRangeDisplayProps) {
   const label =
-    range === "custom" && startTime && endTime
+    range === "custom" && startTime && endTime && isValid(startTime) && isValid(endTime)
       ? `${format(startTime, "MMM d, HH:mm")} - ${format(endTime, "MMM d, HH:mm")}`
       : rangeLabels[range];
 

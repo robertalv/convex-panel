@@ -154,3 +154,33 @@ export function useSheetState() {
   const { state } = useSheet();
   return state;
 }
+
+// ============================================================================
+// Safe Actions Hook (compatible with panel package)
+// ============================================================================
+
+export function useSheetActionsSafe() {
+  const context = useContext(SheetContext);
+  if (context === undefined) {
+    // Return safe defaults when context is not available
+    return {
+      openSheet: () => {},
+      closeSheet: () => {},
+      setSheetContent: () => {},
+    };
+  }
+  const { openSheet, closeSheet, setSheetContent } = context;
+  return {
+    openSheet,
+    closeSheet,
+    setSheetContent,
+  };
+}
+
+export function useSheetStateSafe() {
+  const context = useContext(SheetContext);
+  if (context === undefined) {
+    return initialState;
+  }
+  return context.state;
+}

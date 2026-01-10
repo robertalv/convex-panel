@@ -51,7 +51,9 @@ export class SSEClient {
    */
   async connect(repos: string[]): Promise<void> {
     if (repos.length === 0) {
-      throw new Error("At least one repository required");
+      console.log("[SSE] No repositories to subscribe to, skipping connection");
+      this.setState("disconnected");
+      return;
     }
 
     this.repos = repos;
@@ -61,6 +63,13 @@ export class SSEClient {
   }
 
   private doConnect(): void {
+    // Guard against empty repos (shouldn't happen after connect check, but extra safety)
+    if (this.repos.length === 0) {
+      console.log("[SSE] No repositories to connect to");
+      this.setState("disconnected");
+      return;
+    }
+
     // Clean up existing connection
     this.disconnect(false);
 
@@ -71,6 +80,8 @@ export class SSEClient {
     if (this.deviceId) {
       url.searchParams.set("device_id", this.deviceId);
     }
+
+    console.log("[SSE] Connecting to:", url.toString());
 
     try {
       this.eventSource = new EventSource(url.toString());

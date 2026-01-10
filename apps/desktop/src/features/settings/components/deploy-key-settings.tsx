@@ -8,13 +8,13 @@ import {
   AlertTriangle,
   Plus,
 } from "lucide-react";
-import { useMcpOptional } from "../../../contexts/McpContext";
 import { useDeployment } from "../../../contexts/DeploymentContext";
 import {
   readDeployKeyFromEnvLocal,
   writeDeployKeyToEnvLocal,
   getKeyPreview,
 } from "../../../lib/envFile";
+import { useProjectPathOptional } from "../../../contexts/ProjectPathContext";
 
 /**
  * Get the deployment type from a deployment name
@@ -40,7 +40,8 @@ function getDeploymentType(
 }
 
 export function DeployKeySettings() {
-  const mcp = useMcpOptional();
+  const projectPathContext = useProjectPathOptional();
+  const projectPath = projectPathContext?.projectPath ?? null;
   const deployment = useDeployment();
 
   const [envLocalKey, setEnvLocalKey] = useState<string | null>(null);
@@ -59,21 +60,21 @@ export function DeployKeySettings() {
 
   // Load .env.local key
   useEffect(() => {
-    if (mcp?.projectPath) {
-      readDeployKeyFromEnvLocal(mcp.projectPath)
+    if (projectPath) {
+      readDeployKeyFromEnvLocal(projectPath)
         .then(setEnvLocalKey)
         .catch(() => setEnvLocalKey(null));
     }
-  }, [mcp?.projectPath]);
+  }, [projectPath]);
 
   const handleWriteToEnvLocal = async () => {
-    if (!mcp?.projectPath || !deployment.cliDeployKey) return;
+    if (!projectPath || !deployment.cliDeployKey) return;
 
     setIsWritingEnvLocal(true);
     setDeployKeyMessage(null);
 
     try {
-      await writeDeployKeyToEnvLocal(mcp.projectPath, deployment.cliDeployKey);
+      await writeDeployKeyToEnvLocal(projectPath, deployment.cliDeployKey);
       setEnvLocalKey(deployment.cliDeployKey);
       setDeployKeyMessage({
         type: "success",
@@ -279,7 +280,7 @@ export function DeployKeySettings() {
           </div>
 
           {/* .env.local Section */}
-          {mcp?.projectPath && (
+          {projectPath && (
             <div style={{ marginBottom: "24px" }}>
               <h3
                 style={{

@@ -96,7 +96,6 @@ export function useBigBrain(
       return data;
     } catch (err) {
       console.error("Failed to load user profile:", err);
-      // Don't set error state here as this might be background fetch
       return null;
     } finally {
       setLoading(false);

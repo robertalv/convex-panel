@@ -8,7 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { HealthCard } from "@/components/ui";
 import type {
@@ -141,7 +141,10 @@ export function FunctionActivityCard({
               >
                 <XAxis
                   dataKey="time"
-                  tickFormatter={(t) => format(new Date(t), "HH:mm")}
+                  tickFormatter={(t) => {
+                    const date = new Date(t);
+                    return isValid(date) ? format(date, "HH:mm") : "";
+                  }}
                   tick={{ fontSize: 9, fill: "var(--color-text-muted)" }}
                   axisLine={false}
                   tickLine={false}
@@ -151,10 +154,14 @@ export function FunctionActivityCard({
                 <Tooltip
                   content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null;
+                    const labelDate = new Date(label);
+                    const formattedTime = isValid(labelDate)
+                      ? format(labelDate, "HH:mm:ss")
+                      : "Invalid time";
                     return (
                       <div className="rounded-lg border border-border bg-overlay px-3 py-2 shadow-md">
                         <p className="text-[10px] text-muted mb-1">
-                          {format(new Date(label), "HH:mm:ss")}
+                          {formattedTime}
                         </p>
                         <div className="flex flex-col gap-0.5">
                           {payload.map((entry) => (

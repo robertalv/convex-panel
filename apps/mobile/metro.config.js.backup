@@ -1,0 +1,190 @@
+// Learn more https://docs.expo.dev/guides/customizing-metro
+const path = require('path');
+const fs = require('fs');
+const Module = require('module');
+
+// Patch module resolution to help find metro-cache-key
+// This is needed because @expo/metro-config requires metro-cache-key
+// but pnpm's hoisting doesn't always make it accessible
+const workspaceRoot = path.resolve(__dirname, '../..');
+const originalResolveFilename = Module._resolveFilename;
+
+Module._resolveFilename = function(request, parent, isMain, options) {
+  if (request === 'metro-cache-key') {
+    // Try multiple resolution paths including pnpm virtual store
+    const resolutionPaths = [
+      path.resolve(workspaceRoot, 'node_modules'),
+      path.resolve(__dirname, 'node_modules'),
+      path.resolve(workspaceRoot, 'node_modules/.pnpm/metro-cache-key@0.80.12/node_modules'),
+    ];
+    
+    // Also try to find it in any metro-cache-key location in pnpm store
+    try {
+      const pnpmStorePath = path.resolve(workspaceRoot, 'node_modules/.pnpm');
+      if (fs.existsSync(pnpmStorePath)) {
+        const metroCacheKeyDirs = fs.readdirSync(pnpmStorePath)
+          .filter(dir => dir.startsWith('metro-cache-key@'))
+          .map(dir => path.resolve(pnpmStorePath, dir, 'node_modules'));
+        resolutionPaths.push(...metroCacheKeyDirs);
+      }
+    } catch (e) {
+      // Ignore errors when reading pnpm store
+    }
+    
+    for (const resolutionPath of resolutionPaths) {
+      try {
+        const resolved = require.resolve('metro-cache-key', {
+          paths: [resolutionPath]
+        });
+        if (fs.existsSync(resolved)) {
+          return resolved;
+        }
+      } catch (e) {
+        // Continue to next path
+      }
+    }
+    
+    // If all else fails, try default resolution but with expanded paths
+    try {
+      const parentPaths = parent && parent.paths ? parent.paths : [];
+      const allPaths = [...resolutionPaths, ...parentPaths, ...Module._nodeModulePaths(workspaceRoot)];
+      return require.resolve('metro-cache-key', { paths: allPaths });
+    } catch (e) {
+      // Fall through to default resolution
+    }
+  }
+  return originalResolveFilename.call(this, request, parent, isMain, options);
+};
+
+const { getDefaultConfig } = require('expo/metro-config');
+
+const projectRoot = __dirname;
+
+/** @type {import('expo/metro-config').MetroConfig} */
+const config = getDefaultConfig(projectRoot);
+
+// Watch workspace root for changes
+config.watchFolders = [workspaceRoot];
+
+// Resolve node_modules: prioritize project root first
+// This ensures React and React Native come from mobile app's dependencies
+config.resolver.nodeModulesPaths = [
+  path.resolve(projectRoot, 'node_modules'),
+  path.resolve(workspaceRoot, 'node_modules'),
+];
+
+// Ensure TypeScript files are included in source extensions
+if (!config.resolver.sourceExts) {
+  config.resolver.sourceExts = [];
+}
+if (!config.resolver.sourceExts.includes('ts')) {
+  config.resolver.sourceExts.push('ts');
+}
+if (!config.resolver.sourceExts.includes('tsx')) {
+  config.resolver.sourceExts.push('tsx');
+}
+
+// Force React and React Native to resolve ONLY from mobile app
+// This overrides Metro's default resolution for these specific packages
+const originalResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  // Handle React, React submodules, and react-native
+  // React submodules like 'react/jsx-dev-runtime', 'react/jsx-runtime', etc.
+  const isReactModule = moduleName === 'react' || 
+                        moduleName === 'react-native' || 
+                        moduleName.startsWith('react/');
+  
+  if (isReactModule) {
+    try {
+      // Resolve from project root ONLY - this ensures we get React 18.2.0
+      // even though the symlink goes to workspace root's .pnpm
+      const resolvedPath = require.resolve(moduleName, { 
+        paths: [path.resolve(projectRoot, 'node_modules')] 
+      });
+      
+      return {
+        filePath: resolvedPath,
+        type: 'sourceFile',
+      };
+    } catch (e) {
+      // If resolution fails, provide helpful error
+      throw new Error(
+        `Failed to resolve ${moduleName} from mobile app's node_modules.\n` +
+        `Project root: ${projectRoot}\n` +
+        `Error: ${e.message}\n` +
+        `\nThis usually means ${moduleName} is not installed in apps/mobile/node_modules. ` +
+        `Try running: cd apps/mobile && pnpm install`
+      );
+    }
+  }
+  
+  // Handle @convex-panel/shared workspace package with subpath exports
+  // Metro needs to resolve from source files since it can transpile TypeScript
+  if (moduleName === '@convex-panel/shared' || moduleName === '@convex-panel/shared/api') {
+    try {
+      // Resolve from workspace packages/shared/src
+      const sharedPackageRoot = path.resolve(workspaceRoot, 'packages/shared');
+      
+      if (moduleName === '@convex-panel/shared/api') {
+        // Resolve the api subpath - prefer dist (built) files, fallback to source
+        const apiDistPath = path.resolve(sharedPackageRoot, 'dist/api/index.js');
+        const apiSourcePath = path.resolve(sharedPackageRoot, 'src/api/index.ts');
+        
+        if (fs.existsSync(apiDistPath)) {
+          return {
+            filePath: apiDistPath,
+            type: 'sourceFile',
+          };
+        } else if (fs.existsSync(apiSourcePath)) {
+          return {
+            filePath: apiSourcePath,
+            type: 'sourceFile',
+          };
+        } else {
+          throw new Error(
+            `@convex-panel/shared/api not found. ` +
+            `Tried: ${apiDistPath} and ${apiSourcePath}. ` +
+            `Please build the shared package: cd packages/shared && pnpm build`
+          );
+        }
+      } else {
+        // Resolve main package - prefer dist (built) files, fallback to source
+        const mainDistPath = path.resolve(sharedPackageRoot, 'dist/index.js');
+        const mainSourcePath = path.resolve(sharedPackageRoot, 'src/index.ts');
+        
+        if (fs.existsSync(mainDistPath)) {
+          return {
+            filePath: mainDistPath,
+            type: 'sourceFile',
+          };
+        } else if (fs.existsSync(mainSourcePath)) {
+          return {
+            filePath: mainSourcePath,
+            type: 'sourceFile',
+          };
+        } else {
+          throw new Error(
+            `@convex-panel/shared not found. ` +
+            `Tried: ${mainDistPath} and ${mainSourcePath}. ` +
+            `Please build the shared package: cd packages/shared && pnpm build`
+          );
+        }
+      }
+    } catch (e) {
+      throw new Error(
+        `Failed to resolve ${moduleName} from workspace.\n` +
+        `Workspace root: ${workspaceRoot}\n` +
+        `Error: ${e.message}`
+      );
+    }
+  }
+  
+  // For all other modules, use default resolver (allows workspace root)
+  if (originalResolveRequest) {
+    return originalResolveRequest(context, moduleName, platform);
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
+
+module.exports = config;
+

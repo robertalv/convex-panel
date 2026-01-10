@@ -1,4 +1,4 @@
-export { GradientBackground } from "./GradientBackground";
+export { GradientBackground } from "../shared/GradientBackground";
 export { WelcomeScreen } from "./WelcomeScreen";
 export { AuthCard } from "./AuthCard";
 export { DeviceAuthFlow } from "./DeviceAuthFlow";

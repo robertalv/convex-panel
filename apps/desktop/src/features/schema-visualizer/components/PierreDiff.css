@@ -10,6 +10,7 @@
   height: 100%;
   overflow: auto;
   border-radius: var(--radius-md, 6px);
+  background-color: var(--color-background-base);
 }
 
 /* Override diffs component base styles for integration */
@@ -18,23 +19,37 @@
   font-family: var(--diffs-font-family);
   font-size: var(--diffs-font-size);
   line-height: var(--diffs-line-height);
+  background-color: var(--color-background-base) !important;
+}
+
+/* Ensure all parts use the background */
+[data-component="pierre-diff"] [data-diffs] > * {
+  background-color: var(--color-background-base) !important;
+}
+
+/* Line styling */
+[data-component="pierre-diff"] [data-line] {
+  background-color: var(--color-background-base) !important;
 }
 
 /* Line number styling */
 [data-component="pierre-diff"] [data-line-number] {
   user-select: none;
+  background-color: var(--color-background-base) !important;
 }
 
 /* Code content styling */
 [data-component="pierre-diff"] [data-code] {
   tab-size: var(--diffs-tab-size, 2);
   overflow-x: auto !important;
+  background-color: var(--color-background-base) !important;
 }
 
 /* Separator wrapper styling */
 [data-component="pierre-diff"] [data-separator-wrapper] {
   margin: 0 !important;
   border-radius: 0 !important;
+  background-color: var(--color-surface-raised) !important;
 }
 
 /* Expand button styling */
@@ -69,6 +84,7 @@
 /* Separator content styling */
 [data-component="pierre-diff"] [data-separator-content] {
   height: 24px !important;
+  background-color: var(--color-surface-raised) !important;
 }
 
 /* Scrollbar styling */

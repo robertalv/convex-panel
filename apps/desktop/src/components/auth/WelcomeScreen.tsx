@@ -1,4 +1,4 @@
-import { GradientBackground } from "./GradientBackground";
+import { GradientBackground } from "../shared/GradientBackground";
 import { AuthCard } from "./AuthCard";
 import { ConvexLettering } from "@/components/ui/ConvexLettering";
 

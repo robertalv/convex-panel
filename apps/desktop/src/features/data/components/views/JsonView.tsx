@@ -26,7 +26,7 @@ function getValueColorClass(value: any, isIdField?: boolean): string {
   // Check for date objects
   if (typeof value === "object" && value !== null) {
     if (value.$date) {
-      return ""; // Will use inline style with TIMESTAMP_COLOR
+      return "";
     }
   }
 
@@ -34,7 +34,7 @@ function getValueColorClass(value: any, isIdField?: boolean): string {
     return "text-[var(--color-text-base)]";
   }
   if (typeof value === "number") {
-    return ""; // Will use inline style with TIMESTAMP_COLOR if it's a timestamp
+    return "";
   }
   if (typeof value === "boolean") {
     return "text-yellow-500";
@@ -224,12 +224,14 @@ function JsonNode({
               onBlur={handleSaveEdit}
               onKeyDown={handleKeyDown}
               disabled={isSaving}
-              className="bg-transparent border-none outline-none font-mono text-xs w-fit focus:ring-0 focus:ring-offset-0 focus:outline-none"
+              className="bg-transparent border-none outline-none font-mono text-xs w-fit focus:ring-0 focus:ring-offset-0 focus:outline-none focus:border-none focus-visible:outline-none focus-visible:ring-0"
               style={{
                 color: getValueColorClass(value).includes("text-") 
                   ? undefined 
                   : "var(--color-text-base)",
                 width: `${Math.max(100, editValue.length * 7)}px`,
+                outline: "none",
+                boxShadow: "none",
               }}
             />
             <span style={{ color: "var(--color-text-muted)" }}>"</span>
@@ -246,7 +248,7 @@ function JsonNode({
             onBlur={handleSaveEdit}
             onKeyDown={handleKeyDown}
             disabled={isSaving}
-            className="bg-transparent border-none outline-none font-mono text-xs w-fit focus:ring-0 focus:ring-offset-0 focus:outline-none"
+            className="bg-transparent border-none outline-none font-mono text-xs w-fit focus:ring-0 focus:ring-offset-0 focus:outline-none focus:border-none focus-visible:outline-none focus-visible:ring-0"
             style={{
               color: typeof value === "number" 
                 ? "rgb(59, 130, 246)" 
@@ -254,6 +256,8 @@ function JsonNode({
                 ? "rgb(234, 179, 8)"
                 : "var(--color-text-muted)",
               width: `${Math.max(60, editValue.length * 7)}px`,
+              outline: "none",
+              boxShadow: "none",
             }}
           />
         );

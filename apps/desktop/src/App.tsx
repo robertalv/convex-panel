@@ -60,11 +60,12 @@ import {
 import { DeploymentProvider } from "./contexts/DeploymentContext";
 import { useTheme } from "./contexts/ThemeContext";
 import { TerminalProvider } from "./contexts/TerminalContext";
-import { McpProvider, useMcpOptional } from "./contexts/McpContext";
 import { GitHubProvider } from "./contexts/GitHubContext";
+import { ProjectPathProvider } from "./contexts/ProjectPathContext";
 import { AboutDialog } from "./components/AboutDialog";
 import { EnhancedProjectOnboardingDialog } from "./components/EnhancedProjectOnboardingDialog";
 import { DeploymentNotificationListener } from "./components/DeploymentNotificationListener";
+import { useApplicationVersion } from "./hooks/useApplicationVersion";
 
 interface AppProps {
   convex?: ConvexReactClient | null;
@@ -156,7 +157,6 @@ function EnhancedOnboardingWrapper({
 }: EnhancedOnboardingWrapperProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
-  const mcp = useMcpOptional();
 
   // Storage key for tracking if user has dismissed enhanced onboarding for this deployment
   const dismissedKey = deploymentName
@@ -174,14 +174,13 @@ function EnhancedOnboardingWrapper({
 
     // Show enhanced onboarding if:
     // 1. User hasn't dismissed it for this deployment
-    // 2. No project folder is connected yet
-    // 3. We're in Tauri environment
-    if (!wasDismissed && !mcp?.projectPath && isTauri()) {
+    // 2. We're in Tauri environment
+    if (!wasDismissed && isTauri()) {
       setIsOpen(true);
     }
 
     setHasChecked(true);
-  }, [deploymentName, mcp?.projectPath, hasChecked, dismissedKey]);
+  }, [deploymentName, hasChecked, dismissedKey]);
 
   // Reset checked state when deployment changes
   useEffect(() => {
@@ -283,6 +282,9 @@ export default function App({ convex: _initialConvex }: AppProps) {
     });
 
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Check for application updates
+  useApplicationVersion();
 
   const {
     teams,
@@ -613,10 +615,7 @@ export default function App({ convex: _initialConvex }: AppProps) {
 
   const mainAppContent = isConnected ? (
     <>
-      <McpProvider
-        teamSlug={selectedTeam?.slug ?? null}
-        projectSlug={selectedProject?.slug ?? null}
-      >
+      <ProjectPathProvider>
         <GitHubProviderWithConvexProject
           teamSlug={selectedTeam?.slug ?? null}
           projectSlug={selectedProject?.slug ?? null}
@@ -717,7 +716,6 @@ export default function App({ convex: _initialConvex }: AppProps) {
               />
             </DeploymentProvider>
           </TerminalProvider>
-          {/* Dialogs need to be inside McpProvider to access MCP context */}
           <CommandPalette
             open={paletteOpen}
             navItems={NAV_ITEMS}
@@ -726,7 +724,7 @@ export default function App({ convex: _initialConvex }: AppProps) {
           />
           <AboutDialog isOpen={aboutOpen} onClose={() => setAboutOpen(false)} />
         </GitHubProviderWithConvexProject>
-      </McpProvider>
+      </ProjectPathProvider>
     </>
   ) : null;
 

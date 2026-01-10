@@ -5,6 +5,7 @@
  */
 
 import { useState, useMemo, useCallback } from "react";
+import { toast } from "sonner";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -13,7 +14,6 @@ import {
   Undo2,
 } from "lucide-react";
 import { useDeployment } from "@/contexts/DeploymentContext";
-import { useMcpOptional } from "@/contexts/McpContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useSchema } from "../schema-visualizer/hooks/useSchema";
 import { useComponents } from "@/features/data/hooks/useComponents";
@@ -27,7 +27,9 @@ import type {
 import { HealthScoreCard } from "./components/HealthScoreCard";
 import { RecommendationCard } from "./components/RecommendationCard";
 import { useDismissedWarnings } from "./hooks/useDismissedWarnings";
+import { openSchemaInEditor } from "../../utils/editor";
 import { applyFixToSchema } from "./utils/schema-editor";
+import { useProjectPath } from "@/contexts/ProjectPathContext";
 
 type SeverityFilter = HealthSeverity | "all";
 
@@ -41,7 +43,7 @@ const SEVERITY_OPTIONS = [
 export function PerformanceAdvisorView() {
   const { resolvedTheme } = useTheme();
   const { adminClient } = useDeployment();
-  const mcp = useMcpOptional();
+  const { projectPath, selectProjectDirectory } = useProjectPath();
 
   // Components selector
   const { components, setSelectedComponent, selectedComponentId } =
@@ -98,7 +100,7 @@ export function PerformanceAdvisorView() {
   // Handle apply fix
   const handleApplyFix = useCallback(
     async (warning: HealthWarning, action: WarningAction) => {
-      if (!mcp?.projectPath || !warning.table) {
+      if (!projectPath || !warning.table) {
         console.error("Cannot apply fix: missing project path or table name");
         return;
       }
@@ -107,46 +109,74 @@ export function PerformanceAdvisorView() {
 
       try {
         const result = await applyFixToSchema(
-          mcp.projectPath,
+          projectPath,
           warning.table,
           action,
         );
 
         if (result.success) {
-          // Show success - the warning will be resolved on next schema refresh
-          console.log(result.message);
-          // Optionally dismiss the warning
+          // Show success toast
+          toast.success("Index added successfully", {
+            description: "Opening in editor...",
+            duration: 3000,
+          });
+
+          // Dismiss the warning
           dismissWarning(warning.id);
+
+          // Open in editor at the line where the index was added
+          if (result.lineNumber) {
+            try {
+              await openSchemaInEditor(projectPath, result.lineNumber);
+            } catch (editorError) {
+              console.error("Failed to open editor:", editorError);
+              toast.error("Could not open editor", {
+                description:
+                  "The fix was applied successfully, but we couldn't open your editor. Check Settings to configure your preferred editor.",
+              });
+            }
+          }
         } else {
-          console.error(result.message);
-          // TODO: Show error toast
+          toast.error("Failed to apply fix", {
+            description: result.message,
+          });
         }
       } catch (err) {
         console.error("Failed to apply fix:", err);
+        toast.error("Failed to apply fix", {
+          description: err instanceof Error ? err.message : "Unknown error",
+        });
       } finally {
         setIsApplying(null);
       }
     },
-    [mcp?.projectPath, dismissWarning],
+    [projectPath, dismissWarning],
   );
 
   // Handle open in editor
   const handleOpenInEditor = useCallback(
-    (_tableName: string) => {
-      if (!mcp?.projectPath) return;
-      mcp.openInCursor(`${mcp.projectPath}/convex/schema.ts`);
+    async (_tableName: string) => {
+      if (!projectPath) return;
+      try {
+        await openSchemaInEditor(projectPath);
+      } catch (error) {
+        console.error("Failed to open editor:", error);
+        toast.error("Could not open editor", {
+          description:
+            "Check Settings to make sure your preferred editor is installed and available in your PATH.",
+        });
+      }
     },
-    [mcp],
+    [projectPath],
   );
 
   // Handle select project
   const handleSelectProject = useCallback(async () => {
-    if (!mcp) return;
-    await mcp.selectProjectDirectory();
-  }, [mcp]);
+    await selectProjectDirectory();
+  }, [selectProjectDirectory]);
 
   const dismissedCount = dismissedIds.size;
-  const hasProjectPath = !!mcp?.projectPath;
+  const hasProjectPath = !!projectPath;
 
   // Get health score color
   const healthColor = schema

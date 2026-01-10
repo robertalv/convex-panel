@@ -6,9 +6,9 @@ import type { Team, Project, Deployment, User } from "@/types/desktop";
 import type { TeamSubscription } from "@/api/bigbrain";
 import { TerminalPanel } from "../../features/terminal";
 import { useTerminalActions } from "../../contexts/TerminalContext";
-import { useMcpOptional } from "../../contexts/McpContext";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useBackgroundPrefetch } from "../../hooks/useBackgroundPrefetch";
+import { useProjectPathOptional } from "../../contexts/ProjectPathContext";
 
 const STORAGE_KEYS = {
   sidebarWidth: "convex-desktop-sidebar-width",
@@ -68,6 +68,8 @@ export function AppShell({
   hideNav = false,
   deploymentsLoading = false,
 }: AppShellProps) {
+  const projectPathContext = useProjectPathOptional();
+  const projectPath = projectPathContext?.projectPath ?? null;
   const [sidebarWidth, setSidebarWidth] = React.useState(() => {
     if (typeof window === "undefined") return SIDEBAR_MIN_WIDTH;
     const saved = localStorage.getItem(STORAGE_KEYS.sidebarWidth);
@@ -107,10 +109,7 @@ export function AppShell({
   }, []);
 
   // Terminal keyboard shortcut (Ctrl+` or Cmd+`)
-  // Only works when a project path is set
   const { toggleTerminal } = useTerminalActions();
-  const mcp = useMcpOptional();
-  const hasProjectPath = Boolean(mcp?.projectPath);
 
   // Prefetch health data in the background after the app loads
   useBackgroundPrefetch({ delay: 1500 });
@@ -118,22 +117,20 @@ export function AppShell({
   useHotkeys(
     "ctrl+`",
     (e) => {
-      if (!hasProjectPath) return;
       e.preventDefault();
       toggleTerminal();
     },
     { enableOnFormTags: true },
-    [hasProjectPath, toggleTerminal],
+    [toggleTerminal],
   );
   useHotkeys(
     "meta+`",
     (e) => {
-      if (!hasProjectPath) return;
       e.preventDefault();
       toggleTerminal();
     },
     { enableOnFormTags: true },
-    [hasProjectPath, toggleTerminal],
+    [toggleTerminal],
   );
 
   return (
@@ -213,7 +210,7 @@ export function AppShell({
             >
               {children}
             </div>
-            <TerminalPanel />
+            <TerminalPanel workingDirectory={projectPath || undefined} />
           </main>
         </div>
       </div>

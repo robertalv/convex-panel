@@ -1,27 +1,14 @@
-import { invoke } from "@tauri-apps/api/core";
+// WORKAROUND: macOS Keychain has persistent decryption errors
+// All functions now use localStorage only
 
 const NAMESPACE = "convex-desktop";
 const ACCESS_KEY = `${NAMESPACE}.accessToken`;
 const DEPLOY_KEY = `${NAMESPACE}.deployKey`;
 
-const isTauri = () =>
-  typeof window !== "undefined" && Boolean((window as any).__TAURI_INTERNALS__);
-
 export async function saveAccessToken(token: string | null): Promise<void> {
   if (!token) {
     await clearAccessToken();
     return;
-  }
-  if (isTauri()) {
-    try {
-      await invoke("set_secret", { key: ACCESS_KEY, value: token });
-      return;
-    } catch (err) {
-      console.warn(
-        "[secureStorage] Falling back to localStorage for access token:",
-        err,
-      );
-    }
   }
   if (typeof localStorage !== "undefined") {
     localStorage.setItem(ACCESS_KEY, token);
@@ -29,28 +16,11 @@ export async function saveAccessToken(token: string | null): Promise<void> {
 }
 
 export async function loadAccessToken(): Promise<string | null> {
-  if (isTauri()) {
-    try {
-      return await invoke<string | null>("get_secret", { key: ACCESS_KEY });
-    } catch (err) {
-      console.warn(
-        "[secureStorage] Failed to load access token from secure store:",
-        err,
-      );
-    }
-  }
   if (typeof localStorage === "undefined") return null;
   return localStorage.getItem(ACCESS_KEY);
 }
 
 export async function clearAccessToken(): Promise<void> {
-  if (isTauri()) {
-    try {
-      await invoke("delete_secret", { key: ACCESS_KEY });
-    } catch (err) {
-      console.warn("[secureStorage] Failed to clear access token:", err);
-    }
-  }
   if (typeof localStorage !== "undefined") {
     localStorage.removeItem(ACCESS_KEY);
   }
@@ -61,45 +31,17 @@ export async function saveDeployKey(key: string | null): Promise<void> {
     await clearDeployKey();
     return;
   }
-  if (isTauri()) {
-    try {
-      await invoke("set_secret", { key: DEPLOY_KEY, value: key });
-      return;
-    } catch (err) {
-      console.warn(
-        "[secureStorage] Falling back to localStorage for deploy key:",
-        err,
-      );
-    }
-  }
   if (typeof localStorage !== "undefined") {
     localStorage.setItem(DEPLOY_KEY, key);
   }
 }
 
 export async function loadDeployKey(): Promise<string | null> {
-  if (isTauri()) {
-    try {
-      return await invoke<string | null>("get_secret", { key: DEPLOY_KEY });
-    } catch (err) {
-      console.warn(
-        "[secureStorage] Failed to load deploy key from secure store:",
-        err,
-      );
-    }
-  }
   if (typeof localStorage === "undefined") return null;
   return localStorage.getItem(DEPLOY_KEY);
 }
 
 export async function clearDeployKey(): Promise<void> {
-  if (isTauri()) {
-    try {
-      await invoke("delete_secret", { key: DEPLOY_KEY });
-    } catch (err) {
-      console.warn("[secureStorage] Failed to clear deploy key:", err);
-    }
-  }
   if (typeof localStorage !== "undefined") {
     localStorage.removeItem(DEPLOY_KEY);
   }
@@ -136,21 +78,11 @@ export async function saveDeploymentKey(
     return;
   }
 
-  if (isTauri()) {
-    try {
-      await invoke("set_secret", { key: storageKey, value: key });
-      console.log(`[secureStorage] Saved deploy key for ${deploymentName}`);
-      return;
-    } catch (err) {
-      console.warn(
-        `[secureStorage] Falling back to localStorage for deployment key (${deploymentName}):`,
-        err,
-      );
-    }
-  }
-
   if (typeof localStorage !== "undefined") {
     localStorage.setItem(storageKey, key);
+    console.log(
+      `[secureStorage] Saved deploy key for ${deploymentName} to localStorage`,
+    );
   }
 }
 
@@ -162,27 +94,15 @@ export async function loadDeploymentKey(
 ): Promise<string | null> {
   const storageKey = getDeploymentKeyName(deploymentName);
 
-  if (isTauri()) {
-    try {
-      const key = await invoke<string | null>("get_secret", {
-        key: storageKey,
-      });
-      if (key) {
-        console.log(
-          `[secureStorage] Loaded cached deploy key for ${deploymentName}`,
-        );
-      }
-      return key;
-    } catch (err) {
-      console.warn(
-        `[secureStorage] Failed to load deployment key from secure store (${deploymentName}):`,
-        err,
-      );
-    }
-  }
-
   if (typeof localStorage === "undefined") return null;
-  return localStorage.getItem(storageKey);
+
+  const key = localStorage.getItem(storageKey);
+  if (key) {
+    console.log(
+      `[secureStorage] Loaded cached deploy key for ${deploymentName} from localStorage`,
+    );
+  }
+  return key;
 }
 
 /**
@@ -192,17 +112,6 @@ export async function clearDeploymentKey(
   deploymentName: string,
 ): Promise<void> {
   const storageKey = getDeploymentKeyName(deploymentName);
-
-  if (isTauri()) {
-    try {
-      await invoke("delete_secret", { key: storageKey });
-    } catch (err) {
-      console.warn(
-        `[secureStorage] Failed to clear deployment key (${deploymentName}):`,
-        err,
-      );
-    }
-  }
 
   if (typeof localStorage !== "undefined") {
     localStorage.removeItem(storageKey);

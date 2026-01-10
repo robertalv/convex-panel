@@ -79,7 +79,11 @@ export function formatValue(value: any, maxLength: number = 100): string {
   if (typeof value === "object") {
     // Check for special Convex types
     if (value.$date) {
-      return formatFullTimestamp(new Date(value.$date).getTime());
+      const date = new Date(value.$date);
+      if (!isNaN(date.getTime())) {
+        return formatFullTimestamp(date.getTime());
+      }
+      return "Invalid date";
     }
     if (value.$bytes) {
       return `<bytes: ${value.$bytes.length} chars>`;

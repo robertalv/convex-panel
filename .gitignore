@@ -4,8 +4,8 @@ node_modules
 .pnp.js
 
 # Folders
-# apps/convex-backend-main
-# apps/opencode-dev
+apps/convex-backend-main
+apps/opencode-dev
 
 # Build
 dist

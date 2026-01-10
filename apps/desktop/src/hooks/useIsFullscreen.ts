@@ -1,14 +1,10 @@
 import { useState, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-/**
- * Hook to detect if the Tauri window is fullscreen
- */
 export function useIsFullscreen(): boolean {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
-    // Only run in Tauri environment
     if (typeof window === "undefined" || !(window as any).__TAURI_INTERNALS__) {
       return;
     }

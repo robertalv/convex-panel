@@ -270,10 +270,12 @@ export function DocumentCard({
               onBlur={handleSaveEdit}
               onKeyDown={handleKeyDown}
               disabled={isSaving}
-              className="bg-transparent border-none outline-none font-mono text-[11px] w-fit focus:ring-0 focus:ring-offset-0 focus:outline-none"
+              className="bg-transparent border-none outline-none font-mono text-[11px] w-fit focus:ring-0 focus:ring-offset-0 focus:outline-none focus:border-none focus-visible:outline-none focus-visible:ring-0"
               style={{
                 color: getValueColor(value),
                 width: `${Math.max(100, editValue.length * 6)}px`,
+                outline: "none",
+                boxShadow: "none",
               }}
               spellCheck={false}
             />
@@ -291,7 +293,7 @@ export function DocumentCard({
             onBlur={handleSaveEdit}
             onKeyDown={handleKeyDown}
             disabled={isSaving}
-            className="bg-transparent border-none outline-none font-mono text-[11px] w-fit focus:ring-0 focus:ring-offset-0 focus:outline-none"
+            className="bg-transparent border-none outline-none font-mono text-[11px] w-fit focus:ring-0 focus:ring-offset-0 focus:outline-none focus:border-none focus-visible:outline-none focus-visible:ring-0"
             style={{
               color:
                 typeof value === "number"
@@ -300,6 +302,8 @@ export function DocumentCard({
                     ? "rgb(234, 179, 8)"
                     : "var(--color-text-muted)",
               width: `${Math.max(60, editValue.length * 6)}px`,
+              outline: "none",
+              boxShadow: "none",
             }}
           />
         );

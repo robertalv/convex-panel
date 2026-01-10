@@ -1,42 +1,106 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Loader2,
-  Copy,
-  Check,
   FolderOpen,
   Github,
   ExternalLink,
-  Server,
+  X,
+  AlertCircle,
+  Code2,
+  Terminal,
 } from "lucide-react";
-import { useMcpOptional } from "../../../contexts/McpContext";
 import { useGitHubOptional } from "../../../contexts/GitHubContext";
+import { useProjectPath } from "../../../contexts/ProjectPathContext";
 import type { GitHubRepo } from "../../../services/github/types";
 import { SearchableSelect } from "../../../components/ui/SearchableSelect";
+import {
+  getAllEditors,
+  getPreferredEditor,
+  setPreferredEditor,
+  isEditorAvailable,
+  getInstallInstructions,
+  addCustomEditor,
+  removeCustomEditor,
+  type EditorType,
+} from "../../../utils/editor";
+import {
+  hasAutomatedInstall,
+  getEditorInstallCommand,
+  executeInTerminal,
+} from "../../../utils/terminal-commands";
 
 export function DesktopIntegrations() {
-  const mcp = useMcpOptional();
+  const {
+    projectPath,
+    selectProjectDirectory,
+    clearProjectPath,
+    isValidating,
+    validationError,
+  } = useProjectPath();
   const github = useGitHubOptional();
-  const [cursorConfig, setCursorConfig] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+
+  // Editor preference state
+  const [preferredEditor, setPreferredEditorState] =
+    useState<EditorType>(getPreferredEditor());
+  const [allEditors, setAllEditors] = useState(getAllEditors());
+  const [editorAvailability, setEditorAvailability] = useState<
+    Record<string, boolean | null>
+  >({});
+  const [checkingEditors, setCheckingEditors] = useState(false);
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const [showAddCustomEditor, setShowAddCustomEditor] = useState(false);
+  const [customEditorForm, setCustomEditorForm] = useState({
+    label: "",
+    command: "",
+    instructions: "",
+  });
+
+  // Refresh editors list (after adding/removing custom editors)
+  const refreshEditors = useCallback(() => {
+    setAllEditors(getAllEditors());
+  }, []);
+
+  // Check editor availability on mount and when editors change
+  useEffect(() => {
+    const checkEditors = async () => {
+      setCheckingEditors(true);
+      const results: Record<string, boolean> = {};
+
+      for (const editorKey of Object.keys(allEditors)) {
+        try {
+          results[editorKey] = await isEditorAvailable(editorKey);
+        } catch (error) {
+          console.error(`Failed to check ${editorKey}:`, error);
+          results[editorKey] = false;
+        }
+      }
+
+      setEditorAvailability(results);
+      setCheckingEditors(false);
+    };
+
+    checkEditors();
+  }, [allEditors]);
+
+  // Handle editor selection change
+  const handleEditorChange = useCallback((editor: EditorType) => {
+    setPreferredEditor(editor);
+    setPreferredEditorState(editor);
+  }, []);
 
   // For debouncing repo search
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [repoSearchResults, setRepoSearchResults] = useState<GitHubRepo[]>([]);
   const [repoSearchLoading, setRepoSearchLoading] = useState(false);
 
-  useEffect(() => {
-    if (mcp?.status.running) {
-      mcp.getCursorConfig().then(setCursorConfig);
-    }
-  }, [mcp?.status.running, mcp]);
-
   // Fetch branches when repo is selected (using context's fetchBranches with pagination)
   useEffect(() => {
-    if (github?.selectedRepo) {
+    if (github?.selectedRepo && github?.fetchBranches) {
       const [owner, repo] = github.selectedRepo.full_name.split("/");
       github.fetchBranches(owner, repo);
     }
-  }, [github?.selectedRepo, github]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [github?.selectedRepo?.full_name]);
 
   // Debounced repo search handler
   const handleRepoSearchChange = useCallback(
@@ -75,14 +139,6 @@ export function DesktopIntegrations() {
       }
     };
   }, []);
-
-  const handleCopyConfig = async () => {
-    if (mcp) {
-      await mcp.copyConfigToClipboard();
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
 
   // Combine initial repos with search results for the dropdown
   // When no search is active, show the initial repos list
@@ -164,72 +220,421 @@ export function DesktopIntegrations() {
       >
         <div style={{ maxWidth: "600px" }}>
           {/* Project Directory Section */}
-          {mcp && (
-            <div style={{ marginBottom: "32px" }}>
+          <div style={{ marginBottom: "32px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                marginBottom: "8px",
+              }}
+            >
+              <FolderOpen
+                size={16}
+                style={{ color: "var(--color-panel-accent)" }}
+              />
+              <h3
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "var(--color-panel-text)",
+                  margin: 0,
+                }}
+              >
+                Project Directory
+              </h3>
+            </div>
+            <p
+              style={{
+                fontSize: "12px",
+                color: "var(--color-panel-text-secondary)",
+                marginBottom: "12px",
+              }}
+            >
+              Your Convex project directory for terminal commands, automatic
+              schema fixes, and file operations
+            </p>
+
+            {/* Validation error */}
+            {validationError && (
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
-                  marginBottom: "8px",
-                }}
-              >
-                <FolderOpen
-                  size={16}
-                  style={{ color: "var(--color-panel-accent)" }}
-                />
-                <h3
-                  style={{
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    color: "var(--color-panel-text)",
-                    margin: 0,
-                  }}
-                >
-                  Project Directory
-                </h3>
-              </div>
-              <p
-                style={{
-                  fontSize: "12px",
-                  color: "var(--color-panel-text-secondary)",
+                  padding: "8px 12px",
                   marginBottom: "12px",
+                  backgroundColor:
+                    "color-mix(in srgb, var(--color-error-base) 10%, transparent)",
+                  border: "1px solid var(--color-error-base)",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  color: "var(--color-error-base)",
                 }}
               >
-                Your Convex project directory for terminal commands and file
-                operations
-              </p>
+                <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                <span>{validationError}</span>
+              </div>
+            )}
+
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <div
-                style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                style={{
+                  flex: 1,
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--color-panel-border)",
+                  backgroundColor: "var(--color-panel-bg-secondary)",
+                  fontSize: "12px",
+                  color: projectPath
+                    ? "var(--color-panel-text)"
+                    : "var(--color-panel-text-muted)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
               >
-                <div
-                  style={{
-                    flex: 1,
-                    padding: "10px 12px",
-                    borderRadius: "8px",
-                    border: "1px solid var(--color-panel-border)",
-                    backgroundColor: "var(--color-panel-bg-secondary)",
-                    fontSize: "12px",
-                    color: mcp.projectPath
-                      ? "var(--color-panel-text)"
-                      : "var(--color-panel-text-muted)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {mcp.projectPath || "No project selected"}
-                </div>
+                {projectPath || "No project selected"}
+              </div>
+              <button
+                onClick={selectProjectDirectory}
+                disabled={isValidating}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--color-panel-border)",
+                  backgroundColor: "var(--color-panel-bg-secondary)",
+                  color: "var(--color-panel-text)",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  cursor: isValidating ? "not-allowed" : "pointer",
+                  opacity: isValidating ? 0.6 : 1,
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isValidating) {
+                    e.currentTarget.style.backgroundColor =
+                      "var(--color-panel-bg-tertiary)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor =
+                    "var(--color-panel-bg-secondary)";
+                }}
+              >
+                {isValidating ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  "Browse"
+                )}
+              </button>
+              {projectPath && (
                 <button
-                  onClick={mcp.selectProjectDirectory}
+                  onClick={clearProjectPath}
+                  disabled={isValidating}
+                  title="Clear project path"
                   style={{
-                    padding: "10px 16px",
+                    padding: "10px",
                     borderRadius: "8px",
                     border: "1px solid var(--color-panel-border)",
                     backgroundColor: "var(--color-panel-bg-secondary)",
-                    color: "var(--color-panel-text)",
+                    color: "var(--color-panel-text-muted)",
                     fontSize: "12px",
                     fontWeight: 500,
+                    cursor: isValidating ? "not-allowed" : "pointer",
+                    opacity: isValidating ? 0.6 : 1,
+                    transition: "all 0.2s",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isValidating) {
+                      e.currentTarget.style.backgroundColor =
+                        "var(--color-panel-bg-tertiary)";
+                      e.currentTarget.style.color = "var(--color-error-base)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor =
+                      "var(--color-panel-bg-secondary)";
+                    e.currentTarget.style.color =
+                      "var(--color-panel-text-muted)";
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Editor Preference Section */}
+          <div style={{ marginBottom: "32px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                marginBottom: "8px",
+              }}
+            >
+              <Code2 size={16} style={{ color: "var(--color-panel-accent)" }} />
+              <h3
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "var(--color-panel-text)",
+                  margin: 0,
+                }}
+              >
+                Preferred Editor
+              </h3>
+            </div>
+            <p
+              style={{
+                fontSize: "12px",
+                color: "var(--color-panel-text-secondary)",
+                marginBottom: "12px",
+              }}
+            >
+              Choose which code editor to open when applying schema fixes. Make
+              sure your editor is installed and available in your PATH.
+            </p>
+
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {Object.keys(allEditors).map((editorKey) => {
+                const editor = allEditors[editorKey];
+                const isSelected = preferredEditor === editorKey;
+                const isAvailable = editorAvailability[editorKey];
+                const isCustom = editor.isCustom === true;
+
+                return (
+                  <div
+                    key={editorKey}
+                    style={{
+                      flex: "1 1 calc(50% - 4px)",
+                      minWidth: "200px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                      position: "relative",
+                    }}
+                  >
+                    <button
+                      onClick={() => handleEditorChange(editorKey)}
+                      style={{
+                        padding: "12px 16px",
+                        borderRadius: "8px",
+                        border: `2px solid ${
+                          isSelected
+                            ? "var(--color-panel-accent)"
+                            : "var(--color-panel-border)"
+                        }`,
+                        backgroundColor: isSelected
+                          ? "color-mix(in srgb, var(--color-panel-accent) 10%, transparent)"
+                          : "var(--color-panel-bg-secondary)",
+                        color: isSelected
+                          ? "var(--color-panel-accent)"
+                          : "var(--color-panel-text)",
+                        fontSize: "12px",
+                        fontWeight: isSelected ? 600 : 500,
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                        textAlign: "center",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.backgroundColor =
+                            "var(--color-panel-bg-tertiary)";
+                          e.currentTarget.style.borderColor =
+                            "var(--color-panel-text-muted)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.backgroundColor =
+                            "var(--color-panel-bg-secondary)";
+                          e.currentTarget.style.borderColor =
+                            "var(--color-panel-border)";
+                        }
+                      }}
+                    >
+                      {editor.label}
+                      {isCustom && (
+                        <span
+                          style={{
+                            fontSize: "9px",
+                            padding: "2px 4px",
+                            borderRadius: "4px",
+                            backgroundColor: "var(--color-panel-accent)",
+                            color: "white",
+                          }}
+                        >
+                          CUSTOM
+                        </span>
+                      )}
+                      {!checkingEditors && isAvailable !== null && (
+                        <span
+                          style={{
+                            width: "8px",
+                            height: "8px",
+                            borderRadius: "50%",
+                            backgroundColor: isAvailable
+                              ? "var(--color-success-base)"
+                              : "var(--color-error-base)",
+                          }}
+                          title={
+                            isAvailable
+                              ? "Available in PATH"
+                              : "Not found in PATH"
+                          }
+                        />
+                      )}
+                    </button>
+                    {isCustom && (
+                      <button
+                        onClick={() => {
+                          if (
+                            confirm(`Remove custom editor "${editor.label}"?`)
+                          ) {
+                            removeCustomEditor(editorKey);
+                            if (preferredEditor === editorKey) {
+                              handleEditorChange("cursor");
+                            }
+                            refreshEditors();
+                          }
+                        }}
+                        style={{
+                          padding: "4px 8px",
+                          borderRadius: "6px",
+                          border: "1px solid var(--color-error-base)",
+                          backgroundColor: "transparent",
+                          color: "var(--color-error-base)",
+                          fontSize: "10px",
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor =
+                            "var(--color-error-base)";
+                          e.currentTarget.style.color = "white";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                          e.currentTarget.style.color =
+                            "var(--color-error-base)";
+                        }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div
+              style={{
+                marginTop: "12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "8px",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: "11px",
+                  color: "var(--color-panel-text-muted)",
+                  margin: 0,
+                }}
+              >
+                Selected:{" "}
+                <strong>
+                  {allEditors[preferredEditor]?.label || "Unknown"}
+                </strong>{" "}
+                (
+                <code style={{ fontSize: "10px" }}>
+                  {allEditors[preferredEditor]?.command || "unknown"}
+                </code>
+                )
+                {!checkingEditors &&
+                  editorAvailability[preferredEditor] === false && (
+                    <span style={{ color: "var(--color-error-base)" }}>
+                      {" "}
+                      - Not found in PATH
+                    </span>
+                  )}
+              </p>
+              <div style={{ display: "flex", gap: "8px" }}>
+                {!checkingEditors &&
+                  editorAvailability[preferredEditor] === false &&
+                  hasAutomatedInstall(
+                    allEditors[preferredEditor]?.command || "",
+                  ) && (
+                    <button
+                      onClick={() => {
+                        const editorCommand =
+                          allEditors[preferredEditor]?.command || "";
+                        console.log(
+                          "[DesktopIntegrations] Install CLI Tool clicked for:",
+                          editorCommand,
+                        );
+
+                        const command = getEditorInstallCommand(editorCommand);
+                        console.log(
+                          "[DesktopIntegrations] Got install command:",
+                          command,
+                        );
+
+                        if (command) {
+                          executeInTerminal(command);
+                        } else {
+                          console.error(
+                            "[DesktopIntegrations] No install command found for:",
+                            editorCommand,
+                          );
+                        }
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        padding: "4px 8px",
+                        borderRadius: "6px",
+                        border: "1px solid var(--color-panel-accent)",
+                        backgroundColor: "var(--color-panel-accent)",
+                        color: "white",
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor =
+                          "color-mix(in srgb, var(--color-panel-accent) 85%, black)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor =
+                          "var(--color-panel-accent)";
+                      }}
+                    >
+                      <Terminal size={12} />
+                      Install CLI Tool
+                    </button>
+                  )}
+                <button
+                  onClick={() => setShowInstallHelp(!showInstallHelp)}
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: "6px",
+                    border: "1px solid var(--color-panel-border)",
+                    backgroundColor: "var(--color-panel-bg-secondary)",
+                    color: "var(--color-panel-text-secondary)",
+                    fontSize: "11px",
                     cursor: "pointer",
                     transition: "all 0.2s",
                   }}
@@ -242,11 +647,246 @@ export function DesktopIntegrations() {
                       "var(--color-panel-bg-secondary)";
                   }}
                 >
-                  Browse
+                  {showInstallHelp ? "Hide" : "Show"} Install Instructions
                 </button>
               </div>
             </div>
-          )}
+
+            {/* Installation Instructions */}
+            {showInstallHelp && (
+              <div
+                style={{
+                  marginTop: "12px",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  backgroundColor: "var(--color-panel-bg-secondary)",
+                  border: "1px solid var(--color-panel-border)",
+                }}
+              >
+                <h4
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "var(--color-panel-text)",
+                    marginBottom: "8px",
+                  }}
+                >
+                  How to install{" "}
+                  {allEditors[preferredEditor]?.label || "this editor"}{" "}
+                  command-line tool:
+                </h4>
+                <p
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--color-panel-text-secondary)",
+                    marginBottom: "12px",
+                    lineHeight: "1.5",
+                  }}
+                >
+                  {getInstallInstructions(preferredEditor)}
+                </p>
+                <div
+                  style={{
+                    padding: "8px",
+                    borderRadius: "6px",
+                    backgroundColor: "var(--color-panel-bg)",
+                    border: "1px solid var(--color-panel-border)",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: "10px",
+                      color: "var(--color-panel-text-muted)",
+                      margin: "0 0 4px 0",
+                    }}
+                  >
+                    To verify installation, run in terminal:
+                  </p>
+                  <code
+                    style={{
+                      fontSize: "11px",
+                      color: "var(--color-panel-accent)",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    which {allEditors[preferredEditor]?.command || "command"}
+                  </code>
+                </div>
+              </div>
+            )}
+
+            {/* Add Custom Editor Button */}
+            <div style={{ marginTop: "16px" }}>
+              <button
+                onClick={() => setShowAddCustomEditor(!showAddCustomEditor)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--color-panel-border)",
+                  backgroundColor: "var(--color-panel-bg-secondary)",
+                  color: "var(--color-panel-text)",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  width: "100%",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor =
+                    "var(--color-panel-bg-tertiary)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor =
+                    "var(--color-panel-bg-secondary)";
+                }}
+              >
+                {showAddCustomEditor ? "Cancel" : "+ Add Custom Editor"}
+              </button>
+            </div>
+
+            {/* Add Custom Editor Form */}
+            {showAddCustomEditor && (
+              <div
+                style={{
+                  marginTop: "12px",
+                  padding: "16px",
+                  borderRadius: "8px",
+                  backgroundColor: "var(--color-panel-bg-secondary)",
+                  border: "1px solid var(--color-panel-border)",
+                }}
+              >
+                <h4
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "var(--color-panel-text)",
+                    marginBottom: "12px",
+                  }}
+                >
+                  Add Custom Editor
+                </h4>
+
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "12px",
+                  }}
+                >
+                  <div>
+                    <label
+                      style={{
+                        fontSize: "11px",
+                        color: "var(--color-panel-text-secondary)",
+                        display: "block",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      Editor Name*
+                    </label>
+                    <input
+                      type="text"
+                      value={customEditorForm.label}
+                      onChange={(e) =>
+                        setCustomEditorForm({
+                          ...customEditorForm,
+                          label: e.target.value,
+                        })
+                      }
+                      placeholder="e.g., Zed"
+                      style={{
+                        width: "100%",
+                        padding: "8px 12px",
+                        borderRadius: "6px",
+                        border: "1px solid var(--color-panel-border)",
+                        backgroundColor: "var(--color-panel-bg)",
+                        color: "var(--color-panel-text)",
+                        fontSize: "12px",
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      style={{
+                        fontSize: "11px",
+                        color: "var(--color-panel-text-secondary)",
+                        display: "block",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      Command*
+                    </label>
+                    <input
+                      type="text"
+                      value={customEditorForm.command}
+                      onChange={(e) =>
+                        setCustomEditorForm({
+                          ...customEditorForm,
+                          command: e.target.value,
+                        })
+                      }
+                      placeholder="e.g., zed"
+                      style={{
+                        width: "100%",
+                        padding: "8px 12px",
+                        borderRadius: "6px",
+                        border: "1px solid var(--color-panel-border)",
+                        backgroundColor: "var(--color-panel-bg)",
+                        color: "var(--color-panel-text)",
+                        fontSize: "12px",
+                        fontFamily: "monospace",
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (customEditorForm.label && customEditorForm.command) {
+                        const id = customEditorForm.command.toLowerCase();
+                        addCustomEditor(
+                          id,
+                          customEditorForm.label,
+                          customEditorForm.command,
+                          customEditorForm.instructions || undefined,
+                        );
+                        setCustomEditorForm({
+                          label: "",
+                          command: "",
+                          instructions: "",
+                        });
+                        setShowAddCustomEditor(false);
+                        refreshEditors();
+                      }
+                    }}
+                    disabled={
+                      !customEditorForm.label || !customEditorForm.command
+                    }
+                    style={{
+                      padding: "10px 16px",
+                      borderRadius: "8px",
+                      border: "1px solid var(--color-panel-accent)",
+                      backgroundColor: "var(--color-panel-accent)",
+                      color: "white",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor:
+                        customEditorForm.label && customEditorForm.command
+                          ? "pointer"
+                          : "not-allowed",
+                      opacity:
+                        customEditorForm.label && customEditorForm.command
+                          ? 1
+                          : 0.5,
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    Add Editor
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* GitHub Section */}
           <div style={{ marginBottom: "32px" }}>
@@ -414,7 +1054,30 @@ export function DesktopIntegrations() {
                     </span>
                   </div>
                   <button
-                    onClick={github.logout}
+                    onClick={() => {
+                      const editorCommand =
+                        allEditors[preferredEditor]?.command || "";
+                      console.log(
+                        "[DesktopIntegrations] Install CLI Tool clicked for:",
+                        editorCommand,
+                      );
+
+                      const command = getEditorInstallCommand(editorCommand);
+                      console.log(
+                        "[DesktopIntegrations] Got install command:",
+                        command,
+                      );
+
+                      if (command) {
+                        executeInTerminal(command);
+                      } else {
+                        console.error(
+                          "[DesktopIntegrations] No install command found for:",
+                          editorCommand,
+                        );
+                      }
+                    }}
+                    title="Automatically install CLI tool (may require sudo password)"
                     style={{
                       padding: "4px 10px",
                       borderRadius: "6px",
@@ -497,218 +1160,6 @@ export function DesktopIntegrations() {
               </div>
             )}
           </div>
-
-          {/* MCP Server Section */}
-          {mcp && (
-            <div style={{ marginBottom: "32px" }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "8px",
-                }}
-              >
-                <Server
-                  size={16}
-                  style={{ color: "var(--color-panel-accent)" }}
-                />
-                <h3
-                  style={{
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    color: "var(--color-panel-text)",
-                    margin: 0,
-                  }}
-                >
-                  MCP Server
-                </h3>
-              </div>
-              <p
-                style={{
-                  fontSize: "12px",
-                  color: "var(--color-panel-text-secondary)",
-                  marginBottom: "12px",
-                }}
-              >
-                Connect to Cursor for AI-assisted development
-              </p>
-
-              {/* Status */}
-              <div
-                style={{
-                  padding: "16px",
-                  borderRadius: "12px",
-                  border: "1px solid var(--color-panel-border)",
-                  backgroundColor: "var(--color-panel-bg-secondary)",
-                  marginBottom: "12px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "10px",
-                        height: "10px",
-                        borderRadius: "50%",
-                        backgroundColor: mcp.status.running
-                          ? "#22c55e"
-                          : "#6b7280",
-                      }}
-                    />
-                    <div>
-                      <div
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 500,
-                          color: "var(--color-panel-text)",
-                        }}
-                      >
-                        {mcp.status.running ? "Running" : "Stopped"}
-                      </div>
-                      {mcp.status.port && (
-                        <div
-                          style={{
-                            fontSize: "11px",
-                            color: "var(--color-panel-text-muted)",
-                          }}
-                        >
-                          Port {mcp.status.port}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={
-                      mcp.status.running ? mcp.stopServer : mcp.startServer
-                    }
-                    disabled={mcp.isLoading}
-                    style={{
-                      padding: "8px 16px",
-                      borderRadius: "8px",
-                      border: "none",
-                      backgroundColor: mcp.status.running
-                        ? "rgba(239, 68, 68, 0.1)"
-                        : "rgba(34, 197, 94, 0.1)",
-                      color: mcp.status.running ? "#ef4444" : "#22c55e",
-                      fontSize: "12px",
-                      fontWeight: 500,
-                      cursor: mcp.isLoading ? "not-allowed" : "pointer",
-                      opacity: mcp.isLoading ? 0.6 : 1,
-                      transition: "all 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!mcp.isLoading) {
-                        e.currentTarget.style.backgroundColor = mcp.status
-                          .running
-                          ? "rgba(239, 68, 68, 0.2)"
-                          : "rgba(34, 197, 94, 0.2)";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = mcp.status.running
-                        ? "rgba(239, 68, 68, 0.1)"
-                        : "rgba(34, 197, 94, 0.1)";
-                    }}
-                  >
-                    {mcp.isLoading ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : mcp.status.running ? (
-                      "Stop"
-                    ) : (
-                      "Start"
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Cursor Config */}
-              {mcp.status.running && cursorConfig && (
-                <div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        color: "var(--color-panel-text-secondary)",
-                      }}
-                    >
-                      Add to Cursor's .cursor/mcp.json:
-                    </span>
-                    <button
-                      onClick={handleCopyConfig}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        padding: "6px 10px",
-                        borderRadius: "6px",
-                        border: "none",
-                        backgroundColor: "var(--color-panel-bg-secondary)",
-                        color: copied ? "#22c55e" : "var(--color-panel-text)",
-                        fontSize: "11px",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor =
-                          "var(--color-panel-bg-tertiary)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor =
-                          "var(--color-panel-bg-secondary)";
-                      }}
-                    >
-                      {copied ? (
-                        <>
-                          <Check size={12} />
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy size={12} />
-                          Copy
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <pre
-                    style={{
-                      padding: "12px",
-                      borderRadius: "8px",
-                      backgroundColor: "#0a0a0a",
-                      border: "1px solid var(--color-panel-border)",
-                      fontSize: "11px",
-                      fontFamily: "monospace",
-                      color: "var(--color-panel-text-muted)",
-                      overflowX: "auto",
-                      margin: 0,
-                    }}
-                  >
-                    {cursorConfig}
-                  </pre>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* External Integrations Link */}
           <div>

@@ -169,6 +169,7 @@ export function useHealthMetrics(): HealthMetrics {
     staleTime: STALE_TIME.health,
     refetchInterval: REFETCH_INTERVAL.health,
     refetchOnMount: false,
+    placeholderData: (previousData) => previousData ?? [],
   });
 
   // Cache hit rate query
@@ -186,6 +187,7 @@ export function useHealthMetrics(): HealthMetrics {
     staleTime: STALE_TIME.health,
     refetchInterval: REFETCH_INTERVAL.health,
     refetchOnMount: false,
+    placeholderData: (previousData) => previousData ?? [],
   });
 
   // Scheduler lag query
@@ -215,6 +217,7 @@ export function useHealthMetrics(): HealthMetrics {
     staleTime: STALE_TIME.health,
     refetchInterval: REFETCH_INTERVAL.health,
     refetchOnMount: false,
+    placeholderData: (previousData) => previousData ?? [],
   });
 
   // Latency percentiles query
@@ -258,6 +261,7 @@ export function useHealthMetrics(): HealthMetrics {
     staleTime: STALE_TIME.health,
     refetchInterval: REFETCH_INTERVAL.health,
     refetchOnMount: false,
+    placeholderData: (previousData) => previousData ?? [],
   });
 
   // Compute derived values

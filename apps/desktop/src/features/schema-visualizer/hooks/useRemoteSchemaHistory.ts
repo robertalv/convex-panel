@@ -125,6 +125,15 @@ export function useRemoteSchemaHistory({
   // Use provided repo or context repo
   const selectedRepo = repo ?? contextRepo;
 
+  console.log("[useRemoteSchemaHistory] 🚀 Hook initialized", {
+    isAuthenticated,
+    selectedRepo: selectedRepo?.full_name ?? null,
+    selectedRepoId: selectedRepo?.id ?? null,
+    isConnected: isAuthenticated && !!selectedRepo,
+    autoLoad,
+    initialBranch,
+  });
+
   // Core state - initialize branch from localStorage if available
   const [commits, setCommits] = useState<RemoteGitCommit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -235,9 +244,13 @@ export function useRemoteSchemaHistory({
 
       try {
         const [owner, repoName] = selectedRepo.full_name.split("/");
-        console.log(
-          `[useRemoteSchemaHistory] Fetching commits for ${owner}/${repoName}, path: ${filePath}, branch: ${branch || "(default)"}, maxCommits: ${maxCommits}`,
-        );
+        console.log(`[useRemoteSchemaHistory] 🔍 Fetching commits:`, {
+          owner,
+          repo: repoName,
+          path: filePath,
+          branch: branch || "(default)",
+          maxCommits,
+        });
         const commits = await getFileCommits(
           token,
           owner,
@@ -247,11 +260,14 @@ export function useRemoteSchemaHistory({
           branch || undefined,
         );
         console.log(
-          `[useRemoteSchemaHistory] GitHub API returned ${commits.length} commits`,
+          `[useRemoteSchemaHistory] 📦 GitHub API returned ${commits.length} commits`,
         );
         return commits.map(convertCommit);
       } catch (e) {
-        console.error("[useRemoteSchemaHistory] Failed to fetch commits:", e);
+        console.error(
+          "[useRemoteSchemaHistory] ❌ Failed to fetch commits:",
+          e,
+        );
         throw e;
       }
     },
@@ -389,8 +405,16 @@ export function useRemoteSchemaHistory({
   const refresh = useCallback(async () => {
     // Silently return if not connected - this is not an error state
     if (!isConnected || !isMountedRef.current) {
+      console.log(
+        "[useRemoteSchemaHistory] ⏭️  Skipping refresh (not connected or unmounted)",
+      );
       return;
     }
+
+    console.log(
+      "[useRemoteSchemaHistory] 🔄 Starting refresh for repo:",
+      selectedRepo?.full_name,
+    );
 
     // Increment refresh ID to invalidate any pending refreshes
     refreshIdRef.current += 1;
@@ -402,13 +426,21 @@ export function useRemoteSchemaHistory({
       setBranchesLoading(true);
 
       // Fetch branches
+      console.log("[useRemoteSchemaHistory] 🌿 Fetching branches...");
       const branchData = await fetchBranchesInternal();
 
       // Check if this refresh is still valid
       if (!isMountedRef.current || refreshIdRef.current !== thisRefreshId) {
+        console.log(
+          "[useRemoteSchemaHistory] ⏭️  Refresh cancelled (component unmounted or new refresh started)",
+        );
         return;
       }
 
+      console.log(
+        `[useRemoteSchemaHistory] 🌿 Found ${branchData.length} branches:`,
+        branchData.map((b) => b.name),
+      );
       setBranches(branchData);
       setBranchesLoading(false);
 
@@ -424,17 +456,30 @@ export function useRemoteSchemaHistory({
             branchToUse = initialBranch;
             setCurrentBranch(initialBranch);
             persistBranch(selectedRepo?.full_name ?? null, initialBranch);
+            console.log(
+              `[useRemoteSchemaHistory] 🌿 Using initial branch: ${initialBranch}`,
+            );
           } else {
             // Fall back to default branch
             branchToUse = selectedRepo?.default_branch || "main";
             setCurrentBranch(branchToUse);
             persistBranch(selectedRepo?.full_name ?? null, branchToUse);
+            console.log(
+              `[useRemoteSchemaHistory] 🌿 Initial branch not found, using default: ${branchToUse}`,
+            );
           }
         } else {
           branchToUse = selectedRepo?.default_branch || "main";
           setCurrentBranch(branchToUse);
           persistBranch(selectedRepo?.full_name ?? null, branchToUse);
+          console.log(
+            `[useRemoteSchemaHistory] 🌿 No initial branch, using default: ${branchToUse}`,
+          );
         }
+      } else {
+        console.log(
+          `[useRemoteSchemaHistory] 🌿 Using current branch: ${branchToUse}`,
+        );
       }
 
       // Determine the schema file path to use
@@ -442,24 +487,42 @@ export function useRemoteSchemaHistory({
 
       // Find schema files if not set
       if (!pathToUse) {
+        console.log("[useRemoteSchemaHistory] 📁 Finding schema files...");
         const files = await findSchemas();
 
         // Check if still valid
         if (!isMountedRef.current || refreshIdRef.current !== thisRefreshId) {
+          console.log(
+            "[useRemoteSchemaHistory] ⏭️  Refresh cancelled (component unmounted or new refresh started)",
+          );
           return;
         }
 
+        console.log(
+          `[useRemoteSchemaHistory] 📁 Found ${files.length} schema files:`,
+          files,
+        );
         setAvailableSchemaFiles(files);
 
         if (files.length > 0) {
           // Prefer convex/schema.ts
           pathToUse = files.find((f) => f === "convex/schema.ts") || files[0];
           setSchemaFilePath(pathToUse);
+          console.log(
+            `[useRemoteSchemaHistory] 📁 Using schema file: ${pathToUse}`,
+          );
         } else {
+          console.log(
+            "[useRemoteSchemaHistory] ❌ No schema.ts file found in repository",
+          );
           setError("No schema.ts file found in repository");
           setCommits([]);
           return;
         }
+      } else {
+        console.log(
+          `[useRemoteSchemaHistory] 📁 Using existing schema path: ${pathToUse}`,
+        );
       }
 
       // Fetch commits using the determined path and branch
@@ -467,18 +530,30 @@ export function useRemoteSchemaHistory({
 
       // Final check before updating state
       if (!isMountedRef.current || refreshIdRef.current !== thisRefreshId) {
+        console.log(
+          "[useRemoteSchemaHistory] ⏭️  Refresh cancelled (component unmounted or new refresh started)",
+        );
         return;
       }
 
       setCommits(schemaCommits);
 
       console.log(
-        `[useRemoteSchemaHistory] Found ${schemaCommits.length} commits on branch ${branchToUse}`,
+        `[useRemoteSchemaHistory] ✅ Successfully loaded ${schemaCommits.length} commits`,
+        {
+          branch: branchToUse,
+          schemaPath: pathToUse,
+          repo: selectedRepo?.full_name,
+          commits: schemaCommits.map((c) => ({
+            sha: c.shortSha,
+            message: c.message,
+          })),
+        },
       );
     } catch (e) {
       // Only update error if this refresh is still valid
       if (isMountedRef.current && refreshIdRef.current === thisRefreshId) {
-        console.error("[useRemoteSchemaHistory] Failed to refresh:", e);
+        console.error("[useRemoteSchemaHistory] ❌ Failed to refresh:", e);
         setError(
           e instanceof Error ? e.message : "Failed to load remote history",
         );
@@ -585,8 +660,26 @@ export function useRemoteSchemaHistory({
 
   // Auto-load on mount or when repo/auth changes
   useEffect(() => {
+    console.log("[useRemoteSchemaHistory] 🔍 Auto-load effect triggered", {
+      autoLoad,
+      isConnected,
+      selectedRepoId: selectedRepo?.id,
+    });
+
     if (autoLoad && isConnected) {
+      console.log(
+        "[useRemoteSchemaHistory] ✅ Conditions met, calling refresh()",
+      );
       refresh();
+    } else {
+      console.log(
+        "[useRemoteSchemaHistory] ❌ Conditions NOT met, skipping refresh",
+        {
+          autoLoad,
+          isConnected,
+          reason: !autoLoad ? "autoLoad is false" : "not connected",
+        },
+      );
     }
     // Only trigger on connection state or repo change, not on refresh changes
     // eslint-disable-next-line react-hooks/exhaustive-deps

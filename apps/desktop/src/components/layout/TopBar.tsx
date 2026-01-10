@@ -10,9 +10,7 @@ import {
   useTerminalActions,
   useTerminalState,
 } from "../../contexts/TerminalContext";
-import { useMcpOptional } from "../../contexts/McpContext";
 import { useIsFullscreen } from "../../hooks/useIsFullscreen";
-import { McpStatusIndicator } from "./McpStatusIndicator";
 // import { NetworkStatusIndicator } from "./NetworkStatusIndicator";
 
 interface TopBarProps {
@@ -36,36 +34,15 @@ interface TopBarProps {
   deploymentsLoading?: boolean;
 }
 
-function TerminalButton({ onOpenSettings }: { onOpenSettings?: () => void }) {
+function TerminalButton({ onOpenSettings: _onOpenSettings }: { onOpenSettings?: () => void }) {
   const { toggleTerminal } = useTerminalActions();
   const { isOpen } = useTerminalState();
-  const mcp = useMcpOptional();
-
-  const hasProjectPath = Boolean(mcp?.projectPath);
-  const isLoading = mcp?.isLoading ?? false;
 
   const handleClick = async () => {
-    if (!hasProjectPath) {
-      if (mcp?.selectProjectDirectory) {
-        const path = await mcp.selectProjectDirectory();
-        if (path) {
-          toggleTerminal();
-        }
-      } else if (onOpenSettings) {
-        onOpenSettings();
-      }
-      return;
-    }
     toggleTerminal();
   };
 
-  const title = isLoading
-    ? "Loading..."
-    : !hasProjectPath
-      ? "Select project directory to enable terminal"
-      : isOpen
-        ? "Close terminal (⌃`)"
-        : "Open terminal (⌃`)";
+  const title = isOpen ? "Close terminal (⌃`)" : "Open terminal (⌃`)";
 
   return (
     <button
@@ -75,21 +52,13 @@ function TerminalButton({ onOpenSettings }: { onOpenSettings?: () => void }) {
         "flex items-center justify-center relative",
         "h-6 w-6 rounded-lg",
         "transition-colors duration-150",
-        !hasProjectPath
-          ? "text-text-muted hover:text-text-base hover:bg-surface-raised"
-          : isOpen
-            ? "bg-brand-base/10 text-brand-base"
-            : "text-text-muted hover:text-text-base hover:bg-surface-raised",
+        isOpen
+          ? "bg-brand-base/10 text-brand-base"
+          : "text-text-muted hover:text-text-base hover:bg-surface-raised",
       )}
       title={title}
     >
       <Terminal className="h-4 w-4" />
-      {!hasProjectPath && !isLoading && (
-        <span
-          className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500"
-          title="Project directory not set"
-        />
-      )}
     </button>
   );
 }
@@ -234,9 +203,6 @@ export function TopBar({
           onThemeChange={onThemeChange}
           onLogout={onDisconnect}
         />
-
-        {/* MCP Connection Status Indicator */}
-        <McpStatusIndicator />
       </div>
     </header>
   );

@@ -10,7 +10,7 @@ export const EmptyFunctionsState: React.FC = () => {
     <div className="relative h-full w-full overflow-hidden">
       {/* Background statistics grid - faded */}
       <div
-        className="absolute inset-0 p-4 pointer-events-none"
+        className="absolute inset-0 p-4 pointer-events-none opacity-50"
         style={{
           maskImage:
             "linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.55) 30%, transparent 90%)",
@@ -291,7 +291,7 @@ export const EmptyFunctionsState: React.FC = () => {
 
       {/* Centered message */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="bg-surface-base/90 border border-border-base rounded-3xl p-8 text-center text-text-base max-w-md w-11/12 shadow-lg flex items-center gap-4">
+        <div className="bg-surface-base/90 border border-border-base rounded-3xl p-8 text-center text-text-base max-w-md w-11/12 flex items-center gap-4">
           <ArrowLeft size={24} className="text-text-muted flex-shrink-0" />
           <p className="m-0 text-sm text-text-base leading-relaxed text-left">
             Select a function in the expandable panel to the left to view its

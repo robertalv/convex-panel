@@ -65,7 +65,7 @@ function SidebarItem({
           <div
             className={cn(
               "-ml-2",
-              "w-[3px] h-5 rounded-full flex-shrink-0",
+              "w-[3px] h-5 rounded-full shrink-0",
               "transition-all duration-200 ease-out",
               isActive ? "bg-brand-base" : "bg-transparent",
             )}
@@ -94,7 +94,7 @@ function SidebarItem({
       {/* Active indicator */}
       <div
         className={cn(
-          "w-[3px] h-5 rounded-full flex-shrink-0",
+          "w-[3px] h-5 rounded-full shrink-0",
           "transition-all duration-200 ease-out",
           isActive ? "bg-brand-base" : "bg-transparent",
         )}
@@ -111,7 +111,7 @@ function SidebarItem({
             : "text-text-muted hover:text-text-base hover:bg-surface-raised",
         )}
       >
-        <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+        <Icon className="h-3.5 w-3.5 shrink-0" />
         <span className="truncate flex-1 text-left text-sm">{label}</span>
         {shortcut && (
           <kbd className="text-[10px] text-text-subtle bg-surface-base px-1 py-0.5 rounded">
@@ -201,7 +201,7 @@ export function Sidebar({
           {/* Collapse toggle */}
           <div className="flex items-center w-full gap-1.5">
             {/* Spacer for indicator alignment */}
-            <div className=" flex-shrink-0" />
+            <div className="shrink-0" />
             <TooltipWithKeybind
               content={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               keybind="⌘B"
@@ -223,7 +223,7 @@ export function Sidebar({
                   <PanelLeft className="h-3.5 w-3.5" />
                 ) : (
                   <>
-                    <PanelLeftClose className="h-3.5 w-3.5 flex-shrink-0" />
+                    <PanelLeftClose className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate text-sm">Collapse</span>
                   </>
                 )}

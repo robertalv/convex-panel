@@ -18,6 +18,7 @@ export interface SchemaEditResult {
   success: boolean;
   message: string;
   newContent?: string;
+  lineNumber?: number; // Line number where the change was made (1-based)
 }
 
 /**
@@ -74,9 +75,16 @@ export async function applyFixToSchema(
   tableName: string,
   action: WarningAction,
 ): Promise<SchemaEditResult> {
+  console.log("[applyFixToSchema] Starting with:", {
+    projectPath,
+    tableName,
+    actionType: action.type,
+  });
+
   // Read current schema content
   const schemaContent = await readSchemaFile(projectPath);
   if (!schemaContent) {
+    console.error("[applyFixToSchema] Could not read schema file");
     return {
       success: false,
       message:
@@ -84,7 +92,17 @@ export async function applyFixToSchema(
     };
   }
 
+  console.log(
+    "[applyFixToSchema] Read schema file, length:",
+    schemaContent.length,
+  );
+  console.log(
+    "[applyFixToSchema] Schema contains table name?",
+    schemaContent.includes(tableName),
+  );
+
   let newContent: string | null = null;
+  let lineNumber: number | undefined = undefined;
 
   switch (action.type) {
     case "add-index":
@@ -95,11 +113,17 @@ export async function applyFixToSchema(
           message: "No code snippet available for this action.",
         };
       }
-      newContent = insertIndexIntoSchema(
+      console.log("[applyFixToSchema] Inserting index:", action.codeSnippet);
+      const insertResult = insertIndexIntoSchema(
         schemaContent,
         tableName,
         action.codeSnippet,
       );
+      console.log("[applyFixToSchema] Insert result:", insertResult);
+      if (insertResult) {
+        newContent = insertResult.modifiedContent;
+        lineNumber = insertResult.lineNumber;
+      }
       break;
 
     case "remove-index":
@@ -136,11 +160,16 @@ export async function applyFixToSchema(
   }
 
   if (!newContent) {
+    console.error(
+      "[applyFixToSchema] newContent is null, table not found or operation failed",
+    );
     return {
       success: false,
       message: `Could not find table "${tableName}" in schema.ts. Make sure the table is defined in the schema.`,
     };
   }
+
+  console.log("[applyFixToSchema] Writing modified content to file");
 
   // Write the modified content
   const writeSuccess = await writeSchemaFile(projectPath, newContent);
@@ -151,10 +180,13 @@ export async function applyFixToSchema(
     };
   }
 
+  console.log("[applyFixToSchema] Successfully wrote changes");
+
   return {
     success: true,
     message: `Successfully applied fix to ${tableName} in schema.ts. Run \`npx convex dev\` to deploy changes.`,
     newContent,
+    lineNumber,
   };
 }
 
@@ -232,13 +264,16 @@ export function previewSchemaChange(
     case "add-index":
     case "add-compound-index": {
       if (!action.codeSnippet) return null;
-      const after = insertIndexIntoSchema(
+      const result = insertIndexIntoSchema(
         schemaContent,
         tableName,
         action.codeSnippet,
       );
-      if (!after) return null;
-      const afterLocation = findTableDefinitionInSchema(after, tableName);
+      if (!result) return null;
+      const afterLocation = findTableDefinitionInSchema(
+        result.modifiedContent,
+        tableName,
+      );
       return {
         before,
         after: afterLocation?.content || before,

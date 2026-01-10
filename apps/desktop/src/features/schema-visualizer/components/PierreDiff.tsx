@@ -68,8 +68,11 @@ function createDefaultOptions(diffStyle: "unified" | "split" = "unified") {
  */
 function createUnsafeCSS(isDark: boolean): string {
   // Colors based on theme
-  const bg = isDark ? "rgb(52, 50, 47)" : "rgb(248, 246, 243)";
-  const separatorBg = isDark ? "rgb(60, 58, 55)" : "rgb(240, 238, 235)";
+  // - baseBg: for empty/context lines (background-base)
+  // - containerBg: for the overall container (surface-raised)
+  const baseBg = isDark ? "rgb(30, 28, 26)" : "rgb(243, 240, 237)";
+  const containerBg = isDark ? "rgb(52, 50, 47)" : "rgb(248, 246, 243)";
+  const separatorBg = containerBg;
   const fg = isDark ? "#f1ecec" : "#211e1e";
   const fgNumber = isDark ? "rgb(143, 135, 128)" : "rgb(150, 148, 143)";
 
@@ -102,10 +105,11 @@ function createUnsafeCSS(isDark: boolean): string {
 
   return `
 [data-diffs] {
-  --diffs-bg: ${bg};
-  --diffs-bg-buffer: ${bg};
-  --diffs-bg-hover: ${bg};
-  --diffs-bg-context: ${bg};
+  --diffs-bg: ${baseBg};
+  --diffs-bg-buffer: ${baseBg};
+  --diffs-bg-hover: ${baseBg};
+  --diffs-bg-context: ${baseBg};
+  --diffs-bg-context-number: ${containerBg};
   --diffs-bg-separator: ${separatorBg};
   --diffs-fg: ${fg};
   --diffs-fg-number: ${fgNumber};
@@ -125,8 +129,10 @@ function createUnsafeCSS(isDark: boolean): string {
   --diffs-bg-deletion-emphasis: ${deletionEmphasis};
   
   --diffs-selection-base: ${modifiedColor};
-  --diffs-bg-selection: ${bg};
-  --diffs-bg-selection-number: ${bg};
+  --diffs-bg-selection: ${baseBg};
+  --diffs-bg-selection-number: ${containerBg};
+  
+  background-color: ${containerBg} !important;
 }
 
 [data-diffs-header],
@@ -134,6 +140,7 @@ function createUnsafeCSS(isDark: boolean): string {
   [data-separator-wrapper] {
     margin: 0 !important;
     border-radius: 0 !important;
+    background-color: ${separatorBg} !important;
   }
   [data-expand-button] {
     width: 6.5ch !important;
@@ -150,9 +157,24 @@ function createUnsafeCSS(isDark: boolean): string {
   }
   [data-separator-content] {
     height: 24px !important;
+    background-color: ${separatorBg} !important;
   }
   [data-code] {
     overflow-x: auto !important;
+  }
+  /* Override context/unchanged line backgrounds */
+  [data-line][data-line-type="context"],
+  [data-line]:not([data-line-type]) {
+    background: ${baseBg} !important;
+    background-image: none !important;
+  }
+  /* Line number column uses container/surface-raised background */
+  [data-line-number],
+  [data-gutter],
+  [data-column-number],
+  [data-numbers] {
+    background: ${baseBg} !important;
+    background-image: none !important;
   }
 }
 `;

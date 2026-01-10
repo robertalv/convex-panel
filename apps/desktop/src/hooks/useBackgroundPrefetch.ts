@@ -1,16 +1,9 @@
-/**
- * Background Prefetch Hook
- * Prefetches data in the background using requestIdleCallback.
- * Used to warm the cache after login for faster navigation.
- */
-
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDeployment } from "@/contexts/DeploymentContext";
 import { STALE_TIME } from "@/contexts/QueryContext";
 import { healthMetricsKeys } from "@/features/health/hooks/useHealthMetrics";
-import { functionHealthKeys } from "@/features/health/hooks/useFunctionHealth";
-import { functionActivityKeys } from "@/features/health/hooks/useFunctionActivity";
+import { udfExecutionStatsKeys } from "@/features/health/hooks/useUdfExecutionStats";
 import { deploymentStatusKeys } from "@/features/health/hooks/useDeploymentStatus";
 import { recentErrorsKeys } from "@/features/health/hooks/useRecentErrors";
 import {
@@ -27,10 +20,8 @@ import {
 } from "@convex-panel/shared/api";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 
-// Use Tauri's fetch for CORS-free HTTP requests
 const desktopFetch: FetchFn = (input, init) => tauriFetch(input, init);
 
-// Polyfill requestIdleCallback for older browsers
 const requestIdle =
   typeof window !== "undefined" && "requestIdleCallback" in window
     ? window.requestIdleCallback
@@ -42,16 +33,10 @@ const cancelIdle =
     : (id: number) => clearTimeout(id);
 
 interface UseBackgroundPrefetchOptions {
-  /** Delay before starting prefetch (ms). Defaults to 1000ms. */
   delay?: number;
-  /** Whether to enable prefetching. Defaults to true. */
   enabled?: boolean;
 }
 
-/**
- * Hook that prefetches health and monitoring data in the background.
- * Uses requestIdleCallback to avoid impacting UI responsiveness.
- */
 export function useBackgroundPrefetch({
   delay = 1000,
   enabled = true,
@@ -62,12 +47,10 @@ export function useBackgroundPrefetch({
   const idleCallbackRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // Don't prefetch if disabled, already prefetched, or missing credentials
     if (!enabled || hasPrefetchedRef.current || !deploymentUrl || !authToken) {
       return;
     }
 
-    // Delay before starting prefetch to let the UI settle
     const timeoutId = setTimeout(() => {
       idleCallbackRef.current = requestIdle(() => {
         prefetchHealthData(queryClient, deploymentUrl, authToken);
@@ -83,15 +66,11 @@ export function useBackgroundPrefetch({
     };
   }, [queryClient, deploymentUrl, authToken, delay, enabled]);
 
-  // Reset prefetch flag when deployment changes
   useEffect(() => {
     hasPrefetchedRef.current = false;
   }, [deploymentUrl]);
 }
 
-/**
- * Prefetch health monitoring data into the React Query cache.
- */
 async function prefetchHealthData(
   queryClient: ReturnType<typeof useQueryClient>,
   deploymentUrl: string,
@@ -101,137 +80,186 @@ async function prefetchHealthData(
 
   const prefetchPromises: Promise<void>[] = [];
 
-  // Prefetch failure rate
+  const transformTimeSeries = (
+    data: Array<[string, Array<[{ secs_since_epoch: number }, number | null]>]>,
+  ) => {
+    if (!data || data.length === 0) return [];
+    const allPoints: Array<{ time: number; value: number | null }> = [];
+    for (const [, timeSeries] of data) {
+      for (const [timestamp, value] of timeSeries) {
+        allPoints.push({
+          time: timestamp.secs_since_epoch,
+          value: value,
+        });
+      }
+    }
+    allPoints.sort((a, b) => a.time - b.time);
+    return allPoints;
+  };
+
   prefetchPromises.push(
     queryClient.prefetchQuery({
       queryKey: healthMetricsKeys.failureRate(deploymentUrl),
-      queryFn: () => fetchFailureRate(deploymentUrl, authToken, desktopFetch),
+      queryFn: async () => {
+        const data = await fetchFailureRate(
+          deploymentUrl,
+          authToken,
+          desktopFetch,
+        );
+        return transformTimeSeries(data);
+      },
       staleTime: STALE_TIME.health,
     }),
   );
 
-  // Prefetch cache hit rate
   prefetchPromises.push(
     queryClient.prefetchQuery({
       queryKey: healthMetricsKeys.cacheHitRate(deploymentUrl),
-      queryFn: () => fetchCacheHitRate(deploymentUrl, authToken, desktopFetch),
+      queryFn: async () => {
+        const data = await fetchCacheHitRate(
+          deploymentUrl,
+          authToken,
+          desktopFetch,
+        );
+        return transformTimeSeries(data);
+      },
       staleTime: STALE_TIME.health,
     }),
   );
 
-  // Prefetch scheduler lag
   prefetchPromises.push(
     queryClient.prefetchQuery({
       queryKey: healthMetricsKeys.schedulerLag(deploymentUrl),
-      queryFn: () => fetchSchedulerLag(deploymentUrl, authToken, desktopFetch),
+      queryFn: async () => {
+        const data = await fetchSchedulerLag(
+          deploymentUrl,
+          authToken,
+          desktopFetch,
+        );
+        return Array.isArray(data)
+          ? data.map(
+              ([timestamp, value]: [
+                { secs_since_epoch: number },
+                number | null,
+              ]) => ({
+                time: timestamp.secs_since_epoch,
+                value,
+              }),
+            )
+          : [];
+      },
       staleTime: STALE_TIME.health,
     }),
   );
 
-  // Prefetch latency percentiles
   prefetchPromises.push(
     queryClient.prefetchQuery({
       queryKey: healthMetricsKeys.latency(deploymentUrl),
-      queryFn: () =>
-        fetchLatencyPercentiles(deploymentUrl, authToken, desktopFetch),
+      queryFn: async () => {
+        const data = await fetchLatencyPercentiles(
+          deploymentUrl,
+          authToken,
+          desktopFetch,
+        );
+        const percentiles = { p50: 0, p95: 0, p99: 0 };
+        for (const [percentile, timeSeries] of data) {
+          const latestValue =
+            timeSeries.length > 0
+              ? (timeSeries[timeSeries.length - 1][1] ?? 0)
+              : 0;
+          if (percentile === 50) percentiles.p50 = latestValue;
+          else if (percentile === 95) percentiles.p95 = latestValue;
+          else if (percentile === 99) percentiles.p99 = latestValue;
+        }
+        return percentiles;
+      },
       staleTime: STALE_TIME.health,
     }),
   );
 
-  // Prefetch request rate
   prefetchPromises.push(
     queryClient.prefetchQuery({
       queryKey: healthMetricsKeys.requestRate(deploymentUrl),
-      queryFn: () => fetchUdfRate(deploymentUrl, authToken, desktopFetch),
+      queryFn: async () => {
+        const data = await fetchUdfRate(deploymentUrl, authToken, desktopFetch);
+        return transformTimeSeries(data);
+      },
       staleTime: STALE_TIME.health,
     }),
   );
 
-  // Prefetch function health stats
+  const oneHourAgo = Date.now() - 60 * 60 * 1000;
+  const cursor = Math.floor(oneHourAgo / 1000) * 1000;
   prefetchPromises.push(
     queryClient.prefetchQuery({
-      queryKey: functionHealthKeys.stats(deploymentUrl),
+      queryKey: udfExecutionStatsKeys.stats(deploymentUrl, cursor),
       queryFn: async () => {
-        const oneHourAgo = Date.now() - 60 * 60 * 1000;
-        const cursor = Math.floor(oneHourAgo / 1000) * 1000;
-        return fetchUdfExecutionStats(
+        const response = await fetchUdfExecutionStats(
           deploymentUrl,
           authToken,
           cursor,
           desktopFetch,
         );
+        return response?.entries || [];
       },
       staleTime: STALE_TIME.functionStats,
     }),
   );
 
-  // Prefetch function activity
-  prefetchPromises.push(
-    queryClient.prefetchQuery({
-      queryKey: functionActivityKeys.data(deploymentUrl),
-      queryFn: async () => {
-        const oneHourAgo = Date.now() - 60 * 60 * 1000;
-        const cursor = Math.floor(oneHourAgo);
-        return fetchUdfExecutionStats(
-          deploymentUrl,
-          authToken,
-          cursor,
-          desktopFetch,
-        );
-      },
-      staleTime: STALE_TIME.functionStats,
-    }),
-  );
-
-  // Prefetch deployment state
   prefetchPromises.push(
     queryClient.prefetchQuery({
       queryKey: deploymentStatusKeys.state(deploymentUrl),
-      queryFn: () =>
-        callConvexQuery(
+      queryFn: async () => {
+        const result = (await callConvexQuery(
           deploymentUrl,
           authToken,
           SYSTEM_QUERIES.DEPLOYMENT_STATE,
           {},
           desktopFetch,
-        ),
+        )) as { state: "running" | "paused" } | null;
+        return result?.state ?? "unknown";
+      },
       staleTime: STALE_TIME.health,
     }),
   );
 
-  // Prefetch deployment version
   prefetchPromises.push(
     queryClient.prefetchQuery({
       queryKey: deploymentStatusKeys.version(deploymentUrl),
-      queryFn: () =>
-        callConvexQuery(
+      queryFn: async () => {
+        const result = (await callConvexQuery(
           deploymentUrl,
           authToken,
           SYSTEM_QUERIES.GET_VERSION,
           {},
           desktopFetch,
-        ),
+        )) as string | null;
+        return result || null;
+      },
       staleTime: STALE_TIME.health,
     }),
   );
 
-  // Prefetch last push event
   prefetchPromises.push(
     queryClient.prefetchQuery({
       queryKey: deploymentStatusKeys.lastPush(deploymentUrl),
-      queryFn: () =>
-        callConvexQuery(
+      queryFn: async () => {
+        const result = (await callConvexQuery(
           deploymentUrl,
           authToken,
           SYSTEM_QUERIES.LAST_PUSH_EVENT,
           {},
           desktopFetch,
-        ),
+        )) as { _creationTime?: number } | null;
+        if (result && result._creationTime) {
+          return new Date(result._creationTime);
+        }
+        return null;
+      },
       staleTime: STALE_TIME.health,
     }),
   );
 
-  // Prefetch recent errors
   prefetchPromises.push(
     queryClient.prefetchQuery({
       queryKey: recentErrorsKeys.byHours(deploymentUrl, 1),
@@ -241,12 +269,10 @@ async function prefetchHealthData(
     }),
   );
 
-  // Wait for all prefetch operations (they run in parallel)
   try {
     await Promise.allSettled(prefetchPromises);
     console.log("[BackgroundPrefetch] Background prefetch completed");
   } catch (err) {
-    // Prefetch errors are non-critical
     console.warn("[BackgroundPrefetch] Some prefetch operations failed:", err);
   }
 }

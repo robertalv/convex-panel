@@ -1,13 +1,15 @@
 /**
  * Local Schema Hook
  * Reads and parses the local schema.ts file from the project directory
+ * Watches for file changes and auto-reloads when schema is updated
  */
 
 import { useState, useEffect, useCallback } from "react";
 import { readTextFile, exists } from "@tauri-apps/plugin-fs";
-import { useMcpOptional } from "@/contexts/McpContext";
+import { toast } from "sonner";
 import type { SchemaJSON, TableDefinitionJSON, ValidatorJSON } from "../types";
 import { getSchemaFilePath } from "../utils/code-generator";
+import { useFileWatcher } from "./useFileWatcher";
 
 export interface LocalSchemaState {
   /** The parsed schema JSON (if successful) */
@@ -33,13 +35,26 @@ export interface UseLocalSchemaReturn extends LocalSchemaState {
   hasProjectPath: boolean;
 }
 
+interface UseLocalSchemaOptions {
+  /** Project path (parent of convex/ directory) */
+  projectPath: string | null;
+  /** Enable file watching for auto-reload (default: true) */
+  enableWatch?: boolean;
+  /** Show toast notifications on schema changes (default: true) */
+  showToast?: boolean;
+}
+
 /**
  * Hook to read and parse the local schema.ts file
+ * Watches for file changes and automatically reloads
  */
-export function useLocalSchema(): UseLocalSchemaReturn {
-  const mcp = useMcpOptional();
-  const projectPath = mcp?.projectPath ?? null;
-
+export function useLocalSchema(
+  {
+    projectPath,
+    enableWatch = true,
+    showToast = true,
+  }: UseLocalSchemaOptions = { projectPath: null },
+): UseLocalSchemaReturn {
   const [state, setState] = useState<LocalSchemaState>({
     schema: null,
     rawContent: null,
@@ -111,6 +126,21 @@ export function useLocalSchema(): UseLocalSchemaReturn {
   useEffect(() => {
     loadSchema();
   }, [loadSchema]);
+
+  // Watch for file changes
+  useFileWatcher({
+    path: enableWatch && projectPath ? getSchemaFilePath(projectPath) : null,
+    recursive: false,
+    onFileChange: (event) => {
+      console.log("[useLocalSchema] File change detected:", event);
+      // Auto-reload schema when file changes
+      loadSchema().then(() => {
+        if (showToast) {
+          toast.success("Schema file updated");
+        }
+      });
+    },
+  });
 
   return {
     ...state,

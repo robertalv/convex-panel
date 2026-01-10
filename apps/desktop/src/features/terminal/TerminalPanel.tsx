@@ -19,7 +19,6 @@ import {
   Square,
   Key,
 } from "lucide-react";
-import { useMcpOptional } from "../../contexts/McpContext";
 import { useDeployment } from "../../contexts/DeploymentContext";
 import { DeployKeyDialog } from "../../components/DeployKeyDialog";
 
@@ -318,10 +317,25 @@ function TerminalInstance({
         sessionId: string;
         command: string;
       }>;
-      if (customEvent.detail.sessionId !== session.id) return;
+      // Handle both specific session ID and "active" (for current session)
+      const targetSessionId = customEvent.detail.sessionId;
+
+      console.log("[TerminalInstance] Received command event:", {
+        targetSessionId,
+        actualSessionId: session.id,
+        isActive,
+        isReady,
+        command: customEvent.detail.command,
+      });
+
+      if (targetSessionId !== session.id && targetSessionId !== "active")
+        return;
+      if (targetSessionId === "active" && !isActive) return;
       if (!isReady) return;
 
       const { command } = customEvent.detail;
+
+      console.log("[TerminalInstance] Executing command:", command);
 
       // Write the command to the PTY (including the newline to execute it)
       invoke("pty_write", {
@@ -339,7 +353,7 @@ function TerminalInstance({
         handleExternalCommand,
       );
     };
-  }, [session.id, isReady]);
+  }, [session.id, isReady, isActive]);
 
   // Listen for kill process events
   useEffect(() => {
@@ -404,16 +418,29 @@ export function TerminalPanel({
   const { isOpen, height, sessions, activeSessionId } = useTerminalState();
   const {
     closeTerminal,
+    openTerminal,
     setTerminalHeight,
     createSession,
     closeSession,
     switchSession,
   } = useTerminalActions();
 
-  // Get project path from MCP context if available
-  const mcp = useMcpOptional();
-  const defaultWorkingDirectory =
-    workingDirectory || mcp?.projectPath || undefined;
+  const defaultWorkingDirectory = workingDirectory || undefined;
+
+  // Listen for terminal-open event (from editor install button)
+  useEffect(() => {
+    const handleTerminalOpen = () => {
+      console.log(
+        "[TerminalPanel] Received terminal-open event, opening terminal",
+      );
+      openTerminal();
+    };
+
+    window.addEventListener("terminal-open", handleTerminalOpen);
+    return () => {
+      window.removeEventListener("terminal-open", handleTerminalOpen);
+    };
+  }, [openTerminal]);
 
   // Get deployment context for environment variables
   const deployment = useDeployment();

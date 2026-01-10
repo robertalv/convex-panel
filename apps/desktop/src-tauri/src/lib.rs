@@ -1,5 +1,4 @@
 mod secure_store;
-mod mcp_server;
 mod pty;
 
 use tauri::{Manager, Emitter, AppHandle, include_image};
@@ -363,54 +362,12 @@ fn remove_window_constraints(window: tauri::Window) -> Result<(), String> {
 }
 
 // ============================================================================
-// MCP Server Commands
-// ============================================================================
-
-/// Start the MCP server
-#[tauri::command]
-async fn start_mcp_server(app_handle: tauri::AppHandle) -> Result<u16, String> {
-    mcp_server::start_server(app_handle).await
-}
-
-/// Stop the MCP server
-#[tauri::command]
-fn stop_mcp_server() -> Result<(), String> {
-    mcp_server::stop_server()
-}
-
-/// Get MCP server status
-#[tauri::command]
-fn get_mcp_status() -> mcp_server::McpStatus {
-    mcp_server::get_status()
-}
-
-/// Set project path for MCP operations
-#[tauri::command]
-fn set_mcp_project_path(path: Option<String>) {
-    mcp_server::set_project_path(path);
-}
-
-/// Set deployment credentials for MCP operations
-#[tauri::command]
-fn set_mcp_deployment_credentials(url: Option<String>, key: Option<String>) {
-    mcp_server::set_deployment_credentials(url, key);
-}
-
-/// Get the Cursor configuration JSON for the MCP server
-#[tauri::command]
-fn get_cursor_mcp_config() -> Option<String> {
-    mcp_server::get_cursor_config()
-}
-
-// ============================================================================
 // File System Commands
 // ============================================================================
 
 /// Select a directory using the native file picker
 #[tauri::command]
 async fn select_directory() -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::DialogExt;
-    
     // Note: This requires the dialog plugin to be initialized
     // For now, return a placeholder - will be implemented with dialog plugin
     Ok(None)
@@ -550,19 +507,90 @@ async fn open_in_editor(path: String, line: Option<u32>, editor: Option<String>)
     
     let editor_cmd = editor.unwrap_or_else(|| "cursor".to_string());
     
-    let path_with_line = if let Some(l) = line {
-        format!("{}:{}", path, l)
-    } else {
-        path
-    };
+    println!("[Rust open_in_editor] path={}, line={:?}, editor={}", path, line, editor_cmd);
+    
+    // Build command with appropriate arguments for each editor
+    let mut cmd = Command::new(&editor_cmd);
+    
+    match editor_cmd.as_str() {
+        // Cursor and VS Code need --goto flag
+        "cursor" | "code" => {
+            if let Some(l) = line {
+                cmd.arg("--goto").arg(format!("{}:{}", path, l));
+            } else {
+                cmd.arg(&path);
+            }
+        }
+        // Vim/Neovim need +line flag
+        "vim" | "nvim" => {
+            if let Some(l) = line {
+                cmd.arg(format!("+{}", l)).arg(&path);
+            } else {
+                cmd.arg(&path);
+            }
+        }
+        // Emacs needs +line:column format
+        "emacs" => {
+            if let Some(l) = line {
+                cmd.arg(format!("+{}:0", l)).arg(&path);
+            } else {
+                cmd.arg(&path);
+            }
+        }
+        // Sublime Text with line number
+        "subl" => {
+            if let Some(l) = line {
+                cmd.arg(format!("{}:{}", path, l));
+            } else {
+                cmd.arg(&path);
+            }
+        }
+        // JetBrains IDEs (WebStorm, IntelliJ) use --line flag
+        "webstorm" | "idea" => {
+            cmd.arg(&path);
+            if let Some(l) = line {
+                cmd.arg("--line").arg(l.to_string());
+            }
+        }
+        // Zed and other editors use path:line format
+        _ => {
+            if let Some(l) = line {
+                cmd.arg(format!("{}:{}", path, l));
+            } else {
+                cmd.arg(&path);
+            }
+        }
+    }
+    
+    println!("[Rust open_in_editor] Running command: {:?}", cmd);
     
     // Try to open with the specified editor
-    Command::new(&editor_cmd)
-        .arg(&path_with_line)
-        .spawn()
+    cmd.spawn()
         .map_err(|e| format!("Failed to open editor '{}': {}", editor_cmd, e))?;
     
     Ok(())
+}
+
+/// Check if an editor command is available in PATH
+#[tauri::command]
+async fn check_editor_available(editor: String) -> Result<bool, String> {
+    use std::process::Command;
+    
+    // Try to find the command using 'which' on Unix or 'where' on Windows
+    #[cfg(target_os = "windows")]
+    let check_cmd = "where";
+    
+    #[cfg(not(target_os = "windows"))]
+    let check_cmd = "which";
+    
+    let result = Command::new(check_cmd)
+        .arg(&editor)
+        .output();
+    
+    match result {
+        Ok(output) => Ok(output.status.success()),
+        Err(_) => Ok(false),
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -583,18 +611,12 @@ pub fn run() {
             secure_store::set_secret,
             secure_store::get_secret,
             secure_store::delete_secret,
-            // MCP commands
-            start_mcp_server,
-            stop_mcp_server,
-            get_mcp_status,
-            set_mcp_project_path,
-            set_mcp_deployment_credentials,
-            get_cursor_mcp_config,
             // File system commands
             select_directory,
             list_directory_files,
             read_project_file,
             open_in_editor,
+            check_editor_available,
             // Env file commands
             write_env_variable,
             read_env_variable,
@@ -709,7 +731,20 @@ pub fn run() {
             app.on_menu_event(move |_app, event| {
                 match event.id().as_ref() {
                     "about" => {
-                        let _ = window_clone.emit("show-about", ());
+                        // Show native macOS About dialog
+                        #[cfg(target_os = "macos")]
+                        {
+                            use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+                            let _ = _app.dialog()
+                                .message("Convex Panel v0.1.0\n\nA powerful debugging and monitoring tool for Convex applications.")
+                                .title("About Convex Panel")
+                                .kind(MessageDialogKind::Info)
+                                .blocking_show();
+                        }
+                        #[cfg(not(target_os = "macos"))]
+                        {
+                            let _ = window_clone.emit("show-about", ());
+                        }
                     }
                     "settings" => {
                         let _ = window_clone.emit("show-settings", ());
@@ -717,20 +752,6 @@ pub fn run() {
                     _ => {}
                 }
             });
-
-            // Auto-start MCP server
-            let app_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                match mcp_server::start_server(app_handle).await {
-                    Ok(port) => {
-                        println!("MCP server started on port {}", port);
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to start MCP server: {}", e);
-                    }
-                }
-            });
-
 
             // Create system tray with network status menu
             // Status items are initially "Pending" and will be updated by frontend via update_network_status
@@ -799,19 +820,22 @@ pub fn run() {
             // set background color only when building for macOS
             #[cfg(target_os = "macos")]
             {
-                use cocoa::appkit::{NSColor, NSWindow};
-                use cocoa::base::{id, nil};
+                use objc2_app_kit::NSColor;
+                use objc2::runtime::AnyObject;
+                use objc2::msg_send;
 
-                let ns_window = window.ns_window().unwrap() as id;
+                let ns_window_ptr = window.ns_window().unwrap();
                 unsafe {
-                    let bg_color = NSColor::colorWithRed_green_blue_alpha_(
-                        nil,
+                    let bg_color = NSColor::colorWithRed_green_blue_alpha(
                         42.0 / 255.0,
                         40.0 / 255.0,
                         37.0 / 255.0,
                         1.0,
                     );
-                    ns_window.setBackgroundColor_(bg_color);
+                    
+                    // Use objc2 message sending to set background color
+                    let window: *mut AnyObject = ns_window_ptr as *mut AnyObject;
+                    let _: () = msg_send![window, setBackgroundColor: &*bg_color];
                 }
             }
 

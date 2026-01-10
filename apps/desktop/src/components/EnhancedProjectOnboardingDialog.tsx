@@ -13,7 +13,6 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { useMcpOptional } from "../contexts/McpContext";
 import { useGitHubOptional } from "../contexts/GitHubContext";
 import { useDeployment } from "../contexts/DeploymentContext";
 import {
@@ -22,9 +21,10 @@ import {
   validateDeployKey,
   doesKeyMatchDeployment,
 } from "../lib/envFile";
-import { GradientBackground } from "./auth/GradientBackground";
+import { GradientBackground } from "./shared/GradientBackground";
 import { ConvexLettering } from "@/components/ui/ConvexLettering";
 import { Button } from "@/components/ui/button";
+import { useProjectPath } from "../contexts/ProjectPathContext";
 
 type OnboardingStep = "welcome" | "folder" | "github" | "deploy-key" | "done";
 
@@ -55,7 +55,7 @@ export function EnhancedProjectOnboardingDialog({
   teamSlug,
   projectSlug,
 }: EnhancedProjectOnboardingDialogProps) {
-  const mcp = useMcpOptional();
+  const { projectPath, setProjectPath } = useProjectPath();
   const github = useGitHubOptional();
   const deployment = useDeployment();
 
@@ -69,16 +69,50 @@ export function EnhancedProjectOnboardingDialog({
   const [manualKey, setManualKey] = useState("");
   const [showManualEntry, setShowManualEntry] = useState(false);
 
-  // Reset state when dialog opens
+  // Reset state when dialog opens and validate project path matches deployment
   useEffect(() => {
-    if (isOpen) {
+    const validateAndSetPath = async () => {
+      if (!isOpen) return;
+
       setStep("welcome");
-      setSelectedPath(mcp?.projectPath || null);
       setKeyError(null);
       setManualKey("");
       setShowManualEntry(false);
-    }
-  }, [isOpen, mcp?.projectPath]);
+
+      // If we have a deployment name, validate that the stored project path
+      // actually belongs to this deployment. Only clear if there's a deploy key
+      // that doesn't match - if there's no key, allow the folder (user can set it up)
+      if (deploymentName && projectPath) {
+        try {
+          const key = await readDeployKeyFromEnvLocal(projectPath);
+          if (key) {
+            const matches = doesKeyMatchDeployment(key, deploymentName);
+            if (matches) {
+              // Path belongs to this deployment, use it
+              setSelectedPath(projectPath);
+              return;
+            }
+            // Path has a deploy key for a different deployment, clear it
+            setSelectedPath(null);
+            setProjectPath(null);
+            return;
+          }
+          // No key in .env.local - allow folder, user can set it up
+          setSelectedPath(projectPath);
+          return;
+        } catch {
+          // Error reading .env.local - allow folder, might be valid
+          setSelectedPath(projectPath);
+          return;
+        }
+      }
+
+      // No deployment name specified or no project path, just use what we have
+      setSelectedPath(projectPath || null);
+    };
+
+    validateAndSetPath();
+  }, [isOpen, projectPath, deploymentName, setProjectPath]);
 
   // Load .env.local key when folder is selected and validate it matches deployment
   useEffect(() => {
@@ -107,12 +141,23 @@ export function EnhancedProjectOnboardingDialog({
   }, [selectedPath, deploymentName]);
 
   const handleSelectDirectory = useCallback(async () => {
-    if (!mcp) return;
-    const path = await mcp.selectProjectDirectory();
-    if (path) {
-      setSelectedPath(path);
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: "Select Project Folder",
+      });
+
+      if (selected && typeof selected === "string") {
+        setSelectedPath(selected);
+        // Save to context
+        await setProjectPath(selected);
+      }
+    } catch (error) {
+      console.error("Failed to open directory picker:", error);
     }
-  }, [mcp]);
+  }, [setProjectPath]);
 
   const handleGenerateKey = useCallback(async () => {
     setIsGeneratingKey(true);
@@ -244,16 +289,20 @@ export function EnhancedProjectOnboardingDialog({
   const currentStepIndex = steps.indexOf(step);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div
+      className="project-onboarding-dialog fixed inset-0 z-50 flex items-center justify-center"
+      data-project-scope="onboarding"
+      data-deployment-name={deploymentName || undefined}
+    >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="project-onboarding-dialog__backdrop absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={handleSkip}
       />
 
       {/* Dialog */}
       <div
-        className="relative w-full max-w-lg mx-4 rounded-2xl overflow-hidden shadow-2xl border border-border-base"
+        className="project-onboarding-dialog__content relative w-full max-w-lg mx-4 rounded-2xl overflow-hidden shadow-2xl border border-border-base"
         onClick={(e) => e.stopPropagation()}
       >
         <GradientBackground className="!min-h-0">
@@ -265,11 +314,11 @@ export function EnhancedProjectOnboardingDialog({
 
             {/* Main card */}
             <div
-              className="animate-fade-up"
+              className="project-onboarding-dialog__card animate-fade-up"
               style={{ animationDelay: "100ms" }}
             >
               {/* Step indicators */}
-              <div className="flex items-center justify-center gap-2 mb-6">
+              <div className="project-onboarding-dialog__steps flex items-center justify-center gap-2 mb-6">
                 {steps.slice(0, -1).map((s, i) => (
                   <div key={s} className="flex items-center gap-2">
                     <div
@@ -295,7 +344,7 @@ export function EnhancedProjectOnboardingDialog({
               </div>
 
               {/* Content */}
-              <div className="overflow-y-auto max-h-[600px] max-w-[960px]">
+              <div className="project-onboarding-dialog__content-inner overflow-y-auto max-h-[600px] max-w-[960px]">
                 {/* Step 1: Welcome */}
                 {step === "welcome" && (
                   <div className="text-center space-y-6">

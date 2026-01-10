@@ -282,15 +282,30 @@ export async function getFileCommits(
     url.searchParams.set("sha", sha);
   }
 
+  console.log("[GitHub API] 🌐 Fetching commits:", {
+    url: url.toString(),
+    owner,
+    repo,
+    path,
+    sha,
+    perPage,
+  });
+
   const response = await fetchWithRetry(url.toString(), {
     headers: githubHeaders(token),
   });
 
   if (!response.ok) {
+    console.error("[GitHub API] ❌ Failed to fetch commit history:", {
+      status: response.status,
+      statusText: response.statusText,
+    });
     throw new Error("Failed to fetch commit history");
   }
 
   const data = await response.json();
+  console.log(`[GitHub API] ✅ Fetched ${data.length} commits`);
+
   return data.map(
     (item: {
       sha: string;

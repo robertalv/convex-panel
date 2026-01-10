@@ -1,12 +1,5 @@
-import { useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchUdfExecutionStats, type FetchFn } from "@convex-panel/shared/api";
-import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
-import { useDeployment } from "@/contexts/DeploymentContext";
-import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/QueryContext";
-
-// Use Tauri's fetch for CORS-free HTTP requests
-const desktopFetch: FetchFn = (input, init) => tauriFetch(input, init);
+import { useCallback, useMemo } from "react";
+import { useUdfExecutionStats } from "./useUdfExecutionStats";
 
 export interface FunctionStat {
   /** Function identifier (e.g., "messages:list") */
@@ -55,12 +48,6 @@ interface FunctionHealth extends FunctionHealthData {
   refetch: () => void;
 }
 
-// Query key factory
-export const functionHealthKeys = {
-  all: ["functionHealth"] as const,
-  stats: (deploymentUrl: string) =>
-    [...functionHealthKeys.all, "stats", deploymentUrl] as const,
-};
 
 /**
  * Helper to calculate percentile
@@ -199,55 +186,21 @@ function processExecutionStats(
 
 /**
  * Hook for analyzing function health from UDF execution stats.
- * Uses React Query for caching and automatic refetching.
+ * Uses shared UDF execution stats to avoid duplicate fetches.
  */
 export function useFunctionHealth(): FunctionHealth {
-  const { deploymentUrl, authToken } = useDeployment();
-  const queryClient = useQueryClient();
+  // Use shared hook - this will be cached and shared with useFunctionActivity
+  const { entries, isLoading, error, refetch } = useUdfExecutionStats();
 
-  const enabled = Boolean(deploymentUrl && authToken);
-
-  const query = useQuery({
-    queryKey: functionHealthKeys.stats(deploymentUrl ?? ""),
-    queryFn: async () => {
-      // Fetch execution stats from the last hour
-      const oneHourAgo = Date.now() - 60 * 60 * 1000;
-      const cursor = Math.floor(oneHourAgo / 1000) * 1000;
-
-      const response = await fetchUdfExecutionStats(
-        deploymentUrl!,
-        authToken!,
-        cursor,
-        desktopFetch,
-      );
-
-      return processExecutionStats(response?.entries || []);
-    },
-    enabled,
-    staleTime: STALE_TIME.functionStats,
-    refetchInterval: REFETCH_INTERVAL.functionStats,
-    refetchOnMount: false,
-  });
-
-  const data = query.data ?? {
-    topFailing: [],
-    slowest: [],
-    mostCalled: [],
-    totalInvocations: 0,
-    totalErrors: 0,
-    overallFailureRate: 0,
-  };
-
-  const refetch = useCallback(() => {
-    queryClient.invalidateQueries({
-      queryKey: functionHealthKeys.stats(deploymentUrl ?? ""),
-    });
-  }, [queryClient, deploymentUrl]);
+  // Process the entries into health data
+  const data = useMemo(() => {
+    return processExecutionStats(entries);
+  }, [entries]);
 
   return {
     ...data,
-    isLoading: query.isLoading,
-    error: query.error?.message ?? null,
+    isLoading,
+    error,
     refetch,
   };
 }

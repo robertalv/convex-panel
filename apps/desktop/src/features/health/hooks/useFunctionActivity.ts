@@ -1,16 +1,6 @@
-import { useCallback, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  fetchUdfExecutionStats,
-  type FetchFn,
-  type FunctionExecutionStats,
-} from "@convex-panel/shared/api";
-import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
-import { useDeployment } from "@/contexts/DeploymentContext";
-import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/QueryContext";
-
-// Use Tauri's fetch for CORS-free HTTP requests
-const desktopFetch: FetchFn = (input, init) => tauriFetch(input, init);
+import { useMemo } from "react";
+import { type FunctionExecutionStats } from "@convex-panel/shared/api";
+import { useUdfExecutionStats } from "./useUdfExecutionStats";
 
 export interface FunctionActivityData {
   /** Timestamps for each bucket (in seconds) */
@@ -52,12 +42,6 @@ interface FunctionActivityState {
   refetch: () => void;
 }
 
-// Query key factory
-export const functionActivityKeys = {
-  all: ["functionActivity"] as const,
-  data: (deploymentUrl: string) =>
-    [...functionActivityKeys.all, "data", deploymentUrl] as const,
-};
 
 /**
  * Normalize UDF type to a consistent format.
@@ -162,32 +146,15 @@ function processEntries(
 
 /**
  * Hook for fetching function activity data (invocations by type over time).
- * Uses React Query for caching and automatic refetching.
+ * Uses shared UDF execution stats to avoid duplicate fetches.
  */
 export function useFunctionActivity(): FunctionActivityState {
-  const { deploymentUrl, authToken } = useDeployment();
-  const queryClient = useQueryClient();
+  // Use shared hook - this will be cached and shared with useFunctionHealth
+  const { entries, isLoading, error, refetch } = useUdfExecutionStats();
 
-  const enabled = Boolean(deploymentUrl && authToken);
-
-  const query = useQuery({
-    queryKey: functionActivityKeys.data(deploymentUrl ?? ""),
-    queryFn: async () => {
-      const oneHourAgo = Date.now() - 60 * 60 * 1000;
-      const cursor = Math.floor(oneHourAgo);
-
-      const response = await fetchUdfExecutionStats(
-        deploymentUrl!,
-        authToken!,
-        cursor,
-        desktopFetch,
-      );
-
-      if (response && response.entries && Array.isArray(response.entries)) {
-        return processEntries(response.entries);
-      }
-
-      // Return a valid empty structure instead of null to prevent undefined errors
+  // Process entries into activity data
+  const data = useMemo(() => {
+    if (!entries || entries.length === 0) {
       return {
         timestamps: [],
         queries: [],
@@ -196,14 +163,9 @@ export function useFunctionActivity(): FunctionActivityState {
         scheduled: [],
         httpActions: [],
       };
-    },
-    enabled,
-    staleTime: STALE_TIME.functionStats,
-    refetchInterval: REFETCH_INTERVAL.functionStats,
-    refetchOnMount: false,
-  });
-
-  const data = query.data ?? null;
+    }
+    return processEntries(entries);
+  }, [entries]);
 
   // Compute derived values
   const series: FunctionActivitySeries[] = useMemo(() => {
@@ -258,20 +220,14 @@ export function useFunctionActivity(): FunctionActivityState {
     return Math.ceil(max * 1.1) || 100;
   }, [data]);
 
-  const refetch = useCallback(() => {
-    queryClient.invalidateQueries({
-      queryKey: functionActivityKeys.data(deploymentUrl ?? ""),
-    });
-  }, [queryClient, deploymentUrl]);
-
   return {
     data,
     currentRate,
     totalInvocations,
     maxValue,
     series,
-    isLoading: query.isLoading,
-    error: query.error?.message ?? null,
+    isLoading,
+    error,
     refetch,
   };
 }

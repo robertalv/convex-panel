@@ -7,6 +7,7 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   PanelLeftOpen,
   X,
@@ -18,7 +19,6 @@ import {
 import Editor, { DiffEditor, type BeforeMount } from "@monaco-editor/react";
 import { useDeployment } from "@/contexts/DeploymentContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useMcpOptional } from "@/contexts/McpContext";
 import { useGitHubOptional } from "@/contexts/GitHubContext";
 import { useComponents } from "@/features/data/hooks/useComponents";
 import { saveActiveTable } from "@/lib/storage";
@@ -52,6 +52,8 @@ import {
   generateFullSchemaCode,
   generateSchemaFromTable,
 } from "./utils/code-generator";
+import { useProjectPathOptional } from "@/contexts/ProjectPathContext";
+import { openSchemaInEditor } from "@/utils/editor";
 
 // Default sidebar width
 const DEFAULT_SIDEBAR_WIDTH = 260;
@@ -185,7 +187,7 @@ function SchemaCodePanel({
             onClick={onOpenInCursor}
             className="p-1.5 rounded transition-colors"
             style={{ color: "var(--color-text-subtle)" }}
-            title="Open in Cursor"
+            title="Open in Editor"
           >
             <ExternalLink size={14} />
           </button>
@@ -284,18 +286,16 @@ function LoadingState() {
 function SchemaVisualizerContent() {
   const navigate = useNavigate();
   const { adminClient } = useDeployment();
-  const mcp = useMcpOptional();
+  const projectPathContext = useProjectPathOptional();
+  const projectPath = projectPathContext?.projectPath ?? null;
   const { resolvedTheme } = useTheme();
 
   // Fetch components for component selector
-  const {
-    components,
-    setSelectedComponent,
-    selectedComponentId,
-  } = useComponents({
-    adminClient,
-    useMockData: false,
-  });
+  const { components, setSelectedComponent, selectedComponentId } =
+    useComponents({
+      adminClient,
+      useMockData: false,
+    });
 
   // Fetch schema data filtered by selected component
   const { schema, schemaJson, isLoading, error, refetch } = useSchema({
@@ -308,7 +308,7 @@ function SchemaVisualizerContent() {
     schema: localSchemaJson,
     exists: localSchemaExists,
     hasProjectPath,
-  } = useLocalSchema();
+  } = useLocalSchema({ projectPath });
 
   // Schema diff functionality
   const {
@@ -328,7 +328,7 @@ function SchemaVisualizerContent() {
 
   // Git schema history for comparing with previous commits
   const { currentBranch } = useGitSchemaHistory({
-    projectPath: mcp?.projectPath ?? null,
+    projectPath: projectPath ?? null,
     autoLoad: true,
   });
 
@@ -508,22 +508,22 @@ function SchemaVisualizerContent() {
     [navigate],
   );
 
-  // Open in Cursor
+  // Open in Editor (uses preferred editor from settings)
   const handleOpenInCursor = useCallback(
-    (_tableName: string) => {
-      if (!mcp?.projectPath) return;
+    async (_tableName: string) => {
+      if (!projectPath) return;
 
-      // Try to open schema.ts file in Cursor
-      const schemaPath = `${mcp.projectPath}/convex/schema.ts`;
-
-      // Use shell to open in Cursor
-      import("@tauri-apps/plugin-shell")
-        .then(({ open }) => {
-          open(`cursor://file/${schemaPath}`).catch(console.error);
-        })
-        .catch(console.error);
+      try {
+        await openSchemaInEditor(projectPath);
+      } catch (error) {
+        console.error("Failed to open editor:", error);
+        toast.error("Could not open editor", {
+          description:
+            "Make sure your preferred editor is installed and available in your PATH.",
+        });
+      }
     },
-    [mcp?.projectPath],
+    [projectPath],
   );
 
   // Render loading state (also show loading when we're about to revert to a valid component)
@@ -545,134 +545,137 @@ function SchemaVisualizerContent() {
 
   return (
     <div
-      className="flex flex-col h-full"
+      className="flex h-full w-full overflow-hidden"
       style={{ backgroundColor: "var(--color-background-base)" }}
     >
-      {/* Toolbar */}
-      <VisualizerToolbar
-        settings={settings}
-        onLayoutChange={handleLayoutChange}
-        onExport={handleExport}
-        onResetLayout={handleResetLayout}
-        health={schema.health}
-        onHealthPanelToggle={() => setShowHealthPanel(!showHealthPanel)}
-        showHealthPanel={showHealthPanel}
-        diffMode={diffMode}
-        onDiffModeChange={setDiffMode}
-        hasDiffChanges={hasDiffChanges}
-        hasLocalSchema={
-          hasProjectPath && localSchemaExists && localSchemaJson !== null
-        }
-        // GitHub integration props
-        isGitHubConnected={github?.isAuthenticated ?? false}
-        gitHubRepo={github?.selectedRepo ?? null}
-        gitHubRepos={
-          // Combine initial repos with search results
-          github?.searchedRepos && github.searchedRepos.length > 0
-            ? github.searchedRepos
-            : (github?.repos ?? [])
-        }
-        gitHubReposLoading={
-          github?.reposLoading || github?.searchReposLoading || false
-        }
-        remoteCommits={remoteCommits}
-        remoteBranches={remoteBranches}
-        remoteBranchesLoading={remoteBranchesLoading}
-        remoteCurrentBranch={remoteCurrentBranch}
-        onRemoteBranchChange={setRemoteBranch}
-        onSelectRemoteCommitForDiff={async (commit, target) => {
-          try {
-            // Save the commit as a snapshot
-            await saveRemoteSnapshot(commit);
-            await refreshSnapshots();
+      {/* Sidebar toggle when collapsed */}
+      {sidebarCollapsed && (
+        <button
+          onClick={() => setSidebarCollapsed(false)}
+          className="flex items-center justify-center w-10 h-full transition-colors"
+          style={{
+            backgroundColor: "var(--color-surface-base)",
+            borderRight: "1px solid var(--color-border-base)",
+            color: "var(--color-text-subtle)",
+          }}
+          title="Show sidebar"
+        >
+          <PanelLeftOpen size={16} />
+        </button>
+      )}
 
-            // Use the same format as dropdown options: github:${sha}
-            const commitValue = `github:${commit.sha}`;
-
-            if (target === "from") {
-              setDiffMode({
-                enabled: true,
-                fromSnapshotId: commitValue,
-              });
-            } else {
-              setDiffMode({
-                enabled: true,
-                toSnapshotId: commitValue,
-              });
-            }
-          } catch (err) {
-            console.error(
-              "[SchemaVisualizer] Failed to select remote commit for diff:",
-              err,
-            );
-          }
-        }}
-        onConnectGitHub={() => setShowGitHubAuthModal(true)}
-        onRepoChange={(repoFullName) => {
-          try {
-            // Look in both search results and initial repos
-            const repo =
-              github?.searchedRepos?.find(
-                (r) => r.full_name === repoFullName,
-              ) ?? github?.repos?.find((r) => r.full_name === repoFullName);
-            if (repo) {
-              github?.selectRepo(repo);
-            }
-          } catch (err) {
-            console.error("[SchemaVisualizer] Failed to change repo:", err);
-          }
-        }}
-        onRepoSearch={(query) => {
-          // Debounce is handled in the SearchableSelect component
-          github?.searchRepos(query);
-        }}
-        isCodePanelOpen={codePanelOpen}
-        onToggleCodePanel={() => setCodePanelOpen(true)}
-      />
+      {/* Sidebar */}
+      {!sidebarCollapsed && (
+        <ResizableSheet
+          id="schema-sidebar"
+          side="left"
+          defaultWidth={DEFAULT_SIDEBAR_WIDTH}
+          minWidth={MIN_SIDEBAR_WIDTH}
+          maxWidth={MAX_SIDEBAR_WIDTH}
+          showHeader={false}
+        >
+          <SchemaTreeSidebar
+            schema={schema}
+            selectedTable={selectedTable}
+            onSelectTable={setSelectedTable}
+            onNavigateToData={handleNavigateToData}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            filterPresets={filterPresets}
+            aggregations={aggregations}
+            selectedComponentId={selectedComponentId}
+            onComponentSelect={(componentId) => {
+              setSelectedComponent(componentId);
+            }}
+            components={components}
+            isOpen={true}
+          />
+        </ResizableSheet>
+      )}
 
       {/* Main content area */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar toggle when collapsed */}
-        {sidebarCollapsed && (
-          <button
-            onClick={() => setSidebarCollapsed(false)}
-            className="flex items-center justify-center w-10 h-full transition-colors"
-            style={{
-              backgroundColor: "var(--color-surface-base)",
-              borderRight: "1px solid var(--color-border-base)",
-              color: "var(--color-text-subtle)",
-            }}
-            title="Show sidebar"
-          >
-            <PanelLeftOpen size={16} />
-          </button>
-        )}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Toolbar */}
+        <VisualizerToolbar
+          settings={settings}
+          onLayoutChange={handleLayoutChange}
+          onExport={handleExport}
+          onResetLayout={handleResetLayout}
+          health={schema.health}
+          onHealthPanelToggle={() => setShowHealthPanel(!showHealthPanel)}
+          showHealthPanel={showHealthPanel}
+          diffMode={diffMode}
+          onDiffModeChange={setDiffMode}
+          hasDiffChanges={hasDiffChanges}
+          hasLocalSchema={
+            hasProjectPath && localSchemaExists && localSchemaJson !== null
+          }
+          // GitHub integration props
+          isGitHubConnected={github?.isAuthenticated ?? false}
+          gitHubRepo={github?.selectedRepo ?? null}
+          gitHubRepos={
+            // Combine initial repos with search results
+            github?.searchedRepos && github.searchedRepos.length > 0
+              ? github.searchedRepos
+              : (github?.repos ?? [])
+          }
+          gitHubReposLoading={
+            github?.reposLoading || github?.searchReposLoading || false
+          }
+          remoteCommits={remoteCommits}
+          remoteBranches={remoteBranches}
+          remoteBranchesLoading={remoteBranchesLoading}
+          remoteCurrentBranch={remoteCurrentBranch}
+          onRemoteBranchChange={setRemoteBranch}
+          onSelectRemoteCommitForDiff={async (commit, target) => {
+            try {
+              // Save the commit as a snapshot
+              await saveRemoteSnapshot(commit);
+              await refreshSnapshots();
 
-        {/* Sidebar */}
-        {!sidebarCollapsed && (
-          <>
-            <SchemaTreeSidebar
-              schema={schema}
-              selectedTable={selectedTable}
-              onSelectTable={setSelectedTable}
-              onNavigateToData={handleNavigateToData}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              defaultWidth={DEFAULT_SIDEBAR_WIDTH}
-              minWidth={MIN_SIDEBAR_WIDTH}
-              maxWidth={MAX_SIDEBAR_WIDTH}
-              filterPresets={filterPresets}
-              aggregations={aggregations}
-              selectedComponentId={selectedComponentId}
-              onComponentSelect={(componentId) => {
-                setSelectedComponent(componentId);
-              }}
-              components={components}
-              isOpen={true}
-              onClose={() => setSidebarCollapsed(true)}
-            />
-          </>
-        )}
+              // Use the same format as dropdown options: github:${sha}
+              const commitValue = `github:${commit.sha}`;
+
+              if (target === "from") {
+                setDiffMode({
+                  enabled: true,
+                  fromSnapshotId: commitValue,
+                });
+              } else {
+                setDiffMode({
+                  enabled: true,
+                  toSnapshotId: commitValue,
+                });
+              }
+            } catch (err) {
+              console.error(
+                "[SchemaVisualizer] Failed to select remote commit for diff:",
+                err,
+              );
+            }
+          }}
+          onConnectGitHub={() => setShowGitHubAuthModal(true)}
+          onRepoChange={(repoFullName) => {
+            try {
+              // Look in both search results and initial repos
+              const repo =
+                github?.searchedRepos?.find(
+                  (r) => r.full_name === repoFullName,
+                ) ?? github?.repos?.find((r) => r.full_name === repoFullName);
+              if (repo) {
+                github?.selectRepo(repo);
+              }
+            } catch (err) {
+              console.error("[SchemaVisualizer] Failed to change repo:", err);
+            }
+          }}
+          onRepoSearch={(query) => {
+            // Debounce is handled in the SearchableSelect component
+            github?.searchRepos(query);
+          }}
+          isCodePanelOpen={codePanelOpen}
+          onToggleCodePanel={() => setCodePanelOpen(true)}
+        />
 
         {/* Graph area */}
         <div className="flex-1 relative">
@@ -699,7 +702,7 @@ function SchemaVisualizerContent() {
               selectedTable={selectedTable}
               onTableSelect={setSelectedTable}
               onNavigateToData={handleNavigateToData}
-              onOpenInCursor={mcp?.projectPath ? handleOpenInCursor : undefined}
+              onOpenInCursor={projectPath ? handleOpenInCursor : undefined}
               showOnlyChanges={diffMode.showOnlyChanges}
             />
           ) : (
@@ -712,9 +715,7 @@ function SchemaVisualizerContent() {
                 selectedTable={selectedTable}
                 onTableSelect={setSelectedTable}
                 onNavigateToData={handleNavigateToData}
-                onOpenInCursor={
-                  mcp?.projectPath ? handleOpenInCursor : undefined
-                }
+                onOpenInCursor={projectPath ? handleOpenInCursor : undefined}
                 colorMode={resolvedTheme === "light" ? "light" : "dark"}
                 onCollapseSidebar={
                   !sidebarCollapsed
@@ -727,22 +728,22 @@ function SchemaVisualizerContent() {
             </ReactFlowProvider>
           )}
         </div>
-
-        {/* Code panel */}
-        {codePanelOpen && (
-          <SchemaCodePanel
-            table={selectedTableData}
-            schema={schema}
-            diff={diffMode.enabled ? diff : null}
-            onClose={() => setCodePanelOpen(false)}
-            onOpenInCursor={
-              mcp?.projectPath && selectedTable
-                ? () => handleOpenInCursor(selectedTable)
-                : undefined
-            }
-          />
-        )}
       </div>
+
+      {/* Code panel */}
+      {codePanelOpen && (
+        <SchemaCodePanel
+          table={selectedTableData}
+          schema={schema}
+          diff={diffMode.enabled ? diff : null}
+          onClose={() => setCodePanelOpen(false)}
+          onOpenInCursor={
+            projectPath && selectedTable
+              ? () => handleOpenInCursor(selectedTable)
+              : undefined
+          }
+        />
+      )}
 
       {/* Health panel (slide-out) */}
       {showHealthPanel && (
