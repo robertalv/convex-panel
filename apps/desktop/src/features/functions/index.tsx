@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Editor, { type BeforeMount } from "@monaco-editor/react";
 import { PanelLeftOpen, ToggleLeft, ToggleRight } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { useDeployment } from "@/contexts/DeploymentContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useFunctions } from "./hooks/useFunctions";
@@ -34,6 +35,7 @@ const FunctionsView: React.FC = () => {
   const { deployment, deploymentUrl, authToken, adminClient, useMockData } =
     useDeployment();
   const { resolvedTheme } = useTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedFunction, setSelectedFunction] =
     useState<ModuleFunction | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("statistics");
@@ -59,6 +61,7 @@ const FunctionsView: React.FC = () => {
     adminClient,
     useMockData,
     componentId: componentName,
+    deploymentId: deployment?.id?.toString(),
   });
 
   const [invocationData, setInvocationData] = useState<number[]>([]);
@@ -126,6 +129,69 @@ const FunctionsView: React.FC = () => {
       source: func.file?.path,
     })),
   );
+
+  // Handle URL query parameter to select function on mount
+  useEffect(() => {
+    const functionParam = searchParams.get("function");
+    if (functionParam && groupedFunctions.length > 0 && !selectedFunction) {
+      // Normalize the function parameter by removing .js extension if present
+      const normalizedParam = functionParam.replace(/\.js$/, "");
+
+      // Find the function in groupedFunctions by various matching strategies
+      for (const group of groupedFunctions) {
+        const func = group.functions.find((f) => {
+          // Strategy 1: Exact identifier match
+          if (f.identifier === functionParam) return true;
+
+          // Strategy 2: Exact name match
+          if (f.name === functionParam) return true;
+
+          // Strategy 3: File path match
+          if (f.file?.path === functionParam) return true;
+
+          // Strategy 4: Normalized identifier match (without .js)
+          const normalizedIdentifier = f.identifier.replace(/\.js$/, "");
+          if (normalizedIdentifier === normalizedParam) return true;
+
+          // Strategy 5: File path without .js match
+          const normalizedFilePath = f.file?.path.replace(/\.js$/, "");
+          if (normalizedFilePath === normalizedParam) return true;
+
+          // Strategy 6: Identifier without export name matches param
+          // e.g., "api/tasks.js:processTask" matches "api/tasks"
+          const identifierBase = f.identifier
+            .split(":")[0]
+            .replace(/\.js$/, "");
+          if (identifierBase === normalizedParam) return true;
+
+          // Strategy 7: Match with :default appended
+          // e.g., param "api/tasks" matches identifier "api/tasks:default"
+          if (f.identifier === `${normalizedParam}:default`) return true;
+          if (f.identifier === `${normalizedParam}.js:default`) return true;
+
+          // Strategy 8: Match param with :default appended to identifier base
+          // e.g., param "api/tasks:myFunc" matches if identifier has that base
+          if (normalizedParam.includes(":")) {
+            const paramBase = normalizedParam.split(":")[0];
+            const paramExport = normalizedParam.split(":")[1];
+            const funcBase = f.identifier.split(":")[0].replace(/\.js$/, "");
+            const funcExport = f.identifier.split(":")[1];
+            if (funcBase === paramBase && funcExport === paramExport)
+              return true;
+          }
+
+          return false;
+        });
+
+        if (func) {
+          setSelectedFunction(func);
+          // Remove the query parameter after selecting
+          setSearchParams({});
+          break;
+        }
+      }
+    }
+  }, [groupedFunctions, searchParams, selectedFunction, setSearchParams]);
 
   // Fetch statistics when function is selected
   useEffect(() => {

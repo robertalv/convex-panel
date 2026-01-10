@@ -60,6 +60,18 @@ export {
   processFunctionLogs,
 } from "./logs";
 
+// Export schedules API functions
+export {
+  fetchScheduledJobs,
+  fetchCronJobs,
+  fetchCronJobRuns,
+  fetchModules,
+  fetchScheduledJobArguments,
+  cancelScheduledJob,
+  cancelAllScheduledJobs,
+  fetchDeploymentState,
+} from "./schedules";
+
 // Export BigBrain API functions and types
 export {
   // Core API functions

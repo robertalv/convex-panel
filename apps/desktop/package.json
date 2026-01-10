@@ -68,6 +68,7 @@
     "@tauri-apps/plugin-shell": "^2.2.0",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@types/react-window": "^1.8.8",
     "@vitejs/plugin-react": "^4.3.1",
     "typescript": "^5.9.3",
     "vite": "^5.4.0"

@@ -8,6 +8,7 @@ import { Zap, Search, X, CodeXml } from "lucide-react";
 import { TreeItem } from "@/components/ui/TreeItem";
 import { FunctionIcon } from "@/components/ui/FunctionIcon";
 import { ComponentSelector } from "@/components/ComponentSelector";
+import { FunctionsSidebarSkeleton } from "./FunctionsSidebarSkeleton";
 import type { ConvexComponent } from "@/types/desktop";
 
 /**
@@ -244,12 +245,7 @@ export function FunctionsSidebar({
         style={{ scrollbarColor: "var(--color-border-strong) transparent" }}
       >
         {isLoading ? (
-          <div
-            className="px-4 py-3 text-xs"
-            style={{ color: "var(--color-text-muted)" }}
-          >
-            Loading functions...
-          </div>
+          <FunctionsSidebarSkeleton organizationMode={organizationMode} />
         ) : organizationMode === "byType" ? (
           // By Type View
           groupedByType.length === 0 ? (

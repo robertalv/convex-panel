@@ -1,15 +1,18 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   discoverFunctions,
   groupFunctionsByPath,
   type ModuleFunction,
   type FunctionGroup,
 } from "@convex-panel/shared/api";
+import { STALE_TIME } from "@/contexts/QueryContext";
 
 export interface UseFunctionsProps {
   adminClient: any;
   useMockData?: boolean;
   componentId?: string | null;
+  deploymentId?: string;
   onError?: (error: string) => void;
 }
 
@@ -21,41 +24,59 @@ export interface UseFunctionsReturn {
   refetch: () => void;
 }
 
+// Query key factory for consistent key management
+const functionsKeys = {
+  all: ["functions"] as const,
+  list: (deploymentId: string | undefined, useMockData: boolean) =>
+    [
+      ...functionsKeys.all,
+      "list",
+      deploymentId ?? "none",
+      useMockData,
+    ] as const,
+};
+
+/**
+ * Fetch all functions from Convex
+ */
+async function fetchFunctionsData(
+  adminClient: any,
+  useMockData: boolean,
+): Promise<ModuleFunction[]> {
+  if (!adminClient) {
+    return [];
+  }
+
+  try {
+    const funcs = await discoverFunctions(adminClient, useMockData);
+    return funcs;
+  } catch (err: any) {
+    throw new Error(err?.message || "Failed to fetch functions");
+  }
+}
+
 export function useFunctions({
   adminClient,
   useMockData = false,
   componentId = null,
+  deploymentId,
   onError,
 }: UseFunctionsProps): UseFunctionsReturn {
-  const [allFunctions, setAllFunctions] = useState<ModuleFunction[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // ============================================
+  // Functions Query (with caching)
+  // ============================================
+  const functionsQuery = useQuery({
+    queryKey: functionsKeys.list(deploymentId, useMockData),
+    queryFn: () => fetchFunctionsData(adminClient, useMockData),
+    enabled: Boolean(adminClient || useMockData),
+    staleTime: STALE_TIME.functions,
+    // Don't refetch on mount if we have cached data (manual refresh only)
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
 
-  const fetchFunctions = async () => {
-    if (!adminClient) {
-      setAllFunctions([]);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    try {
-      const funcs = await discoverFunctions(adminClient, useMockData);
-      setAllFunctions(funcs);
-    } catch (err: any) {
-      const errorMessage = err?.message || "Failed to fetch functions";
-      setError(errorMessage);
-      onError?.(errorMessage);
-      setAllFunctions([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchFunctions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminClient, useMockData]);
+  const allFunctions = functionsQuery.data ?? [];
 
   const functions = useMemo(() => {
     if (!allFunctions.length) return [];
@@ -79,11 +100,25 @@ export function useFunctions({
     return groupFunctionsByPath(functions);
   }, [functions]);
 
+  // Handle errors
+  const error = functionsQuery.error
+    ? functionsQuery.error instanceof Error
+      ? functionsQuery.error.message
+      : "Failed to fetch functions"
+    : null;
+
+  // Call onError callback when error occurs
+  if (error && onError) {
+    onError(error);
+  }
+
   return {
     functions,
     groupedFunctions,
-    isLoading,
+    isLoading: functionsQuery.isLoading,
     error,
-    refetch: fetchFunctions,
+    refetch: () => {
+      functionsQuery.refetch();
+    },
   };
 }

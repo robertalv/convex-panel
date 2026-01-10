@@ -13,3 +13,9 @@ export * from "./plan";
 
 // User types
 export * from "./user";
+
+// Function types
+export * from "./functions";
+
+// Schedules types
+export * from "./schedules";

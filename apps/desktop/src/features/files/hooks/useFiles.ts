@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { fetchFiles } from "../api/files";
 import type { FileMetadata } from "../api/types";
 
@@ -16,6 +16,8 @@ export interface UseFilesReturn {
   refetch: () => void;
   hasMore: boolean;
   loadMore: () => void;
+  addOptimisticFile: (file: FileMetadata) => void;
+  removeOptimisticFile: (id: string) => void;
 }
 
 export function useFiles({
@@ -25,6 +27,7 @@ export function useFiles({
   onError,
 }: UseFilesProps): UseFilesReturn {
   const [files, setFiles] = useState<FileMetadata[]>([]);
+  const [optimisticFiles, setOptimisticFiles] = useState<FileMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [continueCursor, setContinueCursor] = useState<string | undefined>(
@@ -82,17 +85,48 @@ export function useFiles({
     }
   }, [hasMore, isLoading, continueCursor, fetchFilesData]);
 
+  const addOptimisticFile = useCallback((file: FileMetadata) => {
+    setOptimisticFiles((prev) => [file, ...prev]);
+  }, []);
+
+  const removeOptimisticFile = useCallback((id: string) => {
+    setOptimisticFiles((prev) => prev.filter((f) => f._id !== id));
+  }, []);
+
   useEffect(() => {
     refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminClient, useMockData, componentId]);
 
+  // Merge optimistic files with fetched files, removing duplicates by storageId
+  const allFiles = useMemo(() => {
+    // Create a Set of storage IDs from real fetched files
+    const realStorageIds = new Set(
+      files.filter((f) => f.storageId).map((f) => f.storageId),
+    );
+
+    // Filter out optimistic files that have a matching storageId in real files
+    // (this happens after upload completes and refetch brings the real file)
+    const uniqueOptimisticFiles = optimisticFiles.filter((optFile) => {
+      // If optimistic file has uploadState with success, check if real file exists
+      if (optFile.uploadState?.status === "success" && optFile.storageId) {
+        return !realStorageIds.has(optFile.storageId);
+      }
+      // Always keep uploading or error state files
+      return true;
+    });
+
+    return [...uniqueOptimisticFiles, ...files];
+  }, [optimisticFiles, files]);
+
   return {
-    files,
+    files: allFiles,
     isLoading,
     error,
     refetch,
     hasMore,
     loadMore,
+    addOptimisticFile,
+    removeOptimisticFile,
   };
 }

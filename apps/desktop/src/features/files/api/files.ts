@@ -486,29 +486,66 @@ export async function deleteFile(
   adminClient: any,
   storageIds: string | string[],
   componentId?: string | null,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{
+  success: boolean;
+  error?: string;
+  deletedCount?: number;
+  failedCount?: number;
+}> {
   if (!adminClient) {
     return {
       success: false,
       error: "Admin client not available",
+      deletedCount: 0,
+      failedCount: 0,
     };
   }
 
-  try {
-    const idsArray = Array.isArray(storageIds) ? storageIds : [storageIds];
-    const normalizedComponentId =
-      componentId === "app" || componentId === null ? null : componentId;
+  const idsArray = Array.isArray(storageIds) ? storageIds : [storageIds];
+  const normalizedComponentId =
+    componentId === "app" || componentId === null ? null : componentId;
 
-    await adminClient.mutation(SYSTEM_MUTATIONS.DELETE_FILES, {
-      storageIds: idsArray,
-      componentId: normalizedComponentId,
-    });
+  // Delete in batches of 50 to avoid overwhelming the backend
+  const BATCH_SIZE = 50;
+  const batches: string[][] = [];
 
-    return { success: true };
-  } catch (err: any) {
+  for (let i = 0; i < idsArray.length; i += BATCH_SIZE) {
+    batches.push(idsArray.slice(i, i + BATCH_SIZE));
+  }
+
+  let deletedCount = 0;
+  let failedCount = 0;
+  const errors: string[] = [];
+
+  for (const batch of batches) {
+    try {
+      await adminClient.mutation(SYSTEM_MUTATIONS.DELETE_FILES, {
+        storageIds: batch,
+        componentId: normalizedComponentId,
+      });
+      deletedCount += batch.length;
+    } catch (err: any) {
+      failedCount += batch.length;
+      errors.push(err?.message || "Unknown error");
+      console.error(`Failed to delete batch of ${batch.length} files:`, err);
+    }
+  }
+
+  if (failedCount === 0) {
+    return { success: true, deletedCount, failedCount: 0 };
+  } else if (deletedCount > 0) {
     return {
       success: false,
-      error: err?.message || "Failed to delete file",
+      error: `Partially deleted: ${deletedCount} succeeded, ${failedCount} failed. Errors: ${errors.join(", ")}`,
+      deletedCount,
+      failedCount,
+    };
+  } else {
+    return {
+      success: false,
+      error: errors.join(", ") || "Failed to delete files",
+      deletedCount: 0,
+      failedCount,
     };
   }
 }

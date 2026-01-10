@@ -259,6 +259,7 @@ export function ResizableSheet({
         height: isHorizontal ? "100%" : `${size}px`,
         minHeight: isHorizontal ? undefined : `${size}px`,
         maxHeight: isHorizontal ? undefined : `${size}px`,
+        flexShrink: 0,
         backgroundColor: "var(--color-surface-base)",
         ...getBorderStyles(side),
       }}
@@ -290,13 +291,13 @@ export function ResizableSheet({
       {/* Header (optional) */}
       {shouldShowHeader && (
         <div
-          className="flex items-center justify-between px-4 h-[45px] shrink-0"
+          className="flex items-center justify-between px-4 h-[45px] shrink-0 gap-3"
           style={{
             borderBottom: "1px solid var(--color-border-base)",
             backgroundColor: "var(--color-surface-raised)",
           }}
         >
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 overflow-hidden">
             {title && (
               <h3
                 className="text-sm font-medium truncate"
@@ -314,7 +315,7 @@ export function ResizableSheet({
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 ml-2">
             {headerActions}
             {onClose && (
               <IconButton

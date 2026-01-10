@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { GradientBackground } from "./GradientBackground";
 import { IconButton } from "@/components/ui/button";
 
-interface ModalHeader {
+export interface ModalHeader {
   title: string;
   icon?: LucideIcon;
 }
@@ -43,7 +43,7 @@ export function Modal({
       <div
         className={cn(
           "relative rounded-3xl overflow-hidden shadow-2xl animate-fade-up",
-          className
+          className,
         )}
         style={{
           width: widthStyle,
@@ -74,7 +74,7 @@ export function Modal({
           <div
             className={cn(
               "relative z-10 h-full overflow-auto p-8",
-              contentClassName
+              contentClassName,
             )}
           >
             <div className="w-full max-w-3xl mx-auto h-full flex items-center justify-center">
@@ -88,4 +88,3 @@ export function Modal({
 }
 
 export default Modal;
-

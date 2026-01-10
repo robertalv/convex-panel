@@ -25,6 +25,10 @@ const STALE_TIME = {
   functionStats: 30 * 1000,
   // Insights - cache for 1 minute
   insights: 60 * 1000,
+  // Functions list - cache for 5 minutes (rarely changes without deployment)
+  functions: 5 * 60 * 1000,
+  // Function source code - cache for 10 minutes (rarely changes)
+  functionCode: 10 * 60 * 1000,
 };
 
 // Refetch intervals for auto-refresh while view is active

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import { useUdfExecutionStats } from "./useUdfExecutionStats";
 
 export interface FunctionStat {
@@ -47,7 +47,6 @@ interface FunctionHealth extends FunctionHealthData {
   // Actions
   refetch: () => void;
 }
-
 
 /**
  * Helper to calculate percentile
