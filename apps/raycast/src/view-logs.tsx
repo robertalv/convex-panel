@@ -16,6 +16,7 @@ import {
 } from "@raycast/api";
 import { useState } from "react";
 import { useConvexAuth } from "./hooks/useConvexAuth";
+import { useAuthenticatedListGuard } from "./components/AuthenticatedListGuard";
 import {
   useLogs,
   useTeams,
@@ -27,25 +28,22 @@ import {
 import {
   formatBytes,
   formatExecutionTime,
-  formatTimestamp,
-  formatRelativeTime,
+  getFunctionCallTreeForExecution,
+  type ExecutionNode,
 } from "./lib/api";
 
 export default function ViewLogsCommand() {
-  const {
-    session,
-    isLoading: authLoading,
-    isAuthenticated,
-    login,
-    selectedContext,
-  } = useConvexAuth();
+  const { session, selectedContext } = useConvexAuth();
   const [functionFilter, setFunctionFilter] = useState<string | undefined>();
+  const [requestFilter, setRequestFilter] = useState<string | undefined>();
   const [searchText, setSearchText] = useState("");
+  const [expandedConsoleOutputs, setExpandedConsoleOutputs] = useState<
+    Set<string>
+  >(new Set());
 
   const accessToken = session?.accessToken ?? null;
   const deploymentName = selectedContext.deploymentName;
 
-  // Fetch context data
   const { data: teams } = useTeams(accessToken);
   const { data: projects } = useProjects(accessToken, selectedContext.teamId);
   const { data: deployments } = useDeployments(
@@ -62,7 +60,6 @@ export default function ViewLogsCommand() {
     (d) => d.name === deploymentName,
   );
 
-  // Fetch logs with polling
   const {
     logs,
     isLoading: logsLoading,
@@ -71,37 +68,15 @@ export default function ViewLogsCommand() {
     refresh,
     clearLogs,
   } = useLogs(accessToken, deploymentName, {
-    functionFilter,
     autoRefresh: true,
   });
 
-  // Handle not authenticated
-  if (authLoading) {
-    return <List isLoading={true} searchBarPlaceholder="Loading..." />;
-  }
+  // Handle authentication
+  const authGuard = useAuthenticatedListGuard(
+    "Connect your Convex account to view logs",
+  );
+  if (authGuard) return authGuard;
 
-  if (!isAuthenticated) {
-    return (
-      <List>
-        <List.EmptyView
-          title="Sign in to Convex"
-          description="Connect your Convex account to view logs"
-          icon={Icon.Key}
-          actions={
-            <ActionPanel>
-              <Action
-                title="Sign in with Convex"
-                icon={Icon.Key}
-                onAction={login}
-              />
-            </ActionPanel>
-          }
-        />
-      </List>
-    );
-  }
-
-  // No deployment selected
   if (!deploymentName) {
     return (
       <List>
@@ -114,21 +89,74 @@ export default function ViewLogsCommand() {
     );
   }
 
-  // Build function list for dropdown
   const allFunctions = (functions ?? []).flatMap((module) =>
     module.functions.map((fn) => fn.identifier),
   );
 
-  // Filter logs by search text
+  // Filter logs by both function filter and search text
   const filteredLogs = logs.filter((log) => {
-    if (!searchText) return true;
-    const search = searchText.toLowerCase();
-    return (
-      log.functionPath.toLowerCase().includes(search) ||
-      log.requestId.toLowerCase().includes(search) ||
-      log.status.toLowerCase().includes(search) ||
-      log.functionType.toLowerCase().includes(search)
-    );
+    // Filter by request ID
+    if (requestFilter && log.requestId !== requestFilter) {
+      return false;
+    }
+
+    // Filter by function dropdown
+    if (functionFilter) {
+      // Normalize both to remove .js extension for comparison
+      // Log: "dummyjson:getFirstFewTodos"
+      // Filter: "dummyjson.js:getFirstFewTodos" -> "dummyjson:getFirstFewTodos"
+      const normalizedLogPath = log.functionPath.replace(/\.js:/g, ":");
+      const normalizedFilter = functionFilter.replace(/\.js:/g, ":");
+
+      // Debug: Log first comparison to see what's happening
+      if (logs.indexOf(log) === 0) {
+        console.log("Function filter comparison (first log):", {
+          originalLogPath: log.functionPath,
+          normalizedLogPath,
+          originalFilter: functionFilter,
+          normalizedFilter,
+          match: normalizedLogPath === normalizedFilter,
+        });
+      }
+
+      // If normalized paths don't match, exclude this log
+      if (normalizedLogPath !== normalizedFilter) {
+        return false;
+      }
+    }
+
+    // Filter by search text (applies even if function filter is active)
+    if (searchText) {
+      const search = searchText.toLowerCase();
+      return (
+        log.functionPath.toLowerCase().includes(search) ||
+        log.requestId.toLowerCase().includes(search) ||
+        log.executionId.toLowerCase().includes(search) ||
+        log.status.toLowerCase().includes(search) ||
+        log.functionType.toLowerCase().includes(search)
+      );
+    }
+
+    // No filters active, include the log
+    return true;
+  });
+
+  console.log("Logs debug:", {
+    totalLogs: logs.length,
+    filteredLogs: filteredLogs.length,
+    functionFilter,
+    searchText,
+    requestFilter,
+    isLoading: logsLoading,
+    sampleLogFunctionPaths: logs.slice(0, 5).map((l) => l.functionPath),
+    sampleFunctions: allFunctions.slice(0, 5),
+    firstLogDetails: logs[0]
+      ? {
+          functionPath: logs[0].functionPath,
+          requestId: logs[0].requestId,
+          executionId: logs[0].executionId,
+        }
+      : null,
   });
 
   const contextSubtitle =
@@ -163,76 +191,142 @@ export default function ViewLogsCommand() {
     >
       <List.Section
         title={contextSubtitle}
-        subtitle={`${filteredLogs.length} logs${isStreaming ? " (streaming)" : ""}`}
+        subtitle={`${filteredLogs.length} log${filteredLogs.length !== 1 ? "s" : ""}${requestFilter ? " (filtered by request)" : ""}${isStreaming ? " (streaming)" : ""}`}
       >
-        {filteredLogs.map((log) => (
-          <List.Item
-            key={log.id}
-            title={getFunctionName(log.functionPath)}
-            icon={getLogIcon(log)}
-            keywords={[log.functionType, log.status, log.requestId]}
-            accessories={getLogAccessories(log)}
-            detail={<LogDetailPanel log={log} />}
-            actions={
-              <ActionPanel>
-                <ActionPanel.Section>
-                  <Action.CopyToClipboard
-                    title="Copy Request Id"
-                    content={log.requestId}
-                    shortcut={{ modifiers: ["cmd"], key: "c" }}
-                  />
-                  <Action.CopyToClipboard
-                    title="Copy Full Log JSON"
-                    content={JSON.stringify(log.raw, null, 2)}
-                    shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
-                  />
-                  {log.errorMessage && (
+        {filteredLogs.map((log) => {
+          const isConsoleExpanded = expandedConsoleOutputs.has(log.id);
+          const toggleConsoleOutput = () => {
+            setExpandedConsoleOutputs((prev) => {
+              const next = new Set(prev);
+              if (next.has(log.id)) {
+                next.delete(log.id);
+              } else {
+                next.add(log.id);
+              }
+              return next;
+            });
+          };
+
+          return (
+            <List.Item
+              key={log.id}
+              title={log.functionPath}
+              subtitle={
+                log.status === "failure" && log.errorMessage
+                  ? truncateError(log.errorMessage, 80)
+                  : undefined
+              }
+              keywords={[log.functionType, log.status, log.requestId]}
+              accessories={getLogAccessories(log)}
+              detail={
+                <LogDetailPanel
+                  log={log}
+                  allLogs={logs}
+                  showConsoleOutput={isConsoleExpanded}
+                />
+              }
+              actions={
+                <ActionPanel>
+                  <ActionPanel.Section>
+                    {log.logLines.length > 0 && (
+                      <Action
+                        title={
+                          isConsoleExpanded
+                            ? "Hide Console Output"
+                            : "Show Console Output"
+                        }
+                        icon={
+                          isConsoleExpanded ? Icon.ChevronUp : Icon.ChevronDown
+                        }
+                        onAction={toggleConsoleOutput}
+                        shortcut={{ modifiers: ["cmd"], key: "l" }}
+                      />
+                    )}
+                    {requestFilter ? (
+                      <Action
+                        title="Clear Request Filter"
+                        icon={Icon.XMarkCircle}
+                        onAction={() => setRequestFilter(undefined)}
+                        shortcut={{ modifiers: ["cmd"], key: "f" }}
+                      />
+                    ) : (
+                      <Action
+                        title="View Full Request"
+                        icon={Icon.Link}
+                        onAction={() => setRequestFilter(log.requestId)}
+                        shortcut={{ modifiers: ["cmd"], key: "f" }}
+                      />
+                    )}
                     <Action.CopyToClipboard
-                      title="Copy Error Message"
-                      content={log.errorMessage}
-                      shortcut={{ modifiers: ["cmd", "opt"], key: "c" }}
+                      title="Copy Request Id"
+                      content={log.requestId}
+                      shortcut={{ modifiers: ["cmd"], key: "c" }}
                     />
-                  )}
-                </ActionPanel.Section>
+                    <Action.CopyToClipboard
+                      title="Copy Execution Id"
+                      content={log.executionId}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "e" }}
+                    />
+                    <Action.CopyToClipboard
+                      title="Copy Full Log JSON"
+                      content={JSON.stringify(log.raw, null, 2)}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
+                    />
+                    {log.errorMessage && (
+                      <Action.CopyToClipboard
+                        title="Copy Error Message"
+                        content={log.errorMessage}
+                        shortcut={{ modifiers: ["cmd", "opt"], key: "c" }}
+                      />
+                    )}
+                  </ActionPanel.Section>
 
-                <ActionPanel.Section>
-                  <Action
-                    title={isStreaming ? "Pause Streaming" : "Resume Streaming"}
-                    icon={isStreaming ? Icon.Pause : Icon.Play}
-                    onAction={toggleStreaming}
-                    shortcut={{ modifiers: ["cmd"], key: "p" }}
-                  />
-                  <Action
-                    title="Refresh Logs"
-                    icon={Icon.ArrowClockwise}
-                    onAction={async () => {
-                      await refresh();
-                      await showToast({
-                        style: Toast.Style.Success,
-                        title: "Logs refreshed",
-                      });
-                    }}
-                    shortcut={{ modifiers: ["cmd"], key: "r" }}
-                  />
-                  <Action
-                    title="Clear Logs"
-                    icon={Icon.Trash}
-                    onAction={clearLogs}
-                    shortcut={{ modifiers: ["cmd", "shift"], key: "delete" }}
-                  />
-                </ActionPanel.Section>
+                  <ActionPanel.Section>
+                    <Action
+                      title={
+                        isStreaming ? "Pause Streaming" : "Resume Streaming"
+                      }
+                      icon={isStreaming ? Icon.Pause : Icon.Play}
+                      onAction={toggleStreaming}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "p" }}
+                    />
+                    <Action
+                      title="Refresh Logs"
+                      icon={Icon.ArrowClockwise}
+                      onAction={async () => {
+                        await refresh();
+                        await showToast({
+                          style: Toast.Style.Success,
+                          title: "Logs refreshed",
+                        });
+                      }}
+                      shortcut={{ modifiers: ["cmd"], key: "r" }}
+                    />
+                    <Action
+                      title="Clear Logs"
+                      icon={Icon.Trash}
+                      onAction={clearLogs}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "delete" }}
+                    />
+                  </ActionPanel.Section>
 
-                <ActionPanel.Section>
-                  <Action.OpenInBrowser
-                    title="Open in Dashboard"
-                    url={`https://dashboard.convex.dev/t/${selectedTeam?.slug}/${selectedProject?.slug}/${selectedDeployment?.deploymentType}/logs`}
-                    shortcut={{ modifiers: ["cmd"], key: "o" }}
-                  />
-                </ActionPanel.Section>
-              </ActionPanel>
-            }
-          />
-        ))}
+                  <ActionPanel.Section>
+                    <Action.OpenInBrowser
+                      title="Open Execution in Dashboard"
+                      url={`https://dashboard.convex.dev/t/${selectedTeam?.slug}/${selectedProject?.slug}/${selectedDeployment?.deploymentType}/logs?request=${log.requestId}`}
+                      shortcut={{ modifiers: ["cmd"], key: "o" }}
+                    />
+                    <Action.OpenInBrowser
+                      title="Open Logs in Dashboard"
+                      url={`https://dashboard.convex.dev/t/${selectedTeam?.slug}/${selectedProject?.slug}/${selectedDeployment?.deploymentType}/logs`}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "o" }}
+                    />
+                  </ActionPanel.Section>
+                </ActionPanel>
+              }
+            />
+          );
+        })}
       </List.Section>
 
       {filteredLogs.length === 0 && !logsLoading && (
@@ -240,8 +334,11 @@ export default function ViewLogsCommand() {
           title="No Logs Found"
           description={
             functionFilter
-              ? `No logs for function "${functionFilter}"`
-              : "No recent function executions"
+              ? `No logs for function "${functionFilter}"\n\nTotal logs: ${logs.length}\nSample log paths: ${logs
+                  .slice(0, 3)
+                  .map((l) => l.functionPath)
+                  .join(", ")}`
+              : `No recent function executions\n\nTotal logs: ${logs.length}`
           }
           icon={Icon.Document}
           actions={
@@ -267,35 +364,93 @@ export default function ViewLogsCommand() {
 // Log detail panel component
 interface LogDetailPanelProps {
   log: LogEntry;
+  allLogs: LogEntry[];
+  showConsoleOutput: boolean;
 }
 
-function LogDetailPanel({ log }: LogDetailPanelProps) {
+function LogDetailPanel({
+  log,
+  allLogs,
+  showConsoleOutput,
+}: LogDetailPanelProps) {
   // Build markdown content
-  let markdown = `## ${getFunctionName(log.functionPath)}\n\n`;
-  markdown += `\`${log.functionPath}\`\n\n`;
+  let markdown = "";
 
-  // Error section
+  // Error section (always show if error exists)
   if (log.status === "failure" && log.errorMessage) {
     markdown += `### Error\n\n`;
-    markdown += `\`\`\`\n${truncateError(log.errorMessage, 500)}\n\`\`\`\n\n`;
+    markdown += `\`\`\`\n${log.errorMessage}\n\`\`\`\n\n`;
   }
 
-  // Console output
-  if (log.logLines.length > 0) {
+  // Console output (only if exists and toggled on)
+  if (log.logLines.length > 0 && showConsoleOutput) {
     markdown += `### Console Output\n\n`;
     markdown += `\`\`\`\n${log.logLines.join("\n")}\n\`\`\`\n\n`;
   }
 
-  // If no logs or errors, show success message
-  if (log.status === "success" && log.logLines.length === 0) {
-    markdown += `*Function executed successfully with no console output.*\n`;
-  }
+  // Extract additional metadata from raw data
+  const raw = log.raw as Record<string, unknown> | undefined;
+
+  const usageStats = raw?.usageStats as Record<string, number> | undefined;
+  const componentPath = raw?.componentPath as string | undefined;
+  const returnBytes = raw?.returnBytes as number | undefined;
+  const requestId = raw?.requestId as string | undefined;
+
+  // Get functions called by this execution
+  const functionsCalled = getFunctionCallTreeForExecution(
+    allLogs,
+    log.executionId,
+  );
 
   return (
     <List.Item.Detail
-      markdown={markdown}
+      markdown={markdown || undefined}
       metadata={
         <List.Item.Detail.Metadata>
+          <List.Item.Detail.Metadata.Label
+            title="Request ID"
+            text={requestId}
+            icon={Icon.Fingerprint}
+          />
+
+          <List.Item.Detail.Metadata.Label
+            title="Execution ID"
+            text={log.executionId}
+          />
+
+          {log.parentExecutionId && (
+            <List.Item.Detail.Metadata.Label
+              title="Parent Execution"
+              text={log.parentExecutionId}
+              icon={Icon.Link}
+            />
+          )}
+
+          <List.Item.Detail.Metadata.Separator />
+
+          <List.Item.Detail.Metadata.Label
+            title="Function"
+            text={log.functionPath}
+          />
+
+          {componentPath && (
+            <List.Item.Detail.Metadata.Label
+              title="Component"
+              text={componentPath}
+              icon={Icon.Box}
+            />
+          )}
+
+          <List.Item.Detail.Metadata.TagList title="Type">
+            <List.Item.Detail.Metadata.TagList.Item
+              text={
+                log.functionType.charAt(0).toUpperCase() +
+                log.functionType.slice(1)
+              }
+              color={getFunctionTypeColor(log.functionType)}
+            />
+          </List.Item.Detail.Metadata.TagList>
+
           <List.Item.Detail.Metadata.TagList title="Status">
             <List.Item.Detail.Metadata.TagList.Item
               text={log.status === "success" ? "Success" : "Failed"}
@@ -309,77 +464,103 @@ function LogDetailPanel({ log }: LogDetailPanelProps) {
             )}
           </List.Item.Detail.Metadata.TagList>
 
-          <List.Item.Detail.Metadata.TagList title="Type">
-            <List.Item.Detail.Metadata.TagList.Item
-              text={log.functionType}
-              color={getFunctionTypeColor(log.functionType)}
+          {log.logLines.length > 0 && (
+            <List.Item.Detail.Metadata.Label
+              title="Console Output"
+              text={
+                showConsoleOutput
+                  ? `${log.logLines.length} lines (press ⌘L to hide)`
+                  : `${log.logLines.length} lines (press ⌘L to show)`
+              }
+              icon={showConsoleOutput ? Icon.ChevronUp : Icon.ChevronDown}
             />
-          </List.Item.Detail.Metadata.TagList>
+          )}
+
+          <List.Item.Detail.Metadata.Separator />
 
           <List.Item.Detail.Metadata.Label
-            title="Execution Time"
-            text={
-              log.cached ? "cached" : formatExecutionTime(log.executionTimeMs)
-            }
-            icon={Icon.Clock}
-          />
-
-          <List.Item.Detail.Metadata.Label
-            title="Timestamp"
+            title="Started at"
             text={new Date(log.timestamp).toLocaleString()}
-            icon={Icon.Calendar}
           />
 
-          <List.Item.Detail.Metadata.Label
-            title="Relative Time"
-            text={formatRelativeTime(log.timestamp)}
-            icon={Icon.Clock}
-          />
+          {!log.cached && (
+            <List.Item.Detail.Metadata.Label
+              title="Duration"
+              text={formatExecutionTime(log.executionTimeMs)}
+            />
+          )}
+
+          {log.identityType && (
+            <>
+              <List.Item.Detail.Metadata.Separator />
+              <List.Item.Detail.Metadata.Label
+                title="Identity"
+                text={log.identityType}
+                icon={Icon.Person}
+              />
+            </>
+          )}
+
+          {log.caller && (
+            <List.Item.Detail.Metadata.Label title="Caller" text={log.caller} />
+          )}
+
+          {log.environment && (
+            <List.Item.Detail.Metadata.Label
+              title="Environment"
+              text={log.environment}
+              icon={Icon.Globe}
+            />
+          )}
 
           <List.Item.Detail.Metadata.Separator />
 
           <List.Item.Detail.Metadata.Label
-            title="Request ID"
-            text={log.requestId}
-            icon={Icon.Fingerprint}
-          />
-
-          <List.Item.Detail.Metadata.Separator />
-
-          <List.Item.Detail.Metadata.Label
-            title="Database Reads"
-            text={formatBytes(log.usage.databaseReadBytes)}
-            icon={Icon.Download}
+            title="Compute"
+            text={formatCompute(log.executionTimeMs, log.usage.memoryUsedMb)}
           />
 
           <List.Item.Detail.Metadata.Label
-            title="Database Writes"
-            text={formatBytes(log.usage.databaseWriteBytes)}
-            icon={Icon.Upload}
+            title="DB Bandwidth"
+            text={`Accessed ${formatDocumentCount(usageStats)}, ${formatBytes(log.usage.databaseReadBytes)} read, ${formatBytes(log.usage.databaseWriteBytes)} written`}
           />
 
-          {log.usage.storageReadBytes > 0 && (
+          {(log.usage.storageReadBytes > 0 ||
+            log.usage.storageWriteBytes > 0) && (
             <List.Item.Detail.Metadata.Label
-              title="Storage Reads"
-              text={formatBytes(log.usage.storageReadBytes)}
-              icon={Icon.Document}
+              title="File Bandwidth"
+              text={`${formatBytes(log.usage.storageReadBytes)} read, ${formatBytes(log.usage.storageWriteBytes)} written`}
             />
           )}
 
-          {log.usage.storageWriteBytes > 0 && (
+          {((usageStats?.vectorIndexReadBytes ?? 0) > 0 ||
+            (usageStats?.vectorIndexWriteBytes ?? 0) > 0) && (
             <List.Item.Detail.Metadata.Label
-              title="Storage Writes"
-              text={formatBytes(log.usage.storageWriteBytes)}
-              icon={Icon.Document}
+              title="Vector Bandwidth"
+              text={`${formatBytes(usageStats?.vectorIndexReadBytes ?? 0)} read, ${formatBytes(usageStats?.vectorIndexWriteBytes ?? 0)} written`}
+              icon={Icon.Text}
             />
           )}
 
-          {log.usage.memoryUsedMb > 0 && (
+          {returnBytes !== undefined && (
             <List.Item.Detail.Metadata.Label
-              title="Memory Used"
-              text={`${log.usage.memoryUsedMb.toFixed(1)} MB`}
-              icon={Icon.MemoryChip}
+              title="Return Size"
+              text={formatBytes(returnBytes)}
+              icon={Icon.Download}
             />
+          )}
+
+          {functionsCalled.length > 0 && (
+            <>
+              <List.Item.Detail.Metadata.Separator />
+              <List.Item.Detail.Metadata.Label
+                title="Functions Called"
+                text={`${functionsCalled.length} function${functionsCalled.length !== 1 ? "s" : ""}`}
+              />
+              {functionsCalled.map((node, idx) => (
+                <FunctionCallMetadataItem key={idx} node={node} level={0} />
+              ))}
+            </>
           )}
         </List.Item.Detail.Metadata>
       }
@@ -387,39 +568,73 @@ function LogDetailPanel({ log }: LogDetailPanelProps) {
   );
 }
 
-// Helper functions
+// Component to render a function call tree node in metadata
+function FunctionCallMetadataItem({
+  node,
+  level,
+}: {
+  node: ExecutionNode;
+  level: number;
+}) {
+  const indent = level > 0 ? "    ".repeat(level) : "";
+  const icon =
+    node.status === "running"
+      ? Icon.CircleProgress
+      : node.error
+        ? Icon.XMarkCircle
+        : Icon.CheckCircle;
 
-function getFunctionName(path: string): string {
-  const colonIndex = path.lastIndexOf(":");
-  if (colonIndex > -1) {
-    return path.substring(colonIndex + 1);
-  }
-  return path;
-}
+  const color =
+    node.status === "running"
+      ? Color.Blue
+      : node.error
+        ? Color.Red
+        : Color.Green;
 
-function getLogIcon(log: LogEntry): { source: Icon; tintColor: Color } {
-  if (log.status === "failure") {
-    return { source: Icon.XMarkCircle, tintColor: Color.Red };
-  }
+  const timing = node.executionTime
+    ? formatExecutionTime(node.executionTime)
+    : node.status === "running"
+      ? "running..."
+      : "";
 
-  switch (log.functionType) {
-    case "query":
-      return { source: Icon.MagnifyingGlass, tintColor: Color.Blue };
-    case "mutation":
-      return { source: Icon.Pencil, tintColor: Color.Orange };
-    case "action":
-      return { source: Icon.Bolt, tintColor: Color.Purple };
-    case "http":
-      return { source: Icon.Globe, tintColor: Color.Green };
-    default:
-      return { source: Icon.Code, tintColor: Color.SecondaryText };
-  }
+  const cached = node.cached ? " • cached" : "";
+  const displayText = timing || cached ? `${timing}${cached}` : undefined;
+
+  return (
+    <>
+      <List.Item.Detail.Metadata.Label
+        title={`${indent}${node.functionName}`}
+        text={displayText}
+        icon={{ source: icon, tintColor: color }}
+      />
+      {node.children.map((child, idx) => (
+        <FunctionCallMetadataItem key={idx} node={child} level={level + 1} />
+      ))}
+    </>
+  );
 }
 
 function getLogAccessories(log: LogEntry): List.Item.Accessory[] {
   const accessories: List.Item.Accessory[] = [];
 
-  // Function type badge
+  // Execution time (like Convex dashboard - simple text with clock icon)
+  if (log.status === "failure") {
+    // Don't show execution time for failures
+  } else if (log.cached) {
+    accessories.push({
+      text: "cached",
+      icon: Icon.Clock,
+      tooltip: "Result from cache",
+    });
+  } else {
+    accessories.push({
+      text: formatExecutionTime(log.executionTimeMs),
+      icon: Icon.Clock,
+      tooltip: `Execution time: ${formatExecutionTime(log.executionTimeMs)}`,
+    });
+  }
+
+  // Function type badge - single letter like Convex dashboard
   accessories.push({
     tag: {
       value: log.functionType.charAt(0).toUpperCase(),
@@ -428,28 +643,9 @@ function getLogAccessories(log: LogEntry): List.Item.Accessory[] {
     tooltip: log.functionType,
   });
 
-  // Cached badge
-  if (log.cached) {
-    accessories.push({
-      tag: { value: "cached", color: Color.Blue },
-    });
-  }
-
-  // Execution time or status
-  if (log.status === "failure") {
-    accessories.push({
-      tag: { value: "failed", color: Color.Red },
-    });
-  } else if (!log.cached) {
-    accessories.push({
-      text: formatExecutionTime(log.executionTimeMs),
-      tooltip: "Execution time",
-    });
-  }
-
-  // Timestamp
+  // Relative timestamp
   accessories.push({
-    text: formatTimestamp(log.timestamp),
+    date: new Date(log.timestamp),
     tooltip: new Date(log.timestamp).toLocaleString(),
   });
 
@@ -476,4 +672,23 @@ function truncateError(error: string, maxLength: number): string {
   return (
     error.substring(0, maxLength) + "\n... (copy full error with Cmd+Opt+C)"
   );
+}
+
+// Helper to format document count from raw log
+function formatDocumentCount(
+  usageStats: Record<string, number> | undefined,
+): string {
+  const reads = (usageStats?.databaseReadDocuments as number) || 0;
+  const writes = (usageStats?.databaseWriteDocuments as number) || 0;
+
+  if (reads === 0 && writes === 0) return "0 documents";
+
+  return `${reads + writes} document${reads + writes !== 1 ? "s" : ""}`;
+}
+
+// Helper to format compute usage
+function formatCompute(executionTimeMs: number, memoryMb: number): string {
+  const executionTimeS = executionTimeMs / 1000;
+  const gbHr = (memoryMb / 1024) * (executionTimeS / 3600);
+  return `${gbHr.toFixed(7)} GB-hr (${memoryMb.toFixed(0)} MB for ${executionTimeS.toFixed(2)}s)`;
 }

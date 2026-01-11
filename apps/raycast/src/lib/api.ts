@@ -15,16 +15,10 @@ import {
   type Deployment,
   type UserProfile,
 } from "./bigbrain";
+import { CONVEX_CLIENT_ID } from "./constants";
 
-// Re-export BigBrain API functions and types
 export { getTeams, getProjects, getDeployments, getProfile };
 export type { Team, Project, Deployment, UserProfile };
-
-const CONVEX_CLIENT_ID = "convex-panel-raycast-1.0.0";
-
-// ============================================================================
-// Deployment API (Functions, Tables, Documents)
-// ============================================================================
 
 export interface FunctionSpec {
   identifier: string;
@@ -97,7 +91,6 @@ export async function getFunctions(
 function parseApiSpec(apiSpec: unknown): ModuleFunctions[] {
   if (!Array.isArray(apiSpec)) return [];
 
-  // Group functions by module path
   const moduleMap = new Map<string, FunctionSpec[]>();
 
   for (const fn of apiSpec) {
@@ -106,26 +99,21 @@ function parseApiSpec(apiSpec: unknown): ModuleFunctions[] {
     const identifier = (fn as Record<string, unknown>).identifier as string;
     if (!identifier) continue;
 
-    // Extract module path from identifier (e.g., "messages:send" -> "messages")
     const colonIndex = identifier.indexOf(":");
     const modulePath =
       colonIndex > -1 ? identifier.substring(0, colonIndex) : identifier;
 
-    // Get and normalize function type (API returns "Query", "Mutation", "Action" with capital letters)
     const rawFunctionType = (fn as Record<string, unknown>)
       .functionType as string;
     if (!rawFunctionType) continue;
 
-    // Skip HTTP actions for now (they have different structure)
     if (rawFunctionType === "HttpAction") continue;
 
-    // Normalize to lowercase
     const functionType = rawFunctionType.toLowerCase() as
       | "query"
       | "mutation"
       | "action";
 
-    // Get visibility (include both public and internal functions)
     const visibility = (fn as Record<string, unknown>).visibility as
       | { kind: string }
       | undefined;
@@ -148,13 +136,11 @@ function parseApiSpec(apiSpec: unknown): ModuleFunctions[] {
     }
   }
 
-  // Convert map to array
   const result: ModuleFunctions[] = [];
   for (const [path, functions] of moduleMap.entries()) {
     result.push({ path, functions });
   }
 
-  // Sort by module path
   result.sort((a, b) => a.path.localeCompare(b.path));
 
   return result;
@@ -212,7 +198,6 @@ export async function getTables(
 
   const data = await response.json();
 
-  // getTableMapping returns { value: { tableId: tableName, ... } }
   let tableNames: string[] = [];
 
   const mapping = data.value ?? data;
@@ -241,7 +226,6 @@ export async function getDocuments(
   const url = getDeploymentUrl(deploymentName);
   const numItems = options?.limit ?? 25;
 
-  // Build pagination options in the format expected by the system query
   const paginationOpts = {
     cursor: options?.cursor ?? null,
     numItems,
@@ -275,7 +259,6 @@ export async function getDocuments(
   const data = await response.json();
   const result = data.value ?? data;
 
-  // Handle the response format: { page: Document[], continueCursor: string | null, isDone: boolean }
   const documents = Array.isArray(result.page) ? result.page : [];
 
   return {
@@ -332,7 +315,6 @@ export async function runFunction(
 
   const data = await response.json();
 
-  // Handle error responses from Convex
   if (data.status === "error" || data.errorMessage) {
     throw new Error(data.errorMessage || "Function execution failed");
   }
@@ -341,17 +323,6 @@ export async function runFunction(
     result: data.value ?? data,
     executionTime,
   };
-}
-
-/**
- * Format a document ID for display
- */
-export function formatDocumentId(id: string): string {
-  // Convex document IDs are typically long, show abbreviated version
-  if (id.length > 20) {
-    return `${id.substring(0, 8)}...${id.substring(id.length - 8)}`;
-  }
-  return id;
 }
 
 /**
@@ -392,8 +363,13 @@ export interface LogEntry {
   executionTimeMs: number;
   cached: boolean;
   requestId: string;
+  executionId: string;
+  parentExecutionId: string | null;
   errorMessage?: string;
   logLines: string[];
+  caller?: string;
+  environment?: "isolate" | "node";
+  identityType?: string;
   usage: {
     databaseReadBytes: number;
     databaseWriteBytes: number;
@@ -447,15 +423,12 @@ export async function getLogs(
   const data = await response.json();
   const entries = data.entries || [];
 
-  // Parse and normalize log entries
   const logs: LogEntry[] = entries.map((entry: Record<string, unknown>) => {
-    // Normalize timestamp (handle both seconds and milliseconds)
     let timestamp = entry.timestamp as number;
     if (timestamp && timestamp < 1e12) {
-      timestamp = timestamp * 1000; // Convert seconds to milliseconds
+      timestamp = timestamp * 1000;
     }
 
-    // Get function type and normalize
     const rawType = (entry.udf_type || entry.udfType || "query") as string;
     const functionType = rawType.toLowerCase() as
       | "query"
@@ -463,12 +436,10 @@ export async function getLogs(
       | "action"
       | "http";
 
-    // Get function path
     const functionPath = (entry.identifier ||
       entry.udf_path ||
       "unknown") as string;
 
-    // Determine status
     let status: "success" | "failure" = "success";
     if (entry.error || entry.error_message) {
       status = "failure";
@@ -476,21 +447,19 @@ export async function getLogs(
       status = "failure";
     }
 
-    // Normalize execution time (API returns seconds, we want ms)
     let executionTimeMs = 0;
     const execTime = entry.execution_time || entry.executionTime;
     if (typeof execTime === "number") {
       executionTimeMs = execTime < 100 ? execTime * 1000 : execTime;
     }
 
-    // Parse log lines
     const logLines: string[] = [];
-    if (Array.isArray(entry.log_lines)) {
-      for (const line of entry.log_lines) {
+    const rawLogLines = entry.logLines || entry.log_lines;
+    if (Array.isArray(rawLogLines)) {
+      for (const line of rawLogLines) {
         if (typeof line === "string") {
           logLines.push(line);
         } else if (Array.isArray(line)) {
-          // Format: [level, message] or [level, ...args]
           logLines.push(line.slice(1).join(" "));
         } else if (line && typeof line === "object") {
           logLines.push(JSON.stringify(line));
@@ -498,7 +467,6 @@ export async function getLogs(
       }
     }
 
-    // Parse usage stats
     const usageStats = entry.usage_stats as Record<string, number> | undefined;
     const usage = {
       databaseReadBytes: usageStats?.database_read_bytes ?? 0,
@@ -508,10 +476,26 @@ export async function getLogs(
       memoryUsedMb: usageStats?.memory_used_mb ?? 0,
     };
 
+    const executionId = (entry.execution_id ||
+      entry.executionId ||
+      "") as string;
+    const parentExecutionId = (entry.parent_execution_id ||
+      entry.parentExecutionId ||
+      null) as string | null;
+    const caller = (entry.caller || undefined) as string | undefined;
+    const environment = (entry.environment || undefined) as
+      | "isolate"
+      | "node"
+      | undefined;
+    const identityType = (entry.identity_type ||
+      entry.identityType ||
+      undefined) as string | undefined;
+
     return {
-      id: (entry.execution_id ||
-        entry.request_id ||
-        `${timestamp}-${functionPath}`) as string,
+      id:
+        executionId ||
+        (entry.request_id as string) ||
+        `${timestamp}-${functionPath}`,
       timestamp: timestamp || Date.now(),
       functionPath,
       functionType,
@@ -519,14 +503,18 @@ export async function getLogs(
       executionTimeMs: Math.round(executionTimeMs),
       cached: Boolean(entry.cached_result || entry.cached),
       requestId: (entry.request_id || entry.execution_id || "") as string,
+      executionId,
+      parentExecutionId,
       errorMessage: (entry.error || entry.error_message) as string | undefined,
       logLines,
+      caller,
+      environment,
+      identityType,
       usage,
       raw: entry,
     };
   });
 
-  // Sort by timestamp descending (newest first)
   logs.sort((a, b) => b.timestamp - a.timestamp);
 
   return {
@@ -580,4 +568,154 @@ export function formatRelativeTime(timestamp: number): string {
   if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
   if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
   return `${Math.floor(diff / 86400000)}d ago`;
+}
+
+// ============================================================================
+// Function Call Tree
+// ============================================================================
+
+export interface ExecutionNode {
+  executionId: string;
+  functionName: string;
+  startTime: number;
+  executionTime?: number;
+  status: "success" | "failure" | "running";
+  parentExecutionId?: string | null;
+  caller?: string;
+  environment?: "isolate" | "node";
+  identityType?: string;
+  children: ExecutionNode[];
+  error?: string;
+  udfType: string;
+  cached?: boolean;
+}
+
+/**
+ * Build a tree of function calls from log entries
+ */
+export function buildFunctionCallTree(logs: LogEntry[]): ExecutionNode[] {
+  const nodeMap = new Map<string, ExecutionNode>();
+  const completedExecutions = new Set<string>();
+
+  logs
+    .filter((log) => log.status !== undefined && log.executionTimeMs > 0)
+    .forEach((log) => {
+      const node: ExecutionNode = {
+        executionId: log.executionId,
+        functionName: log.functionPath,
+        startTime: log.timestamp - log.executionTimeMs,
+        executionTime: log.executionTimeMs,
+        status: log.status,
+        parentExecutionId: log.parentExecutionId,
+        caller: log.caller,
+        environment: log.environment,
+        identityType: log.identityType,
+        children: [],
+        error: log.errorMessage,
+        udfType: log.functionType,
+        cached: log.cached,
+      };
+
+      nodeMap.set(log.executionId, node);
+      completedExecutions.add(log.executionId);
+    });
+
+  const executionLogMap = new Map<string, LogEntry[]>();
+  logs.forEach((log) => {
+    if (!executionLogMap.has(log.executionId)) {
+      executionLogMap.set(log.executionId, []);
+    }
+    executionLogMap.get(log.executionId)!.push(log);
+  });
+
+  executionLogMap.forEach((logEntries, executionId) => {
+    if (!completedExecutions.has(executionId)) {
+      const firstLog = logEntries[0];
+      const node: ExecutionNode = {
+        executionId: firstLog.executionId,
+        functionName: firstLog.functionPath,
+        startTime: firstLog.timestamp,
+        executionTime: undefined,
+        status: "running",
+        parentExecutionId: firstLog.parentExecutionId,
+        caller: firstLog.caller,
+        environment: firstLog.environment,
+        identityType: firstLog.identityType,
+        children: [],
+        error: undefined,
+        udfType: firstLog.functionType,
+        cached: firstLog.cached,
+      };
+
+      nodeMap.set(executionId, node);
+    }
+  });
+
+  const rootNodes: ExecutionNode[] = [];
+  const allNodes = Array.from(nodeMap.values());
+
+  allNodes.forEach((node) => {
+    if (!node.parentExecutionId) {
+      rootNodes.push(node);
+    } else {
+      const parent = nodeMap.get(node.parentExecutionId);
+      if (parent) {
+        parent.children.push(node);
+      } else {
+        rootNodes.push(node);
+      }
+    }
+  });
+
+  const sortChildren = (node: ExecutionNode) => {
+    node.children.sort((a, b) => a.startTime - b.startTime);
+    node.children.forEach(sortChildren);
+  };
+
+  rootNodes.sort((a, b) => a.startTime - b.startTime);
+  rootNodes.forEach(sortChildren);
+
+  return rootNodes;
+}
+
+/**
+ * Get all logs for a specific request
+ */
+export function getLogsForRequest(
+  logs: LogEntry[],
+  requestId: string,
+): LogEntry[] {
+  return logs.filter((log) => log.requestId === requestId);
+}
+
+/**
+ * Get the function call tree for functions called BY a specific execution
+ * (i.e., only show children of this execution, not the whole request)
+ */
+export function getFunctionCallTreeForExecution(
+  allLogs: LogEntry[],
+  executionId: string,
+): ExecutionNode[] {
+  const requestLogs = allLogs.filter(
+    (log) =>
+      log.requestId ===
+      allLogs.find((l) => l.executionId === executionId)?.requestId,
+  );
+
+  const fullTree = buildFunctionCallTree(requestLogs);
+
+  const findNode = (nodes: ExecutionNode[]): ExecutionNode | null => {
+    for (const node of nodes) {
+      if (node.executionId === executionId) {
+        return node;
+      }
+      const found = findNode(node.children);
+      if (found) return found;
+    }
+    return null;
+  };
+
+  const node = findNode(fullTree);
+
+  return node ? node.children : [];
 }

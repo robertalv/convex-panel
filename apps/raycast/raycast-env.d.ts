@@ -21,6 +21,10 @@ declare namespace Preferences {
   export type BrowseTables = ExtensionPreferences & {}
   /** Preferences accessible in the `view-logs` command */
   export type ViewLogs = ExtensionPreferences & {}
+  /** Preferences accessible in the `view-documentation` command */
+  export type ViewDocumentation = ExtensionPreferences & {}
+  /** Preferences accessible in the `view-components` command */
+  export type ViewComponents = ExtensionPreferences & {}
 }
 
 declare namespace Arguments {
@@ -32,5 +36,9 @@ declare namespace Arguments {
   export type BrowseTables = {}
   /** Arguments passed to the `view-logs` command */
   export type ViewLogs = {}
+  /** Arguments passed to the `view-documentation` command */
+  export type ViewDocumentation = {}
+  /** Arguments passed to the `view-components` command */
+  export type ViewComponents = {}
 }
 

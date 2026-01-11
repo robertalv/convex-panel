@@ -43,6 +43,22 @@
       "description": "Stream and view function execution logs from your deployment",
       "mode": "view",
       "icon": "command-icon.png"
+    },
+    {
+      "name": "view-documentation",
+      "title": "View Convex Documentation",
+      "subtitle": "Convex",
+      "description": "Browse and search Convex documentation links",
+      "mode": "view",
+      "icon": "command-icon.png"
+    },
+    {
+      "name": "view-components",
+      "title": "View Convex Components",
+      "subtitle": "Convex",
+      "description": "Browse and install Convex components",
+      "mode": "view",
+      "icon": "command-icon.png"
     }
   ],
   "dependencies": {

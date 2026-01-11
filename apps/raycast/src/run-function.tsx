@@ -19,6 +19,7 @@ import {
 } from "@raycast/api";
 import { useState } from "react";
 import { useConvexAuth } from "./hooks/useConvexAuth";
+import { useAuthenticatedListGuard } from "./components/AuthenticatedListGuard";
 import {
   useFunctions,
   useTeams,
@@ -33,13 +34,7 @@ interface FunctionWithPath extends FunctionSpec {
 }
 
 export default function RunFunctionCommand() {
-  const {
-    session,
-    isLoading: authLoading,
-    isAuthenticated,
-    login,
-    selectedContext,
-  } = useConvexAuth();
+  const { session, selectedContext } = useConvexAuth();
   const [searchText, setSearchText] = useState("");
   const { push } = useNavigation();
 
@@ -68,31 +63,11 @@ export default function RunFunctionCommand() {
     deploymentName,
   );
 
-  // Handle not authenticated
-  if (authLoading) {
-    return <List isLoading={true} searchBarPlaceholder="Loading..." />;
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <List>
-        <List.EmptyView
-          title="Sign in to Convex"
-          description="Connect your Convex account to run functions"
-          icon={Icon.Key}
-          actions={
-            <ActionPanel>
-              <Action
-                title="Sign in with Convex"
-                icon={Icon.Key}
-                onAction={login}
-              />
-            </ActionPanel>
-          }
-        />
-      </List>
-    );
-  }
+  // Handle authentication
+  const authGuard = useAuthenticatedListGuard(
+    "Connect your Convex account to run functions",
+  );
+  if (authGuard) return authGuard;
 
   // No deployment selected
   if (!deploymentName) {

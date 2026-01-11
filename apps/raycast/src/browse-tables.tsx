@@ -15,35 +15,28 @@ import {
 } from "@raycast/api";
 import { useState, useEffect } from "react";
 import { useConvexAuth } from "./hooks/useConvexAuth";
+import { useAuthenticatedListGuard } from "./components/AuthenticatedListGuard";
 import {
   useTables,
   useTeams,
   useProjects,
   useDeployments,
 } from "./hooks/useConvexData";
-import {
-  getDocuments,
-  formatDocumentId,
-  type Document,
-  type TableInfo,
-} from "./lib/api";
+import { getDocuments, type Document, type TableInfo } from "./lib/api";
 
 type ViewState = "tables" | "documents";
 
 export default function BrowseTablesCommand() {
-  const {
-    session,
-    isLoading: authLoading,
-    isAuthenticated,
-    login,
-    selectedContext,
-  } = useConvexAuth();
+  const { session, selectedContext } = useConvexAuth();
   const [viewState, setViewState] = useState<ViewState>("tables");
   const [selectedTable, setSelectedTable] = useState<TableInfo | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | undefined>();
   const [showingDetail, setShowingDetail] = useState(true);
+  const [expandedJsonDocs, setExpandedJsonDocs] = useState<Set<string>>(
+    new Set(),
+  );
 
   const accessToken = session?.accessToken ?? null;
   const deploymentName = selectedContext.deploymentName;
@@ -127,31 +120,11 @@ export default function BrowseTablesCommand() {
     }
   };
 
-  // Handle not authenticated
-  if (authLoading) {
-    return <List isLoading={true} searchBarPlaceholder="Loading..." />;
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <List>
-        <List.EmptyView
-          title="Sign in to Convex"
-          description="Connect your Convex account to browse tables"
-          icon={Icon.Key}
-          actions={
-            <ActionPanel>
-              <Action
-                title="Sign in with Convex"
-                icon={Icon.Key}
-                onAction={login}
-              />
-            </ActionPanel>
-          }
-        />
-      </List>
-    );
-  }
+  // Handle authentication
+  const authGuard = useAuthenticatedListGuard(
+    "Connect your Convex account to browse tables",
+  );
+  if (authGuard) return authGuard;
 
   // No deployment selected
   if (!deploymentName) {
@@ -248,66 +221,96 @@ export default function BrowseTablesCommand() {
             title={selectedTable?.name}
             subtitle={`${documents.length} documents${nextCursor ? " (more available)" : ""}`}
           >
-            {documents.map((doc) => (
-              <List.Item
-                key={doc._id}
-                title={getDocumentTitle(doc)}
-                subtitle={showingDetail ? undefined : getDocumentSubtitle(doc)}
-                icon={Icon.Document}
-                accessories={
-                  showingDetail
-                    ? undefined
-                    : [
-                        {
-                          date: new Date(doc._creationTime),
-                          tooltip: "Created",
-                        },
-                      ]
-                }
-                detail={<DocumentDetailPanel document={doc} />}
-                actions={
-                  <ActionPanel>
-                    <Action
-                      title={showingDetail ? "Hide Detail" : "Show Detail"}
-                      icon={showingDetail ? Icon.EyeDisabled : Icon.Eye}
-                      onAction={() => setShowingDetail(!showingDetail)}
+            {documents.map((doc) => {
+              const isJsonExpanded = expandedJsonDocs.has(doc._id);
+              const toggleJson = () => {
+                setExpandedJsonDocs((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(doc._id)) {
+                    next.delete(doc._id);
+                  } else {
+                    next.add(doc._id);
+                  }
+                  return next;
+                });
+              };
+
+              return (
+                <List.Item
+                  key={doc._id}
+                  title={getDocumentTitle(doc)}
+                  subtitle={
+                    showingDetail ? undefined : getDocumentSubtitle(doc)
+                  }
+                  icon={Icon.Document}
+                  accessories={
+                    showingDetail
+                      ? undefined
+                      : [
+                          {
+                            date: new Date(doc._creationTime),
+                            tooltip: "Created",
+                          },
+                        ]
+                  }
+                  detail={
+                    <DocumentDetailPanel
+                      document={doc}
+                      showJson={isJsonExpanded}
                     />
-                    <Action.CopyToClipboard
-                      title="Copy Document JSON"
-                      content={JSON.stringify(doc, null, 2)}
-                      shortcut={{ modifiers: ["cmd"], key: "c" }}
-                    />
-                    <Action.CopyToClipboard
-                      title="Copy Document Id"
-                      content={doc._id}
-                      shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
-                    />
-                    <ActionPanel.Section>
+                  }
+                  actions={
+                    <ActionPanel>
                       <Action
-                        title="Go Back"
-                        icon={Icon.ArrowLeft}
-                        onAction={handleGoBack}
-                        shortcut={{ modifiers: ["cmd"], key: "[" }}
+                        title={showingDetail ? "Hide Detail" : "Show Detail"}
+                        icon={showingDetail ? Icon.EyeDisabled : Icon.Eye}
+                        onAction={() => setShowingDetail(!showingDetail)}
                       />
-                      {nextCursor && (
+                      <Action
+                        title={isJsonExpanded ? "Hide JSON" : "Show JSON"}
+                        icon={
+                          isJsonExpanded ? Icon.ChevronUp : Icon.ChevronDown
+                        }
+                        onAction={toggleJson}
+                        shortcut={{ modifiers: ["cmd"], key: "j" }}
+                      />
+                      <Action.CopyToClipboard
+                        title="Copy Document JSON"
+                        content={JSON.stringify(doc, null, 2)}
+                        shortcut={{ modifiers: ["cmd"], key: "c" }}
+                      />
+                      <Action.CopyToClipboard
+                        title="Copy Document Id"
+                        content={doc._id}
+                        shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
+                      />
+                      <ActionPanel.Section>
                         <Action
-                          title="Load More"
-                          icon={Icon.ArrowDown}
-                          onAction={loadMore}
-                          shortcut={{ modifiers: ["cmd"], key: "l" }}
+                          title="Go Back"
+                          icon={Icon.ArrowLeft}
+                          onAction={handleGoBack}
+                          shortcut={{ modifiers: ["cmd"], key: "[" }}
                         />
-                      )}
-                    </ActionPanel.Section>
-                    <ActionPanel.Section>
-                      <Action.OpenInBrowser
-                        title="Open in Dashboard"
-                        url={`https://dashboard.convex.dev/t/${selectedTeam?.slug}/${selectedProject?.slug}/${selectedDeployment?.deploymentType}/data?table=${selectedTable?.name}`}
-                      />
-                    </ActionPanel.Section>
-                  </ActionPanel>
-                }
-              />
-            ))}
+                        {nextCursor && (
+                          <Action
+                            title="Load More"
+                            icon={Icon.ArrowDown}
+                            onAction={loadMore}
+                            shortcut={{ modifiers: ["cmd"], key: "l" }}
+                          />
+                        )}
+                      </ActionPanel.Section>
+                      <ActionPanel.Section>
+                        <Action.OpenInBrowser
+                          title="Open in Dashboard"
+                          url={`https://dashboard.convex.dev/t/${selectedTeam?.slug}/${selectedProject?.slug}/${selectedDeployment?.deploymentType}/data?table=${selectedTable?.name}`}
+                        />
+                      </ActionPanel.Section>
+                    </ActionPanel>
+                  }
+                />
+              );
+            })}
           </List.Section>
 
           {/* Load more item */}
@@ -363,63 +366,51 @@ export default function BrowseTablesCommand() {
 // Document detail panel component
 interface DocumentDetailPanelProps {
   document: Document;
+  showJson: boolean;
 }
 
-function DocumentDetailPanel({ document }: DocumentDetailPanelProps) {
-  // Get all fields except system fields for the main display
-  const userFields = Object.entries(document).filter(
-    ([key]) => !key.startsWith("_"),
-  );
+function DocumentDetailPanel({ document, showJson }: DocumentDetailPanelProps) {
+  // Get all fields in order
+  const allFields = Object.entries(document);
 
-  // Build markdown content with formatted JSON
-  const markdown = `
+  // Build markdown with JSON if expanded
+  const markdown = showJson
+    ? `
 \`\`\`json
 ${JSON.stringify(document, null, 2)}
 \`\`\`
-`;
+`
+    : undefined;
 
   return (
     <List.Item.Detail
       markdown={markdown}
       metadata={
         <List.Item.Detail.Metadata>
-          <List.Item.Detail.Metadata.Label
-            title="Document ID"
-            text={formatDocumentId(document._id)}
-            icon={Icon.Fingerprint}
-          />
-          <List.Item.Detail.Metadata.Label
-            title="Created"
-            text={new Date(document._creationTime).toLocaleString()}
-            icon={Icon.Clock}
-          />
-          <List.Item.Detail.Metadata.Separator />
-
-          {userFields.map(([key, value]) => (
+          {allFields.map(([key, value]) => (
             <List.Item.Detail.Metadata.Label
               key={key}
               title={key}
-              text={formatFieldValue(value)}
-              icon={getFieldIcon(value)}
+              text={formatFieldValue(key, value)}
             />
           ))}
 
-          {userFields.length === 0 && (
-            <List.Item.Detail.Metadata.Label
-              title="No fields"
-              text="This document has no user-defined fields"
-              icon={Icon.Warning}
-            />
-          )}
+          <List.Item.Detail.Metadata.Separator />
+
+          <List.Item.Detail.Metadata.Label
+            title="Raw JSON"
+            text={
+              showJson ? "Showing below (press ⌘J to hide)" : "Press ⌘J to show"
+            }
+            icon={showJson ? Icon.ChevronUp : Icon.ChevronDown}
+          />
         </List.Item.Detail.Metadata>
       }
     />
   );
 }
 
-// Helper to get a meaningful title for the document
 function getDocumentTitle(doc: Document): string {
-  // Try to find a good title field
   const titleFields = [
     "name",
     "title",
@@ -435,11 +426,9 @@ function getDocumentTitle(doc: Document): string {
       return value.length > 40 ? value.substring(0, 40) + "..." : value;
     }
   }
-  // Fallback to abbreviated ID
-  return formatDocumentId(doc._id);
+  return doc._id;
 }
 
-// Helper to get subtitle with key fields
 function getDocumentSubtitle(doc: Document): string {
   const fields = Object.entries(doc)
     .filter(([key]) => !key.startsWith("_"))
@@ -448,12 +437,16 @@ function getDocumentSubtitle(doc: Document): string {
   if (fields.length === 0) return "Empty document";
 
   return fields
-    .map(([key, value]) => `${key}: ${formatFieldValue(value)}`)
+    .map(([key, value]) => `${key}: ${formatFieldValue(key, value)}`)
     .join(" | ");
 }
 
-// Format a field value for display
-function formatFieldValue(value: unknown): string {
+function formatFieldValue(key: string, value: unknown): string {
+  // Special handling for _creationTime
+  if (key === "_creationTime" && typeof value === "number") {
+    return new Date(value).toLocaleString();
+  }
+
   if (value === null) return "null";
   if (value === undefined) return "undefined";
   if (typeof value === "boolean") return value ? "true" : "false";
@@ -470,20 +463,4 @@ function formatFieldValue(value: unknown): string {
     return `{${keys.length} fields}`;
   }
   return String(value);
-}
-
-// Get an appropriate icon for the field type
-function getFieldIcon(value: unknown): Icon {
-  if (value === null || value === undefined) return Icon.Circle;
-  if (typeof value === "boolean")
-    return value ? Icon.CheckCircle : Icon.XMarkCircle;
-  if (typeof value === "number") return Icon.Hashtag;
-  if (typeof value === "string") {
-    // Check if it looks like an ID reference
-    if (value.match(/^[a-z][a-z0-9]+\.[a-z0-9]+$/i)) return Icon.Link;
-    return Icon.Text;
-  }
-  if (Array.isArray(value)) return Icon.List;
-  if (typeof value === "object") return Icon.Folder;
-  return Icon.QuestionMark;
 }

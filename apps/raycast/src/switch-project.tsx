@@ -16,6 +16,7 @@ import {
 } from "@raycast/api";
 import { useState, useEffect } from "react";
 import { useConvexAuth } from "./hooks/useConvexAuth";
+import { useAuthenticatedListGuard } from "./components/AuthenticatedListGuard";
 import {
   useTeams,
   useProjects,
@@ -27,15 +28,8 @@ import type { Team, Project, Deployment } from "./hooks/useConvexData";
 type ViewState = "teams" | "projects" | "deployments";
 
 export default function SwitchProjectCommand() {
-  const {
-    session,
-    isLoading: authLoading,
-    isAuthenticated,
-    login,
-    logout,
-    selectedContext,
-    setSelectedContext,
-  } = useConvexAuth();
+  const { session, logout, selectedContext, setSelectedContext } =
+    useConvexAuth();
 
   const [viewState, setViewState] = useState<ViewState>("teams");
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
@@ -75,31 +69,11 @@ export default function SwitchProjectCommand() {
     }
   }, [projects, selectedContext.projectId]);
 
-  // Handle not authenticated
-  if (authLoading) {
-    return <List isLoading={true} searchBarPlaceholder="Loading..." />;
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <List>
-        <List.EmptyView
-          title="Sign in to Convex"
-          description="Connect your Convex account to manage your projects"
-          icon={Icon.Key}
-          actions={
-            <ActionPanel>
-              <Action
-                title="Sign in with Convex"
-                icon={Icon.Key}
-                onAction={login}
-              />
-            </ActionPanel>
-          }
-        />
-      </List>
-    );
-  }
+  // Handle authentication
+  const authGuard = useAuthenticatedListGuard(
+    "Connect your Convex account to manage your projects",
+  );
+  if (authGuard) return authGuard;
 
   // Loading state
   const isLoading =
