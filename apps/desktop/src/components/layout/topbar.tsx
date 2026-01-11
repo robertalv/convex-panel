@@ -1,17 +1,12 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { ConvexLogo } from "@/components/ui/ConvexLogo";
-import { SearchableSelect } from "@/components/ui/SearchableSelect";
-import { UserMenu } from "./UserMenu";
-import type { Team, Project, Deployment, User } from "@/types/desktop";
+import { ConvexLogo } from "@/components/svg/convex-logo";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { UserMenu } from "./user-menu";
+import type { Team, Project, Deployment, User, ThemeType } from "@/types/desktop";
 import type { TeamSubscription } from "@/api/bigbrain";
-import { Terminal } from "lucide-react";
-import {
-  useTerminalActions,
-  useTerminalState,
-} from "../../contexts/TerminalContext";
 import { useIsFullscreen } from "../../hooks/useIsFullscreen";
-// import { NetworkStatusIndicator } from "./NetworkStatusIndicator";
+import { TerminalButton } from "../terminal-button";
 
 interface TopBarProps {
   user: User | null;
@@ -26,47 +21,15 @@ interface TopBarProps {
   onSelectProject: (project: Project) => void;
   onSelectDeployment: (deployment: Deployment) => void;
   onOpenPalette: () => void;
-  onThemeChange: (theme: "light" | "dark" | "system") => void;
+  onThemeChange: (theme: ThemeType) => void;
   onDisconnect: () => void;
   onOpenSettings?: () => void;
-  theme: "light" | "dark" | "system";
+  onNavigateToProjectSelector?: () => void;
+  theme: ThemeType;
   className?: string;
   deploymentsLoading?: boolean;
 }
 
-function TerminalButton({ onOpenSettings: _onOpenSettings }: { onOpenSettings?: () => void }) {
-  const { toggleTerminal } = useTerminalActions();
-  const { isOpen } = useTerminalState();
-
-  const handleClick = async () => {
-    toggleTerminal();
-  };
-
-  const title = isOpen ? "Close terminal (⌃`)" : "Open terminal (⌃`)";
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className={cn(
-        "flex items-center justify-center relative",
-        "h-6 w-6 rounded-lg",
-        "transition-colors duration-150",
-        isOpen
-          ? "bg-brand-base/10 text-brand-base"
-          : "text-text-muted hover:text-text-base hover:bg-surface-raised",
-      )}
-      title={title}
-    >
-      <Terminal className="h-4 w-4" />
-    </button>
-  );
-}
-
-/**
- * Top bar component with logo, deployment breadcrumb selector, and action buttons.
- * Spans the full width of the window, inline with macOS traffic lights.
- */
 export function TopBar({
   user,
   teams,
@@ -83,6 +46,7 @@ export function TopBar({
   onThemeChange,
   onDisconnect,
   onOpenSettings,
+  onNavigateToProjectSelector,
   theme,
   className,
   deploymentsLoading = false,
@@ -100,7 +64,6 @@ export function TopBar({
   );
 
   const deploymentOptions = React.useMemo(() => {
-    // Show saved deployment option even if deployments haven't loaded yet
     if (deployments.length === 0 && selectedDeployment && deploymentsLoading) {
       return [
         {
@@ -153,9 +116,22 @@ export function TopBar({
       )}
       data-tauri-drag-region
     >
-      {/* Left: Logo + Breadcrumb selectors */}
       <div className="flex items-center gap-1">
-        <ConvexLogo size={20} className="shrink-0" />
+        <button
+          onClick={onNavigateToProjectSelector}
+          className={cn(
+            "cursor-pointer transition-opacity duration-150",
+            "hover:opacity-90 active:opacity-80",
+            "shrink-0",
+            "hover:animate-spin",
+            !onNavigateToProjectSelector && "cursor-default",
+          )}
+          title="Go to project selector"
+          type="button"
+          disabled={!onNavigateToProjectSelector}
+        >
+          <ConvexLogo size={20} className="shrink-0" />
+        </button>
 
         <SearchableSelect
           value={selectedTeam ? String(selectedTeam.id) : ""}
@@ -191,8 +167,7 @@ export function TopBar({
         />
       </div>
 
-      <div className="flex items-center gap-2">
-        {/* Terminal Toggle Button - only visible when a project is selected */}
+      <div className="flex items-center gap-1">
         {selectedProject && <TerminalButton onOpenSettings={onOpenSettings} />}
 
         <UserMenu

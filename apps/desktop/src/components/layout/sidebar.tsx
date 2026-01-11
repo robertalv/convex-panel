@@ -2,21 +2,11 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { TooltipWithKeybind } from "@/components/ui/tooltip";
-import { ResizeHandle } from "./ResizeHandle";
-import {
-  PanelLeftClose,
-  PanelLeft,
-  Settings,
-  type LucideIcon,
-} from "lucide-react";
-
-export interface NavItem {
-  id: string;
-  label: string;
-  path: string;
-  icon: LucideIcon;
-  shortcut?: string;
-}
+import { Kbd } from "@/components/ui/kbd";
+import { ResizeHandle } from "../ui/resize-handle";
+import type { NavItem } from "@/lib/navigation";
+import { Icon, IconProps } from "../ui/icon";
+import { SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from "@/lib/layout";
 
 interface SidebarProps {
   navItems: NavItem[];
@@ -33,15 +23,8 @@ interface SidebarProps {
   isSettingsActive?: boolean;
 }
 
-const SIDEBAR_MIN_WIDTH = 180;
-const SIDEBAR_MAX_WIDTH = 320;
-const SIDEBAR_COLLAPSED_WIDTH = 48;
-
-/**
- * Sidebar navigation item with active indicator.
- */
 interface SidebarItemProps {
-  icon: LucideIcon;
+  icon: IconProps;
   label: string;
   shortcut?: string;
   isActive: boolean;
@@ -49,8 +32,23 @@ interface SidebarItemProps {
   onClick: () => void;
 }
 
+function renderShortcut(shortcut: string): React.ReactNode {
+  const match = shortcut.match(/^(\w+)\s+then\s+(\w+)$/i);
+  if (match) {
+    const [, firstKey, secondKey] = match;
+    return (
+      <span className="flex items-center gap-1">
+        <Kbd>{firstKey}</Kbd>
+        <span className="text-[10px] text-text-subtle">then</span>
+        <Kbd>{secondKey}</Kbd>
+      </span>
+    );
+  }
+  return <Kbd>{shortcut}</Kbd>;
+}
+
 function SidebarItem({
-  icon: Icon,
+  icon,
   label,
   shortcut,
   isActive,
@@ -61,7 +59,6 @@ function SidebarItem({
     return (
       <TooltipWithKeybind content={label} keybind={shortcut} side="right">
         <div className="flex items-center justify-center w-full gap-1.5">
-          {/* Active indicator */}
           <div
             className={cn(
               "-ml-2",
@@ -82,7 +79,7 @@ function SidebarItem({
                 : "text-text-muted hover:text-text-base hover:bg-surface-raised",
             )}
           >
-            <Icon className="h-3.5 w-3.5" />
+            <Icon {...icon} className="h-3.5 w-3.5" />
           </Button>
         </div>
       </TooltipWithKeybind>
@@ -91,7 +88,6 @@ function SidebarItem({
 
   return (
     <div className="flex items-center w-full gap-1.5">
-      {/* Active indicator */}
       <div
         className={cn(
           "w-[3px] h-5 rounded-full shrink-0",
@@ -111,22 +107,14 @@ function SidebarItem({
             : "text-text-muted hover:text-text-base hover:bg-surface-raised",
         )}
       >
-        <Icon className="h-3.5 w-3.5 shrink-0" />
+        <Icon {...icon} className="h-3.5 w-3.5 shrink-0" />
         <span className="truncate flex-1 text-left text-sm">{label}</span>
-        {shortcut && (
-          <kbd className="text-[10px] text-text-subtle bg-surface-base px-1 py-0.5 rounded">
-            {shortcut}
-          </kbd>
-        )}
+        {shortcut && renderShortcut(shortcut)}
       </Button>
     </div>
   );
 }
 
-/**
- * Collapsible sidebar with navigation items and resizable width.
- * Supports keyboard shortcut ⌘B to toggle collapse.
- */
 export function Sidebar({
   navItems,
   currentPath,
@@ -161,7 +149,6 @@ export function Sidebar({
       )}
       style={{ width: sidebarWidth }}
     >
-      {/* Navigation items */}
       <nav className="flex-1 py-2 px-2 overflow-y-auto scrollbar-hide">
         <div className="flex flex-col justify-between h-full gap-1">
           <div className="flex flex-col gap-1">
@@ -184,7 +171,7 @@ export function Sidebar({
 
           {onOpenSettings && (
             <SidebarItem
-              icon={Settings}
+              icon={{ name: "settings" }}
               label="Settings"
               shortcut="⌘,"
               isActive={isSettingsActive}
@@ -195,12 +182,9 @@ export function Sidebar({
         </div>
       </nav>
 
-      {/* Footer with settings and collapse toggle */}
       <div className="p-2 border-t border-border-muted">
         <div className="flex flex-col gap-1">
-          {/* Collapse toggle */}
           <div className="flex items-center w-full gap-1.5">
-            {/* Spacer for indicator alignment */}
             <div className="shrink-0" />
             <TooltipWithKeybind
               content={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -220,10 +204,10 @@ export function Sidebar({
                 )}
               >
                 {collapsed ? (
-                  <PanelLeft className="h-3.5 w-3.5" />
+                  <Icon name="chevron-right" className="h-3.5 w-3.5" />
                 ) : (
                   <>
-                    <PanelLeftClose className="h-3.5 w-3.5 shrink-0" />
+                    <Icon name="chevron-back" className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate text-sm">Collapse</span>
                   </>
                 )}
@@ -233,7 +217,6 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* Resize handle (only when not collapsed) */}
       {!collapsed && (
         <ResizeHandle
           direction="horizontal"
@@ -246,4 +229,3 @@ export function Sidebar({
 }
 
 export default Sidebar;
-export { SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH, SIDEBAR_COLLAPSED_WIDTH };
