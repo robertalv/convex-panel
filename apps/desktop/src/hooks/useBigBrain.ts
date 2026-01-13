@@ -5,11 +5,13 @@ import {
   getDeployments,
   getProfile,
   getTeamSubscription,
+  getInvoices,
   Team,
   Project,
   Deployment,
   UserProfile,
   TeamSubscription,
+  Invoice,
 } from "../api/bigbrain";
 import type { DashboardFetch } from "../lib/convex/dashboardCommonAdapter";
 
@@ -24,6 +26,7 @@ export function useBigBrain(
   const [subscription, setSubscription] = useState<TeamSubscription | null>(
     null,
   );
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [deploymentsLoading, setDeploymentsLoading] = useState(false);
@@ -118,6 +121,22 @@ export function useBigBrain(
     [accessToken, fetchFn],
   );
 
+  const loadInvoices = useCallback(
+    async (teamId: number) => {
+      if (!accessToken) return;
+      try {
+        const data = await getInvoices(accessToken, teamId, fetchFn);
+        setInvoices(data);
+        return data;
+      } catch (err) {
+        console.error("Failed to load invoices:", err);
+        setInvoices([]);
+        return [];
+      }
+    },
+    [accessToken, fetchFn],
+  );
+
   useEffect(() => {
     loadTeams();
     loadUser();
@@ -129,11 +148,13 @@ export function useBigBrain(
     deployments,
     user,
     subscription,
+    invoices,
     loadTeams,
     loadProjects,
     loadDeployments,
     loadUser,
     loadSubscription,
+    loadInvoices,
     loading,
     deploymentsLoading,
     error,

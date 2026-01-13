@@ -1,5 +1,5 @@
-export { ThemeProvider, useTheme } from "./ThemeContext";
-export { DeploymentProvider, useDeployment } from "./DeploymentContext";
+export { ThemeProvider, useTheme } from "./theme-context";
+export { DeploymentProvider, useDeployment } from "./deployment-context";
 export {
   TerminalProvider,
   useTerminal,
@@ -10,8 +10,8 @@ export {
   TERMINAL_MIN_HEIGHT,
   TERMINAL_MAX_HEIGHT_RATIO,
   type TerminalSession,
-} from "./TerminalContext";
-export { GitHubProvider, useGitHub, useGitHubOptional } from "./GitHubContext";
+} from "./terminal-context";
+export { GitHubProvider, useGitHub, useGitHubOptional } from "./github-context";
 export {
   SheetProvider,
   useSheet,
@@ -20,7 +20,7 @@ export {
   useSheetState,
   type SheetContent,
   type SheetState,
-} from "./SheetContext";
+} from "./sheet-context";
 export {
   NetworkTestProvider,
   useNetworkTests,
@@ -28,4 +28,12 @@ export {
   type NetworkTestState,
   type TestResult,
   type TestStatus,
-} from "./NetworkTestContext";
+} from "./network-test-context";
+export {
+  OnboardingProvider,
+  useOnboarding,
+  useOnboardingSafe,
+  useOnboardingActions,
+  useOnboardingState,
+  type OnboardingState,
+} from "./onboarding-context";

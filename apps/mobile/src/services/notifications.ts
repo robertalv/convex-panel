@@ -1,79 +1,65 @@
-/**
- * Notifications Service
- * 
- * Handles push notifications setup and management
- */
+import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
 
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
-import { Platform } from 'react-native';
-
-// Configure notification behavior
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
 /**
  * Register for push notifications
- * Returns the Expo push token if successful
  */
 export async function registerForPushNotifications(): Promise<string | null> {
-  if (!Device.isDevice) {
-    console.log('Push notifications only work on physical devices');
-    return null;
-  }
-
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
 
-  if (existingStatus !== 'granted') {
+  if (existingStatus !== "granted") {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
 
-  if (finalStatus !== 'granted') {
-    console.log('Permission to receive push notifications was denied');
+  if (finalStatus !== "granted") {
     return null;
   }
 
   try {
     const token = await Notifications.getExpoPushTokenAsync({
-      projectId: 'convex-panel-mobile',
+      projectId: process.env.EXPO_PUBLIC_EXPO_PROJECT_ID as string | undefined,
     });
-    
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'default',
+
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "default",
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
+        lightColor: "#FF231F7C",
       });
 
-      // Create channels for different severity levels
-      await Notifications.setNotificationChannelAsync('critical', {
-        name: 'Critical Alerts',
+      await Notifications.setNotificationChannelAsync("critical", {
+        name: "Critical Alerts",
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 500, 250, 500],
-        lightColor: '#FF0000',
-        sound: 'default',
+        lightColor: "#FF0000",
+        sound: "default",
         enableVibrate: true,
       });
 
-      await Notifications.setNotificationChannelAsync('warning', {
-        name: 'Warnings',
+      await Notifications.setNotificationChannelAsync("warning", {
+        name: "Warnings",
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FFA500',
+        lightColor: "#FFA500",
       });
     }
 
     return token.data;
   } catch (error) {
-    console.error('Failed to get push token:', error);
+    console.error("Failed to get push token:", error);
     return null;
   }
 }
@@ -89,7 +75,7 @@ export async function scheduleLocalNotification(
     sound?: boolean;
     vibrate?: boolean;
     channelId?: string;
-  }
+  },
 ): Promise<string> {
   return await Notifications.scheduleNotificationAsync({
     content: {
@@ -99,14 +85,16 @@ export async function scheduleLocalNotification(
       sound: options?.sound !== false,
       vibrate: options?.vibrate !== false ? [0, 250, 250, 250] : undefined,
     },
-    trigger: null, // Show immediately
+    trigger: null,
   });
 }
 
 /**
  * Cancel a scheduled notification
  */
-export async function cancelNotification(notificationId: string): Promise<void> {
+export async function cancelNotification(
+  notificationId: string,
+): Promise<void> {
   await Notifications.cancelScheduledNotificationAsync(notificationId);
 }
 
@@ -142,7 +130,7 @@ export async function dismissAllNotifications(): Promise<void> {
  * Add notification received listener
  */
 export function addNotificationReceivedListener(
-  listener: (notification: Notifications.Notification) => void
+  listener: (notification: Notifications.Notification) => void,
 ): Notifications.Subscription {
   return Notifications.addNotificationReceivedListener(listener);
 }
@@ -151,7 +139,7 @@ export function addNotificationReceivedListener(
  * Add notification response listener (when user taps notification)
  */
 export function addNotificationResponseListener(
-  listener: (response: Notifications.NotificationResponse) => void
+  listener: (response: Notifications.NotificationResponse) => void,
 ): Notifications.Subscription {
   return Notifications.addNotificationResponseReceivedListener(listener);
 }

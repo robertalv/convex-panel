@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -15,17 +16,9 @@ import {
 } from "react-router-dom";
 import { ConvexReactClient } from "convex/react";
 import type { Deployment, Project, Team, User } from "@/types/desktop";
-import {
-  Activity,
-  CalendarClock,
-  Code2,
-  FileStack,
-  Gauge,
-  LayoutDashboard,
-  Network,
-  ScrollText,
-} from "lucide-react";
 import { useBigBrain } from "./hooks/useBigBrain";
+import { useGlobalHotkeys } from "./hooks/useGlobalHotkeys";
+import type { HotkeyDefinition } from "@/lib/hotkeys";
 import {
   DashboardSession,
   exchangeForDashboardToken,
@@ -38,179 +31,42 @@ import {
   loadAccessToken,
   loadDeployKey,
   saveAccessToken,
-  saveDeployKey,
 } from "./lib/secureStorage";
-import { HealthView } from "./features/health";
-import { DataView } from "./features/data";
-import FunctionsView from "./features/functions";
-import { RunnerView } from "./features/runner";
-import { FilesView } from "./features/files";
-import { SchedulesView } from "./features/schedules";
-import { LogsView } from "./features/logs";
-import { SchemaVisualizerView } from "./features/schema-visualizer";
-import { PerformanceAdvisorView } from "./features/performance-advisor";
-import { ProjectSelector } from "./features/project-selector";
-import { SettingsView } from "./features/settings";
-import { AppShell, CommandPalette, type NavItem } from "./components/layout";
+import { HealthView } from "./views/health";
+import { DataView } from "./views/data";
+import FunctionsView from "./views/functions";
+import { RunnerView } from "./views/runner";
+import { FilesView } from "./views/files";
+import { SchedulesView } from "./views/schedules";
+import { LogsView } from "./views/logs";
+import { SchemaVisualizerView } from "./views/schema-visualizer";
+import { PerformanceAdvisorView } from "./views/performance-advisor";
+import { ProjectSelector } from "./views/project-selector";
+import { SettingsView } from "./views/settings";
+import { AppShell, CommandPalette } from "./components/layout";
 import {
   WelcomeScreen,
   LoadingScreen,
   LoginTransition,
 } from "./components/auth";
-import { DeploymentProvider } from "./contexts/DeploymentContext";
-import { useTheme } from "./contexts/ThemeContext";
-import { TerminalProvider } from "./contexts/TerminalContext";
-import { GitHubProvider } from "./contexts/GitHubContext";
-import { ProjectPathProvider } from "./contexts/ProjectPathContext";
-import { AboutDialog } from "./components/AboutDialog";
-import { EnhancedProjectOnboardingDialog } from "./components/EnhancedProjectOnboardingDialog";
-import { DeploymentNotificationListener } from "./components/DeploymentNotificationListener";
+import { DeploymentProvider } from "./contexts/deployment-context";
+import { useTheme } from "./contexts/theme-context";
+import { TerminalProvider } from "./contexts/terminal-context";
+import { GitHubProvider } from "./contexts/github-context";
+import { ProjectPathProvider } from "./contexts/project-path-context";
+import { AboutDialog } from "./components/about-dialog";
+import {
+  OnboardingProvider,
+  useOnboarding,
+} from "./contexts/onboarding-context";
+import { DeploymentNotificationListener } from "./components/deployment-notification-listener";
 import { useApplicationVersion } from "./hooks/useApplicationVersion";
+import { NAV_ITEMS } from "./lib/navigation";
+import { isTauri } from "./utils/desktop";
+import { STORAGE_KEYS } from "./lib/constants";
 
 interface AppProps {
   convex?: ConvexReactClient | null;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  {
-    id: "health",
-    label: "Health",
-    path: "/health",
-    icon: Activity,
-    shortcut: "⌘1",
-  },
-  {
-    id: "data",
-    label: "Data",
-    path: "/data",
-    icon: LayoutDashboard,
-    shortcut: "⌘2",
-  },
-  {
-    id: "schema",
-    label: "Schema",
-    path: "/schema",
-    icon: Network,
-    shortcut: "⌘3",
-  },
-  {
-    id: "advisor",
-    label: "Advisor",
-    path: "/advisor",
-    icon: Gauge,
-    shortcut: "⌘4",
-  },
-  {
-    id: "functions",
-    label: "Functions",
-    path: "/functions",
-    icon: Code2,
-    shortcut: "⌘5",
-  },
-  {
-    id: "files",
-    label: "Files",
-    path: "/files",
-    icon: FileStack,
-    shortcut: "⌘7",
-  },
-  {
-    id: "schedules",
-    label: "Schedules",
-    path: "/schedules",
-    icon: CalendarClock,
-    shortcut: "⌘8",
-  },
-  {
-    id: "logs",
-    label: "Logs",
-    path: "/logs",
-    icon: ScrollText,
-    shortcut: "⌘9",
-  },
-];
-
-const STORAGE_KEYS = {
-  team: "convex-panel-team",
-  project: "convex-panel-project",
-  deployment: "convex-panel-deployment",
-  deployUrl: "convex-panel-deploy-url",
-  theme: "convex-panel-theme",
-  authMethod: "convex-panel-auth-method",
-};
-
-const isTauri = () =>
-  typeof window !== "undefined" && Boolean((window as any).__TAURI_INTERNALS__);
-
-// Enhanced onboarding wrapper that uses DeploymentContext
-// Needs to be rendered inside DeploymentProvider
-interface EnhancedOnboardingWrapperProps {
-  deploymentName?: string;
-  teamSlug?: string | null;
-  projectSlug?: string | null;
-}
-
-function EnhancedOnboardingWrapper({
-  deploymentName,
-  teamSlug,
-  projectSlug,
-}: EnhancedOnboardingWrapperProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [hasChecked, setHasChecked] = useState(false);
-
-  // Storage key for tracking if user has dismissed enhanced onboarding for this deployment
-  const dismissedKey = deploymentName
-    ? `convex-panel-enhanced-onboarding-dismissed-${deploymentName}`
-    : null;
-
-  // Check if we should show enhanced onboarding when deployment changes
-  useEffect(() => {
-    if (!deploymentName || hasChecked) return;
-
-    // Check if user has dismissed onboarding for this deployment
-    const wasDismissed = dismissedKey
-      ? localStorage.getItem(dismissedKey)
-      : false;
-
-    // Show enhanced onboarding if:
-    // 1. User hasn't dismissed it for this deployment
-    // 2. We're in Tauri environment
-    if (!wasDismissed && isTauri()) {
-      setIsOpen(true);
-    }
-
-    setHasChecked(true);
-  }, [deploymentName, hasChecked, dismissedKey]);
-
-  // Reset checked state when deployment changes
-  useEffect(() => {
-    setHasChecked(false);
-  }, [deploymentName]);
-
-  const handleClose = useCallback(() => {
-    if (dismissedKey) {
-      localStorage.setItem(dismissedKey, "true");
-    }
-    setIsOpen(false);
-  }, [dismissedKey]);
-
-  const handleComplete = useCallback(() => {
-    if (dismissedKey) {
-      localStorage.setItem(dismissedKey, "true");
-    }
-    setIsOpen(false);
-  }, [dismissedKey]);
-
-  return (
-    <EnhancedProjectOnboardingDialog
-      isOpen={isOpen}
-      onClose={handleClose}
-      onComplete={handleComplete}
-      deploymentName={deploymentName}
-      teamSlug={teamSlug}
-      projectSlug={projectSlug}
-    />
-  );
 }
 
 /**
@@ -231,6 +87,27 @@ function GitHubProviderWithConvexProject({
       {children}
     </GitHubProvider>
   );
+}
+
+/**
+ * Component that syncs deployment changes with OnboardingContext
+ */
+function OnboardingSync({
+  deploymentName,
+  teamSlug,
+  projectSlug,
+}: {
+  deploymentName?: string;
+  teamSlug?: string | null;
+  projectSlug?: string | null;
+}) {
+  const { updateDeployment } = useOnboarding();
+
+  useEffect(() => {
+    updateDeployment(deploymentName, teamSlug, projectSlug);
+  }, [deploymentName, teamSlug, projectSlug, updateDeployment]);
+
+  return null;
 }
 
 export default function App({ convex: _initialConvex }: AppProps) {
@@ -292,9 +169,11 @@ export default function App({ convex: _initialConvex }: AppProps) {
     deployments,
     user,
     subscription,
+    invoices,
     loadProjects,
     loadDeployments,
     loadSubscription,
+    loadInvoices,
     deploymentsLoading,
   } = useBigBrain(
     session?.accessToken ?? null,
@@ -405,8 +284,18 @@ export default function App({ convex: _initialConvex }: AppProps) {
     if (selectedTeam) {
       loadProjects(selectedTeam.id);
       loadSubscription(selectedTeam.id);
+      // Only load invoices for non-managed teams (managed teams don't have billing)
+      if (!selectedTeam.managedBy) {
+        loadInvoices(selectedTeam.id);
+      }
     }
-  }, [selectedTeam?.id, loadProjects, loadSubscription]);
+  }, [
+    selectedTeam?.id,
+    selectedTeam?.managedBy,
+    loadProjects,
+    loadSubscription,
+    loadInvoices,
+  ]);
 
   useEffect(() => {
     if (projects.length > 0 && selectedProject) {
@@ -483,26 +372,34 @@ export default function App({ convex: _initialConvex }: AppProps) {
     }
   }, [deployments, selectedDeployment, selectedProject, deploymentsLoading]);
 
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setPaletteOpen(true);
-      }
-      if ((event.metaKey || event.ctrlKey) && event.key === ",") {
-        event.preventDefault();
-        navigate("/settings");
-      }
-      if ((event.metaKey || event.ctrlKey) && /^[1-9]$/.test(event.key)) {
-        event.preventDefault();
-        const idx = Number(event.key) - 1;
-        const item = NAV_ITEMS[idx];
-        if (item) navigate(item.path);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [navigate]);
+  // Register global hotkeys for palette, settings, and navigation
+  const globalHotkeys = useMemo<HotkeyDefinition[]>(
+    () => [
+      {
+        keys: ["ctrl+k", "meta+k"],
+        action: () => setPaletteOpen(true),
+        description: "Toggle command palette",
+        enableOnFormTags: true,
+      },
+      {
+        keys: ["ctrl+,", "meta+,"],
+        action: () => navigate("/settings"),
+        description: "Open settings",
+        enableOnFormTags: true,
+      },
+      ...NAV_ITEMS.slice(0, 9).map(
+        (item, index): HotkeyDefinition => ({
+          keys: [`ctrl+${index + 1}`, `meta+${index + 1}`],
+          action: () => navigate(item.path),
+          description: `Navigate to ${item.label}`,
+          enableOnFormTags: false,
+        }),
+      ),
+    ],
+    [navigate],
+  );
+
+  useGlobalHotkeys(globalHotkeys);
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -588,14 +485,6 @@ export default function App({ convex: _initialConvex }: AppProps) {
     setAuthError(null);
   }, []);
 
-  const handleManualConnect = useCallback(async () => {
-    if (deployUrl && deployKey) {
-      await saveDeployKey(deployKey);
-      setManualConnected(true);
-      setIsTransitioning(true);
-    }
-  }, [deployKey, deployUrl]);
-
   const onNavigate = useCallback((path: string) => navigate(path), [navigate]);
 
   const isConnected = Boolean(
@@ -616,114 +505,126 @@ export default function App({ convex: _initialConvex }: AppProps) {
   const mainAppContent = isConnected ? (
     <>
       <ProjectPathProvider>
-        <GitHubProviderWithConvexProject
-          teamSlug={selectedTeam?.slug ?? null}
-          projectSlug={selectedProject?.slug ?? null}
-        >
-          <TerminalProvider>
-            <DeploymentProvider
-              deployment={selectedDeployment}
-              authToken={authToken}
-              accessToken={session?.accessToken}
-              deployUrl={deployUrl}
-              teamSlug={selectedTeam?.slug ?? null}
-              projectSlug={selectedProject?.slug ?? null}
-              fetchFn={tauriFetch}
-            >
-              <AppShell
-                theme={theme}
-                navItems={NAV_ITEMS}
-                currentPath={location.pathname}
-                onNavigate={onNavigate}
-                onOpenPalette={() => setPaletteOpen(true)}
-                onThemeChange={setTheme}
-                onDisconnect={handleDisconnect}
-                onOpenSettings={() => navigate("/settings")}
-                user={headerUser}
-                teams={teams}
-                projects={projects}
-                deployments={deployments}
-                selectedTeam={selectedTeam}
-                selectedProject={selectedProject}
-                selectedDeployment={selectedDeployment}
-                subscription={subscription}
-                onSelectTeam={(team) => {
-                  setSelectedTeam(team);
-                  setSelectedProject(null);
-                  setSelectedDeployment(null);
-                }}
-                onSelectProject={(project) => {
-                  setSelectedProject(project);
-                  setSelectedDeployment(null);
-                }}
-                onSelectDeployment={setSelectedDeployment}
-                hideNav={!selectedProject}
-                deploymentsLoading={deploymentsLoading}
+        <OnboardingProvider>
+          <GitHubProviderWithConvexProject
+            teamSlug={selectedTeam?.slug ?? null}
+            projectSlug={selectedProject?.slug ?? null}
+          >
+            <TerminalProvider>
+              <DeploymentProvider
+                deployment={selectedDeployment}
+                authToken={authToken}
+                accessToken={session?.accessToken}
+                deployUrl={deployUrl}
+                teamId={selectedTeam?.id ?? null}
+                teamSlug={selectedTeam?.slug ?? null}
+                projectSlug={selectedProject?.slug ?? null}
+                fetchFn={tauriFetch}
               >
-                {selectedProject ? (
-                  <Routes>
-                    <Route path="/health" element={<HealthView />} />
-                    <Route path="/data" element={<DataView />} />
-                    <Route path="/schema" element={<SchemaVisualizerView />} />
-                    <Route
-                      path="/advisor"
-                      element={<PerformanceAdvisorView />}
+                <OnboardingSync
+                  deploymentName={selectedDeployment?.name}
+                  teamSlug={selectedTeam?.slug}
+                  projectSlug={selectedProject?.slug}
+                />
+                <AppShell
+                  theme={theme}
+                  navItems={NAV_ITEMS}
+                  currentPath={location.pathname}
+                  onNavigate={onNavigate}
+                  onOpenPalette={() => setPaletteOpen(true)}
+                  onThemeChange={setTheme}
+                  onDisconnect={handleDisconnect}
+                  onOpenSettings={() => navigate("/settings")}
+                  onNavigateToProjectSelector={() => {
+                    setSelectedProject(null);
+                    setSelectedDeployment(null);
+                  }}
+                  user={headerUser}
+                  teams={teams}
+                  projects={projects}
+                  deployments={deployments}
+                  selectedTeam={selectedTeam}
+                  selectedProject={selectedProject}
+                  selectedDeployment={selectedDeployment}
+                  subscription={subscription}
+                  invoices={invoices}
+                  onSelectTeam={(team) => {
+                    setSelectedTeam(team);
+                    setSelectedProject(null);
+                    setSelectedDeployment(null);
+                  }}
+                  onSelectProject={(project) => {
+                    setSelectedProject(project);
+                    setSelectedDeployment(null);
+                  }}
+                  onSelectDeployment={setSelectedDeployment}
+                  hideNav={!selectedProject}
+                  deploymentsLoading={deploymentsLoading}
+                >
+                  {selectedProject ? (
+                    <Routes>
+                      <Route path="/health" element={<HealthView />} />
+                      <Route path="/data" element={<DataView />} />
+                      <Route
+                        path="/schema"
+                        element={<SchemaVisualizerView />}
+                      />
+                      <Route
+                        path="/advisor"
+                        element={<PerformanceAdvisorView />}
+                      />
+                      <Route path="/functions" element={<FunctionsView />} />
+                      <Route path="/runner" element={<RunnerView />} />
+                      <Route path="/files" element={<FilesView />} />
+                      <Route path="/schedules" element={<SchedulesView />} />
+                      <Route path="/logs" element={<LogsView />} />
+                      <Route
+                        path="/settings"
+                        element={
+                          <SettingsView
+                            user={{
+                              name: headerUser?.name || "",
+                              email: headerUser?.email || "",
+                              profilePictureUrl: headerUser?.profilePictureUrl,
+                            }}
+                            onLogout={handleDisconnect}
+                            teamId={selectedTeam?.id}
+                          />
+                        }
+                      />
+                      <Route
+                        path="*"
+                        element={<Navigate to="/health" replace />}
+                      />
+                    </Routes>
+                  ) : (
+                    <ProjectSelector
+                      user={headerUser}
+                      team={selectedTeam}
+                      projects={projects}
+                      subscription={subscription}
+                      onSelectProject={(project) => {
+                        setSelectedProject(project);
+                        setSelectedDeployment(null);
+                      }}
                     />
-                    <Route path="/functions" element={<FunctionsView />} />
-                    <Route path="/runner" element={<RunnerView />} />
-                    <Route path="/files" element={<FilesView />} />
-                    <Route path="/schedules" element={<SchedulesView />} />
-                    <Route path="/logs" element={<LogsView />} />
-                    <Route
-                      path="/settings"
-                      element={
-                        <SettingsView
-                          user={{
-                            name: headerUser?.name || "",
-                            email: headerUser?.email || "",
-                            profilePictureUrl: headerUser?.profilePictureUrl,
-                          }}
-                          onLogout={handleDisconnect}
-                          teamId={selectedTeam?.id}
-                        />
-                      }
-                    />
-                    <Route
-                      path="*"
-                      element={<Navigate to="/health" replace />}
-                    />
-                  </Routes>
-                ) : (
-                  <ProjectSelector
-                    user={headerUser}
-                    team={selectedTeam}
-                    projects={projects}
-                    subscription={subscription}
-                    onSelectProject={(project) => {
-                      setSelectedProject(project);
-                      setSelectedDeployment(null);
-                    }}
-                  />
-                )}
-              </AppShell>
-              {/* Listen for deployment pushes and send notifications */}
-              <DeploymentNotificationListener />
-              {/* Enhanced onboarding for deploy key setup - needs DeploymentContext */}
-              <EnhancedOnboardingWrapper
-                deploymentName={selectedDeployment?.name}
-                teamSlug={selectedTeam?.slug}
-                projectSlug={selectedProject?.slug}
-              />
-            </DeploymentProvider>
-          </TerminalProvider>
-          <CommandPalette
-            open={paletteOpen}
-            navItems={NAV_ITEMS}
-            onSelect={onNavigate}
-            onClose={() => setPaletteOpen(false)}
-          />
-          <AboutDialog isOpen={aboutOpen} onClose={() => setAboutOpen(false)} />
-        </GitHubProviderWithConvexProject>
+                  )}
+                </AppShell>
+                <DeploymentNotificationListener />
+              </DeploymentProvider>
+            </TerminalProvider>
+            <CommandPalette
+              open={paletteOpen}
+              navItems={NAV_ITEMS}
+              onSelect={onNavigate}
+              onClose={() => setPaletteOpen(false)}
+            />
+            <AboutDialog
+              isOpen={aboutOpen}
+              onClose={() => setAboutOpen(false)}
+            />
+          </GitHubProviderWithConvexProject>
+        </OnboardingProvider>
       </ProjectPathProvider>
     </>
   ) : null;
@@ -757,17 +658,10 @@ export default function App({ convex: _initialConvex }: AppProps) {
     return (
       <>
         <WelcomeScreen
-          theme={theme}
-          authMethod={authMethod}
           isAuthenticating={isAuthenticating}
           userCode={userCode}
           onStartDeviceAuth={startDeviceAuth}
           onCancelDeviceAuth={cancelDeviceAuth}
-          deployUrl={deployUrl}
-          deployKey={deployKey}
-          onDeployUrlChange={setDeployUrl}
-          onDeployKeyChange={setDeployKey}
-          onManualConnect={handleManualConnect}
           authError={authError}
         />
         <AboutDialog isOpen={aboutOpen} onClose={() => setAboutOpen(false)} />

@@ -1,9 +1,3 @@
-/**
- * Performance Monitoring Utilities
- * 
- * Provides tools to measure and track app performance metrics
- */
-
 import React from 'react';
 import { InteractionManager } from 'react-native';
 
@@ -17,7 +11,7 @@ interface PerformanceMetric {
 
 class PerformanceMonitor {
   private metrics: Map<string, PerformanceMetric> = new Map();
-  private isEnabled: boolean = __DEV__; // Only enable in development
+  private isEnabled: boolean = __DEV__;
 
   /**
    * Start timing a performance metric
@@ -50,13 +44,11 @@ class PerformanceMonitor {
     metric.endTime = endTime;
     metric.duration = duration;
 
-    // Log the metric
     console.log(
       `[Performance] ${metricName}: ${duration}ms`,
       metric.metadata ? metric.metadata : ''
     );
 
-    // Clean up
     this.metrics.delete(metricName);
 
     return duration;
@@ -84,7 +76,6 @@ class PerformanceMonitor {
 
   /**
    * Measure time until interactions are complete
-   * Useful for measuring perceived performance
    */
   measureInteraction(metricName: string): void {
     if (!this.isEnabled) return;
@@ -99,7 +90,6 @@ class PerformanceMonitor {
 
   /**
    * Log component render time
-   * Use with React Profiler API
    */
   logRender(
     componentName: string,
@@ -110,7 +100,6 @@ class PerformanceMonitor {
     if (!this.isEnabled) return;
 
     if (actualDuration > 16) {
-      // Log slow renders (> 16ms = below 60fps)
       console.warn(
         `[Performance] Slow ${phase}: ${componentName}`,
         `Actual: ${actualDuration.toFixed(2)}ms`,
@@ -127,7 +116,6 @@ class PerformanceMonitor {
   }
 }
 
-// Export singleton instance
 export const perfMonitor = new PerformanceMonitor();
 
 /**
@@ -179,7 +167,7 @@ export function logMemoryUsage(): void {
   if (!__DEV__) return;
 
   // Note: Memory measurement requires native modules
-  // This is a placeholder for future implementation
+  // This is just a placehodler for now
   console.log('[Performance] Memory monitoring not yet implemented');
 }
 
@@ -196,7 +184,7 @@ export const NavigationPerf = {
   },
 };
 
-// Performance budget thresholds (in milliseconds)
+// Performance budget thresholds
 export const PERF_BUDGETS = {
   // API calls
   API_FAST: 500,

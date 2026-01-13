@@ -9,7 +9,12 @@
  */
 
 import { LocalStorage, open, showToast, Toast } from "@raycast/api";
-import { AUTH_ISSUER, AUTH_CLIENT_ID, BIG_BRAIN_URL, STORAGE_KEYS } from "./constants";
+import {
+  AUTH_ISSUER,
+  AUTH_CLIENT_ID,
+  BIG_BRAIN_URL,
+  STORAGE_KEYS,
+} from "./constants";
 
 interface DeviceAuthResponse {
   device_code: string;

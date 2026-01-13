@@ -1,8 +1,4 @@
 /**
- * Number formatting utilities
- */
-
-/**
  * Format number with thousand separators
  */
 export function formatNumber(num: number): string {

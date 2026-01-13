@@ -20,6 +20,12 @@
           "url": "https://api.convex.dev/**"
         },
         {
+          "url": "https://bigbrain.convex.dev/**"
+        },
+        {
+          "url": "https://dashboard.convex.dev/**"
+        },
+        {
           "url": "https://*.convex.cloud/**"
         }
       ],

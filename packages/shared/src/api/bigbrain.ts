@@ -39,6 +39,7 @@ export interface Team {
   slug: string;
   creator?: number;
   suspended?: boolean;
+  managedBy?: string | null;
 }
 
 export interface Project {
@@ -84,6 +85,15 @@ export interface TokenDetails {
   projectId?: number;
   deploymentId?: number;
   deploymentName?: string;
+}
+
+export interface AccessToken {
+  accessToken: string;
+  serializedAccessToken: string;
+  name: string;
+  creator: number;
+  creationTime: number;
+  lastUsedTime?: number | null;
 }
 
 export interface TeamAndProject {
@@ -445,6 +455,98 @@ export async function createDeployKey(
   return { key: result.deployKey };
 }
 
+/**
+ * Get access tokens (deploy keys) for a specific deployment
+ */
+export async function getDeploymentAccessTokens(
+  accessToken: string,
+  deploymentName: string,
+  fetchFn: FetchFn = defaultFetch,
+): Promise<AccessToken[]> {
+  return callBigBrainAPI<AccessToken[]>(
+    "/instances/{deployment_name}/access_tokens",
+    {
+      accessToken,
+      pathParams: { deployment_name: deploymentName },
+    },
+    fetchFn,
+  );
+}
+
+/**
+ * Get access tokens for a specific project
+ */
+export async function getProjectAccessTokens(
+  accessToken: string,
+  projectId: number,
+  fetchFn: FetchFn = defaultFetch,
+): Promise<AccessToken[]> {
+  return callBigBrainAPI<AccessToken[]>(
+    "/projects/{project_id}/access_tokens",
+    {
+      accessToken,
+      pathParams: { project_id: projectId },
+    },
+    fetchFn,
+  );
+}
+
+/**
+ * Create a new access token (deploy key)
+ *
+ * @param accessToken - User's authentication token
+ * @param params - Token creation parameters
+ * @param fetchFn - Optional custom fetch function
+ * @returns The created access token
+ */
+export async function createAccessToken(
+  accessToken: string,
+  params: {
+    name: string;
+    teamId: number;
+    deploymentId?: number | null;
+    projectId?: number | null;
+    permissions?: string[] | null;
+  },
+  fetchFn: FetchFn = defaultFetch,
+): Promise<{ accessToken: string }> {
+  return callBigBrainAPI<{ accessToken: string }>(
+    "/authorize",
+    {
+      accessToken,
+      method: "POST",
+      body: {
+        authnToken: accessToken,
+        deviceName: params.name,
+        teamId: params.teamId,
+        deploymentId: params.deploymentId,
+        projectId: params.projectId,
+        permissions: params.permissions,
+      },
+    },
+    fetchFn,
+  );
+}
+
+/**
+ * Delete an access token
+ */
+export async function deleteAccessToken(
+  accessToken: string,
+  tokenAccessToken: string,
+  fetchFn: FetchFn = defaultFetch,
+): Promise<void> {
+  await callBigBrainAPI(
+    "/teams/delete_access_token",
+    {
+      accessToken,
+      method: "POST",
+      body: { accessToken: tokenAccessToken },
+    },
+    fetchFn,
+  );
+}
+
 // ============================================================================
 // Usage & Insights Functions
 // ============================================================================
@@ -513,7 +615,75 @@ export async function queryUsage(
 export const DATABRICKS_QUERY_IDS = {
   /** Insights query - returns function issues like OCC, bytes read limits, etc. */
   INSIGHTS: "9ab3b74e-a725-480b-88a6-43e6bd70bd82",
+  /** Team summary - aggregated usage metrics */
+  TEAM_SUMMARY: "15fbb132-6641-4f17-9156-b05e9ee966d9",
+  /** Function breakdown by team */
+  TEAM_FUNCTION_BREAKDOWN: "8e6592dd-12a0-4ddf-bc79-7498e07352d4",
 } as const;
+
+/**
+ * Usage summary data returned from team summary query
+ */
+export interface UsageSummary {
+  databaseStorage: number;
+  databaseBandwidth: number;
+  fileStorage: number;
+  fileBandwidth: number;
+  functionCalls: number;
+  actionCompute: number;
+  vectorStorage: number;
+  vectorBandwidth: number;
+}
+
+/**
+ * Parse team summary query response into UsageSummary
+ */
+export function parseUsageSummary(data: string[][]): UsageSummary | null {
+  if (!data || data.length === 0) return null;
+
+  const row = data[0];
+  // Row format: [teamId, databaseStorage, databaseBandwidth, functionCalls, actionCompute, fileStorage, fileBandwidth, vectorStorage, vectorBandwidth]
+  return {
+    databaseStorage: Number(row[1]) || 0,
+    databaseBandwidth: Number(row[2]) || 0,
+    functionCalls: Number(row[3]) || 0,
+    actionCompute: (Number(row[4]) || 0) / 60 / 60, // Convert GB-seconds to GB-hours
+    fileStorage: Number(row[5]) || 0,
+    fileBandwidth: Number(row[6]) || 0,
+    vectorStorage: Number(row[7]) || 0,
+    vectorBandwidth: Number(row[8]) || 0,
+  };
+}
+
+/**
+ * Fetch team usage summary
+ */
+export async function fetchTeamUsageSummary(
+  accessToken: string,
+  teamId: number,
+  options?: {
+    projectId?: number | null;
+    from?: string;
+    to?: string;
+    componentPath?: string;
+  },
+  fetchFn: FetchFn = defaultFetch,
+): Promise<UsageSummary | null> {
+  const data = await queryUsage(
+    {
+      queryId: DATABRICKS_QUERY_IDS.TEAM_SUMMARY,
+      teamId,
+      projectId: options?.projectId,
+      from: options?.from,
+      to: options?.to,
+      componentPath: options?.componentPath,
+    },
+    accessToken,
+    fetchFn,
+  );
+
+  return parseUsageSummary(data);
+}
 
 /**
  * Root component path constant (used in usage queries)

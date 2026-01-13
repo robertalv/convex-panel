@@ -1,10 +1,3 @@
-/**
- * Authentication Service
- * 
- * Implements OAuth 2.0 Device Authorization Flow for Convex
- * Based on the desktop app's authentication pattern
- */
-
 import axios from 'axios';
 import type { DeviceAuthResponse, TokenResponse, DashboardSession, UserProfile } from '../types';
 
@@ -75,7 +68,6 @@ export async function pollForDeviceToken(
 
     return response.data as TokenResponse;
   } catch (error: any) {
-    // Check for expected error codes
     const errorCode = error.response?.data?.error;
     
     if (errorCode === 'authorization_pending' || errorCode === 'slow_down') {
@@ -91,7 +83,6 @@ export async function pollForDeviceToken(
       throw new Error('Authorization was denied.');
     }
 
-    // Unexpected error
     throw error;
   }
 }

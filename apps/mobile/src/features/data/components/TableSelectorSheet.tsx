@@ -6,7 +6,7 @@
  * scoped to tables only.
  */
 
-import React, { useCallback, useMemo } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -14,15 +14,13 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Platform,
-  FlatList,
 } from "react-native";
-import BottomSheet, {
-  BottomSheetBackdrop,
-  BottomSheetView,
-} from "@gorhom/bottom-sheet";
+import type BottomSheet from "@gorhom/bottom-sheet";
+import { BottomSheetFlatList, BottomSheetView } from "@gorhom/bottom-sheet";
 import type { TableItem } from "./TableList";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { Icon } from "../../../components/ui/Icon";
+import { BaseSheet } from "../../../components/sheets/BaseSheet";
 
 export interface TableSelectorSheetProps {
   sheetRef: React.RefObject<BottomSheet>;
@@ -43,175 +41,104 @@ export function TableSelectorSheet({
 }: TableSelectorSheetProps) {
   const { theme } = useTheme();
 
-  const snapPoints = useMemo(() => ["50%", "80%"], []);
-
-  const renderBackdrop = useCallback(
-    (props: any) => (
-      <BottomSheetBackdrop
-        {...props}
-        disappearsOnIndex={-1}
-        appearsOnIndex={0}
-        opacity={0.5}
-      />
-    ),
-    [],
-  );
-
-  const handleSheetChanges = useCallback(
-    (index: number) => {
-      console.log("[TableSelectorSheet] Sheet index changed:", index);
-      if (index === -1) {
-        onClose?.();
-      }
-    },
-    [onClose],
-  );
-
   const handleSelectTableInternal = (tableName: string) => {
     console.log("[TableSelectorSheet] Table selected:", tableName);
     onSelectTable(tableName);
     sheetRef.current?.close();
   };
 
-  return (
-    <BottomSheet
-      ref={sheetRef}
-      index={-1}
-      snapPoints={snapPoints}
-      onChange={handleSheetChanges}
-      backdropComponent={renderBackdrop}
-      enablePanDownToClose
-      backgroundStyle={{ backgroundColor: theme.colors.background }}
-      handleIndicatorStyle={{ backgroundColor: theme.colors.border }}
-    >
-      <BottomSheetView style={styles.container}>
-        {/* Header */}
-        <View
-          style={[
-            styles.header,
-            {
-              borderBottomColor: theme.colors.border,
-              borderBottomWidth: 0,
-              paddingBottom: 4,
-            },
-          ]}
-        >
-          <View style={styles.headerLeft} />
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            Select Table
-          </Text>
-          <View style={styles.headerRight}>
-            <Text style={[styles.count, { color: theme.colors.textSecondary }]}>
-              {tables.length}
-            </Text>
-          </View>
-        </View>
+  // Custom header right showing table count
+  const headerRight = (
+    <Text style={[styles.count, { color: theme.colors.textSecondary }]}>
+      {tables.length}
+    </Text>
+  );
 
-        {/* Content */}
-        <View
-          style={[styles.content, { backgroundColor: theme.colors.background }]}
-        >
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={theme.colors.primary} />
-            </View>
-          ) : tables.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text
-                style={[styles.emptyText, { color: theme.colors.textSecondary }]}
+  const renderEmpty = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+        No tables found
+      </Text>
+    </View>
+  );
+
+  return (
+    <BaseSheet
+      sheetRef={sheetRef}
+      onClose={onClose}
+      size="list"
+      itemCount={tables.length}
+      isLoading={isLoading}
+      title="Select Table"
+      headerRight={headerRight}
+      rawContent
+    >
+      {isLoading ? (
+        <BottomSheetView style={styles.container}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+          </View>
+        </BottomSheetView>
+      ) : (
+        <BottomSheetFlatList
+          data={tables}
+          keyExtractor={(item: TableItem) => item.name}
+          ListEmptyComponent={renderEmpty}
+          renderItem={({ item }: { item: TableItem }) => {
+            const isSelected = item.name === selectedTable;
+            return (
+              <TouchableOpacity
+                style={styles.item}
+                onPress={() => handleSelectTableInternal(item.name)}
+                activeOpacity={0.6}
               >
-                No tables found
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={tables}
-              keyExtractor={(item: TableItem) => item.name}
-              renderItem={({ item }: { item: TableItem }) => {
-                const isSelected = item.name === selectedTable;
-                return (
-                  <TouchableOpacity
-                    style={styles.item}
-                    onPress={() => handleSelectTableInternal(item.name)}
-                    activeOpacity={0.6}
+                <View style={styles.tableIcon}>
+                  <Icon
+                    name="table"
+                    size={18}
+                    color={theme.colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.itemContent}>
+                  <Text
+                    style={[styles.itemTitle, { color: theme.colors.text }]}
+                    numberOfLines={1}
                   >
-                    <View
-                      style={styles.tableIcon}
+                    {item.name}
+                  </Text>
+                  {item.schema?.indexes && item.schema.indexes.length > 0 && (
+                    <Text
+                      style={[
+                        styles.itemMeta,
+                        { color: theme.colors.textSecondary },
+                      ]}
                     >
-                      <Icon
-                        name="table"
-                        size={18}
-                        color={theme.colors.textSecondary}
-                      />
-                    </View>
-                    <View style={styles.itemContent}>
-                      <Text
-                        style={[
-                          styles.itemTitle,
-                          { color: theme.colors.text },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {item.name}
-                      </Text>
-                      {item.schema?.indexes &&
-                        item.schema.indexes.length > 0 && (
-                          <Text
-                            style={[
-                              styles.itemMeta,
-                              { color: theme.colors.textSecondary },
-                            ]}
-                          >
-                            {item.schema.indexes.length}{" "}
-                            {item.schema.indexes.length === 1
-                              ? "index"
-                              : "indexes"}
-                          </Text>
-                        )}
-                    </View>
-                    {isSelected && (
-                      <Icon
-                        name="checkmark-circle"
-                        size={20}
-                        color={theme.colors.primary}
-                      />
-                    )}
-                  </TouchableOpacity>
-                );
-              }}
-              contentContainerStyle={styles.listContent}
-            />
-          )}
-        </View>
-      </BottomSheetView>
-    </BottomSheet>
+                      {item.schema.indexes.length}{" "}
+                      {item.schema.indexes.length === 1 ? "index" : "indexes"}
+                    </Text>
+                  )}
+                </View>
+                {isSelected && (
+                  <Icon
+                    name="checkmark-circle"
+                    size={20}
+                    color={theme.colors.primary}
+                  />
+                )}
+              </TouchableOpacity>
+            );
+          }}
+          contentContainerStyle={styles.listContent}
+          style={{ backgroundColor: theme.colors.background }}
+        />
+      )}
+    </BaseSheet>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  headerLeft: {
-    width: 40,
-    alignItems: "flex-start",
-  },
-  headerRight: {
-    width: 40,
-    alignItems: "flex-end",
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    flex: 1,
-    textAlign: "center",
   },
   count: {
     fontSize: 14,
@@ -220,9 +147,6 @@ const styles = StyleSheet.create({
       android: "monospace",
       default: "monospace",
     }),
-  },
-  content: {
-    flex: 1,
   },
   listContent: {
     paddingVertical: 8,

@@ -9,10 +9,13 @@ import {
   Text,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
+  Keyboard,
 } from "react-native";
 import { useDeployment } from "../../contexts/DeploymentContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useSheet } from "../../contexts/SheetContext";
 import {
   useTables,
   useDocuments,
@@ -22,28 +25,95 @@ import {
 } from "./hooks/useTableData";
 import { useDataPreferences } from "./hooks/useDataPreferences";
 import { DataHeader } from "./components/DataHeader";
-import { ListView } from "./components/views/ListView";
 import { TableView } from "./components/views/TableView";
 import type { TableDocument, DataViewMode } from "./types";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { TableSelectorSheet } from "./components/TableSelectorSheet";
-import { DataFilterSheet } from "./components/DataFilterSheet";
-import { DataSortSheet } from "./components/DataSortSheet";
-import { DetailSheet } from "./components/DetailSheet";
-import { ViewModeSheet } from "./components/ViewModeSheet";
+import { BaseFilterSheet } from "../../components/sheets/BaseFilterSheet";
+import { BaseSortSheet } from "../../components/sheets/BaseSortSheet";
+import { useDataFilterConfig } from "./hooks/useDataFilterConfig";
+import { useDataSortConfig } from "./hooks/useDataSortConfig";
+import { CellEditSheet } from "./components/CellEditSheet";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { patchDocumentFields } from "../../api/data";
+import { dataQueryKeys } from "./hooks/useTableData";
+import type { TableSchema, FilterExpression, SortConfig } from "./types";
+
+// Inline wrapper components using the hooks and base sheets
+
+interface DataFilterSheetWrapperProps {
+  sheetRef: React.RefObject<BottomSheet>;
+  schema?: TableSchema;
+  filters: FilterExpression[];
+  onChangeFilters: (filters: FilterExpression[]) => void;
+}
+
+function DataFilterSheetWrapper({
+  sheetRef,
+  schema,
+  filters,
+  onChangeFilters,
+}: DataFilterSheetWrapperProps) {
+  const { config, activeFilters, handleFiltersChange } = useDataFilterConfig({
+    schema,
+    filters,
+    onChangeFilters,
+  });
+
+  return (
+    <BaseFilterSheet
+      sheetRef={sheetRef}
+      filters={activeFilters}
+      onChangeFilters={handleFiltersChange}
+      config={config}
+    />
+  );
+}
+
+interface DataSortSheetWrapperProps {
+  sheetRef: React.RefObject<BottomSheet>;
+  schema?: TableSchema;
+  sortConfig: SortConfig | null;
+  onChangeSortConfig: (sortConfig: SortConfig | null) => void;
+  tableName: string | null;
+}
+
+function DataSortSheetWrapper({
+  sheetRef,
+  schema,
+  sortConfig,
+  onChangeSortConfig,
+  tableName,
+}: DataSortSheetWrapperProps) {
+  const { config } = useDataSortConfig({ schema });
+
+  return (
+    <BaseSortSheet
+      sheetRef={sheetRef}
+      sortConfig={sortConfig}
+      onChangeSortConfig={onChangeSortConfig}
+      config={config}
+      schema={schema}
+      tableName={tableName}
+    />
+  );
+}
 
 export function DataBrowserScreen() {
   const { deployment } = useDeployment();
   const { session } = useAuth();
   const { theme } = useTheme();
-  const [selectedDocumentIndex, setSelectedDocumentIndex] = useState<
-    number | null
-  >(null);
+  const { openSheet } = useSheet();
+  const queryClient = useQueryClient();
+  const [editingCell, setEditingCell] = useState<{
+    document: TableDocument;
+    fieldName: string;
+    value: any;
+  } | null>(null);
   const tableSheetRef = useRef<BottomSheet>(null);
   const filterSheetRef = useRef<BottomSheet>(null);
   const sortSheetRef = useRef<BottomSheet>(null);
-  const viewModeSheetRef = useRef<BottomSheet>(null);
-  const detailSheetRef = useRef<BottomSheet>(null);
+  const cellEditSheetRef = useRef<BottomSheet>(null);
 
   // Preferences
   const {
@@ -101,6 +171,45 @@ export function DataBrowserScreen() {
   const documents = sortDocuments(rawDocuments, sortConfig);
   const hasMore = hasMoreDocuments(documentsData);
 
+  // Mutation for patching document fields
+  const patchMutation = useMutation({
+    mutationFn: async ({
+      documentId,
+      fields,
+    }: {
+      documentId: string;
+      fields: Record<string, any>;
+    }) => {
+      if (!deploymentUrl || !accessToken || !selectedTable) {
+        throw new Error("Missing required parameters");
+      }
+      await patchDocumentFields(
+        deploymentUrl,
+        accessToken,
+        selectedTable,
+        [documentId],
+        fields,
+      );
+    },
+    onSuccess: () => {
+      // Invalidate and refetch documents
+      queryClient.invalidateQueries({
+        queryKey: dataQueryKeys.documentsWithFilters(
+          deploymentUrl || "",
+          selectedTable || "",
+          normalizedFilters,
+          sortConfig,
+        ),
+      });
+    },
+    onError: (error) => {
+      Alert.alert(
+        "Save Failed",
+        error instanceof Error ? error.message : "Failed to save changes",
+      );
+    },
+  });
+
   // Auto-select a default table when tables are loaded, similar to desktop
   useEffect(() => {
     if (
@@ -152,7 +261,6 @@ export function DataBrowserScreen() {
   const handleSelectTable = useCallback(
     (tableName: string) => {
       setSelectedTable(tableName);
-      setSelectedDocumentIndex(null);
     },
     [setSelectedTable],
   );
@@ -160,34 +268,6 @@ export function DataBrowserScreen() {
   const handleViewModeToggle = useCallback(() => {
     setViewMode(viewMode === "list" ? "table" : "list");
   }, [viewMode, setViewMode]);
-
-  const handleDocumentPress = useCallback(
-    (document: TableDocument, index: number) => {
-      setSelectedDocumentIndex(index);
-      detailSheetRef.current?.snapToIndex(0);
-    },
-    [],
-  );
-
-  const handleCloseDetail = useCallback(() => {
-    setSelectedDocumentIndex(null);
-    detailSheetRef.current?.close();
-  }, []);
-
-  const handleNavigatePrevious = useCallback(() => {
-    if (selectedDocumentIndex !== null && selectedDocumentIndex > 0) {
-      setSelectedDocumentIndex(selectedDocumentIndex - 1);
-    }
-  }, [selectedDocumentIndex]);
-
-  const handleNavigateNext = useCallback(() => {
-    if (
-      selectedDocumentIndex !== null &&
-      selectedDocumentIndex < documents.length - 1
-    ) {
-      setSelectedDocumentIndex(selectedDocumentIndex + 1);
-    }
-  }, [selectedDocumentIndex, documents.length]);
 
   const handleRefresh = useCallback(() => {
     refetch();
@@ -199,24 +279,105 @@ export function DataBrowserScreen() {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  const handleCellPress = useCallback(
+    (document: TableDocument, fieldName: string, value: any) => {
+      console.log("[DataBrowserScreen] Cell pressed:", { fieldName, value });
+      // Don't dismiss keyboard here - we want it open for editing
+      // The CellEditSheet has autoFocus which will open the keyboard
+      setEditingCell({ document, fieldName, value });
+      cellEditSheetRef.current?.snapToIndex(0);
+    },
+    [],
+  );
+
+  const handleCellSave = useCallback(
+    async (newValue: string) => {
+      if (!editingCell) return;
+
+      console.log("[DataBrowserScreen] Cell save:", { newValue, editingCell });
+
+      try {
+        // Parse value based on original type (similar to desktop implementation)
+        let parsedValue: any = newValue;
+        const originalValue = editingCell.value;
+
+        if (newValue === "" || newValue === "unset") {
+          parsedValue = undefined;
+        } else if (newValue === "null") {
+          parsedValue = null;
+        } else if (typeof originalValue === "string") {
+          // If original was a string, keep the input as a string directly
+          parsedValue = newValue;
+        } else if (
+          typeof originalValue === "object" &&
+          originalValue !== null
+        ) {
+          try {
+            parsedValue = JSON.parse(newValue);
+          } catch {
+            // Keep as string if JSON parse fails
+            parsedValue = newValue;
+          }
+        } else if (typeof originalValue === "number") {
+          const numValue = parseFloat(newValue);
+          if (!isNaN(numValue)) {
+            parsedValue = numValue;
+          }
+        } else if (typeof originalValue === "boolean") {
+          if (newValue.toLowerCase() === "true") {
+            parsedValue = true;
+          } else if (newValue.toLowerCase() === "false") {
+            parsedValue = false;
+          }
+        }
+
+        // Only save if value changed
+        const valueChanged =
+          JSON.stringify(parsedValue) !== JSON.stringify(originalValue);
+
+        if (valueChanged) {
+          await patchMutation.mutateAsync({
+            documentId: editingCell.document._id,
+            fields: { [editingCell.fieldName]: parsedValue },
+          });
+        }
+
+        // Clear editing state
+        setEditingCell(null);
+      } catch (error) {
+        console.error("[DataBrowserScreen] Save error:", error);
+        Alert.alert(
+          "Save Failed",
+          error instanceof Error ? error.message : "Failed to save changes",
+        );
+      }
+    },
+    [editingCell, patchMutation],
+  );
+
+  const handleCloseCellEdit = useCallback(() => {
+    setEditingCell(null);
+  }, []);
+
   const handleFilterPress = useCallback(() => {
+    Keyboard.dismiss();
     filterSheetRef.current?.snapToIndex(0); // Open at first snap point (28% when empty)
   }, []);
 
   const handleSortPress = useCallback(() => {
+    Keyboard.dismiss();
     sortSheetRef.current?.snapToIndex(0);
   }, []);
 
-  const handleViewModePress = useCallback(() => {
-    viewModeSheetRef.current?.snapToIndex(0);
+  const handleTableSelectorPress = useCallback(() => {
+    Keyboard.dismiss();
+    tableSheetRef.current?.snapToIndex(0);
   }, []);
 
-  const handleSelectViewMode = useCallback(
-    (mode: DataViewMode) => {
-      setViewMode(mode);
-    },
-    [setViewMode],
-  );
+  const handleMenuPress = useCallback(() => {
+    Keyboard.dismiss();
+    openSheet("menu");
+  }, [openSheet]);
 
   // Error states
   const renderContent = () => {
@@ -282,7 +443,7 @@ export function DataBrowserScreen() {
               styles.selectButton,
               { backgroundColor: theme.colors.primary },
             ]}
-            onPress={() => tableSheetRef.current?.expand()}
+            onPress={handleMenuPress}
             activeOpacity={0.7}
           >
             <Text style={styles.selectButtonText}>Browse Tables</Text>
@@ -291,25 +452,20 @@ export function DataBrowserScreen() {
       );
     }
 
-    if (viewMode === "table") {
-      return (
-        <TableView
-          documents={documents}
-          schema={tables?.find((t) => t.name === selectedTable)?.schema}
-          onDocumentPress={handleDocumentPress}
-          onRefresh={handleRefresh}
-          onLoadMore={handleLoadMore}
-          isRefreshing={documentsLoading && !isFetchingNextPage}
-          isLoadingMore={isFetchingNextPage}
-          hasMore={hasMore}
-        />
-      );
-    }
-
+    // Always use table view
     return (
-      <ListView
+      <TableView
         documents={documents}
-        onDocumentPress={handleDocumentPress}
+        schema={tables?.find((t) => t.name === selectedTable)?.schema}
+        onCellPress={handleCellPress}
+        selectedCell={
+          editingCell
+            ? {
+                documentId: editingCell.document._id,
+                fieldName: editingCell.fieldName,
+              }
+            : null
+        }
         onRefresh={handleRefresh}
         onLoadMore={handleLoadMore}
         isRefreshing={documentsLoading && !isFetchingNextPage}
@@ -319,9 +475,6 @@ export function DataBrowserScreen() {
     );
   };
 
-  const selectedDocument =
-    selectedDocumentIndex !== null ? documents[selectedDocumentIndex] : null;
-
   return (
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
@@ -329,12 +482,12 @@ export function DataBrowserScreen() {
       {/* Data header under native stack header */}
       <DataHeader
         tableName={selectedTable}
-        viewMode={viewMode}
+        viewMode="table"
         onViewModeToggle={handleViewModeToggle}
-        onViewModePress={handleViewModePress}
         onFilterPress={handleFilterPress}
         onSortPress={handleSortPress}
-        onMenuPress={() => tableSheetRef.current?.expand()}
+        onTablePress={handleTableSelectorPress}
+        onMenuPress={handleMenuPress}
         activeFilters={normalizedFilters}
         activeSortConfig={sortConfig}
         documentCount={documents.length}
@@ -353,48 +506,29 @@ export function DataBrowserScreen() {
       />
 
       {/* Filters Bottom Sheet */}
-      <DataFilterSheet
+      <DataFilterSheetWrapper
         sheetRef={filterSheetRef}
-        tableName={selectedTable}
         schema={tables?.find((t) => t.name === selectedTable)?.schema}
         filters={filters}
         onChangeFilters={setFilters}
       />
 
       {/* Sort Bottom Sheet */}
-      <DataSortSheet
+      <DataSortSheetWrapper
         sheetRef={sortSheetRef}
-        tableName={selectedTable}
         schema={tables?.find((t) => t.name === selectedTable)?.schema}
         sortConfig={sortConfig}
         onChangeSortConfig={setSortConfig}
+        tableName={selectedTable}
       />
 
-      {/* View Mode Selector Bottom Sheet */}
-      <ViewModeSheet
-        sheetRef={viewModeSheetRef}
-        currentViewMode={viewMode}
-        onSelectViewMode={handleSelectViewMode}
-      />
-
-      {/* Document Detail Bottom Sheet */}
-      <DetailSheet
-        sheetRef={detailSheetRef}
-        document={selectedDocument}
-        onClose={handleCloseDetail}
-        onNavigatePrevious={
-          selectedDocumentIndex !== null && selectedDocumentIndex > 0
-            ? handleNavigatePrevious
-            : undefined
-        }
-        onNavigateNext={
-          selectedDocumentIndex !== null &&
-          selectedDocumentIndex < documents.length - 1
-            ? handleNavigateNext
-            : undefined
-        }
-        currentIndex={selectedDocumentIndex ?? undefined}
-        totalCount={documents.length}
+      {/* Cell Edit Bottom Sheet */}
+      <CellEditSheet
+        sheetRef={cellEditSheetRef}
+        fieldName={editingCell?.fieldName ?? null}
+        value={editingCell?.value}
+        onSave={handleCellSave}
+        onClose={handleCloseCellEdit}
       />
     </View>
   );

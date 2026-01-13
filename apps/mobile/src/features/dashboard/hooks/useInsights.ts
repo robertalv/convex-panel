@@ -60,7 +60,7 @@ export function useInsights(): InsightsState {
 
   return {
     insights: query.data ?? [],
-    isLoading: query.isLoading,
+    isLoading: enabled ? query.isLoading : false,
     error: query.error?.message ?? null,
     refetch,
   };

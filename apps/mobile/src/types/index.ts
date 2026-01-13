@@ -1,14 +1,10 @@
-/**
- * Type definitions for Convex Panel Mobile
- */
-
-// Re-export shared types from BigBrain API
 export interface Team {
   id: number;
   name: string;
   slug: string;
   creator?: number;
   suspended?: boolean;
+  referralCode?: string;
 }
 
 export interface Project {
@@ -28,7 +24,7 @@ export interface Deployment {
   kind: "cloud" | "local";
   creator?: number;
   previewIdentifier?: string | null;
-  url?: string; // Full deployment URL (e.g., https://xyz.convex.cloud)
+  url?: string;
 }
 
 export interface UserProfile {
@@ -48,7 +44,18 @@ export interface TeamSubscription {
   };
 }
 
-// Auth types
+export interface Referral {
+  id: number;
+  referrerTeamId: number;
+  refereeTeamId: number;
+  createdAt: string;
+}
+
+export interface ReferralState {
+  referrals: Referral[];
+  referralCode: string;
+}
+
 export interface DeviceAuthResponse {
   device_code: string;
   user_code: string;
@@ -72,7 +79,6 @@ export interface DashboardSession {
   profile?: UserProfile;
 }
 
-// Navigation types
 export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
@@ -88,6 +94,9 @@ export type MainTabParamList = {
   Data: undefined;
   Logs: undefined;
   Account: undefined;
+  Subscription: undefined;
+  Team: undefined;
+  TeamBilling: undefined;
 };
 
 export type DashboardStackParamList = {
@@ -102,7 +111,6 @@ export type AlertsStackParamList = {
   NotificationSettings: undefined;
 };
 
-// Health & Metrics types
 export interface HealthMetrics {
   status: "healthy" | "degraded" | "critical";
   activeUsers: number;
@@ -128,7 +136,6 @@ export interface RecentError {
   count: number;
 }
 
-// Alert types
 export interface Alert {
   id: string;
   severity: "critical" | "warning" | "info";
@@ -144,14 +151,13 @@ export interface Alert {
 export interface NotificationPreferences {
   enabled: boolean;
   onCallMode: boolean;
-  quietHoursStart?: string; // HH:mm format
+  quietHoursStart?: string;
   quietHoursEnd?: string;
   severityFilter: Array<"critical" | "warning" | "info">;
   soundEnabled: boolean;
   vibrationEnabled: boolean;
 }
 
-// Theme types
 export interface Theme {
   dark: boolean;
   colors: {

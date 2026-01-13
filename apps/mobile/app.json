@@ -11,14 +11,17 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "dev.convex.panel",
       "infoPlist": {
-        "NSUserNotificationsUsageDescription": "This app uses notifications to alert you about deployment events and errors."
+        "NSUserNotificationsUsageDescription": "This app uses notifications to alert you about deployment events and errors.",
+        "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "1"
+      "buildNumber": "3"
     },
     "android": {
       "adaptiveIcon": {
@@ -26,8 +29,12 @@
         "backgroundColor": "#ffffff"
       },
       "package": "dev.convex.panel",
-      "permissions": ["NOTIFICATIONS", "RECEIVE_BOOT_COMPLETED", "VIBRATE"],
-      "versionCode": 1
+      "permissions": [
+        "NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ],
+      "versionCode": 3
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -42,17 +49,19 @@
             "usesCleartextTraffic": false
           },
           "ios": {
-            "deploymentTarget": "14.0"
+            "deploymentTarget": "15.1"
           }
         }
-      ]
+      ],
+      "expo-font",
+      "react-native-iap",
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {
-        "projectId": "convex-panel-mobile"
+        "projectId": "2ae2ce39-9c48-42ae-89ec-d8930ad30b0c"
       }
     },
-    "privacy": "https://convexpanel.dev/privacy",
     "description": "Monitor and manage your Convex deployments on the go. Real-time metrics, logs viewer, data browser, and quick actions for your serverless backend.",
     "primaryColor": "#EE342F"
   }

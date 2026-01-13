@@ -1,9 +1,10 @@
 /**
- * LogDetailSheet - Bottom sheet showing detailed log information  
+ * LogDetailSheet - Bottom sheet showing detailed log information
  * Modern design with tabs for Execution, Request, Logs, and Raw data
+ * Inspired by desktop LogDetailSheet with usage stats
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,33 +15,69 @@ import {
   Share,
   Alert,
 } from "react-native";
-import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import type BottomSheet from "@gorhom/bottom-sheet";
 import * as Clipboard from "expo-clipboard";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { Icon } from "../../../components/ui/Icon";
-import { StatusBadge } from "./StatusBadge";
+import { BaseSheet } from "../../../components/sheets/BaseSheet";
+import { filterSheetStyles } from "../../../components/sheets/filterSheetStyles";
 import { JsonSyntaxHighlighter } from "./JsonSyntaxHighlighter";
+import { FunctionCallTree } from "./FunctionCallTree";
 import type { LogEntry } from "../../../api/logs";
 
 export interface LogDetailSheetProps {
   sheetRef: React.RefObject<BottomSheet>;
   log: LogEntry | null;
+  allLogs: LogEntry[];
   onClose: () => void;
 }
 
-type TabType = "execution" | "request" | "logs" | "raw";
+type TabType = "execution" | "request" | "functions" | "logs" | "raw";
+
+// Helper to format bytes
+function formatBytes(bytes: number | undefined): string {
+  if (bytes === undefined || bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+// Helper to format duration
+function formatDuration(ms: number | undefined): string {
+  if (ms === undefined) return "-";
+  if (ms < 1) return "<1ms";
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  return `${(ms / 1000).toFixed(2)}s`;
+}
 
 export function LogDetailSheet({
   sheetRef,
   log,
+  allLogs,
   onClose,
 }: LogDetailSheetProps) {
   const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>("execution");
 
-  const snapPoints = useMemo(() => ["75%", "90%"], []);
-
   const isError = log?.status === "error" || log?.status === "failure";
+
+  // Get usage stats from raw data if available
+  const usageStats = useMemo(() => {
+    if (!log?.raw) return null;
+    return log.raw.usageStats || log.raw.usage_stats || null;
+  }, [log]);
+
+  // Filter logs that belong to the same request for the function call tree
+  const relatedLogs = useMemo(() => {
+    if (!log) return [];
+    const requestId = log.function?.request_id || log.raw?.requestId;
+    if (!requestId) return [log];
+    return allLogs.filter((l) => {
+      const lRequestId = l.function?.request_id || l.raw?.requestId;
+      return lRequestId === requestId;
+    });
+  }, [log, allLogs]);
 
   // Share helper
   const handleShare = async () => {
@@ -67,91 +104,84 @@ ${log.message || "No log message"}`;
     }
   };
 
-  // Copy execution details
-  const handleCopyExecutionDetails = async () => {
-    if (!log) return;
-
-    const text = `Function: ${log.function?.path || "N/A"}
-Type: ${log.function?.type || "N/A"}
-Status: ${log.status || "success"}
-Cached: ${log.function?.cached ? "Yes" : "No"}
-Execution Time: ${log.execution_time_ms !== undefined ? `${log.execution_time_ms.toFixed(2)}ms` : "N/A"}
-Timestamp: ${new Date(log.timestamp).toLocaleString()}${log.error_message ? `\nError: ${log.error_message}` : ""}`;
-
+  // Copy to clipboard helper
+  const handleCopy = useCallback(async (text: string) => {
     try {
       await Clipboard.setStringAsync(text);
-      Alert.alert("Copied", "Execution details copied to clipboard");
+      Alert.alert("Copied", "Copied to clipboard");
     } catch (error) {
-      Alert.alert("Error", "Failed to copy to clipboard");
+      Alert.alert("Error", "Failed to copy");
+    }
+  }, []);
+
+  // Get function type label
+  const getFunctionTypeLabel = () => {
+    if (!log?.function?.type) return "";
+    switch (log.function.type.toLowerCase()) {
+      case "query":
+        return "Query";
+      case "mutation":
+        return "Mutation";
+      case "action":
+        return "Action";
+      case "httpaction":
+        return "HTTP Action";
+      default:
+        return log.function.type;
     }
   };
 
-  const handleClose = () => {
-    sheetRef.current?.close();
-  };
+  // Custom header left with share button
+  const renderHeaderLeft = (
+    <TouchableOpacity
+      style={[styles.iconBtn, { backgroundColor: theme.colors.background }]}
+      onPress={handleShare}
+      activeOpacity={0.7}
+    >
+      <Icon name="share" size={18} color={theme.colors.textSecondary} />
+    </TouchableOpacity>
+  );
+
+  // Custom header right with copy button
+  const renderHeaderRight = (
+    <TouchableOpacity
+      style={[styles.iconBtn, { backgroundColor: theme.colors.background }]}
+      onPress={() =>
+        log && handleCopy(log.function?.request_id || log.raw?.requestId || "")
+      }
+      activeOpacity={0.7}
+    >
+      <Icon name="copy" size={18} color={theme.colors.textSecondary} />
+    </TouchableOpacity>
+  );
+
+  // Function type badge for title
+  const titleWithType = log?.function?.type ? (
+    <View style={styles.titleContainer}>
+      <Text
+        style={[styles.functionType, { color: theme.colors.textSecondary }]}
+      >
+        {getFunctionTypeLabel()}
+      </Text>
+    </View>
+  ) : null;
 
   return (
-    <BottomSheet
-      ref={sheetRef}
-      index={-1}
-      snapPoints={snapPoints}
-      enablePanDownToClose
+    <BaseSheet
+      sheetRef={sheetRef}
       onClose={onClose}
-      backgroundStyle={{ backgroundColor: theme.colors.surface }}
-      handleIndicatorStyle={{ backgroundColor: theme.colors.border }}
+      size="large"
+      title={log?.function?.path || "Log Details"}
+      headerLeft={renderHeaderLeft}
+      headerRight={renderHeaderRight}
+      scrollable
     >
-      {/* Header */}
-      <View
-        style={[
-          styles.headerContainer,
-          {
-            borderBottomColor: theme.colors.border,
-            backgroundColor: theme.colors.surface,
-          },
-        ]}
-      >
-        <View style={styles.headerRow}>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={handleShare}
-            activeOpacity={0.7}
-          >
-            <Icon name="share" size={16} color={theme.colors.primary} />
-            <Text
-              style={[styles.headerButtonText, { color: theme.colors.primary }]}
-            >
-              Share
-            </Text>
-          </TouchableOpacity>
-
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            Log Details
-          </Text>
-
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={handleClose}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                styles.headerCloseText,
-                { color: theme.colors.textSecondary },
-              ]}
-            >
-              Close
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Tabs */}
+      {/* Tabs - styled like desktop */}
       <View
         style={[
           styles.tabsContainer,
           {
             borderBottomColor: theme.colors.border,
-            backgroundColor: theme.colors.surface,
           },
         ]}
       >
@@ -165,6 +195,12 @@ Timestamp: ${new Date(log.timestamp).toLocaleString()}${log.error_message ? `\nE
           label="Request"
           isActive={activeTab === "request"}
           onPress={() => setActiveTab("request")}
+          theme={theme}
+        />
+        <TabButton
+          label="Functions"
+          isActive={activeTab === "functions"}
+          onPress={() => setActiveTab("functions")}
           theme={theme}
         />
         <TabButton
@@ -182,14 +218,18 @@ Timestamp: ${new Date(log.timestamp).toLocaleString()}${log.error_message ? `\nE
       </View>
 
       {/* Tab Content */}
-      <BottomSheetScrollView
-        style={[styles.content, { backgroundColor: theme.colors.background }]}
-        contentContainerStyle={styles.contentContainer}
-      >
+      <View style={styles.contentContainer}>
         {log ? (
           <>
-            {activeTab === "execution" && <ExecutionTab log={log} theme={theme} />}
-            {activeTab === "request" && <RequestTab log={log} theme={theme} />}
+            {activeTab === "execution" && (
+              <ExecutionTab log={log} theme={theme} usageStats={usageStats} />
+            )}
+            {activeTab === "request" && (
+              <RequestTab log={log} theme={theme} onCopy={handleCopy} />
+            )}
+            {activeTab === "functions" && (
+              <FunctionsTab log={log} allLogs={relatedLogs} theme={theme} />
+            )}
             {activeTab === "logs" && <LogsTab log={log} theme={theme} />}
             {activeTab === "raw" && <RawTab log={log} theme={theme} />}
           </>
@@ -205,41 +245,12 @@ Timestamp: ${new Date(log.timestamp).toLocaleString()}${log.error_message ? `\nE
             </Text>
           </View>
         )}
-      </BottomSheetScrollView>
-
-      {/* Footer with Copy Button */}
-      {log && (
-        <View
-          style={[
-            styles.footer,
-            {
-              borderTopColor: theme.colors.border,
-              backgroundColor: theme.colors.surface,
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={[styles.copyButton, { backgroundColor: theme.colors.text }]}
-            onPress={handleCopyExecutionDetails}
-            activeOpacity={0.8}
-          >
-            <Icon name="copy" size={18} color={theme.colors.background} />
-            <Text
-              style={[
-                styles.copyButtonText,
-                { color: theme.colors.background },
-              ]}
-            >
-              Copy Execution Details
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </BottomSheet>
+      </View>
+    </BaseSheet>
   );
 }
 
-// Tab Button Component
+// Tab Button Component - styled exactly like FilterPillButton from BaseFilterSheet
 function TabButton({
   label,
   isActive,
@@ -252,191 +263,208 @@ function TabButton({
   theme: any;
 }) {
   return (
-    <TouchableOpacity style={styles.tab} onPress={onPress} activeOpacity={0.6}>
+    <TouchableOpacity
+      style={[
+        filterSheetStyles.pillButton,
+        {
+          backgroundColor: isActive
+            ? theme.colors.primary + "20"
+            : "transparent",
+        },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
       <Text
         style={[
-          styles.tabText,
+          filterSheetStyles.pillText,
           {
-            color: isActive ? theme.colors.text : theme.colors.textSecondary,
-            fontWeight: isActive ? "600" : "500",
+            color: isActive ? theme.colors.primary : theme.colors.text,
           },
         ]}
       >
         {label}
       </Text>
-      {isActive && (
-        <View
-          style={[
-            styles.tabIndicator,
-            { backgroundColor: theme.colors.primary },
-          ]}
-        />
-      )}
     </TouchableOpacity>
   );
 }
 
-// Execution Tab - Shows timing and performance metrics
-function ExecutionTab({ log, theme }: { log: LogEntry; theme: any }) {
-  const isError = log.status === "error" || log.status === "failure";
+// Usage Stat Card Component - like desktop
+function UsageStatCard({
+  icon,
+  label,
+  value,
+  subValue,
+  theme,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+  subValue?: string;
+  theme: any;
+}) {
+  return (
+    <View style={[styles.usageCard, { backgroundColor: theme.colors.surface }]}>
+      <View style={styles.usageCardHeader}>
+        <Icon name={icon} size={12} color={theme.colors.textSecondary} />
+        <Text
+          style={[styles.usageLabel, { color: theme.colors.textSecondary }]}
+        >
+          {label}
+        </Text>
+      </View>
+      <Text style={[styles.usageValue, { color: theme.colors.text }]}>
+        {value}
+      </Text>
+      {subValue && (
+        <Text
+          style={[styles.usageSubValue, { color: theme.colors.textTertiary }]}
+        >
+          {subValue}
+        </Text>
+      )}
+    </View>
+  );
+}
 
-  const getStatusIconColor = () => {
-    if (log.status === "success") return theme.colors.success;
+// Execution Tab - Shows timing and performance metrics
+function ExecutionTab({
+  log,
+  theme,
+  usageStats,
+}: {
+  log: LogEntry;
+  theme: any;
+  usageStats: any;
+}) {
+  const isError = log.status === "error" || log.status === "failure";
+  const isCached = log.function?.cached;
+
+  const getStatusColor = () => {
     if (isError) return theme.colors.error;
-    return theme.colors.warning;
+    if (isCached) return theme.colors.warning || "#f59e0b";
+    return theme.colors.success;
   };
 
-  const getStatusBgColor = () => {
-    if (log.status === "success") return theme.colors.success + "30";
-    if (isError) return theme.colors.error + "30";
-    return theme.colors.warning + "30";
+  const getStatusLabel = () => {
+    if (isError) return "Failed";
+    if (isCached) return "Cached";
+    return "Success";
   };
 
   return (
     <View style={styles.tabContent}>
-      {/* Summary Card */}
-      <View
-        style={[
-          styles.summaryCard,
-          {
-            backgroundColor: theme.colors.surface,
-            borderColor: theme.colors.border,
-          },
-        ]}
-      >
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryLeft}>
-            <View
-              style={[
-                styles.statusIconContainer,
-                { backgroundColor: getStatusBgColor() },
-              ]}
-            >
-              <Icon
-                name="activity"
-                size={20}
-                color={getStatusIconColor()}
-              />
-            </View>
-            <View>
-              <Text
-                style={[
-                  styles.summaryLabel,
-                  { color: theme.colors.textSecondary },
-                ]}
-              >
-                STATUS
-              </Text>
-              <View style={styles.statusBadgeContainer}>
-                <StatusBadge status={log.status || "success"} />
-              </View>
-            </View>
-          </View>
-          <View style={styles.summaryRight}>
-            <Text
-              style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}
-            >
-              DURATION
-            </Text>
-            <Text style={[styles.durationText, { color: theme.colors.text }]}>
-              {log.execution_time_ms !== undefined
-                ? `${Math.round(log.execution_time_ms)}ms`
-                : "N/A"}
-            </Text>
-          </View>
+      {/* Status Row */}
+      <View style={styles.statusRow}>
+        <View style={styles.statusLeft}>
+          <Icon
+            name={isError ? "x-circle" : isCached ? "zap" : "check-circle"}
+            size={18}
+            color={getStatusColor()}
+          />
+          <Text style={[styles.statusLabel, { color: getStatusColor() }]}>
+            {getStatusLabel()}
+          </Text>
         </View>
-      </View>
-
-      {/* Function Details */}
-      <View>
-        <Text
-          style={[styles.sectionHeader, { color: theme.colors.textSecondary }]}
-        >
-          FUNCTION DETAILS
-        </Text>
-        <View
-          style={[
-            styles.infoCard,
-            {
-              backgroundColor: theme.colors.surface + "66",
-              borderColor: theme.colors.border,
-            },
-          ]}
-        >
-          <InfoRow
-            label="Path"
-            value={log.function?.path || "N/A"}
-            theme={theme}
-            mono
-          />
-          <InfoRow
-            label="Type"
-            value={log.function?.type || "N/A"}
-            theme={theme}
-          />
-          <InfoRow
-            label="Cached"
-            value={log.function?.cached ? "Yes" : "No"}
-            theme={theme}
-            highlight={log.function?.cached}
-          />
-        </View>
-      </View>
-
-      {/* Timing & Metadata */}
-      <View>
-        <Text
-          style={[styles.sectionHeader, { color: theme.colors.textSecondary }]}
-        >
-          TIMING & METADATA
-        </Text>
-        <View
-          style={[
-            styles.infoCard,
-            {
-              backgroundColor: theme.colors.surface + "66",
-              borderColor: theme.colors.border,
-            },
-          ]}
-        >
-          <InfoRow
-            label="Request ID"
-            value={log.function?.request_id || "N/A"}
-            theme={theme}
-            mono
-          />
-          <InfoRow
-            label="Timestamp"
-            value={new Date(log.timestamp).toLocaleString()}
-            theme={theme}
-          />
-        </View>
-      </View>
-
-      {/* Error Section */}
-      {log.error_message && (
-        <View>
+        {log.execution_time_ms !== undefined && (
           <Text
             style={[
-              styles.sectionHeader,
+              styles.durationSmall,
               { color: theme.colors.textSecondary },
             ]}
           >
-            ERROR
+            {formatDuration(log.execution_time_ms)}
           </Text>
-          <View
-            style={[
-              styles.errorCard,
-              {
-                backgroundColor: theme.colors.error + "20",
-                borderColor: theme.colors.error + "40",
-                borderLeftColor: theme.colors.error,
-              },
-            ]}
+        )}
+      </View>
+
+      {/* Error message */}
+      {log.error_message && (
+        <View
+          style={[
+            styles.errorBox,
+            {
+              backgroundColor: theme.colors.error + "15",
+              borderColor: theme.colors.error,
+            },
+          ]}
+        >
+          <Text style={[styles.errorText, { color: theme.colors.error }]}>
+            {log.error_message}
+          </Text>
+        </View>
+      )}
+
+      {/* Timestamp & Duration Grid */}
+      <View style={styles.gridRow}>
+        <View style={styles.gridCell}>
+          <Text
+            style={[styles.gridLabel, { color: theme.colors.textSecondary }]}
           >
-            <Text style={[styles.errorText, { color: theme.colors.error }]}>
-              {log.error_message}
-            </Text>
+            Timestamp
+          </Text>
+          <Text style={[styles.gridValue, { color: theme.colors.text }]}>
+            {new Date(log.timestamp).toLocaleString()}
+          </Text>
+        </View>
+        <View style={styles.gridCell}>
+          <Text
+            style={[styles.gridLabel, { color: theme.colors.textSecondary }]}
+          >
+            Duration
+          </Text>
+          <Text style={[styles.gridValue, { color: theme.colors.text }]}>
+            {formatDuration(log.execution_time_ms)}
+          </Text>
+        </View>
+      </View>
+
+      {/* Usage Statistics */}
+      {usageStats && (
+        <View style={styles.section}>
+          <Text
+            style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}
+          >
+            Usage Statistics
+          </Text>
+          <View style={styles.usageGrid}>
+            <UsageStatCard
+              icon="database"
+              label="Database Read"
+              value={formatBytes(usageStats.database_read_bytes)}
+              subValue={
+                usageStats.database_read_documents
+                  ? `${usageStats.database_read_documents} docs`
+                  : undefined
+              }
+              theme={theme}
+            />
+            <UsageStatCard
+              icon="database"
+              label="Database Write"
+              value={formatBytes(usageStats.database_write_bytes)}
+              theme={theme}
+            />
+            <UsageStatCard
+              icon="hard-drive"
+              label="Storage Read"
+              value={formatBytes(usageStats.storage_read_bytes)}
+              theme={theme}
+            />
+            <UsageStatCard
+              icon="hard-drive"
+              label="Storage Write"
+              value={formatBytes(usageStats.storage_write_bytes)}
+              theme={theme}
+            />
+            {usageStats.memory_used_mb !== undefined && (
+              <UsageStatCard
+                icon="cpu"
+                label="Memory"
+                value={`${usageStats.memory_used_mb} MB`}
+                theme={theme}
+              />
+            )}
           </View>
         </View>
       )}
@@ -444,39 +472,82 @@ function ExecutionTab({ log, theme }: { log: LogEntry; theme: any }) {
   );
 }
 
-// Request Tab - Shows request metadata
-function RequestTab({ log, theme }: { log: LogEntry; theme: any }) {
+// Request Tab - Shows request metadata with copy buttons
+function RequestTab({
+  log,
+  theme,
+  onCopy,
+}: {
+  log: LogEntry;
+  theme: any;
+  onCopy: (text: string) => void;
+}) {
+  const raw = log.raw || {};
+
   return (
     <View style={styles.tabContent}>
-      <View>
-        <Text
-          style={[styles.sectionHeader, { color: theme.colors.textSecondary }]}
-        >
-          REQUEST INFORMATION
-        </Text>
-        <View
-          style={[
-            styles.infoCard,
-            {
-              backgroundColor: theme.colors.surface + "66",
-              borderColor: theme.colors.border,
-            },
-          ]}
-        >
-          <InfoRow
-            label="Request ID"
-            value={log.function?.request_id || "N/A"}
-            theme={theme}
-            mono
-          />
-          <InfoRow label="Topic" value={log.topic || "N/A"} theme={theme} />
-          <InfoRow
-            label="Log Level"
-            value={log.log_level || "INFO"}
-            theme={theme}
-          />
-        </View>
-      </View>
+      <InfoRow
+        label="Request ID"
+        value={log.function?.request_id || raw.requestId}
+        theme={theme}
+        mono
+        onCopy={onCopy}
+      />
+      <InfoRow
+        label="Execution ID"
+        value={raw.executionId}
+        theme={theme}
+        mono
+        onCopy={onCopy}
+      />
+      <InfoRow
+        label="Function"
+        value={log.function?.path || raw.identifier}
+        theme={theme}
+        mono
+        onCopy={onCopy}
+      />
+      {raw.componentPath && (
+        <InfoRow label="Component" value={raw.componentPath} theme={theme} />
+      )}
+      <InfoRow label="Identity Type" value={raw.identityType} theme={theme} />
+      {raw.caller && (
+        <InfoRow label="Caller" value={raw.caller} theme={theme} />
+      )}
+      {raw.environment && (
+        <InfoRow label="Environment" value={raw.environment} theme={theme} />
+      )}
+      {raw.returnBytes !== undefined && (
+        <InfoRow
+          label="Return Size"
+          value={formatBytes(raw.returnBytes)}
+          theme={theme}
+        />
+      )}
+    </View>
+  );
+}
+
+// Functions Tab - Shows function call tree
+function FunctionsTab({
+  log,
+  allLogs,
+  theme,
+}: {
+  log: LogEntry;
+  allLogs: LogEntry[];
+  theme: any;
+}) {
+  const raw = log.raw || {};
+  const currentExecutionId = raw.executionId || log.function?.request_id || "";
+
+  return (
+    <View style={styles.tabContent}>
+      <FunctionCallTree
+        logs={allLogs}
+        currentExecutionId={currentExecutionId}
+        theme={theme}
+      />
     </View>
   );
 }
@@ -485,25 +556,18 @@ function RequestTab({ log, theme }: { log: LogEntry; theme: any }) {
 function LogsTab({ log, theme }: { log: LogEntry; theme: any }) {
   return (
     <View style={styles.tabContent}>
-      <View>
-        <Text
-          style={[styles.sectionHeader, { color: theme.colors.textSecondary }]}
-        >
-          LOG OUTPUT
+      <View
+        style={[
+          styles.logBox,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.border,
+          },
+        ]}
+      >
+        <Text style={[styles.logText, { color: theme.colors.text }]}>
+          {log.message || "No log message"}
         </Text>
-        <View
-          style={[
-            styles.logCard,
-            {
-              backgroundColor: theme.colors.surface + "66",
-              borderColor: theme.colors.border,
-            },
-          ]}
-        >
-          <Text style={[styles.logText, { color: theme.colors.text }]}>
-            {log.message || "No log message"}
-          </Text>
-        </View>
       </View>
     </View>
   );
@@ -515,257 +579,254 @@ function RawTab({ log, theme }: { log: LogEntry; theme: any }) {
 
   return (
     <View style={styles.tabContent}>
-      <View>
-        <Text
-          style={[styles.sectionHeader, { color: theme.colors.textSecondary }]}
-        >
-          RAW JSON
-        </Text>
-        <ScrollView
-          horizontal
-          style={[
-            styles.rawContainer,
-            {
-              backgroundColor: theme.colors.surface + "66",
-              borderColor: theme.colors.border,
-            },
-          ]}
-        >
-          <JsonSyntaxHighlighter json={rawJson} theme={theme} />
-        </ScrollView>
-      </View>
+      <ScrollView
+        horizontal
+        style={[
+          styles.rawContainer,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.border,
+          },
+        ]}
+      >
+        <JsonSyntaxHighlighter json={rawJson} theme={theme} />
+      </ScrollView>
     </View>
   );
 }
 
-// Info Row Component
+// Info Row Component with optional copy
 function InfoRow({
   label,
   value,
   theme,
   mono = false,
-  highlight = false,
+  onCopy,
 }: {
   label: string;
-  value: string;
+  value?: string;
   theme: any;
   mono?: boolean;
-  highlight?: boolean;
+  onCopy?: (text: string) => void;
 }) {
+  if (!value) return null;
+
   return (
-    <View style={[styles.infoRow, { borderBottomColor: theme.colors.border }]}>
+    <View style={styles.infoRow}>
       <Text style={[styles.infoLabel, { color: theme.colors.textSecondary }]}>
         {label}
       </Text>
-      <Text
-        style={[
-          styles.infoValue,
-          { color: highlight ? theme.colors.text : theme.colors.textSecondary },
-          mono && styles.infoValueMono,
-          highlight && styles.infoValueHighlight,
-        ]}
-      >
-        {value}
-      </Text>
+      <View style={styles.infoValueRow}>
+        <Text
+          style={[
+            styles.infoValue,
+            { color: theme.colors.text },
+            mono && styles.mono,
+          ]}
+          numberOfLines={2}
+        >
+          {value}
+        </Text>
+        {onCopy && (
+          <TouchableOpacity
+            style={styles.copyBtn}
+            onPress={() => onCopy(value)}
+            activeOpacity={0.7}
+          >
+            <Icon name="copy" size={12} color={theme.colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerContainer: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  headerSubtitle: {
+    fontSize: 12,
   },
-  headerRow: {
+  headerActions: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-  },
-  headerButton: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: 8,
   },
-  headerButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
+  iconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: "700",
+  titleContainer: {
+    alignItems: "center",
   },
-  headerCloseText: {
-    fontSize: 14,
-    fontWeight: "600",
+  functionType: {
+    fontSize: 12,
+    fontWeight: "500",
   },
   tabsContainer: {
     flexDirection: "row",
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    gap: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  tab: {
-    paddingBottom: 12,
-    position: "relative",
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  tabIndicator: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    borderTopLeftRadius: 2,
-    borderTopRightRadius: 2,
-  },
-  content: {
-    flex: 1,
+    flexWrap: "wrap",
   },
   contentContainer: {
-    padding: 24,
+    padding: 16,
     paddingBottom: 40,
   },
   tabContent: {
-    gap: 24,
+    gap: 16,
   },
-  summaryCard: {
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  summaryRow: {
+  // Status row
+  statusRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  summaryLeft: {
+  statusLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 8,
   },
-  statusIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  summaryLabel: {
-    fontSize: 10,
+  statusLabel: {
+    fontSize: 14,
     fontWeight: "600",
-    letterSpacing: 1,
-    marginBottom: 4,
   },
-  statusBadgeContainer: {
-    marginTop: 2,
+  durationSmall: {
+    fontSize: 12,
   },
-  summaryRight: {
-    alignItems: "flex-end",
+  // Error box
+  errorBox: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
   },
-  durationText: {
-    fontSize: 24,
-    fontWeight: "700",
+  errorText: {
+    fontSize: 13,
+    lineHeight: 18,
     fontFamily: Platform.select({
       ios: "Menlo",
       android: "monospace",
       default: "monospace",
     }),
+  },
+  // Grid layout
+  gridRow: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  gridCell: {
+    flex: 1,
+  },
+  gridLabel: {
+    fontSize: 11,
+    fontWeight: "500",
+    marginBottom: 4,
+  },
+  gridValue: {
+    fontSize: 13,
+  },
+  // Section
+  section: {
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+  },
+  // Usage stats grid
+  usageGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  usageCard: {
+    width: "48%",
+    padding: 10,
+    borderRadius: 8,
+  },
+  usageCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 4,
+  },
+  usageLabel: {
+    fontSize: 10,
+  },
+  usageValue: {
+    fontSize: 14,
+    fontWeight: "600",
+    fontFamily: Platform.select({
+      ios: "Menlo",
+      android: "monospace",
+      default: "monospace",
+    }),
+  },
+  usageSubValue: {
+    fontSize: 10,
     marginTop: 2,
   },
-  sectionHeader: {
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1.2,
-    marginBottom: 12,
-    paddingHorizontal: 4,
-  },
-  infoCard: {
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 16,
-    overflow: "hidden",
-  },
+  // Info row
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    alignItems: "flex-start",
+    paddingVertical: 8,
   },
   infoLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "500",
+    width: 100,
+    flexShrink: 0,
   },
-  infoValue: {
-    fontSize: 14,
-  },
-  infoValueMono: {
-    fontFamily: Platform.select({
-      ios: "Menlo",
-      android: "monospace",
-      default: "monospace",
-    }),
-  },
-  infoValueHighlight: {
-    fontWeight: "700",
-  },
-  errorCard: {
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: 16,
-    borderLeftWidth: 4,
-  },
-  errorText: {
-    fontSize: 14,
-    lineHeight: 22,
-    fontFamily: Platform.select({
-      ios: "Menlo",
-      android: "monospace",
-      default: "monospace",
-    }),
-  },
-  logCard: {
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: 16,
-  },
-  logText: {
-    fontSize: 14,
-    lineHeight: 22,
-    fontFamily: Platform.select({
-      ios: "Menlo",
-      android: "monospace",
-      default: "monospace",
-    }),
-  },
-  rawContainer: {
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: 16,
-    maxHeight: 400,
-  },
-  footer: {
-    padding: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  copyButton: {
+  infoValueRow: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-end",
     gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 16,
   },
-  copyButtonText: {
-    fontSize: 16,
-    fontWeight: "700",
+  infoValue: {
+    fontSize: 13,
+    textAlign: "right",
+    flex: 1,
   },
+  mono: {
+    fontFamily: Platform.select({
+      ios: "Menlo",
+      android: "monospace",
+      default: "monospace",
+    }),
+  },
+  copyBtn: {
+    padding: 4,
+  },
+  // Log box
+  logBox: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  logText: {
+    fontSize: 13,
+    lineHeight: 20,
+    fontFamily: Platform.select({
+      ios: "Menlo",
+      android: "monospace",
+      default: "monospace",
+    }),
+  },
+  // Raw container
+  rawContainer: {
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 12,
+    maxHeight: 400,
+  },
+  // Empty state
   emptyState: {
     flex: 1,
     justifyContent: "center",
@@ -773,8 +834,8 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyStateText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "500",
     opacity: 0.5,
   },
 });

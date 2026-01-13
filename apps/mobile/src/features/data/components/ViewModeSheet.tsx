@@ -5,19 +5,12 @@
  */
 
 import React, { useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-} from "react-native";
-import BottomSheet, {
-  BottomSheetBackdrop,
-  BottomSheetView,
-} from "@gorhom/bottom-sheet";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import type BottomSheet from "@gorhom/bottom-sheet";
 import { useTheme } from "../../../contexts/ThemeContext";
 import type { DataViewMode } from "../types";
 import { Icon } from "../../../components/ui/Icon";
+import { BaseSheet } from "../../../components/sheets/BaseSheet";
 
 export interface ViewModeSheetProps {
   sheetRef: React.RefObject<BottomSheet>;
@@ -51,20 +44,6 @@ export function ViewModeSheet({
   onSelectViewMode,
 }: ViewModeSheetProps) {
   const { theme } = useTheme();
-
-  const snapPoints = React.useMemo(() => ["25%"], []);
-
-  const renderBackdrop = useCallback(
-    (props: any) => (
-      <BottomSheetBackdrop
-        {...props}
-        disappearsOnIndex={-1}
-        appearsOnIndex={0}
-        opacity={0.5}
-      />
-    ),
-    [],
-  );
 
   const handleSelectMode = useCallback(
     (mode: DataViewMode) => {
@@ -140,69 +119,17 @@ export function ViewModeSheet({
   );
 
   return (
-    <BottomSheet
-      ref={sheetRef}
-      index={-1}
-      snapPoints={snapPoints}
-      backdropComponent={renderBackdrop}
-      enablePanDownToClose
-      backgroundStyle={{ backgroundColor: theme.colors.background }}
-      handleIndicatorStyle={{ backgroundColor: theme.colors.border }}
-    >
-      <BottomSheetView style={styles.container}>
-        {/* Header */}
-        <View
-          style={[
-            styles.header,
-            {
-              borderBottomColor: theme.colors.border,
-              borderBottomWidth: 0,
-              paddingBottom: 4,
-            },
-          ]}
-        >
-          <View style={styles.headerLeft} />
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            Select View
-          </Text>
-          <View style={styles.headerRight} />
-        </View>
-
-        {/* Options */}
-        <View
-          style={[styles.content, { backgroundColor: theme.colors.background }]}
-        >
-          {VIEW_MODE_OPTIONS.map(renderOption)}
-        </View>
-      </BottomSheetView>
-    </BottomSheet>
+    <BaseSheet sheetRef={sheetRef} size="small" title="Select View">
+      <View
+        style={[styles.content, { backgroundColor: theme.colors.background }]}
+      >
+        {VIEW_MODE_OPTIONS.map(renderOption)}
+      </View>
+    </BaseSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  headerLeft: {
-    width: 40,
-    alignItems: "flex-start",
-  },
-  headerRight: {
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    flex: 1,
-    textAlign: "center",
-  },
   content: {
     flex: 1,
     paddingVertical: 8,

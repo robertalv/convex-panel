@@ -1,24 +1,27 @@
 /**
  * BaseSortSheet - Bottom sheet component for sorting
  * Matches BaseFilterSheet structure and behavior
+ *
+ * Uses BaseSheet as the single source of truth for bottom sheet behavior.
  */
 
-import React, { useCallback, useMemo, useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-} from "react-native";
-import BottomSheet, {
-  BottomSheetBackdrop,
-  BottomSheetView,
-} from "@gorhom/bottom-sheet";
+import React, { useCallback, useState } from "react";
+import { View, Text, TouchableOpacity } from "react-native";
+import type BottomSheet from "@gorhom/bottom-sheet";
 import { useTheme } from "../../contexts/ThemeContext";
 import { Icon } from "../ui/Icon";
-import type { SortConfig, SortDirection, TableSchema } from "../../features/data/types";
+import type {
+  SortConfig,
+  SortDirection,
+  TableSchema,
+} from "../../features/data/types";
 import { filterSheetStyles } from "./filterSheetStyles";
-import { getFieldTypeIcon, getFieldTypeColor } from "../../features/data/utils/fieldTypeIcons";
+import {
+  getFieldTypeIcon,
+  getFieldTypeColor,
+} from "../../features/data/utils/fieldTypeIcons";
 import { FilterPillButton } from "./BaseFilterSheet";
+import { BaseSheet } from "./BaseSheet";
 
 export interface BaseSortSheetConfig {
   // Title configuration
@@ -61,65 +64,38 @@ export function BaseSortSheet({
 }: BaseSortSheetProps) {
   const { theme } = useTheme();
   const [mode, setMode] = useState<SheetMode>("overview");
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
-  // Dynamic snap points based on sort config (same calculation as BaseFilterSheet)
-  const snapPoints = useMemo(() => {
-    const baseHeight = 25;
-    const heightPerSort = 8;
-    const sortCount = sortConfig ? 1 : 0;
-    const dynamicHeight = Math.min(
-      baseHeight + sortCount * heightPerSort,
-      70,
-    );
-    return [`${dynamicHeight}%`, "70%"];
-  }, [sortConfig]);
-
-  const renderBackdrop = useCallback(
-    (props: any) => (
-      <BottomSheetBackdrop
-        {...props}
-        disappearsOnIndex={-1}
-        appearsOnIndex={0}
-        opacity={0.5}
-      />
-    ),
-    [],
-  );
+  // Maximum height for the sheet content
+  const MAX_SHEET_HEIGHT = 500;
 
   const handleSheetChange = useCallback(
     (index: number) => {
-      setIsSheetOpen(index !== -1);
       if (index === -1) {
         setMode("overview");
         onSheetClose?.();
-      } else if (index === 0 && mode === "select") {
-        setMode("overview");
       }
     },
-    [mode, onSheetClose],
+    [onSheetClose],
   );
 
-  // Adjust sheet height when sort config changes (only if sheet is already open)
-  useEffect(() => {
-    if (isSheetOpen && mode === "overview") {
-      sheetRef.current?.snapToIndex(0);
-    }
-  }, [sortConfig, mode, isSheetOpen, sheetRef]);
+  // With dynamic sizing, the sheet automatically resizes when content changes
 
   const handleAddSort = useCallback(() => {
     setMode("select");
-    sheetRef.current?.snapToIndex(1);
-  }, [sheetRef]);
+    // With dynamic sizing, the sheet will automatically resize when content changes
+  }, []);
 
-  const handleFieldSelect = useCallback((field: string) => {
-    const newSortConfig: SortConfig = {
-      field,
-      direction: sortConfig?.field === field ? sortConfig.direction : "desc",
-    };
-    onChangeSortConfig(newSortConfig);
-    setMode("overview");
-  }, [sortConfig, onChangeSortConfig]);
+  const handleFieldSelect = useCallback(
+    (field: string) => {
+      const newSortConfig: SortConfig = {
+        field,
+        direction: sortConfig?.field === field ? sortConfig.direction : "desc",
+      };
+      onChangeSortConfig(newSortConfig);
+      setMode("overview");
+    },
+    [sortConfig, onChangeSortConfig],
+  );
 
   const handleToggleDirection = useCallback(() => {
     if (sortConfig) {
@@ -132,8 +108,8 @@ export function BaseSortSheet({
 
   const handleEditSort = useCallback(() => {
     setMode("select");
-    sheetRef.current?.snapToIndex(1);
-  }, [sheetRef]);
+    // With dynamic sizing, the sheet will automatically resize when content changes
+  }, []);
 
   const handleRemoveSort = useCallback(() => {
     onChangeSortConfig(null);
@@ -147,11 +123,16 @@ export function BaseSortSheet({
     onChangeSortConfig(null);
   }, [onChangeSortConfig]);
 
+  const handleBack = useCallback(() => {
+    setMode("overview");
+    // With dynamic sizing, the sheet will automatically resize when content changes
+  }, []);
+
   const renderOverview = () => {
     const hasSort = sortConfig !== null;
 
     return (
-      <View style={filterSheetStyles.body}>
+      <View style={{ padding: 16 }}>
         {!hasSort && (
           <>
             <View style={filterSheetStyles.emptyState}>
@@ -205,29 +186,37 @@ export function BaseSortSheet({
               <View style={filterSheetStyles.clauseRow}>
                 <FilterPillButton
                   icon={(() => {
-                    const fieldType = config.getFieldType?.(sortConfig.field) ?? null;
-                    return config.availableFields.find(f => f.field === sortConfig.field)?.icon || getFieldTypeIcon(fieldType);
+                    const fieldType =
+                      config.getFieldType?.(sortConfig.field) ?? null;
+                    return (
+                      config.availableFields.find(
+                        (f) => f.field === sortConfig.field,
+                      )?.icon || getFieldTypeIcon(fieldType)
+                    );
                   })()}
-                  label={config.availableFields.find(f => f.field === sortConfig.field)?.label || sortConfig.field}
+                  label={
+                    config.availableFields.find(
+                      (f) => f.field === sortConfig.field,
+                    )?.label || sortConfig.field
+                  }
                   onPress={handleEditSort}
                   theme={theme}
                 />
                 <FilterPillButton
                   icon={sortConfig.direction === "asc" ? "sortAsc" : "sortDesc"}
-                  label={sortConfig.direction === "asc" ? "Ascending" : "Descending"}
+                  label={
+                    sortConfig.direction === "asc" ? "Ascending" : "Descending"
+                  }
                   onPress={handleToggleDirection}
                   theme={theme}
                 />
+                <View style={{ flex: 1 }} />
                 <TouchableOpacity
                   style={filterSheetStyles.moreButton}
                   onPress={handleRemoveSort}
                   activeOpacity={0.7}
                 >
-                  <Icon
-                    name="close"
-                    size={18}
-                    color={theme.colors.textSecondary}
-                  />
+                  <Icon name="delete" size={18} color={theme.colors.error} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -268,10 +257,12 @@ export function BaseSortSheet({
                 activeOpacity={0.6}
               >
                 <View style={styles.leftContent}>
-                  <View
-                    style={styles.fieldIcon}
-                  >
-                    <Icon name={iconName} size={18} color={theme.colors.textSecondary} />
+                  <View style={styles.fieldIcon}>
+                    <Icon
+                      name={iconName}
+                      size={18}
+                      color={theme.colors.textSecondary}
+                    />
                   </View>
                   <Text
                     style={[
@@ -304,82 +295,54 @@ export function BaseSortSheet({
 
   const title = mode === "overview" ? config.overviewTitle : config.selectTitle;
 
+  // Header left: Back button in select mode, Clear in overview mode with sort
+  const headerLeft =
+    mode === "select" ? (
+      <TouchableOpacity onPress={handleBack} activeOpacity={0.7}>
+        <Icon
+          name="chevron-back"
+          size={20}
+          color={theme.colors.textSecondary}
+        />
+      </TouchableOpacity>
+    ) : sortConfig ? (
+      <TouchableOpacity onPress={handleClearSort} activeOpacity={0.7}>
+        <Text
+          style={[
+            filterSheetStyles.headerClear,
+            { color: theme.colors.textSecondary },
+          ]}
+        >
+          Clear
+        </Text>
+      </TouchableOpacity>
+    ) : undefined;
+
+  // Header right: Done/Apply button
+  const headerRight = (
+    <TouchableOpacity onPress={handleDone} activeOpacity={0.7}>
+      <Text
+        style={[filterSheetStyles.headerDone, { color: theme.colors.primary }]}
+      >
+        {mode === "overview" ? "Done" : "Apply"}
+      </Text>
+    </TouchableOpacity>
+  );
+
   return (
-    <BottomSheet
-      ref={sheetRef}
-      index={-1}
-      snapPoints={snapPoints}
+    <BaseSheet
+      sheetRef={sheetRef}
+      size="dynamic"
+      maxDynamicContentSize={MAX_SHEET_HEIGHT}
+      scrollable
+      title={title}
+      headerLeft={headerLeft}
+      headerRight={headerRight}
       onChange={handleSheetChange}
-      enablePanDownToClose
-      backdropComponent={renderBackdrop}
-      backgroundStyle={{
-        backgroundColor: theme.colors.surface,
-      }}
-      handleIndicatorStyle={{
-        backgroundColor: theme.colors.border,
-      }}
     >
-      <BottomSheetView style={filterSheetStyles.container}>
-        {/* Header */}
-        <View style={filterSheetStyles.header}>
-          <View style={filterSheetStyles.headerSide}>
-            {mode === "select" ? (
-              <TouchableOpacity
-                onPress={() => {
-                  setMode("overview");
-                  sheetRef.current?.snapToIndex(0);
-                }}
-                activeOpacity={0.7}
-              >
-                <Icon
-                  name="chevron-back"
-                  size={20}
-                  color={theme.colors.textSecondary}
-                />
-              </TouchableOpacity>
-            ) : sortConfig ? (
-              <TouchableOpacity onPress={handleClearSort} activeOpacity={0.7}>
-                <Text
-                  style={[
-                    filterSheetStyles.headerClear,
-                    { color: theme.colors.textSecondary },
-                  ]}
-                >
-                  Clear
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-
-          <Text
-            style={[
-              filterSheetStyles.headerTitle,
-              { color: theme.colors.text },
-            ]}
-          >
-            {title}
-          </Text>
-
-          <TouchableOpacity
-            style={filterSheetStyles.headerSide}
-            onPress={handleDone}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                filterSheetStyles.headerDone,
-                { color: theme.colors.primary },
-              ]}
-            >
-              {mode === "overview" ? "Done" : "Apply"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Content */}
-        {mode === "overview" ? renderOverview() : renderSelectMode()}
-      </BottomSheetView>
-    </BottomSheet>
+      {/* Content */}
+      {mode === "overview" ? renderOverview() : renderSelectMode()}
+    </BaseSheet>
   );
 }
 

@@ -41,7 +41,14 @@ import {
   SortByDown01Icon,
   Share08Icon,
   Activity03Icon,
-  Copy02Icon
+  Copy02Icon,
+  MoreVerticalIcon,
+  MoreHorizontalIcon,
+  UserGroupIcon,
+  FolderOpenIcon,
+  Delete01Icon,
+  Home01Icon,
+  Logout01Icon,
 } from "@hugeicons/core-free-icons";
 
 /**
@@ -97,6 +104,15 @@ const ICON_MAP: Record<string, IconSvgElement> = {
   "circle-slash": CancelCircleIcon,
   braces: CodeIcon,
   fingerprint: Link02Icon,
+  "ellipsis-vertical": MoreVerticalIcon,
+  "more-vertical": MoreVerticalIcon,
+  "ellipsis-horizontal": MoreHorizontalIcon,
+  "more-horizontal": MoreHorizontalIcon,
+  people: UserGroupIcon,
+  "folder-open": FolderOpenIcon,
+  delete: Delete01Icon,
+  home: Home01Icon,
+  logout: Logout01Icon,
 };
 
 export interface IconProps {

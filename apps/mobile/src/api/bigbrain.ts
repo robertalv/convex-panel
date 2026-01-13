@@ -68,11 +68,17 @@ export async function callBigBrainAPI<T = unknown>(
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => "Unknown error");
-    console.error(`[BigBrain] Request failed:`, {
-      status: response.status,
-      statusText: response.statusText,
-      error: errorText,
-    });
+
+    // Suppress 404 errors to reduce log noise during navigation/context clearing
+    // These are expected when queries are in-flight during deployment context changes
+    if (response.status !== 404) {
+      console.error(`[BigBrain] Request failed:`, {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      });
+    }
+
     throw new Error(
       `BigBrain API error: ${response.status} ${response.statusText} - ${errorText}`,
     );
@@ -155,11 +161,17 @@ export async function callBigBrainManagementAPI<T = unknown>(
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => "Unknown error");
-    console.error(`[BigBrain Management] Request failed:`, {
-      status: response.status,
-      statusText: response.statusText,
-      error: errorText,
-    });
+
+    // Suppress 404 errors to reduce log noise during navigation/context clearing
+    // These are expected when queries are in-flight during deployment context changes
+    if (response.status !== 404) {
+      console.error(`[BigBrain Management] Request failed:`, {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      });
+    }
+
     throw new Error(
       `BigBrain Management API error: ${response.status} ${response.statusText} - ${errorText}`,
     );
@@ -413,6 +425,27 @@ export async function getTeamSubscription(
   try {
     return await callBigBrainAPI<any>(
       "/teams/{team_id}/get_orb_subscription",
+      {
+        accessToken,
+        pathParams: { team_id: teamId },
+      },
+      fetch,
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get team referral state
+ */
+export async function getTeamReferralState(
+  accessToken: string,
+  teamId: number,
+): Promise<any | null> {
+  try {
+    return await callBigBrainAPI<any>(
+      "/teams/{team_id}/referrals",
       {
         accessToken,
         pathParams: { team_id: teamId },

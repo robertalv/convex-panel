@@ -4,13 +4,12 @@ import {
   fetchFailureRate,
   fetchCacheHitRate,
   fetchSchedulerLag,
-  fetchLatencyPercentiles,
-  fetchUdfRate,
 } from "../../../api";
 import { useDeployment } from "../../../contexts/DeploymentContext";
 import { useAuth } from "../../../contexts/AuthContext";
 import { STALE_TIME, REFETCH_INTERVAL } from "../../../contexts/QueryContext";
 import { mobileFetch } from "../../../utils/fetch";
+import { useUdfExecutionStats } from "./useUdfExecutionStats";
 
 export interface TimeSeriesDataPoint {
   time: number;
@@ -221,44 +220,111 @@ export function useHealthMetrics(): HealthMetrics {
     refetchOnMount: false,
   });
 
-  // Latency percentiles query
+  // Latency percentiles query - derived from shared UDF execution stats
+  const { entries: udfEntries } = useUdfExecutionStats();
+
+  const latencyPercentiles = useMemo(() => {
+    if (!udfEntries || udfEntries.length === 0) {
+      return { p50: 0, p95: 0, p99: 0 };
+    }
+
+    // Get execution times from entries
+    const executionTimes: number[] = [];
+    udfEntries.forEach((entry: any) => {
+      let execTime =
+        entry.execution_time_ms ||
+        entry.executionTimeMs ||
+        entry.execution_time ||
+        entry.executionTime;
+      if (execTime) {
+        // Convert to milliseconds if needed
+        if (execTime < 1000 && execTime > 0) {
+          execTime = execTime * 1000;
+        }
+        if (execTime > 0) {
+          executionTimes.push(execTime);
+        }
+      }
+    });
+
+    if (executionTimes.length === 0) {
+      return { p50: 0, p95: 0, p99: 0 };
+    }
+
+    // Calculate percentiles
+    const sorted = executionTimes.sort((a, b) => a - b);
+    const p50 = sorted[Math.floor(sorted.length * 0.5)];
+    const p95 = sorted[Math.floor(sorted.length * 0.95)];
+    const p99 = sorted[Math.floor(sorted.length * 0.99)];
+
+    return { p50, p95, p99 };
+  }, [udfEntries]);
+
+  // Request rate query - derived from shared UDF execution stats
+  const requestRateData = useMemo(() => {
+    if (!udfEntries || udfEntries.length === 0) {
+      return [];
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const twentySixMinutesAgo = now - 26 * 60;
+    const numBuckets = 26;
+    const bucketSizeSeconds = (26 * 60) / numBuckets;
+
+    // Initialize buckets
+    const buckets: number[] = Array(numBuckets).fill(0);
+
+    // Count invocations per bucket
+    udfEntries.forEach((entry: any) => {
+      let entryTime =
+        entry.timestamp || entry.execution_timestamp || entry.unix_timestamp;
+      if (entryTime > 1e12) {
+        entryTime = Math.floor(entryTime / 1000);
+      }
+
+      if (entryTime >= twentySixMinutesAgo && entryTime <= now) {
+        const bucketIndex = Math.floor(
+          (entryTime - twentySixMinutesAgo) / bucketSizeSeconds,
+        );
+        const clampedIndex = Math.max(0, Math.min(numBuckets - 1, bucketIndex));
+        buckets[clampedIndex]++;
+      }
+    });
+
+    // Convert to TimeSeriesDataPoint format
+    const result: TimeSeriesDataPoint[] = [];
+    for (let i = 0; i < numBuckets; i++) {
+      const bucketTime = twentySixMinutesAgo + i * bucketSizeSeconds;
+      result.push({
+        time: bucketTime,
+        value: buckets[i],
+      });
+    }
+
+    return result;
+  }, [udfEntries]);
+
+  // Latency percentiles query (keep for loading/error state only)
   const latencyQuery = useQuery({
     queryKey: healthMetricsKeys.latency(deploymentUrl ?? ""),
     queryFn: async () => {
-      const data = await fetchLatencyPercentiles(
-        deploymentUrl!,
-        authToken!,
-        mobileFetch,
-      );
-      // Data format: [[50, [[timestamp, value]]], [95, [...]], [99, [...]]]
-      const percentiles: LatencyPercentiles = { p50: 0, p95: 0, p99: 0 };
-
-      for (const [percentile, timeSeries] of data) {
-        const latestValue =
-          timeSeries.length > 0
-            ? (timeSeries[timeSeries.length - 1][1] ?? 0)
-            : 0;
-        if (percentile === 50) percentiles.p50 = latestValue;
-        else if (percentile === 95) percentiles.p95 = latestValue;
-        else if (percentile === 99) percentiles.p99 = latestValue;
-      }
-
-      return percentiles;
+      // This is now a no-op since we derive from shared stats
+      return { p50: 0, p95: 0, p99: 0 };
     },
-    enabled,
+    enabled: false, // Disabled since we compute from shared stats
     staleTime: STALE_TIME.health,
     refetchInterval: REFETCH_INTERVAL.health,
     refetchOnMount: false,
   });
 
-  // Request rate query
+  // Request rate query (keep for loading/error state only)
   const requestRateQuery = useQuery({
     queryKey: healthMetricsKeys.requestRate(deploymentUrl ?? ""),
     queryFn: async () => {
-      const data = await fetchUdfRate(deploymentUrl!, authToken!, mobileFetch);
-      return transformTimeSeries(data);
+      // This is now a no-op since we derive from shared stats
+      return [];
     },
-    enabled,
+    enabled: false, // Disabled since we compute from shared stats
     staleTime: STALE_TIME.health,
     refetchInterval: REFETCH_INTERVAL.health,
     refetchOnMount: false,
@@ -286,9 +352,7 @@ export function useHealthMetrics(): HealthMetrics {
     [schedulerLagData],
   );
 
-  const latencyPercentiles = latencyQuery.data ?? { p50: 0, p95: 0, p99: 0 };
-
-  const requestRateData = requestRateQuery.data ?? [];
+  // Latency and request rate computed above from shared stats
   const requestRate = getLatestValue(requestRateData);
   const requestRateTrend = useMemo(
     () => calculateTrend(requestRateData),
@@ -344,16 +408,12 @@ export function useHealthMetrics(): HealthMetrics {
   const isLoading =
     failureRateQuery.isLoading ||
     cacheHitRateQuery.isLoading ||
-    schedulerLagQuery.isLoading ||
-    latencyQuery.isLoading ||
-    requestRateQuery.isLoading;
+    schedulerLagQuery.isLoading;
 
   const hasError = Boolean(
     failureRateQuery.error ||
-    cacheHitRateQuery.error ||
-    schedulerLagQuery.error ||
-    latencyQuery.error ||
-    requestRateQuery.error,
+      cacheHitRateQuery.error ||
+      schedulerLagQuery.error,
   );
 
   return {
@@ -378,17 +438,17 @@ export function useHealthMetrics(): HealthMetrics {
     schedulerLagLoading: schedulerLagQuery.isLoading,
     schedulerLagError: schedulerLagQuery.error?.message ?? null,
 
-    // Latency percentiles
+    // Latency percentiles (derived from shared UDF stats)
     latencyPercentiles,
-    latencyLoading: latencyQuery.isLoading,
-    latencyError: latencyQuery.error?.message ?? null,
+    latencyLoading: false,
+    latencyError: null,
 
-    // Request rate
+    // Request rate (derived from shared UDF stats)
     requestRate,
     requestRateTrend,
     requestRateData,
-    requestRateLoading: requestRateQuery.isLoading,
-    requestRateError: requestRateQuery.error?.message ?? null,
+    requestRateLoading: false,
+    requestRateError: null,
 
     // Global state
     isLoading,

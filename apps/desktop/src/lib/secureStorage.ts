@@ -57,6 +57,13 @@ export const secureKeys = {
 // These keys are auto-generated via OAuth and cached per deployment
 // ============================================================================
 
+export interface CachedDeploymentKeyMetadata {
+  deploymentName: string;
+  projectId?: number;
+  teamId?: number;
+  createdAt: number;
+}
+
 /**
  * Get the storage key for a deployment's cached deploy key
  */
@@ -65,13 +72,22 @@ function getDeploymentKeyName(deploymentName: string): string {
 }
 
 /**
- * Save a deploy key for a specific deployment
+ * Get the storage key for deployment key metadata
+ */
+function getDeploymentKeyMetadataName(deploymentName: string): string {
+  return `${NAMESPACE}.deploymentKeyMeta.${deploymentName}`;
+}
+
+/**
+ * Save a deploy key for a specific deployment with metadata
  */
 export async function saveDeploymentKey(
   deploymentName: string,
   key: string | null,
+  metadata?: { projectId?: number; teamId?: number },
 ): Promise<void> {
   const storageKey = getDeploymentKeyName(deploymentName);
+  const metadataKey = getDeploymentKeyMetadataName(deploymentName);
 
   if (!key) {
     await clearDeploymentKey(deploymentName);
@@ -80,6 +96,16 @@ export async function saveDeploymentKey(
 
   if (typeof localStorage !== "undefined") {
     localStorage.setItem(storageKey, key);
+
+    // Save metadata
+    const meta: CachedDeploymentKeyMetadata = {
+      deploymentName,
+      projectId: metadata?.projectId,
+      teamId: metadata?.teamId,
+      createdAt: Date.now(),
+    };
+    localStorage.setItem(metadataKey, JSON.stringify(meta));
+
     console.log(
       `[secureStorage] Saved deploy key for ${deploymentName} to localStorage`,
     );
@@ -112,28 +138,67 @@ export async function clearDeploymentKey(
   deploymentName: string,
 ): Promise<void> {
   const storageKey = getDeploymentKeyName(deploymentName);
+  const metadataKey = getDeploymentKeyMetadataName(deploymentName);
 
   if (typeof localStorage !== "undefined") {
     localStorage.removeItem(storageKey);
+    localStorage.removeItem(metadataKey);
+  }
+}
+
+/**
+ * Get metadata for a cached deployment key
+ */
+export async function getDeploymentKeyMetadata(
+  deploymentName: string,
+): Promise<CachedDeploymentKeyMetadata | null> {
+  const metadataKey = getDeploymentKeyMetadataName(deploymentName);
+
+  if (typeof localStorage === "undefined") return null;
+
+  const metadata = localStorage.getItem(metadataKey);
+  if (!metadata) return null;
+
+  try {
+    return JSON.parse(metadata) as CachedDeploymentKeyMetadata;
+  } catch {
+    return null;
   }
 }
 
 /**
  * Get all cached deployment keys from localStorage
- * Returns a map of deployment name -> masked key preview
+ * Returns a map of deployment name -> masked key preview with metadata
  */
-export async function listCachedDeploymentKeys(): Promise<
-  Array<{ deploymentName: string; keyPreview: string }>
+export async function listCachedDeploymentKeys(projectId?: number): Promise<
+  Array<{
+    deploymentName: string;
+    keyPreview: string;
+    projectId?: number;
+    teamId?: number;
+  }>
 > {
-  const results: Array<{ deploymentName: string; keyPreview: string }> = [];
+  const results: Array<{
+    deploymentName: string;
+    keyPreview: string;
+    projectId?: number;
+    teamId?: number;
+  }> = [];
   const prefix = `${NAMESPACE}.deploymentKey.`;
 
   if (typeof localStorage !== "undefined") {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith(prefix)) {
+      if (key && key.startsWith(prefix) && !key.includes("Meta")) {
         const deploymentName = key.substring(prefix.length);
         const value = localStorage.getItem(key);
+        const metadata = await getDeploymentKeyMetadata(deploymentName);
+
+        // Filter by projectId if provided
+        if (projectId !== undefined && metadata?.projectId !== projectId) {
+          continue;
+        }
+
         if (value) {
           // Create a preview: show first part before | and mask the rest
           const pipeIndex = value.indexOf("|");
@@ -141,7 +206,12 @@ export async function listCachedDeploymentKeys(): Promise<
             pipeIndex > 0
               ? `${value.substring(0, Math.min(pipeIndex + 5, value.length))}...`
               : `${value.substring(0, 20)}...`;
-          results.push({ deploymentName, keyPreview });
+          results.push({
+            deploymentName,
+            keyPreview,
+            projectId: metadata?.projectId,
+            teamId: metadata?.teamId,
+          });
         }
       }
     }

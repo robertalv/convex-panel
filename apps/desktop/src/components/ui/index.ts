@@ -1,5 +1,3 @@
-// UI Components - Convex Desktop Design System
-
 export { Button, buttonVariants, type ButtonProps } from "./button";
 export {
   Card,
@@ -23,6 +21,7 @@ export {
   TooltipWithKeybind,
 } from "./tooltip";
 export { ToolbarButton, type ToolbarButtonProps } from "./button";
+export { Toolbar, type ToolbarProps } from "./toolbar";
 export {
   Menu,
   MenuItem,
@@ -32,7 +31,10 @@ export {
   type MenuItemProps,
   type MenuTriggerProps,
 } from "./menu";
-export { TreeItem, type TreeItemProps } from "./TreeItem";
-export { FunctionIcon } from "./FunctionIcon";
-export { HealthCard } from "./health-card/HealthCard";
-export { Icon, type IconProps } from "./Icon";
+export { TreeItem, type TreeItemProps } from "./tree-item";
+export { FunctionIcon } from "../svg/function-icon";
+export { HealthCard } from "./health-card";
+export { Icon, type IconProps } from "./icon";
+export { CodeDiffViewer, type CodeDiffViewerProps } from "./code-diff-viewer";
+export { SearchInput, type SearchInputProps } from "./search-input";
+export { Kbd, type KbdProps } from "./kbd";

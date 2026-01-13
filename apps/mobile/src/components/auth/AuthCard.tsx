@@ -1,10 +1,10 @@
 /**
  * Auth Card Component
- * 
+ *
  * Main authentication card that switches between device auth and deploy key forms
  */
 
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -12,20 +12,20 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../../contexts/ThemeContext';
-import { Theme } from '../../types';
-import { DeviceAuthFlow } from './DeviceAuthFlow';
-import { ConvexLogo } from '../ui/ConvexLogo';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../../contexts/ThemeContext";
+import { Theme } from "../../types";
+import { DeviceAuthFlow } from "./DeviceAuthFlow";
+import { ConvexLogo } from "../ui/ConvexLogo";
 
-
-type AuthMethod = 'device' | 'manual';
+type AuthMethod = "device" | "manual";
 
 interface AuthCardProps {
   authMethod: AuthMethod;
   isAuthenticating: boolean;
   userCode: string | null;
+  verificationUrl: string | null;
   onStartDeviceAuth: () => void;
   onCancelDeviceAuth: () => void;
   deployUrl: string;
@@ -41,6 +41,7 @@ export function AuthCard({
   authMethod,
   isAuthenticating,
   userCode,
+  verificationUrl,
   onStartDeviceAuth,
   onCancelDeviceAuth,
   deployUrl,
@@ -57,7 +58,7 @@ export function AuthCard({
   const isDark = theme.dark;
 
   // Surface raised color - matching desktop: rgb(52, 50, 47) in dark, rgb(248, 246, 243) in light
-  const surfaceRaised = isDark ? '#34322f' : '#f8f6f3';
+  const surfaceRaised = isDark ? "#34322f" : "#f8f6f3";
   const borderBase = theme.colors.border;
 
   return (
@@ -67,8 +68,8 @@ export function AuthCard({
           style={[
             styles.errorContainer,
             {
-              backgroundColor: theme.colors.error + '20',
-              borderColor: theme.colors.error + '33',
+              backgroundColor: theme.colors.error + "20",
+              borderColor: theme.colors.error + "33",
             },
           ]}
         >
@@ -79,9 +80,14 @@ export function AuthCard({
         </View>
       )}
 
-      {authMethod === 'device' ? (
+      {authMethod === "device" ? (
         isDeviceAuthPending ? (
-          <DeviceAuthFlow userCode={userCode!} onCancel={onCancelDeviceAuth} theme={theme} />
+          <DeviceAuthFlow
+            userCode={userCode!}
+            verificationUrl={verificationUrl!}
+            onCancel={onCancelDeviceAuth}
+            theme={theme}
+          />
         ) : (
           <TouchableOpacity
             style={[
@@ -101,18 +107,30 @@ export function AuthCard({
             ) : (
               <></>
             )}
-            <Text style={[styles.signInButtonText, { color: theme.colors.text }]}>
-              {isAuthenticating ? 'Starting...' : 'Sign in with Convex'}
+            <Text
+              style={[styles.signInButtonText, { color: theme.colors.text }]}
+            >
+              {isAuthenticating ? "Starting..." : "Sign in with Convex"}
             </Text>
           </TouchableOpacity>
         )
       ) : (
         <View style={styles.deployKeyForm}>
-          <Text style={[styles.formDescription, { color: theme.colors.textSecondary }]}>
+          <Text
+            style={[
+              styles.formDescription,
+              { color: theme.colors.textSecondary },
+            ]}
+          >
             Connect directly with your deployment URL and deploy key.
           </Text>
           {/* Deploy key form would go here - simplified for now */}
-          <Text style={[styles.formDescription, { color: theme.colors.textSecondary }]}>
+          <Text
+            style={[
+              styles.formDescription,
+              { color: theme.colors.textSecondary },
+            ]}
+          >
             Deploy key form coming soon
           </Text>
         </View>
@@ -123,12 +141,12 @@ export function AuthCard({
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
+    width: "100%",
     maxWidth: 400,
   },
   errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: 12,
     padding: 12,
     borderRadius: 8,
@@ -140,26 +158,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   signInButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
     borderWidth: 1,
-    width: '100%',
+    width: "100%",
   },
   signInButtonText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   deployKeyForm: {
     gap: 16,
   },
   formDescription: {
     fontSize: 14,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });
-

@@ -1,7 +1,6 @@
-export { GradientBackground } from "../shared/GradientBackground";
-export { WelcomeScreen } from "./WelcomeScreen";
-export { AuthCard } from "./AuthCard";
-export { DeviceAuthFlow } from "./DeviceAuthFlow";
-export { DeployKeyForm } from "./DeployKeyForm";
-export { LoadingScreen } from "./LoadingScreen";
-export { LoginTransition } from "./LoginTransition";
+export { GradientBackground } from "../gradient-background";
+export { WelcomeScreen } from "./welcome-screen";
+export { AuthCard } from "./auth-card";
+export { DeviceAuthFlow } from "./device-auth-flow";
+export { LoadingScreen } from "./loading-screen";
+export { LoginTransition } from "./login-transition";

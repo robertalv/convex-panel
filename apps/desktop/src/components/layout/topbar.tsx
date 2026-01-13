@@ -64,7 +64,7 @@ export function TopBar({
   );
 
   const deploymentOptions = React.useMemo(() => {
-    if (deployments.length === 0 && selectedDeployment && deploymentsLoading) {
+    if (deployments.length === 0 && selectedDeployment) {
       return [
         {
           value: String(selectedDeployment.id),
@@ -78,7 +78,7 @@ export function TopBar({
       label: d.name,
       sublabel: d.deploymentType,
     }));
-  }, [deployments, selectedDeployment, deploymentsLoading]);
+  }, [deployments, selectedDeployment]);
 
   const handleTeamChange = React.useCallback(
     (value: string) => {
@@ -109,7 +109,7 @@ export function TopBar({
       className={cn(
         "flex items-center justify-between",
         "h-10 pr-3",
-        isFullscreen ? "pl-3" : "pl-18",
+        isFullscreen ? "pl-3.5" : "pl-20",
         "bg-background-raised border-b border-border-muted",
         "select-none",
         className,

@@ -1,9 +1,3 @@
-/**
- * Account Screen
- * 
- * Account management screen with user info and logout
- */
-
 import React, { useState } from 'react';
 import {
   View,
@@ -11,19 +5,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   Alert,
   TextInput,
   ActivityIndicator,
 } from 'react-native';
-
-// Type assertions to fix React 18/19 types compatibility
-const SafeAreaViewTyped = SafeAreaView as any;
-const ScrollViewTyped = ScrollView as any;
-const ViewTyped = View as any;
-const TextTyped = Text as any;
-const TouchableOpacityTyped = TouchableOpacity as any;
-const TextInputTyped = TextInput as any;
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useDeployment } from '../contexts/DeploymentContext';
@@ -48,7 +34,6 @@ export default function AccountScreen() {
   const [name, setName] = useState(profile?.name || '');
   const [isSavingName, setIsSavingName] = useState(false);
 
-  // Update name when profile loads
   React.useEffect(() => {
     if (profile?.name) {
       setName(profile.name);
@@ -99,23 +84,29 @@ export default function AccountScreen() {
   const isLoading = isLoadingProfile || isLoadingEmails || isLoadingIdentities;
 
   return (
-    <SafeAreaViewTyped style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <ScrollViewTyped
+    <SafeAreaView 
+      edges={[]}
+      style={[
+        styles.container,
+        { backgroundColor: theme.colors.background },
+      ]}
+    >
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
       >
         {/* Profile Information Section */}
-        <ViewTyped style={[styles.section, { backgroundColor: theme.colors.surface }]}>
-          <TextTyped style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
             Profile information
-          </TextTyped>
+          </Text>
           
-          <ViewTyped style={styles.nameSection}>
-            <TextTyped style={[styles.label, { color: theme.colors.textSecondary }]}>
+          <View style={styles.nameSection}>
+            <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
               Name
-            </TextTyped>
-            <ViewTyped style={styles.nameInputContainer}>
-              <TextInputTyped
+            </Text>
+            <View style={styles.nameInputContainer}>
+              <TextInput
                 style={[
                   styles.nameInput,
                   {
@@ -130,7 +121,7 @@ export default function AccountScreen() {
                 placeholderTextColor={theme.colors.textSecondary}
                 maxLength={128}
               />
-              <TouchableOpacityTyped
+              <TouchableOpacity
                 style={[
                   styles.saveButton,
                   {
@@ -150,30 +141,30 @@ export default function AccountScreen() {
                 {isSavingName ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <TextTyped style={styles.saveButtonText}>Save</TextTyped>
+                  <Text style={styles.saveButtonText}>Save</Text>
                 )}
-              </TouchableOpacityTyped>
-            </ViewTyped>
+              </TouchableOpacity>
+            </View>
             {name && name.length > 128 && (
-              <TextTyped style={[styles.errorText, { color: theme.colors.error }]}>
+              <Text style={[styles.errorText, { color: theme.colors.error }]}>
                 Name must be at most 128 characters long.
-              </TextTyped>
+              </Text>
             )}
-          </ViewTyped>
-        </ViewTyped>
+          </View>
+        </View>
 
         {/* Emails Section */}
-        <ViewTyped style={[styles.section, { backgroundColor: theme.colors.surface }]}>
-          <TextTyped style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
             Emails
-          </TextTyped>
-          <TextTyped style={[styles.sectionDescription, { color: theme.colors.textSecondary }]}>
+          </Text>
+          <Text style={[styles.sectionDescription, { color: theme.colors.textSecondary }]}>
             The emails associated with your account are used to accept team invitations. Account-related communications will be sent to your primary email.
-          </TextTyped>
+          </Text>
           {isLoadingEmails ? (
             <ActivityIndicator size="small" color={theme.colors.primary} style={styles.loader} />
           ) : emails && emails.length > 0 ? (
-            <ViewTyped style={styles.listContainer}>
+            <View style={styles.listContainer}>
               {emails
                 .sort((a: any, b: any) => {
                   if (a.isPrimary) return -1;
@@ -183,99 +174,99 @@ export default function AccountScreen() {
                   return 0;
                 })
                 .map((email: any) => (
-                  <ViewTyped
+                  <View
                     key={email.id}
                     style={[
                       styles.listItem,
                       { borderColor: theme.colors.border, backgroundColor: theme.colors.background },
                     ]}
                   >
-                    <ViewTyped style={styles.listItemContent}>
-                      <TextTyped style={[styles.listItemText, { color: theme.colors.text }]}>
+                    <View style={styles.listItemContent}>
+                      <Text style={[styles.listItemText, { color: theme.colors.text }]}>
                         {email.email}
-                      </TextTyped>
-                      <ViewTyped style={styles.badges}>
+                      </Text>
+                      <View style={styles.badges}>
                         {email.isPrimary && (
-                          <ViewTyped
+                          <View
                             style={[
                               styles.badge,
                               { backgroundColor: theme.colors.primary + '20' },
                             ]}
                           >
-                            <TextTyped
+                            <Text
                               style={[styles.badgeText, { color: theme.colors.primary }]}
                             >
                               Primary
-                            </TextTyped>
-                          </ViewTyped>
+                            </Text>
+                          </View>
                         )}
                         {email.isVerified ? (
-                          <ViewTyped
+                          <View
                             style={[
                               styles.badge,
                               { backgroundColor: theme.colors.success + '20' },
                             ]}
                           >
-                            <TextTyped
+                            <Text
                               style={[styles.badgeText, { color: theme.colors.success }]}
                             >
                               Verified
-                            </TextTyped>
-                          </ViewTyped>
+                            </Text>
+                          </View>
                         ) : (
-                          <ViewTyped
+                          <View
                             style={[
                               styles.badge,
                               { backgroundColor: theme.colors.warning + '20' },
                             ]}
                           >
-                            <TextTyped
+                            <Text
                               style={[styles.badgeText, { color: theme.colors.warning }]}
                             >
                               Unverified
-                            </TextTyped>
-                          </ViewTyped>
+                            </Text>
+                          </View>
                         )}
-                      </ViewTyped>
-                    </ViewTyped>
-                  </ViewTyped>
+                      </View>
+                    </View>
+                  </View>
                 ))}
-            </ViewTyped>
+            </View>
           ) : (
-            <TextTyped style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+            <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
               No emails found
-            </TextTyped>
+            </Text>
           )}
-        </ViewTyped>
+        </View>
 
         {/* Identities Section */}
-        <ViewTyped style={[styles.section, { backgroundColor: theme.colors.surface }]}>
-          <TextTyped style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
             Identities
-          </TextTyped>
-          <TextTyped style={[styles.sectionDescription, { color: theme.colors.textSecondary }]}>
+          </Text>
+          <Text style={[styles.sectionDescription, { color: theme.colors.textSecondary }]}>
             These are the identities associated with your account. Identities are used to login to Convex, and are distinct from the emails connected to your account for communication purposes.
-          </TextTyped>
+          </Text>
           {isLoadingIdentities ? (
             <ActivityIndicator size="small" color={theme.colors.primary} style={styles.loader} />
           ) : identities && identities.length > 0 ? (
-            <ViewTyped style={styles.listContainer}>
+            <View style={styles.listContainer}>
               {identities.map((identity: any) => (
-                <ViewTyped
+                <View
                   key={identity.id}
                   style={[
                     styles.listItem,
                     { borderColor: theme.colors.border, backgroundColor: theme.colors.background },
                   ]}
                 >
-                  <ViewTyped style={styles.listItemContent}>
-                    <ViewTyped style={styles.identityInfo}>
-                      <TextTyped style={[styles.listItemText, { color: theme.colors.text }]}>
+                  <View style={styles.listItemContent}>
+                    <View style={styles.identityInfo}>
+                      <Text style={[styles.listItemText, { color: theme.colors.text }]}>
                         {identity.email || identity.id}
-                      </TextTyped>
-                      <ViewTyped style={styles.providersContainer}>
+                      </Text>
+                      <View style={styles.providersContainer}>
                         {identity.providers?.map((provider: string) => (
-                          <ViewTyped
+                          <View
                             key={provider}
                             style={[
                               styles.providerBadge,
@@ -283,29 +274,29 @@ export default function AccountScreen() {
                               { borderColor: theme.colors.border },
                             ]}
                           >
-                            <TextTyped
+                            <Text
                               style={[styles.providerText, { color: theme.colors.textSecondary }]}
                             >
                               {provider.charAt(0).toUpperCase() + provider.slice(1)}
-                            </TextTyped>
-                          </ViewTyped>
+                            </Text>
+                          </View>
                         ))}
-                      </ViewTyped>
-                    </ViewTyped>
-                  </ViewTyped>
-                </ViewTyped>
+                      </View>
+                    </View>
+                  </View>
+                </View>
               ))}
-            </ViewTyped>
+            </View>
           ) : (
-            <TextTyped style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+            <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
               No identities found
-            </TextTyped>
+            </Text>
           )}
-        </ViewTyped>
+        </View>
 
         {/* Sign Out Section */}
-        <ViewTyped style={styles.actionsSection}>
-          <TouchableOpacityTyped
+        <View style={styles.actionsSection}>
+          <TouchableOpacity
             style={[
               styles.logoutButton,
               {
@@ -315,13 +306,13 @@ export default function AccountScreen() {
             onPress={handleLogout}
             activeOpacity={0.7}
           >
-            <TextTyped style={[styles.logoutButtonText, { color: '#ffffff' }]}>
+            <Text style={[styles.logoutButtonText, { color: '#ffffff' }]}>
               Sign Out
-            </TextTyped>
-          </TouchableOpacityTyped>
-        </ViewTyped>
-      </ScrollViewTyped>
-    </SafeAreaViewTyped>
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 

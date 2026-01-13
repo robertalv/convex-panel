@@ -1,10 +1,8 @@
-import { useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchUdfExecutionStats } from "../../../api";
+import { useCallback, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useDeployment } from "../../../contexts/DeploymentContext";
 import { useAuth } from "../../../contexts/AuthContext";
-import { STALE_TIME, REFETCH_INTERVAL } from "../../../contexts/QueryContext";
-import { mobileFetch } from "../../../utils/fetch";
+import { useUdfExecutionStats } from "./useUdfExecutionStats";
 
 export interface FunctionStat {
   /** Function identifier (e.g., "messages:list") */
@@ -52,13 +50,6 @@ interface FunctionHealth extends FunctionHealthData {
   // Actions
   refetch: () => void;
 }
-
-// Query key factory
-export const functionHealthKeys = {
-  all: ["functionHealth"] as const,
-  stats: (deploymentUrl: string) =>
-    [...functionHealthKeys.all, "stats", deploymentUrl] as const,
-};
 
 /**
  * Helper to calculate percentile
@@ -197,7 +188,7 @@ function processExecutionStats(
 
 /**
  * Hook for analyzing function health from UDF execution stats.
- * Uses React Query for caching and automatic refetching.
+ * Uses shared UDF execution stats to avoid duplicate API calls.
  */
 export function useFunctionHealth(): FunctionHealth {
   const { deployment } = useDeployment();
@@ -206,49 +197,28 @@ export function useFunctionHealth(): FunctionHealth {
 
   const deploymentUrl = deployment?.url ?? null;
   const authToken = session?.accessToken ?? null;
-  const enabled = Boolean(deploymentUrl && authToken);
 
-  const query = useQuery({
-    queryKey: functionHealthKeys.stats(deploymentUrl ?? ""),
-    queryFn: async () => {
-      // Fetch execution stats from the last hour
-      const oneHourAgo = Date.now() - 60 * 60 * 1000;
-      const cursor = Math.floor(oneHourAgo / 1000) * 1000;
+  // Use shared UDF execution stats
+  const {
+    entries,
+    isLoading,
+    error,
+    refetch: refetchStats,
+  } = useUdfExecutionStats();
 
-      const response = await fetchUdfExecutionStats(
-        deploymentUrl!,
-        authToken!,
-        cursor,
-        mobileFetch,
-      );
-
-      return processExecutionStats(response?.entries || []);
-    },
-    enabled,
-    staleTime: STALE_TIME.functionStats,
-    refetchInterval: REFETCH_INTERVAL.functionStats,
-    refetchOnMount: false,
-  });
-
-  const data = query.data ?? {
-    topFailing: [],
-    slowest: [],
-    mostCalled: [],
-    totalInvocations: 0,
-    totalErrors: 0,
-    overallFailureRate: 0,
-  };
+  // Process the data using useMemo to avoid re-processing on every render
+  const data = useMemo(() => {
+    return processExecutionStats(entries);
+  }, [entries]);
 
   const refetch = useCallback(() => {
-    queryClient.invalidateQueries({
-      queryKey: functionHealthKeys.stats(deploymentUrl ?? ""),
-    });
-  }, [queryClient, deploymentUrl]);
+    refetchStats();
+  }, [refetchStats]);
 
   return {
     ...data,
-    isLoading: query.isLoading,
-    error: query.error?.message ?? null,
+    isLoading,
+    error,
     refetch,
   };
 }

@@ -57,6 +57,87 @@ struct TrayMenuItems {
     proxy_status: MenuItem<tauri::Wry>,
 }
 
+// ============================================================================
+// Native About Dialog Functions
+// ============================================================================
+
+/// Show native macOS About panel
+#[cfg(target_os = "macos")]
+fn show_native_about_macos() {
+    use objc2_foundation::{NSString, NSData, ns_string};
+    use objc2::{rc::Retained, msg_send_id, runtime::AnyObject, msg_send};
+    
+    unsafe {
+        // Get shared NSApplication instance
+        let app_class = objc2::class!(NSApplication);
+        let app: Retained<AnyObject> = msg_send_id![app_class, sharedApplication];
+        
+        // Load the app icon from the embedded PNG and set it on the application
+        let icon_bytes = include_bytes!("../icons/icon.png");
+        let ns_data = NSData::with_bytes(icon_bytes);
+        
+        // Create NSImage from data using regular msg_send
+        let image_class = objc2::class!(NSImage);
+        let icon: *mut AnyObject = msg_send![image_class, alloc];
+        let icon: *mut AnyObject = msg_send![icon, initWithData: &*ns_data];
+        
+        if !icon.is_null() {
+            // Set application icon so it appears in About panel
+            let _: () = msg_send![&app, setApplicationIconImage: icon];
+        }
+        
+        // Create a mutable dictionary
+        let dict_class = objc2::class!(NSMutableDictionary);
+        let dict: Retained<AnyObject> = msg_send_id![dict_class, new];
+        
+        // Set application name
+        let app_name_key = ns_string!("ApplicationName");
+        let app_name_value = NSString::from_str("Convex Panel");
+        let _: () = msg_send![&dict, setObject:&*app_name_value, forKey:&*app_name_key];
+        
+        // Set version
+        let version_key = ns_string!("Version");
+        let version_value = NSString::from_str(env!("CARGO_PKG_VERSION"));
+        let _: () = msg_send![&dict, setObject:&*version_value, forKey:&*version_key];
+        
+        // Set copyright/description
+        let copyright_key = ns_string!("Copyright");
+        let copyright_value = NSString::from_str("A powerful debugging and monitoring tool for Convex applications.");
+        let _: () = msg_send![&dict, setObject:&*copyright_value, forKey:&*copyright_key];
+        
+        // Show the about panel
+        let _: () = msg_send![&app, orderFrontStandardAboutPanelWithOptions:&*dict];
+    }
+}
+
+/// Show native Windows About dialog
+#[cfg(target_os = "windows")]
+fn show_native_about_windows(window_handle: isize) {
+    use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_OK, MB_ICONINFORMATION};
+    use windows::Win32::Foundation::HWND;
+    use windows::core::PCWSTR;
+    
+    let version = env!("CARGO_PKG_VERSION");
+    let message = format!(
+        "Convex Panel v{}\n\nA powerful debugging and monitoring tool for Convex applications.",
+        version
+    );
+    let title = "About Convex Panel";
+    
+    // Convert strings to wide strings (UTF-16) for Windows API
+    let message_wide: Vec<u16> = message.encode_utf16().chain(std::iter::once(0)).collect();
+    let title_wide: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
+    
+    unsafe {
+        MessageBoxW(
+            HWND(window_handle),
+            PCWSTR(message_wide.as_ptr()),
+            PCWSTR(title_wide.as_ptr()),
+            MB_OK | MB_ICONINFORMATION,
+        );
+    }
+}
+
 /// Update network test status from frontend and update tray menu
 #[tauri::command]
 fn update_network_status(status: NetworkTestStatus) -> Result<(), String> {
@@ -731,18 +812,20 @@ pub fn run() {
             app.on_menu_event(move |_app, event| {
                 match event.id().as_ref() {
                     "about" => {
-                        // Show native macOS About dialog
+                        // Show native About dialog
                         #[cfg(target_os = "macos")]
                         {
-                            use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
-                            let _ = _app.dialog()
-                                .message("Convex Panel v0.1.0\n\nA powerful debugging and monitoring tool for Convex applications.")
-                                .title("About Convex Panel")
-                                .kind(MessageDialogKind::Info)
-                                .blocking_show();
+                            show_native_about_macos();
                         }
-                        #[cfg(not(target_os = "macos"))]
+                        #[cfg(target_os = "windows")]
                         {
+                            if let Ok(hwnd) = window_clone.hwnd() {
+                                show_native_about_windows(hwnd.0 as isize);
+                            }
+                        }
+                        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+                        {
+                            // Fallback to React component for Linux
                             let _ = window_clone.emit("show-about", ());
                         }
                     }

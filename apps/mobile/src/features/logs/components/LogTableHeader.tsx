@@ -63,27 +63,27 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   timestampCol: {
-    width: 155,
-    marginRight: 12,
+    width: 130,
+    marginRight: 8,
   },
   idCol: {
-    width: 45,
-    marginRight: 12,
+    width: 44,
+    marginRight: 8,
   },
   statusCol: {
-    width: 110,
-    marginRight: 12,
+    width: 80,
+    marginRight: 8,
   },
   functionCol: {
     flex: 1,
   },
   headerText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.5,

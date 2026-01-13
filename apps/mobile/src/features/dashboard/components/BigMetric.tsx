@@ -5,17 +5,11 @@ import { useTheme } from "../../../contexts/ThemeContext";
 export type MetricHealth = "healthy" | "warning" | "error";
 
 interface BigMetricProps {
-  /** Health status of the metric */
   health: MetricHealth;
-  /** The metric value to display */
   metric: string;
-  /** Optional subtitle */
   children?: React.ReactNode;
 }
 
-/**
- * Large metric display component with health-based styling.
- */
 export function BigMetric({ health, metric, children }: BigMetricProps) {
   const { theme } = useTheme();
 

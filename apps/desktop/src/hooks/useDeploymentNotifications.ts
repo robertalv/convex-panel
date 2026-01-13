@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { isPermissionGranted } from "@tauri-apps/plugin-notification";
-import { useDeployment } from "@/contexts/DeploymentContext";
-import { useDeploymentStatus } from "@/features/health/hooks/useDeploymentStatus";
+import { useDeployment } from "@/contexts/deployment-context";
+import { useDeploymentStatus } from "@/views/health/hooks/useDeploymentStatus";
 
 const STORAGE_KEY = "convex-panel-notifications-enabled";
 

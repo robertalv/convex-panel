@@ -66,6 +66,8 @@ export function useTables(
     enabled: !!deploymentUrl,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchInterval: 30000, // Refetch every 30 seconds for new tables
+    refetchIntervalInBackground: false, // Only refetch when app is active
   });
 }
 
@@ -123,6 +125,8 @@ export function useDocuments(
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: 3000, // Refetch every 3 seconds for real-time-like updates
+    refetchIntervalInBackground: false, // Only refetch when app is active
   });
 }
 

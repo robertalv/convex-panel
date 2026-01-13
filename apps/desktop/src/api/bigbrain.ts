@@ -1,10 +1,3 @@
-/**
- * BigBrain API for Desktop
- *
- * This module re-exports BigBrain API functions from @convex-panel/shared
- * and adapts them to work with the desktop app's custom fetch function.
- */
-
 import type { DashboardFetch } from "../lib/convex/dashboardCommonAdapter";
 import type { PlanType } from "@convex-panel/shared";
 import {
@@ -14,16 +7,19 @@ import {
   getProfile as sharedGetProfile,
   getTeamSubscription as sharedGetTeamSubscription,
   createDeployKey as sharedCreateDeployKey,
+  createAccessToken as sharedCreateAccessToken,
+  getDeploymentAccessTokens as sharedGetDeploymentAccessTokens,
+  getProjectAccessTokens as sharedGetProjectAccessTokens,
+  deleteAccessToken as sharedDeleteAccessToken,
   type Team,
   type Project,
   type Deployment,
   type UserProfile,
+  type AccessToken,
 } from "@convex-panel/shared/api";
 
-// Re-export types
-export type { Team, Project, Deployment, UserProfile };
+export type { AccessToken, Team, Project, Deployment, UserProfile };
 
-// Extended subscription types for desktop
 export interface SubscriptionPlan {
   id: string;
   name: string;
@@ -36,9 +32,15 @@ export interface TeamSubscription {
   plan: SubscriptionPlan;
 }
 
-/**
- * Fetch all teams the user has access to
- */
+export interface Invoice {
+  id: string;
+  status: string;
+  hasFailedPayment: boolean;
+  invoiceDate: string;
+  amountDue: number;
+  currency: string;
+}
+
 export async function getTeams(
   accessToken: string,
   fetchFn: DashboardFetch,
@@ -46,9 +48,6 @@ export async function getTeams(
   return sharedGetTeams(accessToken, fetchFn);
 }
 
-/**
- * Fetch all projects for a team
- */
 export async function getProjects(
   accessToken: string,
   teamId: number,
@@ -57,9 +56,6 @@ export async function getProjects(
   return sharedGetProjects(accessToken, teamId, fetchFn);
 }
 
-/**
- * Fetch all deployments for a project
- */
 export async function getDeployments(
   accessToken: string,
   projectId: number,
@@ -68,9 +64,6 @@ export async function getDeployments(
   return sharedGetDeployments(accessToken, projectId, fetchFn);
 }
 
-/**
- * Fetch user profile
- */
 export async function getProfile(
   accessToken: string,
   fetchFn: DashboardFetch,
@@ -78,10 +71,6 @@ export async function getProfile(
   return sharedGetProfile(accessToken, fetchFn);
 }
 
-/**
- * Get the subscription/plan for a team.
- * Returns null if team is on free plan (CONVEX_BASE) or no subscription found.
- */
 export async function getTeamSubscription(
   accessToken: string,
   teamId: number,
@@ -91,19 +80,6 @@ export async function getTeamSubscription(
   return result as TeamSubscription | null;
 }
 
-/**
- * Create a deploy key for a deployment.
- * This key can be used as CONVEX_DEPLOY_KEY for CLI operations.
- *
- * Uses the Management API at /v1/deployments/{deployment_name}/create_deploy_key
- * See: https://docs.convex.dev/api/management-api
- *
- * @param accessToken - The OAuth access token (from device authorization flow)
- * @param deploymentName - The deployment name (e.g., "my-project-abc123")
- * @param keyName - A name for the key (e.g., "cp-12345-1234567890")
- * @param fetchFn - The fetch function to use
- * @returns The deploy key
- */
 export async function createDeployKey(
   accessToken: string,
   deploymentName: string,
@@ -111,4 +87,67 @@ export async function createDeployKey(
   fetchFn: DashboardFetch,
 ): Promise<{ key: string }> {
   return sharedCreateDeployKey(accessToken, deploymentName, keyName, fetchFn);
+}
+
+export async function createAccessToken(
+  accessToken: string,
+  params: {
+    name: string;
+    teamId: number;
+    deploymentId?: number | null;
+    projectId?: number | null;
+    permissions?: string[] | null;
+  },
+  fetchFn: DashboardFetch,
+): Promise<{ accessToken: string }> {
+  return sharedCreateAccessToken(accessToken, params, fetchFn);
+}
+
+export async function getDeploymentAccessTokens(
+  accessToken: string,
+  deploymentName: string,
+  fetchFn: DashboardFetch,
+): Promise<AccessToken[]> {
+  return sharedGetDeploymentAccessTokens(accessToken, deploymentName, fetchFn);
+}
+
+export async function getProjectAccessTokens(
+  accessToken: string,
+  projectId: number,
+  fetchFn: DashboardFetch,
+): Promise<AccessToken[]> {
+  return sharedGetProjectAccessTokens(accessToken, projectId, fetchFn);
+}
+
+export async function deleteAccessToken(
+  accessToken: string,
+  tokenAccessToken: string,
+  fetchFn: DashboardFetch,
+): Promise<void> {
+  return sharedDeleteAccessToken(accessToken, tokenAccessToken, fetchFn);
+}
+
+export async function getInvoices(
+  accessToken: string,
+  teamId: number,
+  fetchFn: DashboardFetch,
+): Promise<Invoice[]> {
+  const response = await fetchFn(
+    `https://api.convex.dev/api/dashboard/teams/${teamId}/list_invoices`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch invoices: ${response.statusText}`);
+  }
+
+  const data = (await response.json()) as { invoices: Invoice[] };
+  return data.invoices.filter(
+    (invoice) => new Date(invoice.invoiceDate) >= new Date("2024-04-29"),
+  );
 }

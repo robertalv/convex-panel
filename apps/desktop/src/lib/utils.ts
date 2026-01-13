@@ -1,10 +1,15 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { open } from "@tauri-apps/plugin-shell";
 
-/**
- * Utility function to merge Tailwind CSS classes with proper precedence.
- * Combines clsx for conditional classes and tailwind-merge to handle conflicts.
- */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+export const openExternalLink = async (url: string) => {
+  if (typeof window !== "undefined" && (window as any).__TAURI_INTERNALS__) {
+    open(url);
+  } else {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+};

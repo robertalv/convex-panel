@@ -1,13 +1,10 @@
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import BottomSheet, {
-  BottomSheetBackdrop,
-  BottomSheetView,
-} from "@gorhom/bottom-sheet";
+import type BottomSheet from "@gorhom/bottom-sheet";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { Icon } from "../../../components/ui/Icon";
+import { BaseSheet } from "../../../components/sheets/BaseSheet";
 import type { TableDocument } from "../types";
-import { formatConvexValue } from "../utils/formatters";
 
 export interface DetailSheetProps {
   sheetRef: React.RefObject<BottomSheet>;
@@ -19,39 +16,8 @@ export interface DetailSheetProps {
   totalCount?: number;
 }
 
-export function DetailSheet({
-  sheetRef,
-  document,
-  onClose,
-  onNavigatePrevious,
-  onNavigateNext,
-  currentIndex,
-  totalCount,
-}: DetailSheetProps) {
+export function DetailSheet({ sheetRef, document, onClose }: DetailSheetProps) {
   const { theme } = useTheme();
-  
-  // Compact snap point for action menu style
-  const snapPoints = useMemo(() => ["40%"], []);
-
-  const renderBackdrop = useCallback(
-    (props: any) => (
-      <BottomSheetBackdrop
-        {...props}
-        disappearsOnIndex={-1}
-        appearsOnIndex={0}
-        opacity={0.5}
-      />
-    ),
-    [],
-  );
-
-  // If no document, keep sheet closed
-  const initialIndex = document ? 0 : -1;
-
-  const handleClose = useCallback(() => {
-    sheetRef.current?.close();
-    onClose();
-  }, [sheetRef, onClose]);
 
   // Get document identifier - prefer name, email, or fallback to _id
   const getDocumentIdentifier = useCallback((doc: TableDocument): string => {
@@ -68,21 +34,8 @@ export function DetailSheet({
   const identifier = getDocumentIdentifier(document);
 
   return (
-    <BottomSheet
-      ref={sheetRef}
-      index={initialIndex}
-      snapPoints={snapPoints}
-      enablePanDownToClose
-      backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: theme.colors.surface }}
-      handleIndicatorStyle={{ backgroundColor: theme.colors.border }}
-      onChange={(index) => {
-        if (index === -1) {
-          onClose();
-        }
-      }}
-    >
-      <BottomSheetView style={styles.container}>
+    <BaseSheet sheetRef={sheetRef} onClose={onClose} size={[280]}>
+      <View style={styles.container}>
         {/* Header with document identifier */}
         <TouchableOpacity
           style={[
@@ -103,11 +56,7 @@ export function DetailSheet({
                 { backgroundColor: theme.colors.background },
               ]}
             >
-              <Icon
-                name="table"
-                size={24}
-                color={theme.colors.textSecondary}
-              />
+              <Icon name="table" size={24} color={theme.colors.textSecondary} />
             </View>
             <View style={styles.headerText}>
               <Text
@@ -180,7 +129,9 @@ export function DetailSheet({
                   { backgroundColor: theme.colors.background },
                 ]}
               >
-                <Text style={[styles.commentText, { color: theme.colors.text }]}>
+                <Text
+                  style={[styles.commentText, { color: theme.colors.text }]}
+                >
                   💬
                 </Text>
               </View>
@@ -225,8 +176,8 @@ export function DetailSheet({
             </Text>
           </TouchableOpacity>
         </View>
-      </BottomSheetView>
-    </BottomSheet>
+      </View>
+    </BaseSheet>
   );
 }
 
@@ -330,4 +281,3 @@ const styles = StyleSheet.create({
     fontWeight: "400",
   },
 });
-

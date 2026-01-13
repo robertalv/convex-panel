@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@convex-panel/shared": "workspace:*",
-    "@hugeicons/core-free-icons": "^2.0.0",
+    "@hugeicons/core-free-icons": "^3.1.1",
     "@hugeicons/react": "^1.1.1",
     "@monaco-editor/react": "^4.6.0",
     "@pierre/diffs": "^1.0.4",

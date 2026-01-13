@@ -3,6 +3,12 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { execSync } from "child_process";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+
+// Get __dirname equivalent for ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Get git commit hash and repository URL at build time
 function getGitCommitHash(): string {
@@ -29,6 +35,18 @@ function getGitRepoUrl(): string {
   }
 }
 
+// Get package version from package.json
+function getPackageVersion(): string {
+  try {
+    const packageJson = JSON.parse(
+      readFileSync(path.resolve(__dirname, "package.json"), "utf-8")
+    );
+    return packageJson.version || "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -52,10 +70,11 @@ export default defineConfig({
   // To access the Tauri environment variables set by the CLI with information about the current target
   envPrefix: ["VITE_", "TAURI_ENV_*"],
 
-  // Inject git commit info at build time
+  // Inject git commit info and package version at build time
   define: {
     __GIT_COMMIT_HASH__: JSON.stringify(getGitCommitHash()),
     __GIT_REPO_URL__: JSON.stringify(getGitRepoUrl()),
+    __APP_VERSION__: JSON.stringify(getPackageVersion()),
   },
 
   build: {

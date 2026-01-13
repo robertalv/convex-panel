@@ -1,7 +1,3 @@
-/**
- * Date formatting utilities
- */
-
 import { format, formatDistance, formatRelative } from 'date-fns';
 
 /**

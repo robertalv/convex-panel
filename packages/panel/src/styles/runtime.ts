@@ -4,7 +4,7 @@
  * DO NOT EDIT MANUALLY - run 'npm run build:styles-ts' to regenerate.
  */
 
-export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tailwindcss.com */
+export const panelStyles = `/*! tailwindcss v4.1.18 | MIT License | https://tailwindcss.com */
 @layer properties;
 .collapse {
   visibility: collapse;

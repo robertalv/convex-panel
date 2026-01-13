@@ -1,8 +1,8 @@
 import * as React from "react";
-import { Search, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
+import Icon from "../ui/icon";
 
 export interface SearchDropdownOption {
   value: string;
@@ -68,7 +68,7 @@ export function SearchDropdown({
           <span className="truncate max-w-[150px]">
             {selectedOption ? selectedOption.label : placeholder}
           </span>
-          <ChevronDown
+          <Icon name="chevron-down"
             className={cn(
               "h-3.5 w-3.5 text-text-subtle transition-transform duration-fast",
               open && "rotate-180",
@@ -82,7 +82,7 @@ export function SearchDropdown({
       >
         {enableSearch && (
           <div className="flex items-center gap-2 px-3 py-2 border-b border-border-muted">
-            <Search className="h-3.5 w-3.5 text-text-subtle" />
+            <Icon name="search" className="h-3.5 w-3.5 text-text-subtle" />
             <input
               type="text"
               value={query}
@@ -116,7 +116,7 @@ export function SearchDropdown({
                   )}
                 >
                   {option.icon && (
-                    <div className="flex-shrink-0">{option.icon}</div>
+                    <div className="shrink-0">{option.icon}</div>
                   )}
                   <div className="flex-1 truncate">
                     <div>{option.label}</div>
@@ -126,7 +126,7 @@ export function SearchDropdown({
                       </div>
                     )}
                   </div>
-                  {isSelected && <Check className="h-3.5 w-3.5" />}
+                  {isSelected && <Icon name="check" className="h-3.5 w-3.5" />}
                 </button>
               );
             })

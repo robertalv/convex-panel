@@ -1,8 +1,4 @@
 /**
- * Validation utilities
- */
-
-/**
  * Validate email format
  */
 export function isValidEmail(email: string): boolean {

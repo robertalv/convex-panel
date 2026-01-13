@@ -32,9 +32,10 @@ const features = [
 ];
 
 export function DownloadPage() {
-    const version = "0.1.0";
+    const version = "1.0.0";
     const macDownloadUrl = `https://github.com/robertalv/convex-panel/releases/download/v${version}/Convex.Panel_${version}_aarch64.dmg`;
     const windowsDownloadUrl = `https://github.com/robertalv/convex-panel/releases/download/v${version}/Convex.Panel_${version}_x64-setup.exe`;
+    const androidDownloadUrl = `https://github.com/robertalv/convex-panel/releases/download/v${version}/convex-panel-mobile-${version}.apk`;
 
     return (
         <section className="mt-[80px] lg:mt-[140px] min-h-[530px] relative">
@@ -106,6 +107,26 @@ export function DownloadPage() {
                                 <HugeiconsIcon icon={Download01FreeIcons} className="w-5 h-5 ml-2" />
                             </Button>
                         </a>
+
+                        <a
+                            href={androidDownloadUrl}
+                            className="w-full sm:w-auto"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            <Button
+                                size="lg"
+                                variant="outline"
+                                className="w-full sm:w-auto border-border hover:bg-background-secondary px-8 py-6 text-lg gap-3"
+                            >
+                                <HugeiconsIcon icon={ComputerFreeIcons} className="w-6 h-6" />
+                                <span className="flex flex-col items-start">
+                                    <span className="text-xs opacity-80">Download for</span>
+                                    <span>Android</span>
+                                </span>
+                                <HugeiconsIcon icon={Download01FreeIcons} className="w-5 h-5 ml-2" />
+                            </Button>
+                        </a>
                     </div>
 
                     {/* Features */}
@@ -135,6 +156,10 @@ export function DownloadPage() {
                         <p>
                             <strong className="text-content-secondary">Windows:</strong>{" "}
                             Windows 10 or later, 64-bit
+                        </p>
+                        <p>
+                            <strong className="text-content-secondary">Android:</strong>{" "}
+                            Android 6.0 (API level 23) or later
                         </p>
                     </div>
 

@@ -1,9 +1,3 @@
-/**
- * App Entry Point
- *
- * Sets up providers and initializes the app
- */
-
 import React from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "react-native";

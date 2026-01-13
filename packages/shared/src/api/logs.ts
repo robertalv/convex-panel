@@ -287,6 +287,8 @@ export function processFunctionLogs(
       })(),
       requestId: raw.request_id || raw.requestId || "",
       executionId: raw.execution_id || raw.executionId || "",
+      parentExecutionId:
+        raw.parent_execution_id || raw.parentExecutionId || null,
       caller: raw.caller,
       environment:
         raw.environment === "isolate" ? "Convex" : raw.environment || "Convex",

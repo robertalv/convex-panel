@@ -1,9 +1,3 @@
-/**
- * Root Navigator
- *
- * Handles navigation between Auth and Main stacks
- */
-
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -20,7 +14,7 @@ export default function RootNavigator() {
   const { theme } = useTheme();
 
   if (isLoading) {
-    return null; // Or a loading splash screen
+    return null;
   }
 
   return (

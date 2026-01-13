@@ -288,6 +288,7 @@ export interface FunctionExecutionLog {
   usageStats: FunctionExecutionJson["usage_stats"];
   requestId: string;
   executionId: string;
+  parentExecutionId?: string | null;
   caller?: string;
   environment?: string;
   identityType: string;

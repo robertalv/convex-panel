@@ -1,7 +1,3 @@
-/**
- * Data Stack Navigator
- */
-
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { DataBrowserScreen } from "../features/data/DataBrowserScreen";

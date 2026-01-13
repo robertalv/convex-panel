@@ -1,22 +1,22 @@
 /**
  * BigBrain API Hooks
- * 
+ *
  * React Query hooks for fetching data from BigBrain API
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import * as bigbrain from '../api/bigbrain';
-import type { Team, Project, Deployment } from '../types';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import * as bigbrain from "../api/bigbrain";
+import type { Team, Project, Deployment } from "../types";
 
 /**
  * Hook for fetching teams
  */
 export function useTeams(accessToken: string | null) {
   return useQuery({
-    queryKey: ['teams', accessToken],
+    queryKey: ["teams", accessToken],
     queryFn: () => bigbrain.getTeams(accessToken!),
     enabled: !!accessToken,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -25,7 +25,7 @@ export function useTeams(accessToken: string | null) {
  */
 export function useProjects(accessToken: string | null, teamId: number | null) {
   return useQuery({
-    queryKey: ['projects', teamId, accessToken],
+    queryKey: ["projects", teamId, accessToken],
     queryFn: () => bigbrain.getProjects(accessToken!, teamId!),
     enabled: !!accessToken && !!teamId,
     staleTime: 5 * 60 * 1000,
@@ -35,12 +35,15 @@ export function useProjects(accessToken: string | null, teamId: number | null) {
 /**
  * Hook for fetching deployments for a project
  */
-export function useDeployments(accessToken: string | null, projectId: number | null) {
+export function useDeployments(
+  accessToken: string | null,
+  projectId: number | null,
+) {
   return useQuery({
-    queryKey: ['deployments', projectId, accessToken],
+    queryKey: ["deployments", projectId, accessToken],
     queryFn: () => bigbrain.getDeployments(accessToken!, projectId!),
     enabled: !!accessToken && !!projectId,
-    staleTime: 2 * 60 * 1000, // 2 minutes (more frequent for deployments)
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -49,10 +52,10 @@ export function useDeployments(accessToken: string | null, projectId: number | n
  */
 export function useProfile(accessToken: string | null) {
   return useQuery({
-    queryKey: ['profile', accessToken],
+    queryKey: ["profile", accessToken],
     queryFn: () => bigbrain.getProfile(accessToken!),
     enabled: !!accessToken,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 10 * 60 * 1000,
   });
 }
 
@@ -63,9 +66,10 @@ export function useUpdateProfileName(accessToken: string | null) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (name: string) => bigbrain.updateProfileName(accessToken!, name),
+    mutationFn: (name: string) =>
+      bigbrain.updateProfileName(accessToken!, name),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['profile', accessToken] });
+      queryClient.invalidateQueries({ queryKey: ["profile", accessToken] });
     },
   });
 }
@@ -75,10 +79,10 @@ export function useUpdateProfileName(accessToken: string | null) {
  */
 export function useProfileEmails(accessToken: string | null) {
   return useQuery({
-    queryKey: ['profileEmails', accessToken],
+    queryKey: ["profileEmails", accessToken],
     queryFn: () => bigbrain.getProfileEmails(accessToken!),
     enabled: !!accessToken,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 10 * 60 * 1000,
   });
 }
 
@@ -87,20 +91,53 @@ export function useProfileEmails(accessToken: string | null) {
  */
 export function useIdentities(accessToken: string | null) {
   return useQuery({
-    queryKey: ['identities', accessToken],
+    queryKey: ["identities", accessToken],
     queryFn: () => bigbrain.getIdentities(accessToken!),
     enabled: !!accessToken,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 10 * 60 * 1000,
   });
 }
 
 /**
  * Hook for fetching team subscription
  */
-export function useTeamSubscription(accessToken: string | null, teamId: number | null) {
+export function useTeamSubscription(
+  accessToken: string | null,
+  teamId: number | null,
+) {
   return useQuery({
-    queryKey: ['subscription', teamId, accessToken],
+    queryKey: ["subscription", teamId, accessToken],
     queryFn: () => bigbrain.getTeamSubscription(accessToken!, teamId!),
+    enabled: !!accessToken && !!teamId,
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+/**
+ * Hook for fetching team referral state
+ */
+export function useTeamReferralState(
+  accessToken: string | null,
+  teamId: number | null,
+) {
+  return useQuery({
+    queryKey: ["referrals", teamId, accessToken],
+    queryFn: () => bigbrain.getTeamReferralState(accessToken!, teamId!),
+    enabled: !!accessToken && !!teamId,
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+/**
+ * Hook for fetching available plans for a team
+ */
+export function usePlans(accessToken: string | null, teamId: number | null) {
+  return useQuery({
+    queryKey: ["plans", teamId, accessToken],
+    queryFn: async () => {
+      const billing = await import("../api/billing");
+      return billing.getPlans(accessToken!, teamId!);
+    },
     enabled: !!accessToken && !!teamId,
     staleTime: 10 * 60 * 1000,
   });
@@ -114,21 +151,28 @@ export function useDeploymentInsights(
   teamId: number | null,
   projectId: number | null,
   deploymentName: string | null,
-  period: { from: string; to: string }
+  period: { from: string; to: string },
 ) {
   return useQuery({
-    queryKey: ['insights', teamId, projectId, deploymentName, period, accessToken],
+    queryKey: [
+      "insights",
+      teamId,
+      projectId,
+      deploymentName,
+      period,
+      accessToken,
+    ],
     queryFn: () =>
       bigbrain.getDeploymentInsights(
         accessToken!,
         teamId!,
         projectId!,
         deploymentName!,
-        period
+        period,
       ),
     enabled: !!accessToken && !!teamId && !!projectId && !!deploymentName,
-    staleTime: 1 * 60 * 1000, // 1 minute
-    refetchInterval: 30 * 1000, // Refetch every 30 seconds for live data
+    staleTime: 1 * 60 * 1000,
+    refetchInterval: 30 * 1000,
   });
 }
 
@@ -139,11 +183,16 @@ export function useCreateDeployKey(accessToken: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ deploymentName, keyName }: { deploymentName: string; keyName: string }) =>
-      bigbrain.createDeployKey(accessToken, deploymentName, keyName),
+    mutationFn: ({
+      deploymentName,
+      keyName,
+    }: {
+      deploymentName: string;
+      keyName: string;
+    }) => bigbrain.createDeployKey(accessToken, deploymentName, keyName),
     onSuccess: () => {
       // Optionally invalidate related queries
-      queryClient.invalidateQueries({ queryKey: ['deployments'] });
+      queryClient.invalidateQueries({ queryKey: ["deployments"] });
     },
   });
 }
@@ -161,11 +210,12 @@ export function useRollbackDeployment(accessToken: string) {
     }: {
       deploymentName: string;
       targetVersion: string;
-    }) => bigbrain.rollbackDeployment(accessToken, deploymentName, targetVersion),
+    }) =>
+      bigbrain.rollbackDeployment(accessToken, deploymentName, targetVersion),
     onSuccess: () => {
       // Invalidate deployments and insights
-      queryClient.invalidateQueries({ queryKey: ['deployments'] });
-      queryClient.invalidateQueries({ queryKey: ['insights'] });
+      queryClient.invalidateQueries({ queryKey: ["deployments"] });
+      queryClient.invalidateQueries({ queryKey: ["insights"] });
     },
   });
 }
@@ -185,7 +235,7 @@ export function useDisableFunction(accessToken: string) {
       functionName: string;
     }) => bigbrain.disableFunction(accessToken, deploymentName, functionName),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['insights'] });
+      queryClient.invalidateQueries({ queryKey: ["insights"] });
     },
   });
 }
@@ -200,7 +250,7 @@ export function useClearCache(accessToken: string) {
     mutationFn: ({ deploymentName }: { deploymentName: string }) =>
       bigbrain.clearCache(accessToken, deploymentName),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['insights'] });
+      queryClient.invalidateQueries({ queryKey: ["insights"] });
     },
   });
 }
@@ -210,7 +260,7 @@ export function useClearCache(accessToken: string) {
  */
 export function useBigBrain(accessToken: string | null) {
   const teams = useTeams(accessToken);
-  
+
   return {
     teams: teams.data || [],
     isLoadingTeams: teams.isLoading,

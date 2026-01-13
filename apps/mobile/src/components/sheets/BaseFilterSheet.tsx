@@ -1,25 +1,23 @@
 /**
  * BaseFilterSheet - Shared bottom sheet component for filters
  * Provides common structure and behavior for DataFilterSheet and LogFilterSheet
+ *
+ * Uses BaseSheet as the single source of truth for bottom sheet behavior.
  */
 
 import React, {
   useCallback,
-  useMemo,
   useState,
   useEffect,
   useRef,
   ReactNode,
 } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
-import BottomSheet, {
-  BottomSheetBackdrop,
-  BottomSheetView,
-} from "@gorhom/bottom-sheet";
-import type BottomSheetType from "@gorhom/bottom-sheet";
+import type BottomSheet from "@gorhom/bottom-sheet";
 import { useTheme } from "../../contexts/ThemeContext";
 import { Icon } from "../ui/Icon";
 import { filterSheetStyles } from "./filterSheetStyles";
+import { BaseSheet } from "./BaseSheet";
 
 export interface BaseFilterClause {
   id: string;
@@ -86,36 +84,18 @@ export function BaseFilterSheet<T extends BaseFilterClause>({
   const { theme } = useTheme();
   const [mode, setMode] = useState<SheetMode>("overview");
   const [editingClauseId, setEditingClauseId] = useState<string | null>(null);
-  const [editingPart, setEditingPart] = useState<"field" | "operator" | "value" | undefined>(undefined);
+  const [editingPart, setEditingPart] = useState<
+    "field" | "operator" | "value" | undefined
+  >(undefined);
   const [selectedClauseId, setSelectedClauseId] = useState<string | null>(null);
   const [modalPickerVisible, setModalPickerVisible] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const nestedPickerRef = useRef<BottomSheetType>(null);
+  const nestedPickerRef = useRef<BottomSheet>(null);
 
   const filterCount = filters.clauses?.length ?? 0;
 
-  // Dynamic snap points based on filter count
-  const snapPoints = useMemo(() => {
-    const baseHeight = 25;
-    const heightPerFilter = 8;
-    const dynamicHeight = Math.min(
-      baseHeight + filterCount * heightPerFilter,
-      70,
-    );
-    return [`${dynamicHeight}%`, "70%"];
-  }, [filterCount]);
-
-  const renderBackdrop = useCallback(
-    (props: any) => (
-      <BottomSheetBackdrop
-        {...props}
-        disappearsOnIndex={-1}
-        appearsOnIndex={0}
-        opacity={0.5}
-      />
-    ),
-    [],
-  );
+  // Maximum height for the sheet content (60% of a typical screen)
+  const MAX_SHEET_HEIGHT = 500;
 
   // Helper to update filters
   const updateFilters = useCallback(
@@ -144,21 +124,13 @@ export function BaseFilterSheet<T extends BaseFilterClause>({
         setEditingClauseId(null);
         setEditingPart(undefined);
         onSheetClose?.();
-      } else if (index === 0 && mode === "select") {
-        setMode("overview");
-        setEditingClauseId(null);
-        setEditingPart(undefined);
       }
     },
-    [mode, filters, onChangeFilters, onSheetClose],
+    [filters, onChangeFilters, onSheetClose],
   );
 
-  // Adjust sheet height when filters change (only if sheet is already open)
-  useEffect(() => {
-    if (isSheetOpen && mode === "overview") {
-      sheetRef.current?.snapToIndex(0);
-    }
-  }, [filterCount, mode, isSheetOpen, sheetRef]);
+  // With dynamic sizing, the sheet automatically resizes when content changes
+  // No need to manually adjust snap points
 
   // Open nested picker when selectedClauseId is set and renderNestedPicker exists
   useEffect(() => {
@@ -166,7 +138,7 @@ export function BaseFilterSheet<T extends BaseFilterClause>({
       // Use a timeout with retry to ensure the BottomSheet is mounted and ready
       let retries = 0;
       const maxRetries = 10;
-      
+
       const tryOpen = () => {
         if (nestedPickerRef.current) {
           try {
@@ -183,7 +155,7 @@ export function BaseFilterSheet<T extends BaseFilterClause>({
           setTimeout(tryOpen, 50);
         }
       };
-      
+
       // Start trying after a short delay
       const timeoutId = setTimeout(tryOpen, 100);
       return () => clearTimeout(timeoutId);
@@ -196,8 +168,8 @@ export function BaseFilterSheet<T extends BaseFilterClause>({
   const handleAddFilter = useCallback(() => {
     setEditingClauseId(null);
     setMode("select");
-    sheetRef.current?.snapToIndex(1);
-  }, [sheetRef]);
+    // With dynamic sizing, the sheet will automatically resize when content changes
+  }, []);
 
   const handleUpdateClause = useCallback(
     (id: string, updates: Partial<T>) => {
@@ -268,17 +240,22 @@ export function BaseFilterSheet<T extends BaseFilterClause>({
       setEditingClauseId(id);
       setEditingPart(part);
       setMode("select");
-      sheetRef.current?.snapToIndex(1);
+      // With dynamic sizing, the sheet will automatically resize when content changes
     },
-    [sheetRef],
+    [],
   );
 
+  const handleBack = useCallback(() => {
+    setEditingClauseId(null);
+    setMode("overview");
+    // With dynamic sizing, the sheet will automatically resize when content changes
+  }, []);
 
   const renderOverview = () => {
     const hasFilters = filters.clauses && filters.clauses.length > 0;
 
     return (
-      <View style={filterSheetStyles.body}>
+      <View style={{ padding: 16 }}>
         {!hasFilters && (
           <>
             <View style={filterSheetStyles.emptyState}>
@@ -340,13 +317,15 @@ export function BaseFilterSheet<T extends BaseFilterClause>({
                     (id) => {
                       if (id) {
                         // Check if this is for operator selection (DataFilterSheet) vs value selection (LogFilterSheet)
-                        const clause = filters.clauses?.find((c) => c.id === id);
+                        const clause = filters.clauses?.find(
+                          (c) => c.id === id,
+                        );
                         // If clause has 'op' field, it's a FilterClause and we're selecting operator
                         // If clause has 'type' field, it's a LogFilterClause and we're selecting value
-                        if (clause && 'op' in clause) {
+                        if (clause && "op" in clause) {
                           // This is operator selection in DataFilterSheet - use edit mode
                           handleEditClause(id, "operator");
-                        } else if (clause && 'type' in clause) {
+                        } else if (clause && "type" in clause) {
                           // This is value selection in LogFilterSheet - use edit mode
                           handleEditClause(id, "value");
                         } else if (config.renderNestedPicker) {
@@ -385,80 +364,66 @@ export function BaseFilterSheet<T extends BaseFilterClause>({
 
   const title = mode === "overview" ? config.overviewTitle : config.selectTitle;
 
+  // Header left: Back button in select mode, Clear all in overview mode with filters
+  const headerLeft =
+    mode === "select" ? (
+      <TouchableOpacity onPress={handleBack} activeOpacity={0.7}>
+        <Icon
+          name="chevron-back"
+          size={20}
+          color={theme.colors.textSecondary}
+        />
+      </TouchableOpacity>
+    ) : filterCount > 0 ? (
+      <TouchableOpacity onPress={handleClearAll} activeOpacity={0.7}>
+        <Text
+          style={[
+            filterSheetStyles.headerClear,
+            { color: theme.colors.textSecondary },
+          ]}
+        >
+          Clear all
+        </Text>
+      </TouchableOpacity>
+    ) : undefined;
+
+  // Header right: Done/Apply button
+  const headerRight = (
+    <TouchableOpacity onPress={handleDone} activeOpacity={0.7}>
+      <Text
+        style={[filterSheetStyles.headerDone, { color: theme.colors.primary }]}
+      >
+        {mode === "overview" ? "Done" : "Apply"}
+      </Text>
+    </TouchableOpacity>
+  );
+
   return (
-    <BottomSheet
-      ref={sheetRef}
-      index={-1}
-      snapPoints={snapPoints}
-      backdropComponent={renderBackdrop}
-      onChange={handleSheetChange}
-      enablePanDownToClose
-      backgroundStyle={{ backgroundColor: theme.colors.surface }}
-      handleIndicatorStyle={{ backgroundColor: theme.colors.border }}
-    >
-      <BottomSheetView style={filterSheetStyles.container}>
-        {/* Header */}
-        <View style={filterSheetStyles.header}>
-          <View style={filterSheetStyles.headerSide}>
-            {mode === "select" ? (
-              <TouchableOpacity
-                onPress={() => {
-                  setEditingClauseId(null);
-                  setMode("overview");
-                  sheetRef.current?.snapToIndex(0);
-                }}
-                activeOpacity={0.7}
-              >
-                <Icon
-                  name="chevron-back"
-                  size={20}
-                  color={theme.colors.textSecondary}
-                />
-              </TouchableOpacity>
-            ) : filterCount > 0 ? (
-              <TouchableOpacity onPress={handleClearAll} activeOpacity={0.7}>
-                <Text
-                  style={[
-                    filterSheetStyles.headerClear,
-                    { color: theme.colors.textSecondary },
-                  ]}
-                >
-                  Clear all
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-
-          <Text
-            style={[
-              filterSheetStyles.headerTitle,
-              { color: theme.colors.text },
-            ]}
-          >
-            {title}
-          </Text>
-
-          <TouchableOpacity
-            style={filterSheetStyles.headerSide}
-            onPress={handleDone}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                filterSheetStyles.headerDone,
-                { color: theme.colors.primary },
-              ]}
-            >
-              {mode === "overview" ? "Done" : "Apply"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
+    <>
+      <BaseSheet
+        sheetRef={sheetRef}
+        size="dynamic"
+        maxDynamicContentSize={MAX_SHEET_HEIGHT}
+        scrollable
+        title={title}
+        headerLeft={headerLeft}
+        headerRight={headerRight}
+        onChange={handleSheetChange}
+        handleKeyboard
+      >
         {/* Content */}
-        {mode === "overview"
-          ? renderOverview()
-          : config.renderSelectMode(handleSelectUpdate, editingClauseId, editingPart)}
-      </BottomSheetView>
+        {mode === "overview" ? (
+          renderOverview()
+        ) : (
+          <View>
+            {config.renderSelectMode(
+              handleSelectUpdate,
+              editingClauseId,
+              editingPart,
+            )}
+          </View>
+        )}
+      </BaseSheet>
 
       {/* Optional Modal Picker */}
       {config.renderModalPicker &&
@@ -482,69 +447,51 @@ export function BaseFilterSheet<T extends BaseFilterClause>({
 
       {/* Optional Nested Bottom Sheet Picker */}
       {config.renderNestedPicker && (
-        <BottomSheet
-          ref={nestedPickerRef}
-          index={-1}
-          snapPoints={["50%", "70%"]}
-          enablePanDownToClose
-          backdropComponent={renderBackdrop}
-          backgroundStyle={{ backgroundColor: theme.colors.background }}
-          handleIndicatorStyle={{ backgroundColor: theme.colors.border }}
+        <BaseSheet
+          sheetRef={nestedPickerRef}
+          size="dynamic"
+          maxDynamicContentSize={MAX_SHEET_HEIGHT}
+          scrollable
+          title={config.nestedPickerTitle || "Select"}
+          headerLeft={
+            <TouchableOpacity
+              onPress={() => {
+                nestedPickerRef.current?.close();
+              }}
+              activeOpacity={0.7}
+            >
+              <Icon
+                name="chevron-back"
+                size={20}
+                color={theme.colors.textSecondary}
+              />
+            </TouchableOpacity>
+          }
           onChange={(index) => {
             if (index === -1) {
               setSelectedClauseId(null);
             }
           }}
         >
-          <BottomSheetView style={filterSheetStyles.container}>
-            {/* Header */}
-            <View style={filterSheetStyles.header}>
-              <View style={filterSheetStyles.headerSide}>
-                <TouchableOpacity
-                  onPress={() => {
-                    nestedPickerRef.current?.close();
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Icon
-                    name="chevron-back"
-                    size={20}
-                    color={theme.colors.textSecondary}
-                  />
-                </TouchableOpacity>
-              </View>
-              <Text
-                style={[
-                  filterSheetStyles.headerTitle,
-                  { color: theme.colors.text },
-                ]}
-              >
-                {config.nestedPickerTitle || "Select"}
-              </Text>
-              <View style={filterSheetStyles.headerSide} />
-            </View>
-
-            {/* Content */}
-            {config.renderNestedPicker(
-              selectedClauseId,
-              () => {
-                nestedPickerRef.current?.close();
-                setSelectedClauseId(null);
-              },
-              (value) => {
-                if (selectedClauseId) {
-                  handleUpdateClause(selectedClauseId, {
-                    ...value,
-                  } as unknown as Partial<T>);
-                }
-                nestedPickerRef.current?.close();
-                setSelectedClauseId(null);
-              },
-            )}
-          </BottomSheetView>
-        </BottomSheet>
+          {config.renderNestedPicker(
+            selectedClauseId,
+            () => {
+              nestedPickerRef.current?.close();
+              setSelectedClauseId(null);
+            },
+            (value) => {
+              if (selectedClauseId) {
+                handleUpdateClause(selectedClauseId, {
+                  ...value,
+                } as unknown as Partial<T>);
+              }
+              nestedPickerRef.current?.close();
+              setSelectedClauseId(null);
+            },
+          )}
+        </BaseSheet>
       )}
-    </BottomSheet>
+    </>
   );
 }
 
@@ -581,11 +528,7 @@ export function FilterPillButton({
       >
         {label}
       </Text>
-      <Icon
-        name="chevron-down"
-        size={14}
-        color={theme.colors.textSecondary}
-      />
+      <Icon name="chevron-down" size={14} color={theme.colors.textSecondary} />
     </TouchableOpacity>
   );
 }

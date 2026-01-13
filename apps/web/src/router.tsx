@@ -22,7 +22,6 @@ const RootLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </div>
 );
 
-// Home page (marketing + embedded ConvexPanel)
 const HomePage: React.FC = () => {
   return (
     <main className="w-full px-4 md:px-12 lg:px-36 overflow-hidden">

@@ -1,11 +1,11 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useDeployment } from "@/contexts/DeploymentContext";
-import { STALE_TIME } from "@/contexts/QueryContext";
-import { healthMetricsKeys } from "@/features/health/hooks/useHealthMetrics";
-import { udfExecutionStatsKeys } from "@/features/health/hooks/useUdfExecutionStats";
-import { deploymentStatusKeys } from "@/features/health/hooks/useDeploymentStatus";
-import { recentErrorsKeys } from "@/features/health/hooks/useRecentErrors";
+import { useDeployment } from "@/contexts/deployment-context";
+import { STALE_TIME } from "@/contexts/query-context";
+import { healthMetricsKeys } from "@/views/health/hooks/useHealthMetrics";
+import { udfExecutionStatsKeys } from "@/views/health/hooks/useUdfExecutionStats";
+import { deploymentStatusKeys } from "@/views/health/hooks/useDeploymentStatus";
+import { recentErrorsKeys } from "@/views/health/hooks/useRecentErrors";
 import {
   fetchFailureRate,
   fetchCacheHitRate,

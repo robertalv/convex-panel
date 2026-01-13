@@ -6,29 +6,63 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_CONVEX_URL": "https://friendly-wombat-759.convex.cloud",
+        "EXPO_PUBLIC_PROJECT_ID": "convex-panel-mobile",
+        "EXPO_PUBLIC_ACCESS_TOKEN_KEY": "convex_access_token",
+        "EXPO_PUBLIC_REFRESH_TOKEN_KEY": "convex_refresh_token",
+        "EXPO_PUBLIC_SESSION_KEY": "convex_session"
+      },
       "ios": {
         "simulator": true
       }
     },
     "preview": {
       "distribution": "internal",
-      "ios": {
-        "simulator": false
-      },
-      "android": {
-        "buildType": "apk"
-      }
-    },
-    "production": {
       "env": {
-        "NODE_ENV": "production"
+        "EXPO_PUBLIC_CONVEX_URL": "https://friendly-wombat-759.convex.cloud",
+        "EXPO_PUBLIC_PROJECT_ID": "convex-panel-mobile",
+        "EXPO_PUBLIC_ACCESS_TOKEN_KEY": "convex_access_token",
+        "EXPO_PUBLIC_REFRESH_TOKEN_KEY": "convex_refresh_token",
+        "EXPO_PUBLIC_SESSION_KEY": "convex_session"
       },
       "ios": {
         "simulator": false,
         "buildConfiguration": "Release"
       },
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "apk"
+      }
+    },
+    "testflight": {
+      "distribution": "store",
+      "env": {
+        "EXPO_PUBLIC_CONVEX_URL": "https://friendly-wombat-759.convex.cloud",
+        "EXPO_PUBLIC_PROJECT_ID": "convex-panel-mobile",
+        "EXPO_PUBLIC_ACCESS_TOKEN_KEY": "convex_access_token",
+        "EXPO_PUBLIC_REFRESH_TOKEN_KEY": "convex_refresh_token",
+        "EXPO_PUBLIC_SESSION_KEY": "convex_session"
+      },
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      }
+    },
+    "production": {
+      "env": {
+        "NODE_ENV": "production",
+        "EXPO_PUBLIC_CONVEX_URL": "https://friendly-wombat-759.convex.cloud",
+        "EXPO_PUBLIC_PROJECT_ID": "convex-panel-mobile",
+        "EXPO_PUBLIC_ACCESS_TOKEN_KEY": "convex_access_token",
+        "EXPO_PUBLIC_REFRESH_TOKEN_KEY": "convex_refresh_token",
+        "EXPO_PUBLIC_SESSION_KEY": "convex_session"
+      },
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      },
+      "android": {
+        "buildType": "apk"
       }
     }
   },

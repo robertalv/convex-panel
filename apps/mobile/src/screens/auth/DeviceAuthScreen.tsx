@@ -1,10 +1,4 @@
-/**
- * Device Authorization Screen
- * 
- * Shows the user code and handles OAuth device flow
- */
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,27 +7,30 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
-  SafeAreaView,
-} from 'react-native';
-
-
-import * as Clipboard from 'expo-clipboard';
-import { useTheme } from '../../contexts/ThemeContext';
-import { useAuth } from '../../contexts/AuthContext';
-import * as authService from '../../services/auth';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RouteProp } from '@react-navigation/native';
-import type { AuthStackParamList, DeviceAuthResponse } from '../../types';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import * as Clipboard from "expo-clipboard";
+import { useTheme } from "../../contexts/ThemeContext";
+import { useAuth } from "../../contexts/AuthContext";
+import * as authService from "../../services/auth";
+import * as WebBrowser from "expo-web-browser";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { RouteProp } from "@react-navigation/native";
+import type { AuthStackParamList, DeviceAuthResponse } from "../../types";
 
 type DeviceAuthScreenProps = {
-  navigation: NativeStackNavigationProp<AuthStackParamList, 'DeviceAuth'>;
-  route: RouteProp<AuthStackParamList, 'DeviceAuth'>;
+  navigation: NativeStackNavigationProp<AuthStackParamList, "DeviceAuth">;
+  route: RouteProp<AuthStackParamList, "DeviceAuth">;
 };
 
-export default function DeviceAuthScreen({ navigation }: DeviceAuthScreenProps) {
+export default function DeviceAuthScreen({
+  navigation,
+}: DeviceAuthScreenProps) {
   const { theme } = useTheme();
   const { login } = useAuth();
-  const [authResponse, setAuthResponse] = useState<DeviceAuthResponse | null>(null);
+  const [authResponse, setAuthResponse] = useState<DeviceAuthResponse | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isPolling, setIsPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +48,7 @@ export default function DeviceAuthScreen({ navigation }: DeviceAuthScreenProps) 
       setIsLoading(false);
       startPolling(response);
     } catch (err: any) {
-      setError(err.message || 'Failed to start authorization');
+      setError(err.message || "Failed to start authorization");
       setIsLoading(false);
     }
   };
@@ -65,31 +62,27 @@ export default function DeviceAuthScreen({ navigation }: DeviceAuthScreenProps) 
     const poll = async () => {
       if (attempts >= maxAttempts) {
         setIsPolling(false);
-        setError('Authorization expired. Please try again.');
+        setError("Authorization expired. Please try again.");
         return;
       }
 
       try {
         const tokenResponse = await authService.pollForDeviceToken(auth);
-        
+
         if (tokenResponse) {
-          // Success! Exchange for dashboard token
-          // Use access_token as authnToken (desktop app pattern)
           const dashboardSession = await authService.exchangeForDashboardToken(
-            tokenResponse.access_token
+            tokenResponse.access_token,
           );
-          
+
           await login(dashboardSession);
           setIsPolling(false);
-          // Navigation will be handled by App.tsx based on auth state
         } else {
-          // Not authorized yet, try again
           attempts++;
           setTimeout(poll, interval);
         }
       } catch (err: any) {
         setIsPolling(false);
-        setError(err.message || 'Authorization failed');
+        setError(err.message || "Authorization failed");
       }
     };
 
@@ -99,26 +92,31 @@ export default function DeviceAuthScreen({ navigation }: DeviceAuthScreenProps) 
   const handleCopyCode = async () => {
     if (authResponse) {
       await Clipboard.setStringAsync(authResponse.user_code);
-      Alert.alert('Copied!', 'User code copied to clipboard');
+      Alert.alert("Copied!", "User code copied to clipboard");
     }
   };
 
   const handleOpenBrowser = async () => {
     if (authResponse) {
-      const url = authResponse.verification_uri_complete || authResponse.verification_uri;
-      const canOpen = await Linking.canOpenURL(url);
-      
-      if (canOpen) {
-        await Linking.openURL(url);
-      } else {
-        Alert.alert('Error', 'Cannot open browser');
+      const url =
+        authResponse.verification_uri_complete || authResponse.verification_uri;
+
+      try {
+        // Open in-app browser (slide-up modal)
+        await WebBrowser.openAuthSessionAsync(url, undefined, {
+          preferEphemeralSession: true,
+        });
+      } catch (error) {
+        Alert.alert("Error", "Cannot open browser");
       }
     }
   };
 
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
+      >
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={[styles.loadingText, { color: theme.colors.text }]}>
@@ -131,7 +129,9 @@ export default function DeviceAuthScreen({ navigation }: DeviceAuthScreenProps) 
 
   if (error) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
+      >
         <View style={styles.centerContent}>
           <Text style={[styles.errorText, { color: theme.colors.error }]}>
             {error}
@@ -148,29 +148,37 @@ export default function DeviceAuthScreen({ navigation }: DeviceAuthScreenProps) 
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       <View style={styles.content}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.colors.text }]}>
             Sign in to Convex
           </Text>
-          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+          <Text
+            style={[styles.subtitle, { color: theme.colors.textSecondary }]}
+          >
             Follow these steps to authenticate:
           </Text>
         </View>
 
         <View style={styles.steps}>
-          <StepItem
-            number={1}
-            text="Copy your user code"
-            theme={theme}
-          />
-          <View style={[styles.codeContainer, { backgroundColor: theme.colors.surface }]}>
+          <StepItem number={1} text="Copy your user code" theme={theme} />
+          <View
+            style={[
+              styles.codeContainer,
+              { backgroundColor: theme.colors.surface },
+            ]}
+          >
             <Text style={[styles.code, { color: theme.colors.text }]}>
               {authResponse?.user_code}
             </Text>
             <TouchableOpacity
-              style={[styles.copyButton, { backgroundColor: theme.colors.primary }]}
+              style={[
+                styles.copyButton,
+                { backgroundColor: theme.colors.primary },
+              ]}
               onPress={handleCopyCode}
             >
               <Text style={styles.copyButtonText}>Copy</Text>
@@ -186,7 +194,12 @@ export default function DeviceAuthScreen({ navigation }: DeviceAuthScreenProps) 
             style={[styles.browserButton, { borderColor: theme.colors.border }]}
             onPress={handleOpenBrowser}
           >
-            <Text style={[styles.browserButtonText, { color: theme.colors.primary }]}>
+            <Text
+              style={[
+                styles.browserButtonText,
+                { color: theme.colors.primary },
+              ]}
+            >
               Open Browser
             </Text>
           </TouchableOpacity>
@@ -201,7 +214,12 @@ export default function DeviceAuthScreen({ navigation }: DeviceAuthScreenProps) 
         {isPolling && (
           <View style={styles.pollingContainer}>
             <ActivityIndicator size="small" color={theme.colors.primary} />
-            <Text style={[styles.pollingText, { color: theme.colors.textSecondary }]}>
+            <Text
+              style={[
+                styles.pollingText,
+                { color: theme.colors.textSecondary },
+              ]}
+            >
               Waiting for authorization...
             </Text>
           </View>
@@ -211,7 +229,12 @@ export default function DeviceAuthScreen({ navigation }: DeviceAuthScreenProps) 
           style={styles.cancelButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={[styles.cancelButtonText, { color: theme.colors.textSecondary }]}>
+          <Text
+            style={[
+              styles.cancelButtonText,
+              { color: theme.colors.textSecondary },
+            ]}
+          >
             Cancel
           </Text>
         </TouchableOpacity>
@@ -220,13 +243,25 @@ export default function DeviceAuthScreen({ navigation }: DeviceAuthScreenProps) 
   );
 }
 
-function StepItem({ number, text, theme }: { number: number; text: string; theme: any }) {
+function StepItem({
+  number,
+  text,
+  theme,
+}: {
+  number: number;
+  text: string;
+  theme: any;
+}) {
   return (
     <View style={styles.stepItem}>
-      <View style={[styles.stepNumber, { backgroundColor: theme.colors.primary }]}>
+      <View
+        style={[styles.stepNumber, { backgroundColor: theme.colors.primary }]}
+      >
         <Text style={styles.stepNumberText}>{number}</Text>
       </View>
-      <Text style={[styles.stepText, { color: theme.colors.text }]}>{text}</Text>
+      <Text style={[styles.stepText, { color: theme.colors.text }]}>
+        {text}
+      </Text>
     </View>
   );
 }
@@ -241,8 +276,8 @@ const styles = StyleSheet.create({
   },
   centerContent: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 24,
   },
   header: {
@@ -250,7 +285,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 8,
   },
   subtitle: {
@@ -261,29 +296,29 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   stepItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   stepNumber: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   stepNumberText: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   stepText: {
     fontSize: 16,
   },
   codeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     padding: 16,
     borderRadius: 12,
     marginLeft: 44,
@@ -291,7 +326,7 @@ const styles = StyleSheet.create({
   },
   code: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     letterSpacing: 4,
   },
   copyButton: {
@@ -300,27 +335,27 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   copyButtonText: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   browserButton: {
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 12,
     borderWidth: 2,
-    alignItems: 'center',
+    alignItems: "center",
     marginLeft: 44,
     marginBottom: 8,
   },
   browserButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   pollingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 12,
     marginTop: 24,
   },
@@ -329,7 +364,7 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     paddingVertical: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
   cancelButtonText: {
     fontSize: 16,
@@ -340,7 +375,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 24,
   },
   button: {
@@ -349,8 +384,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   buttonText: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

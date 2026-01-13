@@ -1,7 +1,3 @@
-/**
- * Logs Stack Navigator
- */
-
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { LogsScreen } from "../features/logs/LogsScreen";
@@ -14,12 +10,12 @@ const Stack = createNativeStackNavigator<LogsStackParamList>();
 
 export function LogsStack() {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <Stack.Screen name="LogsList" component={LogsScreen} />
+    <Stack.Navigator>
+      <Stack.Screen
+        name="LogsList"
+        component={LogsScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }

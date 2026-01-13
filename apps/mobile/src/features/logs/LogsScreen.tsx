@@ -10,15 +10,16 @@ import {
   StyleSheet,
   RefreshControl,
   TextInput,
-  TouchableOpacity,
   Text,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { useDeployment } from "../../contexts/DeploymentContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
-import { Icon } from "../../components/ui/Icon";
+import { useSheet } from "../../contexts/SheetContext";
+import { AppHeader } from "../../components/AppHeader";
 import {
   useLogStream,
   filterLogsBySearch,
@@ -27,14 +28,45 @@ import {
 import { LogCard } from "./components/LogCard";
 import { LogTableHeader } from "./components/LogTableHeader";
 import { LogDetailSheet } from "./components/LogDetailSheet";
-import { LogFilterSheet, type LogFilters } from "./components/LogFilterSheet";
+import { BaseFilterSheet } from "../../components/sheets/BaseFilterSheet";
+import {
+  useLogFilterConfig,
+  type LogFilters,
+  type LogFilterClause,
+} from "./hooks/useLogFilterConfig";
 import { EmptyLogsState } from "./components/EmptyLogsState";
 import type { LogEntry } from "../../api/logs";
+
+// Inline wrapper component using the hook and base sheet
+
+interface LogFilterSheetWrapperProps {
+  sheetRef: React.RefObject<BottomSheet>;
+  filters: LogFilters;
+  onChangeFilters: (filters: LogFilters) => void;
+}
+
+function LogFilterSheetWrapper({
+  sheetRef,
+  filters,
+  onChangeFilters,
+}: LogFilterSheetWrapperProps) {
+  const { config } = useLogFilterConfig({ filters });
+
+  return (
+    <BaseFilterSheet
+      sheetRef={sheetRef}
+      filters={filters}
+      onChangeFilters={onChangeFilters}
+      config={config}
+    />
+  );
+}
 
 export function LogsScreen() {
   const { deployment } = useDeployment();
   const { session } = useAuth();
   const { theme } = useTheme();
+  const { openSheet } = useSheet();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
   const [filters, setFilters] = useState<LogFilters>({
@@ -109,6 +141,7 @@ export function LogsScreen() {
 
   // Open filter sheet
   const handleOpenFilters = () => {
+    Keyboard.dismiss();
     filterSheetRef.current?.snapToIndex(0);
   };
 
@@ -121,84 +154,56 @@ export function LogsScreen() {
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
-      edges={["top"]}
+      edges={[]}
     >
-      {/* Header with search and actions */}
-      <View style={styles.topSection}>
-        {/* Search and buttons row */}
-        <View style={styles.controlsRow}>
-          <View style={styles.searchWrapper}>
-            <TextInput
-              style={[
-                styles.searchInput,
-                {
-                  color: theme.colors.text,
-                  backgroundColor: theme.colors.surface,
-                  borderColor: theme.colors.border,
-                },
-              ]}
-              placeholder="Filter logs..."
-              placeholderTextColor={theme.colors.textTertiary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
+      {/* Header */}
+      <AppHeader
+        title="Logs"
+        actions={[
+          {
+            icon: "clear",
+            onPress: clearLogs,
+            color: theme.colors.error,
+          },
+          {
+            icon: "filter",
+            onPress: handleOpenFilters,
+            color: hasActiveFilters ? theme.colors.primary : theme.colors.text,
+            badge: hasActiveFilters ? activeFilterCount : undefined,
+          },
+          {
+            icon: isPaused ? "toggle-off" : "toggle-on",
+            onPress: isPaused ? resume : pause,
+            color: isPaused
+              ? theme.colors.textSecondary
+              : theme.colors.success || "#22c55e",
+          },
+          {
+            icon: "more-vertical",
+            onPress: () => {
+              Keyboard.dismiss();
+              openSheet("menu");
+            },
+          },
+        ]}
+      />
 
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={clearLogs}
-            activeOpacity={0.7}
-          >
-            <Icon name="clear" size={18} color={theme.colors.error} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={handleOpenFilters}
-            activeOpacity={0.7}
-          >
-            <View style={styles.iconButtonContainer}>
-              <Icon
-                name="filter"
-                size={18}
-                color={
-                  hasActiveFilters ? theme.colors.primary : theme.colors.text
-                }
-              />
-              {hasActiveFilters && activeFilterCount > 0 && (
-                <View
-                  style={[
-                    styles.filterBadge,
-                    {
-                      backgroundColor: theme.colors.primary,
-                      borderColor: theme.colors.background,
-                    },
-                  ]}
-                >
-                  <Text style={styles.filterBadgeText}>
-                    {activeFilterCount}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={isPaused ? resume : pause}
-            activeOpacity={0.7}
-          >
-            <Icon
-              name={isPaused ? "toggle-off" : "toggle-on"}
-              size={18}
-              color={
-                isPaused
-                  ? theme.colors.textSecondary
-                  : theme.colors.success || "#22c55e"
-              }
-            />
-          </TouchableOpacity>
-        </View>
+      {/* Search bar */}
+      <View style={styles.searchSection}>
+        <TextInput
+          style={[
+            styles.searchInput,
+            {
+              color: theme.colors.text,
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+            },
+          ]}
+          placeholder="Filter logs..."
+          placeholderTextColor={theme.colors.textTertiary}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
       </View>
 
       {/* Error message */}
@@ -218,7 +223,9 @@ export function LogsScreen() {
       {/* No deployment selected */}
       {!deployment && (
         <View style={styles.emptyContainer}>
-          <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+          <Text
+            style={[styles.emptyText, { color: theme.colors.textSecondary }]}
+          >
             No deployment selected
           </Text>
           <Text
@@ -267,11 +274,12 @@ export function LogsScreen() {
       <LogDetailSheet
         sheetRef={detailSheetRef}
         log={selectedLog}
+        allLogs={logs}
         onClose={handleSheetClose}
       />
 
       {/* Log Filter Sheet */}
-      <LogFilterSheet
+      <LogFilterSheetWrapper
         sheetRef={filterSheetRef}
         filters={filters}
         onChangeFilters={setFilters}
@@ -284,33 +292,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  topSection: {
-    paddingHorizontal: 4,
-    paddingTop: 16,
+  searchSection: {
+    paddingHorizontal: 12,
     paddingBottom: 12,
-  },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "700",
-  },
-  logCount: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  controlsRow: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "center",
-    marginLeft: 8,
-  },
-  searchWrapper: {
-    flex: 1,
+    marginTop: -12,
   },
   searchInput: {
     fontSize: 14,
@@ -318,37 +303,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
-  },
-  iconButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  iconButtonContainer: {
-    width: 32,
-    height: 32,
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-  },
-  filterBadge: {
-    position: "absolute",
-    top: -4,
-    right: -4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 7,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 4,
-    borderWidth: 2,
-  },
-  filterBadgeText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "600",
   },
   errorContainer: {
     marginHorizontal: 16,

@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Platform,
+  useWindowDimensions,
 } from "react-native";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import type { TableDocument, TableSchema } from "../../types";
@@ -27,11 +28,6 @@ import {
   formatTimestamp,
   TIMESTAMP_COLOR,
 } from "../../utils/formatters";
-
-interface ColumnMeta {
-  typeLabel: string;
-  optional: boolean;
-}
 
 // Build column metadata from schema (matches desktop)
 function buildColumnMeta(
@@ -70,7 +66,13 @@ function buildColumnMeta(
 export interface MobileTableViewProps {
   documents: TableDocument[];
   schema?: TableSchema;
-  onDocumentPress: (document: TableDocument, index: number) => void;
+  onDocumentPress?: (document: TableDocument, index: number) => void;
+  onCellPress?: (
+    document: TableDocument,
+    fieldName: string,
+    value: any,
+  ) => void;
+  selectedCell?: { documentId: string; fieldName: string } | null;
   onRefresh?: () => void;
   onLoadMore?: () => void;
   isRefreshing?: boolean;
@@ -84,6 +86,8 @@ export function TableView({
   documents,
   schema,
   onDocumentPress,
+  onCellPress,
+  selectedCell,
   onRefresh,
   onLoadMore,
   isRefreshing = false,
@@ -91,6 +95,7 @@ export function TableView({
   hasMore = false,
 }: MobileTableViewProps) {
   const { theme } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
 
   // Build ordered list of fields similar to desktop:
   // _id, schema fields (excluding system), dynamic doc fields, _creationTime
@@ -120,10 +125,23 @@ export function TableView({
     return ordered;
   }, [documents, schema]);
 
-  // Total table width based on fixed column width
+  // Calculate column width - either fill screen or use fixed width
+  const columnWidth = useMemo(() => {
+    const MIN_COLUMN_WIDTH = 180;
+    const minTableWidth = columns.length * MIN_COLUMN_WIDTH;
+
+    // If the table would be narrower than screen, expand columns to fill
+    if (minTableWidth < screenWidth) {
+      return screenWidth / columns.length;
+    }
+
+    return MIN_COLUMN_WIDTH;
+  }, [columns.length, screenWidth]);
+
+  // Total table width based on calculated column width
   const tableWidth = useMemo(
-    () => columns.length * COLUMN_WIDTH,
-    [columns.length],
+    () => Math.max(columns.length * columnWidth, screenWidth),
+    [columns.length, columnWidth, screenWidth],
   );
 
   const columnMeta = useMemo(() => buildColumnMeta(schema), [schema]);
@@ -186,17 +204,14 @@ export function TableView({
               style={[
                 styles.headerCell,
                 {
-                  width: COLUMN_WIDTH,
+                  width: columnWidth,
                   borderRightColor: theme.colors.border,
                 },
               ]}
             >
               <View style={styles.headerContent}>
                 <Text
-                  style={[
-                    styles.headerText,
-                    { color: theme.colors.text },
-                  ]}
+                  style={[styles.headerText, { color: theme.colors.text }]}
                   numberOfLines={1}
                   ellipsizeMode="tail"
                 >
@@ -233,7 +248,7 @@ export function TableView({
     index: number;
   }) => {
     return (
-      <TouchableOpacity
+      <View
         style={[
           styles.row,
           {
@@ -242,14 +257,11 @@ export function TableView({
             width: tableWidth,
           },
         ]}
-        activeOpacity={0.7}
-        onPress={() => onDocumentPress(item, index)}
       >
         {columns.map((column) => {
           const value = (item as any)[column];
           const meta = columnMeta[column];
-          const isIdColumn =
-            column === "_id" || meta?.linkTable !== undefined;
+          const isIdColumn = column === "_id" || meta?.linkTable !== undefined;
           const isDateColumn =
             column === "_creationTime" || meta?.typeLabel === "timestamp";
           const isUnset = value === null || value === undefined;
@@ -276,21 +288,48 @@ export function TableView({
                   : valueColor;
           }
 
+          // Check if this cell is selected
+          const isSelected =
+            selectedCell &&
+            selectedCell.documentId === item._id &&
+            selectedCell.fieldName === column;
+
+          // System fields are not editable
+          const isSystemField = column === "_id" || column === "_creationTime";
+
           return (
-            <View
+            <TouchableOpacity
               key={column}
               style={[
                 styles.cell,
                 {
-                  width: COLUMN_WIDTH,
-                  borderRightColor: theme.colors.border,
-                  backgroundColor: isUnset
-                    ? theme.dark
-                      ? "rgba(128, 128, 128, 0.1)"
-                      : "rgba(128, 128, 128, 0.05)"
-                    : "transparent",
+                  width: columnWidth,
+                  borderRightWidth: 1,
+                  borderRightColor: isSelected
+                    ? "rgba(59, 130, 246, 1)" // blue-500 when selected
+                    : theme.colors.border,
+                  backgroundColor: isSelected
+                    ? "rgba(59, 130, 246, 0.2)" // blue-500 with 20% opacity
+                    : isUnset
+                      ? theme.dark
+                        ? "rgba(128, 128, 128, 0.1)"
+                        : "rgba(128, 128, 128, 0.05)"
+                      : "transparent",
+                },
+                isSelected && {
+                  borderTopWidth: 1,
+                  borderBottomWidth: 1,
+                  borderLeftWidth: 1,
+                  borderColor: "rgba(59, 130, 246, 1)", // blue-500
                 },
               ]}
+              activeOpacity={isSystemField ? 1 : 0.7}
+              disabled={isSystemField}
+              onPress={() => {
+                if (onCellPress && !isSystemField) {
+                  onCellPress(item, column, value);
+                }
+              }}
             >
               <Text
                 style={[
@@ -304,16 +343,22 @@ export function TableView({
               >
                 {displayValue}
               </Text>
-            </View>
+            </TouchableOpacity>
           );
         })}
-      </TouchableOpacity>
+      </View>
     );
   };
 
   return (
     <ScrollView horizontal bounces showsHorizontalScrollIndicator={true}>
-      <View style={{ width: tableWidth, borderTopWidth: 1, borderTopColor: theme.colors.border }}>
+      <View
+        style={{
+          width: tableWidth,
+          borderTopWidth: 1,
+          borderTopColor: theme.colors.border,
+        }}
+      >
         {renderHeaderRow()}
         <FlatList
           data={documents}
@@ -343,7 +388,6 @@ export function TableView({
     </ScrollView>
   );
 }
-
 
 const styles = StyleSheet.create({
   horizontalContent: {
@@ -434,4 +478,3 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 });
-

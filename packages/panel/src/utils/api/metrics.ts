@@ -564,9 +564,7 @@ export async function fetchUdfRate(
     const now = Math.floor(Date.now() / 1000);
     const twentySixMinutesAgo = now - 26 * 60;
     const numBuckets = 26;
-    const bucketSizeSeconds = (26 * 60) / numBuckets;
-
-    // Initialize buckets
+    const bucketSizeSeconds = (26 * 60) / numBuckets;    // Initialize buckets
     const buckets: number[] = Array(numBuckets).fill(0);
     const timestamps: Array<{
       secs_since_epoch: number;
@@ -674,15 +672,11 @@ export async function fetchRecentErrors(
     errorLogs.forEach((log) => {
       const message = log.error_message || log.message || "Unknown error";
       errorCounts.set(message, (errorCounts.get(message) || 0) + 1);
-    });
-
-    // Get top 5 errors
+    });    // Get top 5 errors
     const topErrors = Array.from(errorCounts.entries())
       .map(([message, count]) => ({ message, count }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-
-    return {
+      .slice(0, 5);    return {
       count: errorLogs.length,
       topErrors,
     };

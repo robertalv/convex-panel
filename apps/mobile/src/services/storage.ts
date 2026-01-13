@@ -1,15 +1,24 @@
-/**
- * Secure Storage Service
- * 
- * Handles secure storage of sensitive data like access tokens
- * Uses expo-secure-store for platform-specific secure storage
- */
+import * as SecureStore from "expo-secure-store";
 
-import * as SecureStore from 'expo-secure-store';
+const ACCESS_TOKEN_KEY =
+  process.env.EXPO_PUBLIC_ACCESS_TOKEN_KEY || "convex_access_token";
+const REFRESH_TOKEN_KEY =
+  process.env.EXPO_PUBLIC_REFRESH_TOKEN_KEY || "convex_refresh_token";
+const SESSION_KEY = process.env.EXPO_PUBLIC_SESSION_KEY || "convex_session";
 
-const ACCESS_TOKEN_KEY = 'convex_access_token';
-const REFRESH_TOKEN_KEY = 'convex_refresh_token';
-const SESSION_KEY = 'convex_session';
+// Validate that keys meet SecureStore requirements
+if (!ACCESS_TOKEN_KEY || !REFRESH_TOKEN_KEY || !SESSION_KEY) {
+  throw new Error("SecureStore keys must not be empty");
+}
+
+const SECURE_STORE_KEY_REGEX = /^[a-zA-Z0-9._-]+$/;
+[ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, SESSION_KEY].forEach((key) => {
+  if (!SECURE_STORE_KEY_REGEX.test(key)) {
+    throw new Error(
+      `Invalid SecureStore key: "${key}". Keys must contain only alphanumeric characters, ".", "-", and "_"`,
+    );
+  }
+});
 
 /**
  * Save access token securely
@@ -66,11 +75,11 @@ export async function saveSession(session: object): Promise<void> {
 export async function loadSession<T = any>(): Promise<T | null> {
   const sessionStr = await SecureStore.getItemAsync(SESSION_KEY);
   if (!sessionStr) return null;
-  
+
   try {
     return JSON.parse(sessionStr) as T;
   } catch (error) {
-    console.error('Failed to parse session:', error);
+    console.error("Failed to parse session:", error);
     return null;
   }
 }

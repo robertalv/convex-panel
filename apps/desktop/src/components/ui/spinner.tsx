@@ -22,10 +22,6 @@ interface SpinnerProps
     React.SVGAttributes<SVGSVGElement>,
     VariantProps<typeof spinnerVariants> {}
 
-/**
- * Animated Convex logo spinner - black/white with shimmer effect.
- * Each petal shimmers in sequence.
- */
 export function Spinner({ className, size, ...props }: SpinnerProps) {
   return (
     <svg

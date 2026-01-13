@@ -2,13 +2,9 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
-  /** Variant style for different content types */
   variant?: "default" | "text" | "circular" | "rectangular";
 }
 
-/**
- * Skeleton loading placeholder with shimmer animation.
- */
 function Skeleton({ className, variant = "default", ...props }: SkeletonProps) {
   return (
     <div
@@ -26,9 +22,6 @@ function Skeleton({ className, variant = "default", ...props }: SkeletonProps) {
   );
 }
 
-/**
- * Skeleton for text content with multiple lines.
- */
 function SkeletonText({
   lines = 3,
   className,
@@ -42,7 +35,6 @@ function SkeletonText({
           variant="text"
           className={cn(
             "h-4",
-            // Last line is shorter for natural look
             i === lines - 1 && "w-3/4",
           )}
           style={{ animationDelay: `${i * 0.1}s` }}
@@ -52,9 +44,6 @@ function SkeletonText({
   );
 }
 
-/**
- * Skeleton card for dashboard metric cards.
- */
 function SkeletonCard({
   className,
   showHeader = true,
@@ -93,9 +82,6 @@ function SkeletonCard({
   );
 }
 
-/**
- * Skeleton for list items.
- */
 function SkeletonList({
   items = 5,
   className,

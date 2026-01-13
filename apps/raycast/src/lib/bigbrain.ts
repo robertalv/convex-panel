@@ -4,7 +4,11 @@
  * Standalone client for Convex's BigBrain API (api.convex.dev/api/dashboard)
  * Used for fetching teams, projects, deployments, and user profile.
  */
-import { BIG_BRAIN_URL, BIG_BRAIN_DASHBOARD_PATH, CONVEX_CLIENT_ID } from "./constants";
+import {
+  BIG_BRAIN_URL,
+  BIG_BRAIN_DASHBOARD_PATH,
+  CONVEX_CLIENT_ID,
+} from "./constants";
 
 // ============================================================================
 // Types

@@ -1,23 +1,24 @@
-/**
- * Deployment Header Component
- *
- * Custom header that displays current deployment selection and opens bottom sheet
- */
-
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, Text, StyleSheet } from "react-native";
 import { useTheme } from "../contexts/ThemeContext";
 import { useDeployment } from "../contexts/DeploymentContext";
-import { useDeploymentSheet } from "../contexts/DeploymentSheetContext";
+import { useSheet } from "../contexts/SheetContext";
+import { AppHeader } from "./AppHeader";
 import { Icon } from "./ui/Icon";
 
 export function DeploymentHeader() {
   const { theme } = useTheme();
-  const { team, project, deployment } = useDeployment();
-  const { openSheet } = useDeploymentSheet();
+  const { team, project, deployment, setProject, clearSelection } =
+    useDeployment();
+  const { openSheet } = useSheet();
 
-  // Get display text
+  const handleOpenDeploymentSheet = () => openSheet("deployment");
+  const handleOpenMenuSheet = () => openSheet("menu");
+
+  const showBackToProjects = project && !deployment;
+  const showBackToTeams = team && !project && !deployment;
+  const showBackButton = showBackToProjects || showBackToTeams;
+
   const getDisplayText = () => {
     if (deployment) {
       return deployment.name;
@@ -41,76 +42,71 @@ export function DeploymentHeader() {
 
   const subtitle = getSubtitle();
 
+  const handleBackPress = () => {
+    if (showBackToProjects) {
+      setProject(null);
+    } else if (showBackToTeams) {
+      clearSelection();
+    }
+  };
+
+  const backButtonText = showBackToProjects
+    ? "Back to projects"
+    : "Back to teams";
+
+  if (showBackButton) {
+    const leftContent = (
+      <View style={styles.backContent}>
+        <Icon name="chevron-back" size={20} color={theme.colors.primary} />
+        <Text
+          style={[styles.backText, { color: theme.colors.primary }]}
+          numberOfLines={1}
+        >
+          {backButtonText}
+        </Text>
+      </View>
+    );
+
+    return (
+      <AppHeader
+        title={backButtonText}
+        titleColor={theme.colors.primary}
+        leftContent={leftContent}
+        onTitlePress={handleBackPress}
+        actions={[
+          {
+            icon: "more-vertical",
+            onPress: handleOpenMenuSheet,
+          },
+        ]}
+      />
+    );
+  }
+
   return (
-    <SafeAreaView
-      edges={["top"]}
-      style={[
-        styles.container,
+    <AppHeader
+      title={getDisplayText()}
+      subtitle={subtitle}
+      showChevron={true}
+      onTitlePress={handleOpenDeploymentSheet}
+      actions={[
         {
-          backgroundColor: theme.colors.background,
+          icon: "more-vertical",
+          onPress: handleOpenMenuSheet,
         },
       ]}
-    >
-      <TouchableOpacity
-        style={styles.content}
-        onPress={openSheet}
-        activeOpacity={0.7}
-      >
-        <View style={styles.textContainer}>
-          <View style={styles.titleRow}>
-            <Text
-              style={[styles.title, { color: theme.colors.text }]}
-              numberOfLines={1}
-            >
-              {getDisplayText()}
-            </Text>
-            <Icon
-              name="chevron-down"
-              size={20}
-              color={theme.colors.textSecondary}
-            />
-          </View>
-          {subtitle && (
-            <Text
-              style={[styles.subtitle, { color: theme.colors.textSecondary }]}
-              numberOfLines={1}
-            >
-              {subtitle}
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
-    </SafeAreaView>
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingTop: 0,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-  },
-  content: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: "100%",
-    paddingVertical: 8,
-  },
-  titleRow: {
+  backContent: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
   },
-  textContainer: {
-    flex: 1,
-  },
-  title: {
+  backText: {
     fontSize: 18,
     fontWeight: "600",
-    marginBottom: 2,
-  },
-  subtitle: {
-    fontSize: 13,
-    marginTop: 2,
   },
 });

@@ -1,6 +1,7 @@
 import * as React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { cn } from "@/lib/utils";
+import { Kbd } from "./kbd";
 
 const TooltipProvider = TooltipPrimitive.Provider;
 
@@ -17,11 +18,9 @@ const TooltipContent = React.forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        // Base styles
         "z-50 overflow-hidden rounded-md px-3 py-1.5",
         "bg-surface-overlay text-xs text-text-base",
         "border border-border-base shadow-md",
-        // Animation
         "animate-fade-up",
         "data-[state=closed]:animate-fade-out",
         className,
@@ -32,9 +31,29 @@ const TooltipContent = React.forwardRef<
 ));
 TooltipContent.displayName = TooltipPrimitive.Content.displayName;
 
-/**
- * Tooltip with keyboard shortcut display.
- */
+function renderKeybind(keybind: string): React.ReactNode {
+  const match = keybind.match(/^(\w+)\s+then\s+(\w+)$/i);
+  if (match) {
+    const [, firstKey, secondKey] = match;
+    return (
+      <span className="flex items-center gap-1">
+        <Kbd className="rounded-lg px-1.5 py-0.5 text-xs font-medium text-text-muted border border-border-base">
+          {firstKey}
+        </Kbd>
+        <span className="text-xs text-text-muted">then</span>
+        <Kbd className="rounded-lg px-1.5 py-0.5 text-xs font-medium text-text-muted border border-border-base">
+          {secondKey}
+        </Kbd>
+      </span>
+    );
+  }
+  return (
+    <Kbd className="rounded-lg px-1.5 py-0.5 text-xs font-medium text-text-muted border border-border-base">
+      {keybind}
+    </Kbd>
+  );
+}
+
 interface TooltipWithKeybindProps {
   children: React.ReactNode;
   content: string;
@@ -56,11 +75,7 @@ function TooltipWithKeybind({
       <TooltipContent side={side} className="py-0.5 px-1.5 rounded-lg">
         <div className="flex items-center gap-1">
           <span>{content}</span>
-          {keybind && (
-            <kbd className="rounded-lg bg-surface-base px-1.5 py-0.5 text-xs font-medium text-text-muted border border-border-base">
-              {keybind}
-            </kbd>
-          )}
+          {keybind && renderKeybind(keybind)}
         </div>
       </TooltipContent>
     </Tooltip>

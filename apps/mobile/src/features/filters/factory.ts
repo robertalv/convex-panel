@@ -162,22 +162,56 @@ export function filterLogsByClauses(
   const normalize = (val?: string | null) =>
     val === null || val === undefined ? "" : String(val).toLowerCase();
 
+  // Filter out inactive clauses for debugging
+  const activeClauses = filters.clauses.filter(isActiveClause);
+
+  console.log("[filterLogsByClauses] Filtering logs:", {
+    totalLogs: logs.length,
+    totalClauses: filters.clauses.length,
+    activeClauses: activeClauses.length,
+    clausesDetail: activeClauses.map((c) => ({
+      type: (c as any).type,
+      value: (c as any).value,
+      enabled: c.enabled,
+    })),
+  });
+
   const predicate = buildPredicate<
     LogEntry,
     { type: string; value: string; enabled?: boolean }
   >(filters.clauses, (clause, log) => {
     const value = normalize((clause as any).value);
-    switch ((clause as any).type) {
+    const clauseType = (clause as any).type;
+    let matches = false;
+
+    switch (clauseType) {
       case "functionType":
-        return normalize(log.function?.type) === value;
+        matches = normalize(log.function?.type) === value;
+        if (!matches && isActiveClause(clause as any)) {
+          console.log("[filterLogsByClauses] functionType mismatch:", {
+            expected: value,
+            actual: normalize(log.function?.type),
+            rawType: log.function?.type,
+          });
+        }
+        return matches;
       case "status":
-        return normalize(log.status) === value;
+        matches = normalize(log.status) === value;
+        return matches;
       case "logLevel":
-        return normalize(log.log_level) === value;
+        matches = normalize(log.log_level) === value;
+        return matches;
       default:
         return true;
     }
   });
 
-  return logs.filter(predicate);
+  const filtered = logs.filter(predicate);
+  console.log("[filterLogsByClauses] Result:", {
+    inputCount: logs.length,
+    outputCount: filtered.length,
+    filtered: logs.length - filtered.length,
+  });
+
+  return filtered;
 }

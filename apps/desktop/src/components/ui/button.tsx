@@ -9,6 +9,8 @@ import {
   TooltipProvider,
   TooltipWithKeybind,
 } from "@/components/ui/tooltip";
+import { Icon, IconSvgElement } from "@/components/ui/icon";
+
 
 const buttonVariants = cva(
   // Base styles
@@ -135,9 +137,9 @@ Button.displayName = "Button";
 const iconButtonVariants = cva(
   // Base styles
   [
-    "inline-flex items-center justify-center",
+    "inline-flex items-center justify-center relative",
     "rounded-lg",
-    "transition-all duration-150",
+    "transition-colors duration-150",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-base focus-visible:ring-offset-2 focus-visible:ring-offset-background-base",
     "disabled:pointer-events-none disabled:opacity-50",
     "select-none",
@@ -173,6 +175,10 @@ const iconButtonVariants = cva(
           "hover:bg-error-base/90",
           "active:bg-error-base",
         ],
+        topbar: [
+          "text-text-muted",
+          "hover:text-text-base hover:bg-surface-raised",
+        ],
       },
       size: {
         xs: "w-5 h-5",
@@ -181,10 +187,22 @@ const iconButtonVariants = cva(
         default: "w-8 h-8",
         lg: "w-10 h-10",
       },
+      active: {
+        true: "",
+        false: "",
+      },
     },
+    compoundVariants: [
+      {
+        variant: "topbar",
+        active: true,
+        class: ["bg-brand-base/10 text-brand-base"],
+      },
+    ],
     defaultVariants: {
       variant: "ghost",
       size: "default",
+      active: false,
     },
   },
 );
@@ -193,9 +211,12 @@ export interface IconButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof iconButtonVariants> {
   asChild?: boolean;
+  icon?: string | IconSvgElement;
+  iconSize?: number;
   tooltip?: string;
   tooltipSide?: "top" | "right" | "bottom" | "left";
   tooltipKeybind?: string;
+  active?: boolean;
 }
 
 const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
@@ -204,21 +225,55 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       className,
       variant,
       size,
+      active,
       asChild = false,
+      icon,
+      iconSize,
       tooltip,
       tooltipSide = "top",
       tooltipKeybind,
+      children,
       ...props
     },
     ref,
   ) => {
+    const calculatedIconSize = React.useMemo(() => {
+      if (iconSize !== undefined) return iconSize;
+      switch (size) {
+        case "xs":
+          return 16;
+        case "sm":
+          return 18;
+        case "md":
+          return 20;
+        case "lg":
+          return 24;
+        case "default":
+        default:
+          return 20;
+      }
+    }, [iconSize, size]);
+
     const Comp = asChild ? Slot : "button";
+    
+    const content = icon ? (
+      typeof icon === "string" ? (
+        <Icon name={icon} size={calculatedIconSize} />
+      ) : (
+        <Icon icon={icon} size={calculatedIconSize} />
+      )
+    ) : (
+      children
+    );
+
     const button = (
       <Comp
-        className={cn(iconButtonVariants({ variant, size, className }))}
+        className={cn(iconButtonVariants({ variant, size, active, className }))}
         ref={ref}
         {...props}
-      />
+      >
+        {content}
+      </Comp>
     );
 
     if (tooltip) {

@@ -1,7 +1,3 @@
-/**
- * Error handling utilities
- */
-
 import { AxiosError } from 'axios';
 
 export interface AppError {
@@ -10,16 +6,12 @@ export interface AppError {
   statusCode?: number;
 }
 
-/**
- * Extract user-friendly error message from error object
- */
 export function getErrorMessage(error: unknown): string {
   if (typeof error === 'string') {
     return error;
   }
 
   if (error instanceof AxiosError) {
-    // API error
     if (error.response?.data?.message) {
       return error.response.data.message;
     }

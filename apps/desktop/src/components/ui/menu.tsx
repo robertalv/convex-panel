@@ -1,11 +1,6 @@
-/**
- * Menu Component
- * Reusable dropdown menu with keyboard navigation and click-outside handling
- */
-
 import { useRef, useEffect, useCallback } from "react";
-import { CircleCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Icon from "../ui/icon";
 
 export interface MenuItemProps {
   icon?: React.ReactNode;
@@ -44,7 +39,7 @@ export function MenuItem({
         {icon && (
           <span
             className={cn(
-              "flex-shrink-0",
+              "shrink-0",
               destructive
                 ? "text-error-base"
                 : active
@@ -58,7 +53,7 @@ export function MenuItem({
         <span className="truncate">{label}</span>
       </div>
       {active && (
-        <CircleCheck className="h-4 w-4 flex-shrink-0 stroke-brand-base" />
+        <Icon name="checkmark-circle" className="h-4 w-4 shrink-0 stroke-brand-base" />
       )}
     </button>
   );
@@ -69,21 +64,13 @@ export function MenuDivider() {
 }
 
 export interface MenuProps {
-  /** Whether the menu is open */
   open: boolean;
-  /** Callback when menu should close */
   onClose: () => void;
-  /** Menu content (MenuItems, MenuDividers, etc.) */
   children: React.ReactNode;
-  /** Optional className for the menu container */
   className?: string;
-  /** Optional style for positioning */
   style?: React.CSSProperties;
-  /** Optional ref for the menu container */
   menuRef?: React.RefObject<HTMLDivElement>;
-  /** Optional alignment */
   align?: "left" | "right" | "center";
-  /** Optional side offset */
   sideOffset?: number;
 }
 
@@ -168,17 +155,11 @@ export function Menu({
 }
 
 export interface MenuTriggerProps {
-  /** Whether the menu is open */
   open: boolean;
-  /** Callback when trigger is clicked */
   onOpenChange: (open: boolean) => void;
-  /** Optional check function to prevent opening (e.g., if drag is in progress) */
   checkBeforeOpen?: () => boolean;
-  /** Trigger element */
   children: React.ReactNode;
-  /** Optional className for the trigger container */
   className?: string;
-  /** Optional style for the trigger container */
   style?: React.CSSProperties;
 }
 

@@ -1,6 +1,7 @@
 import React from "react";
-import { StyleSheet, View, Text, ActivityIndicator } from "react-native";
+import { StyleSheet, View, Text } from "react-native";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { Skeleton } from "../../../components/ui/Skeleton";
 
 interface HealthCardProps {
   /** Card title */
@@ -60,15 +61,10 @@ export function HealthCard({
       <View style={styles.content}>
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color={theme.colors.primary} />
-            <Text
-              style={[
-                styles.loadingText,
-                { color: theme.colors.textSecondary },
-              ]}
-            >
-              Loading...
-            </Text>
+            <Skeleton width="40%" height={32} style={{ marginBottom: 12 }} />
+            <Skeleton width="60%" height={16} style={{ marginBottom: 8 }} />
+            <Skeleton width="80%" height={16} style={{ marginBottom: 8 }} />
+            <Skeleton width="50%" height={16} />
           </View>
         ) : error ? (
           <View style={styles.errorContainer}>
@@ -117,14 +113,8 @@ const styles = StyleSheet.create({
     minHeight: 60,
   },
   loadingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 24,
+    paddingVertical: 12,
     gap: 8,
-  },
-  loadingText: {
-    fontSize: 12,
   },
   errorContainer: {
     paddingVertical: 24,
