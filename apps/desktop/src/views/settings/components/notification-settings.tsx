@@ -7,8 +7,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { CheckCircle, XCircle, Info } from "lucide-react";
+import { CheckCircle2, Circle, Info } from "lucide-react";
 
 // ============================================================================
 // Section Container Component (matching profile-settings pattern)
@@ -56,6 +55,50 @@ function Section({ title, description, children }: SectionProps) {
       )}
       {children}
     </div>
+  );
+}
+
+// ============================================================================
+// Icon-based Switch Component (shows green checkmark when enabled)
+// ============================================================================
+
+interface IconSwitchProps {
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  disabled?: boolean;
+}
+
+function IconSwitch({ checked, onCheckedChange, disabled }: IconSwitchProps) {
+  return (
+    <button
+      onClick={() => !disabled && onCheckedChange(!checked)}
+      disabled={disabled}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "24px",
+        height: "24px",
+        border: "none",
+        background: "transparent",
+        cursor: disabled ? "not-allowed" : "pointer",
+        padding: "0",
+        opacity: disabled ? 0.5 : 1,
+        transition: "color 0.2s ease-in-out",
+      }}
+    >
+      {checked ? (
+        <CheckCircle2
+          size={24}
+          style={{ color: "var(--color-success-base, #22c55e)" }}
+        />
+      ) : (
+        <Circle
+          size={24}
+          style={{ color: "var(--color-border-base, #e5e7eb)" }}
+        />
+      )}
+    </button>
   );
 }
 
@@ -385,8 +428,7 @@ export function NotificationSettings() {
                         Receive notifications for deployment updates
                       </p>
                     </div>
-                    <Switch
-                      id="notifications-enabled"
+                    <IconSwitch
                       checked={notificationsEnabled}
                       onCheckedChange={handleToggleNotifications}
                     />
@@ -432,8 +474,7 @@ export function NotificationSettings() {
                       Get notified when new code is pushed to your deployment
                     </p>
                   </div>
-                  <Switch
-                    id="deployment-notifications"
+                  <IconSwitch
                     checked={notificationTypes.deploymentUpdates}
                     onCheckedChange={(checked) =>
                       handleToggleNotificationType("deploymentUpdates", checked)
@@ -465,8 +506,7 @@ export function NotificationSettings() {
                       Get notified when errors occur in your deployment
                     </p>
                   </div>
-                  <Switch
-                    id="error-notifications"
+                  <IconSwitch
                     checked={notificationTypes.errorNotifications}
                     onCheckedChange={(checked) =>
                       handleToggleNotificationType(
@@ -500,8 +540,7 @@ export function NotificationSettings() {
                       Get notified about build successes and failures
                     </p>
                   </div>
-                  <Switch
-                    id="build-notifications"
+                  <IconSwitch
                     checked={notificationTypes.buildStatus}
                     onCheckedChange={(checked) =>
                       handleToggleNotificationType("buildStatus", checked)
@@ -526,7 +565,7 @@ export function NotificationSettings() {
           )}
 
           {/* Test Notification Section */}
-          {permissionGranted && notificationsEnabled && (
+          {/* {permissionGranted && notificationsEnabled && (
             <Section
               title="Test Notifications"
               description="Send a test notification to verify everything is working"
@@ -567,74 +606,24 @@ export function NotificationSettings() {
                     }}
                   >
                     {testNotificationStatus.type === "success" ? (
-                      <CheckCircle size={16} className="flex-shrink-0" />
+                      <CheckCircle2
+                        size={16}
+                        className="flex-shrink-0"
+                        style={{ color: "var(--color-success-base, #22c55e)" }}
+                      />
                     ) : (
-                      <XCircle size={16} className="flex-shrink-0" />
+                      <Circle
+                        size={16}
+                        className="flex-shrink-0"
+                        style={{ color: "var(--color-error-base, #ef4444)" }}
+                      />
                     )}
                     <span>{testNotificationStatus.message}</span>
                   </div>
                 )}
               </div>
             </Section>
-          )}
-
-          {/* System-Managed Options Section */}
-          <Section
-            title="System-Managed Options"
-            description="These settings are controlled by your operating system"
-          >
-            <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
-              <SystemManagedRow
-                label="Alert Style"
-                description="How notifications appear on screen"
-              />
-              <SystemManagedRow
-                label="Show on Lock Screen"
-                description="Display notifications when device is locked"
-              />
-              <SystemManagedRow
-                label="Show in Notification Center"
-                description="Keep notifications in the notification center"
-              />
-              <SystemManagedRow
-                label="Badge App Icon"
-                description="Show notification count on app icon"
-              />
-              <SystemManagedRow
-                label="Play Sound"
-                description="Play a sound when notifications arrive"
-              />
-              <SystemManagedRow
-                label="Show Previews"
-                description="Show notification content in previews"
-              />
-              <SystemManagedRow
-                label="Notification Grouping"
-                description="How notifications are grouped together"
-              />
-            </div>
-
-            <div
-              style={{
-                marginTop: "12px",
-                padding: "8px 12px",
-                borderRadius: "8px",
-                backgroundColor:
-                  "var(--color-info-base-alpha, rgba(59, 130, 246, 0.1))",
-                color: "var(--color-info-base, #3b82f6)",
-                fontSize: "12px",
-                display: "flex",
-                alignItems: "flex-start",
-                gap: "8px",
-              }}
-            >
-              <Info size={14} className="flex-shrink-0 margin-top-1" />
-              <p style={{ margin: 0 }}>
-                To change these settings, click the System Settings button
-                above.
-              </p>
-            </div>
-          </Section>
+          )} */}
         </div>
       </div>
     </div>
