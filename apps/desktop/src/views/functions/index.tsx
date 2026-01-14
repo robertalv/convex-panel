@@ -431,7 +431,7 @@ const FunctionsView: React.FC = () => {
   return (
     <div
       ref={containerRef}
-      className="flex h-full bg-surface-base overflow-hidden"
+      className="flex h-full bg-background-base overflow-hidden"
     >
       {/* Sidebar toggle when collapsed */}
       {sidebarCollapsed && (

@@ -6,7 +6,7 @@ interface FailedPaymentBannerProps {
 }
 
 export function FailedPaymentBanner({
-  teamSlug,
+  teamSlug: _teamSlug,
   onOpenBilling,
 }: FailedPaymentBannerProps) {
   return (

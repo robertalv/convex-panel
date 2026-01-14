@@ -37,6 +37,7 @@ export default function ViewLogsCommand() {
   const [functionFilter, setFunctionFilter] = useState<string | undefined>();
   const [requestFilter, setRequestFilter] = useState<string | undefined>();
   const [searchText, setSearchText] = useState("");
+  const [showingDetail, setShowingDetail] = useState(false);
   const [expandedConsoleOutputs, setExpandedConsoleOutputs] = useState<
     Set<string>
   >(new Set());
@@ -108,17 +109,6 @@ export default function ViewLogsCommand() {
       const normalizedLogPath = log.functionPath.replace(/\.js:/g, ":");
       const normalizedFilter = functionFilter.replace(/\.js:/g, ":");
 
-      // Debug: Log first comparison to see what's happening
-      if (logs.indexOf(log) === 0) {
-        console.log("Function filter comparison (first log):", {
-          originalLogPath: log.functionPath,
-          normalizedLogPath,
-          originalFilter: functionFilter,
-          normalizedFilter,
-          match: normalizedLogPath === normalizedFilter,
-        });
-      }
-
       // If normalized paths don't match, exclude this log
       if (normalizedLogPath !== normalizedFilter) {
         return false;
@@ -141,24 +131,6 @@ export default function ViewLogsCommand() {
     return true;
   });
 
-  console.log("Logs debug:", {
-    totalLogs: logs.length,
-    filteredLogs: filteredLogs.length,
-    functionFilter,
-    searchText,
-    requestFilter,
-    isLoading: logsLoading,
-    sampleLogFunctionPaths: logs.slice(0, 5).map((l) => l.functionPath),
-    sampleFunctions: allFunctions.slice(0, 5),
-    firstLogDetails: logs[0]
-      ? {
-          functionPath: logs[0].functionPath,
-          requestId: logs[0].requestId,
-          executionId: logs[0].executionId,
-        }
-      : null,
-  });
-
   const contextSubtitle =
     selectedProject && selectedDeployment
       ? `${selectedProject.name} / ${selectedDeployment.deploymentType}`
@@ -167,7 +139,7 @@ export default function ViewLogsCommand() {
   return (
     <List
       isLoading={logsLoading}
-      isShowingDetail={filteredLogs.length > 0}
+      isShowingDetail={showingDetail}
       searchText={searchText}
       onSearchTextChange={setSearchText}
       searchBarPlaceholder="Search logs..."
@@ -216,6 +188,11 @@ export default function ViewLogsCommand() {
                   ? truncateError(log.errorMessage, 80)
                   : undefined
               }
+              icon={
+                log.status === "failure"
+                  ? { source: Icon.XMarkCircle, tintColor: Color.Red }
+                  : undefined
+              }
               keywords={[log.functionType, log.status, log.requestId]}
               accessories={getLogAccessories(log)}
               detail={
@@ -228,6 +205,11 @@ export default function ViewLogsCommand() {
               actions={
                 <ActionPanel>
                   <ActionPanel.Section>
+                    <Action
+                      title={showingDetail ? "Hide Details" : "Show Details"}
+                      icon={showingDetail ? Icon.EyeDisabled : Icon.Eye}
+                      onAction={() => setShowingDetail(!showingDetail)}
+                    />
                     {log.logLines.length > 0 && (
                       <Action
                         title={
@@ -441,28 +423,18 @@ function LogDetailPanel({
             />
           )}
 
-          <List.Item.Detail.Metadata.TagList title="Type">
-            <List.Item.Detail.Metadata.TagList.Item
-              text={
-                log.functionType.charAt(0).toUpperCase() +
-                log.functionType.slice(1)
-              }
-              color={getFunctionTypeColor(log.functionType)}
-            />
-          </List.Item.Detail.Metadata.TagList>
+          <List.Item.Detail.Metadata.Label
+            title="Type"
+            text={
+              log.functionType.charAt(0).toUpperCase() +
+              log.functionType.slice(1)
+            }
+          />
 
-          <List.Item.Detail.Metadata.TagList title="Status">
-            <List.Item.Detail.Metadata.TagList.Item
-              text={log.status === "success" ? "Success" : "Failed"}
-              color={log.status === "success" ? Color.Green : Color.Red}
-            />
-            {log.cached && (
-              <List.Item.Detail.Metadata.TagList.Item
-                text="Cached"
-                color={Color.Blue}
-              />
-            )}
-          </List.Item.Detail.Metadata.TagList>
+          <List.Item.Detail.Metadata.Label
+            title="Status"
+            text={`${log.status === "success" ? "Success" : "Failed"}${log.cached ? " (cached)" : ""}`}
+          />
 
           {log.logLines.length > 0 && (
             <List.Item.Detail.Metadata.Label
@@ -634,13 +606,10 @@ function getLogAccessories(log: LogEntry): List.Item.Accessory[] {
     });
   }
 
-  // Function type badge - single letter like Convex dashboard
+  // Function type - plain text like Convex dashboard
   accessories.push({
-    tag: {
-      value: log.functionType.charAt(0).toUpperCase(),
-      color: getFunctionTypeColor(log.functionType),
-    },
-    tooltip: log.functionType,
+    text: log.functionType.charAt(0).toUpperCase() + log.functionType.slice(1),
+    tooltip: `Function type: ${log.functionType}`,
   });
 
   // Relative timestamp
@@ -650,21 +619,6 @@ function getLogAccessories(log: LogEntry): List.Item.Accessory[] {
   });
 
   return accessories;
-}
-
-function getFunctionTypeColor(type: string): Color {
-  switch (type) {
-    case "query":
-      return Color.Blue;
-    case "mutation":
-      return Color.Orange;
-    case "action":
-      return Color.Purple;
-    case "http":
-      return Color.Green;
-    default:
-      return Color.SecondaryText;
-  }
 }
 
 function truncateError(error: string, maxLength: number): string {

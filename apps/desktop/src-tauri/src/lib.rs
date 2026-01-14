@@ -1,5 +1,7 @@
 mod secure_store;
 mod pty;
+mod log_store;
+mod notifications;
 
 use tauri::{Manager, Emitter, AppHandle, include_image};
 use tauri::menu::{Menu, MenuItem, IconMenuItem, Submenu, PredefinedMenuItem};
@@ -286,97 +288,7 @@ fn clear_deployment_history() -> Result<(), String> {
     Ok(())
 }
 
-/// Send a test notification (for settings page)
-#[tauri::command]
-async fn send_test_notification(app: AppHandle) -> Result<(), String> {
-    println!("[Rust] Attempting to send test notification...");
-    
-    let title = "Test Notification";
-    let subtitle = "Convex Panel";
-    let body = "Notifications are working correctly!";
-    
-    #[cfg(target_os = "macos")]
-    {
-        // Use terminal-notifier for better banner support in dev mode
-        println!("[Rust] macOS: Trying terminal-notifier first...");
-        
-        match std::process::Command::new("terminal-notifier")
-            .arg("-title")
-            .arg(title)
-            .arg("-subtitle")
-            .arg(subtitle)
-            .arg("-message")
-            .arg(body)
-            .arg("-sound")
-            .arg("Glass")
-            .output()
-        {
-            Ok(output) if output.status.success() => {
-                println!("[Rust] ✓ Notification sent via terminal-notifier");
-                return Ok(());
-            }
-            Ok(output) => {
-                eprintln!("[Rust] terminal-notifier failed: {:?}", String::from_utf8_lossy(&output.stderr));
-                println!("[Rust] Falling back to osascript...");
-            }
-            Err(e) => {
-                eprintln!("[Rust] terminal-notifier not available: {}", e);
-                println!("[Rust] Falling back to osascript...");
-            }
-        }
-        
-        // Fallback to osascript
-        let script = format!(
-            "display notification \"{}\" with title \"{}\" subtitle \"{}\" sound name \"Glass\"",
-            body.replace("\"", "\\\""),
-            title.replace("\"", "\\\""),
-            subtitle.replace("\"", "\\\"")
-        );
-        
-        match std::process::Command::new("osascript")
-            .arg("-e")
-            .arg(&script)
-            .output()
-        {
-            Ok(output) => {
-                if output.status.success() {
-                    println!("[Rust] ✓ osascript notification sent successfully");
-                    return Ok(());
-                } else {
-                    eprintln!("[Rust] osascript failed: {:?}", String::from_utf8_lossy(&output.stderr));
-                }
-            }
-            Err(e) => {
-                eprintln!("[Rust] Failed to execute osascript: {}", e);
-            }
-        }
-    }
-    
-    // Fallback to Tauri notification API
-    let mut notification = app.notification()
-        .builder()
-        .title(&format!("{} - {}", title, subtitle))
-        .body(body);
-
-    #[cfg(target_os = "macos")]
-    {
-        notification = notification.sound("default");
-    }
-
-    println!("[Rust] Calling notification.show()...");
-    let result = notification.show();
-    
-    match result {
-        Ok(_) => {
-            println!("[Rust] ✓ Notification.show() succeeded");
-            Ok(())
-        },
-        Err(e) => {
-            eprintln!("[Rust] ✗ Failed to show notification: {}", e);
-            Err(e.to_string())
-        }
-    }
-}
+// Note: send_test_notification has been moved to notifications.rs module
 
 /// Command to expand the window to near-fullscreen (maximized)
 #[tauri::command]
@@ -715,9 +627,32 @@ pub fn run() {
             notify_deployment_push,
             get_recent_deployments,
             clear_deployment_history,
-            send_test_notification
+            // Notification commands (from notifications module)
+            notifications::send_test_notification,
+            notifications::open_notification_settings,
+            // Log store commands
+            log_store::ingest_logs,
+            log_store::query_logs,
+            log_store::search_logs,
+            log_store::get_log_by_id,
+            log_store::delete_logs_older_than,
+            log_store::get_log_stats,
+            log_store::get_log_store_settings,
+            log_store::set_log_store_settings,
+            log_store::clear_all_logs,
+            log_store::optimize_log_db
         ])
         .setup(|app| {
+            // Initialize log store database
+            let db_conn = log_store::init_db(&app.handle())
+                .expect("Failed to initialize log store database");
+            
+            // Start retention scheduler
+            log_store::start_retention_scheduler(db_conn.clone(), app.handle().clone());
+            
+            // Store DB connection in app state
+            app.manage(db_conn);
+            
             let window = app.get_webview_window("main").unwrap();
 
             // Set window size constraints for welcome screen (960x600 fixed)

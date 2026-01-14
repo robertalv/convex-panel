@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { Code } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { ConvexComponent } from "@/views/data/types";

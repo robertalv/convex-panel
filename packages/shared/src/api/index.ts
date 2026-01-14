@@ -96,6 +96,14 @@ export {
   queryUsage,
   fetchTeamUsageSummary,
   parseUsageSummary,
+  // Profile management functions
+  updateProfileName,
+  getProfileEmails,
+  getIdentities,
+  unlinkIdentity,
+  getDiscordAccounts,
+  unlinkDiscordAccount,
+  deleteAccount,
   // Constants
   BIG_BRAIN_URL,
   BIG_BRAIN_DASHBOARD_PATH,
@@ -117,4 +125,7 @@ export {
   type UsageQueryParams,
   type InsightsPeriod,
   type UsageSummary,
+  type ProfileEmail,
+  type Identity,
+  type DiscordAccount,
 } from "./bigbrain";

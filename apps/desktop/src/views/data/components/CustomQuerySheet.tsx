@@ -27,7 +27,7 @@ import {
   isCustomQuery,
   type ModuleFunction,
   type SelectedFunction,
-} from "./FunctionSelector";
+} from "@/components/function-selector";
 import type { ConvexComponent } from "../types";
 
 /** Layout mode for the Function Runner */

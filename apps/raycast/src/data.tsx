@@ -132,8 +132,7 @@ export default function BrowseTablesCommand() {
       <List>
         <List.EmptyView
           title="No Deployment Selected"
-          description="Use 'Switch Convex Project' to select a deployment first"
-          icon={Icon.Cloud}
+          description="Use 'Switch Project' to select a deployment first"
         />
       </List>
     );

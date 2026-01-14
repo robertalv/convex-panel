@@ -1,6 +1,6 @@
 /**
  * LogsToolbar Component
- * Toolbar with search, filters, and pause/clear controls
+ * Toolbar with search, filters, and pause/more controls
  */
 
 import {
@@ -10,16 +10,18 @@ import {
   Trash2,
   Download,
   Loader2,
-  ChevronLeft,
-  ChevronRight,
+  Database,
 } from "lucide-react";
+import { useState } from "react";
 import { Toolbar } from "@/components/ui/toolbar";
 import { ToolbarButton, IconButton } from "@/components/ui/button";
 import { ComponentSelector } from "@/components/component-selector";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Menu, MenuItem, MenuTrigger, MenuDivider } from "@/components/ui/menu";
 import type { LogFilters, ModuleFunction, LogType } from "../types";
 import type { ConvexComponent } from "@/types/desktop";
 import { useMemo } from "react";
+import { Icon } from "@/components";
 
 interface LogsToolbarProps {
   filters: LogFilters;
@@ -35,12 +37,9 @@ interface LogsToolbarProps {
   components?: ConvexComponent[];
   functions?: ModuleFunction[];
   onSearchChange: (query: string) => void;
-  // Pagination props
-  currentPage?: number;
-  totalPages?: number;
-  onPrevPage?: () => void;
-  onNextPage?: () => void;
-  isViewingHistoricalLogs?: boolean;
+  // Storage management
+  onViewStorage?: () => void;
+  localLogCount?: number; // Count of logs in SQLite storage
 }
 
 // Log type display labels
@@ -76,12 +75,11 @@ export function LogsToolbar({
   components = [],
   functions = [],
   onSearchChange,
-  currentPage = 1,
-  totalPages = 1,
-  onPrevPage,
-  onNextPage,
-  isViewingHistoricalLogs = false,
+  onViewStorage,
+  localLogCount,
 }: LogsToolbarProps) {
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     onSearchChange(query);
@@ -229,70 +227,19 @@ export function LogsToolbar({
       }
       right={
         <>
-          {/* Pagination controls */}
-          {totalPages > 1 && (
-            <div className="flex items-center gap-1">
-              <IconButton
-                onClick={onPrevPage}
-                tooltip="Previous page"
-                size="sm"
-                variant="ghost"
-                disabled={currentPage <= 1 || !onPrevPage}
-              >
-                <ChevronLeft size={14} />
-              </IconButton>
-              <span
-                className="text-xs font-mono px-2"
-                style={{ color: "var(--color-text-muted)" }}
-              >
-                Page {currentPage} of {totalPages}
-              </span>
-              <IconButton
-                onClick={onNextPage}
-                tooltip="Next page"
-                size="sm"
-                variant="ghost"
-                disabled={currentPage >= totalPages || !onNextPage}
-              >
-                <ChevronRight size={14} />
-              </IconButton>
-            </div>
-          )}
-
-          {/* Log count */}
-          <span
-            className="text-xs font-mono"
-            style={{ color: "var(--color-text-muted)" }}
-          >
-            {logCount} logs
-            {isViewingHistoricalLogs && " (stored)"}
-          </span>
-
-          {/* Clear logs button */}
-          <IconButton
-            onClick={onClearLogs}
-            tooltip="Clear logs"
-            size="sm"
-            variant="ghost"
-          >
-            <Trash2 size={14} />
-          </IconButton>
-
-          {/* Export button */}
-          {onExport && (
-            <IconButton
-              onClick={onExport}
-              tooltip="Export logs"
-              size="sm"
-              variant="ghost"
-              disabled={isExporting || logCount === 0}
+          {/* Local storage indicator */}
+          {typeof localLogCount === "number" && localLogCount > 0 && (
+            <div
+              className="flex items-center gap-1.5 px-2 py-1 rounded text-xs"
+              style={{
+                color: "var(--color-text-muted)",
+                backgroundColor: "var(--color-surface-overlay)",
+              }}
+              title={`${localLogCount.toLocaleString()} logs in local storage`}
             >
-              {isExporting ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Download size={14} />
-              )}
-            </IconButton>
+              <Database size={12} />
+              <span>{localLogCount.toLocaleString()}</span>
+            </div>
           )}
 
           {/* Pause/Resume button */}
@@ -313,6 +260,68 @@ export function LogsToolbar({
               </>
             )}
           </ToolbarButton>
+
+          {/* More menu */}
+          <MenuTrigger open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
+            <IconButton
+              tooltip="More actions"
+              size="sm"
+              variant="ghost"
+              active={moreMenuOpen}
+            >
+              <Icon name="more-vertical" size={14} />
+            </IconButton>
+
+            <Menu
+              open={moreMenuOpen}
+              onClose={() => setMoreMenuOpen(false)}
+              align="right"
+            >
+              {/* View Storage */}
+              {onViewStorage && (
+                <MenuItem
+                  icon={<Database size={14} />}
+                  label="View Storage"
+                  onClick={() => {
+                    onViewStorage();
+                    setMoreMenuOpen(false);
+                  }}
+                />
+              )}
+
+              {/* Export logs */}
+              {onExport && (
+                <MenuItem
+                  icon={
+                    isExporting ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Download size={14} />
+                    )
+                  }
+                  label="Download Logs"
+                  onClick={() => {
+                    onExport();
+                    setMoreMenuOpen(false);
+                  }}
+                  disabled={isExporting || logCount === 0}
+                />
+              )}
+
+              <MenuDivider />
+
+              {/* Clear logs */}
+              <MenuItem
+                icon={<Trash2 size={14} />}
+                label="Clear Logs"
+                onClick={() => {
+                  onClearLogs();
+                  setMoreMenuOpen(false);
+                }}
+                destructive
+              />
+            </Menu>
+          </MenuTrigger>
         </>
       }
     />

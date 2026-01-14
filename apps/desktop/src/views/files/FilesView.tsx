@@ -15,7 +15,7 @@ import { useComponents } from "../data/hooks/useComponents";
 import { useFiles } from "./hooks/useFiles";
 import type { FileMetadata } from "./api/types";
 import { deleteFile, uploadFileWithFallbacks } from "./api/files";
-import { useDeployment } from "../../contexts/deployment-context";
+import { useDeployment } from "@/contexts/deployment-context";
 import { FilePreview } from "./components/FilePreview";
 import { DateFilterDropdown } from "./components/DateFilterDropdown";
 import type { DateFilter } from "./components/DateFilterDropdown";
@@ -945,12 +945,6 @@ export const FilesView: React.FC<FilesViewProps> = ({
         )}
         {/* Toolbar */}
         <Toolbar
-          padding="8px"
-          className="gap-2"
-          style={{
-            borderBottomColor: "var(--color-panel-border)",
-            backgroundColor: "var(--color-panel-bg)",
-          }}
           left={
             <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             {components && components.length > 1 && (
@@ -958,7 +952,6 @@ export const FilesView: React.FC<FilesViewProps> = ({
                 selectedComponentId={selectedComponentId || null}
                 onSelect={(componentId) => setSelectedComponent(componentId)}
                 components={components}
-                variant="input"
               />
             )}
             <div style={{ minWidth: "200px", width: "300px" }}>

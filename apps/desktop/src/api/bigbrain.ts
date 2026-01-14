@@ -11,14 +11,33 @@ import {
   getDeploymentAccessTokens as sharedGetDeploymentAccessTokens,
   getProjectAccessTokens as sharedGetProjectAccessTokens,
   deleteAccessToken as sharedDeleteAccessToken,
+  updateProfileName as sharedUpdateProfileName,
+  getProfileEmails as sharedGetProfileEmails,
+  getIdentities as sharedGetIdentities,
+  unlinkIdentity as sharedUnlinkIdentity,
+  getDiscordAccounts as sharedGetDiscordAccounts,
+  unlinkDiscordAccount as sharedUnlinkDiscordAccount,
+  deleteAccount as sharedDeleteAccount,
   type Team,
   type Project,
   type Deployment,
   type UserProfile,
   type AccessToken,
+  type ProfileEmail,
+  type Identity,
+  type DiscordAccount,
 } from "@convex-panel/shared/api";
 
-export type { AccessToken, Team, Project, Deployment, UserProfile };
+export type {
+  AccessToken,
+  Team,
+  Project,
+  Deployment,
+  UserProfile,
+  ProfileEmail,
+  Identity,
+  DiscordAccount,
+};
 
 export interface SubscriptionPlan {
   id: string;
@@ -150,4 +169,60 @@ export async function getInvoices(
   return data.invoices.filter(
     (invoice) => new Date(invoice.invoiceDate) >= new Date("2024-04-29"),
   );
+}
+
+// ============================================================================
+// Profile Management Functions
+// ============================================================================
+
+export async function updateProfileName(
+  accessToken: string,
+  name: string,
+  fetchFn: DashboardFetch,
+): Promise<void> {
+  return sharedUpdateProfileName(accessToken, name, fetchFn);
+}
+
+export async function getProfileEmails(
+  accessToken: string,
+  fetchFn: DashboardFetch,
+): Promise<ProfileEmail[]> {
+  return sharedGetProfileEmails(accessToken, fetchFn);
+}
+
+export async function getIdentities(
+  accessToken: string,
+  fetchFn: DashboardFetch,
+): Promise<Identity[]> {
+  return sharedGetIdentities(accessToken, fetchFn);
+}
+
+export async function unlinkIdentity(
+  accessToken: string,
+  provider: "google" | "github" | "vercel",
+  fetchFn: DashboardFetch,
+): Promise<void> {
+  return sharedUnlinkIdentity(accessToken, provider, fetchFn);
+}
+
+export async function getDiscordAccounts(
+  accessToken: string,
+  fetchFn: DashboardFetch,
+): Promise<DiscordAccount[]> {
+  return sharedGetDiscordAccounts(accessToken, fetchFn);
+}
+
+export async function unlinkDiscordAccount(
+  accessToken: string,
+  discordUserId: string,
+  fetchFn: DashboardFetch,
+): Promise<void> {
+  return sharedUnlinkDiscordAccount(accessToken, discordUserId, fetchFn);
+}
+
+export async function deleteAccount(
+  accessToken: string,
+  fetchFn: DashboardFetch,
+): Promise<void> {
+  return sharedDeleteAccount(accessToken, fetchFn);
 }

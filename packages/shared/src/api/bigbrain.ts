@@ -721,3 +721,147 @@ export function extractDeploymentName(deploymentUrl: string): string | null {
 export function normalizeBearerToken(token: string): string {
   return token.startsWith("Convex ") ? token.substring(7) : token;
 }
+
+// ============================================================================
+// Profile Management Types
+// ============================================================================
+
+export interface ProfileEmail {
+  email: string;
+  verified: boolean;
+  primary: boolean;
+}
+
+export interface Identity {
+  id: string;
+  providers: Array<"google" | "github" | "vercel">;
+  email?: string | null;
+}
+
+export interface DiscordAccount {
+  id: string;
+  details: {
+    username: string;
+    discriminator: string;
+    avatar?: string | null;
+    global_name?: string | null;
+  };
+}
+
+// ============================================================================
+// Profile Management Functions
+// ============================================================================
+
+/**
+ * Update the user's profile name
+ */
+export async function updateProfileName(
+  accessToken: string,
+  name: string,
+  fetchFn: FetchFn = defaultFetch,
+): Promise<void> {
+  await callBigBrainAPI(
+    "/update_profile_name",
+    {
+      accessToken,
+      method: "PUT",
+      body: { name },
+    },
+    fetchFn,
+  );
+}
+
+/**
+ * Get profile emails
+ */
+export async function getProfileEmails(
+  accessToken: string,
+  fetchFn: FetchFn = defaultFetch,
+): Promise<ProfileEmail[]> {
+  return callBigBrainAPI<ProfileEmail[]>(
+    "/profile_emails/list",
+    { accessToken },
+    fetchFn,
+  );
+}
+
+/**
+ * Get connected identities (OAuth providers)
+ */
+export async function getIdentities(
+  accessToken: string,
+  fetchFn: FetchFn = defaultFetch,
+): Promise<Identity[]> {
+  return callBigBrainAPI<Identity[]>("/identities", { accessToken }, fetchFn);
+}
+
+/**
+ * Unlink an identity provider
+ */
+export async function unlinkIdentity(
+  accessToken: string,
+  provider: "google" | "github" | "vercel",
+  fetchFn: FetchFn = defaultFetch,
+): Promise<void> {
+  await callBigBrainAPI(
+    "/unlink_identity",
+    {
+      accessToken,
+      method: "POST",
+      body: { provider },
+    },
+    fetchFn,
+  );
+}
+
+/**
+ * Get linked Discord accounts
+ */
+export async function getDiscordAccounts(
+  accessToken: string,
+  fetchFn: FetchFn = defaultFetch,
+): Promise<DiscordAccount[]> {
+  // API returns { accounts: [...] } structure
+  const response = await callBigBrainAPI<{ accounts: DiscordAccount[] }>(
+    "/discord/accounts",
+    { accessToken },
+    fetchFn,
+  );
+  return response?.accounts ?? [];
+}
+
+/**
+ * Unlink a Discord account
+ */
+export async function unlinkDiscordAccount(
+  accessToken: string,
+  discordUserId: string,
+  fetchFn: FetchFn = defaultFetch,
+): Promise<void> {
+  await callBigBrainAPI(
+    "/discord/unlink",
+    {
+      accessToken,
+      method: "POST",
+      body: { discordUserId },
+    },
+    fetchFn,
+  );
+}
+
+/**
+ * Delete the user's account
+ */
+export async function deleteAccount(
+  accessToken: string,
+  fetchFn: FetchFn = defaultFetch,
+): Promise<void> {
+  await callBigBrainAPI(
+    "/delete_account",
+    {
+      accessToken,
+      method: "POST",
+    },
+    fetchFn,
+  );
+}

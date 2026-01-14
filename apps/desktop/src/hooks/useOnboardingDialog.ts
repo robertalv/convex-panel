@@ -7,7 +7,6 @@ import {
   validateDeployKey,
   doesKeyMatchDeployment,
 } from "../lib/envFile";
-import type { OnboardingStep } from "../components/onboarding/utils";
 
 interface UseOnboardingDialogProps {
   isOpen: boolean;
@@ -17,16 +16,10 @@ interface UseOnboardingDialogProps {
 }
 
 interface UseOnboardingDialogReturn {
-  // Step navigation
-  step: OnboardingStep;
-  nextStep: () => void;
-  prevStep: () => void;
-  goToStep: (step: OnboardingStep) => void;
-  
   // Project path
   selectedPath: string | null;
   handleSelectDirectory: () => Promise<void>;
-  
+
   // Deploy key state
   envLocalKey: string | null;
   envLocalKeyMatchesDeployment: boolean;
@@ -39,11 +32,11 @@ interface UseOnboardingDialogReturn {
   handleGenerateKey: () => Promise<void>;
   handleUseEnvLocalKey: () => Promise<void>;
   handleSaveManualKey: () => Promise<void>;
-  
+
   // Actions
   handleComplete: () => void;
   handleSkip: () => void;
-  
+
   // Context values (to pass to step components)
   github: ReturnType<typeof useGitHubOptional>;
   deployment: ReturnType<typeof useDeployment>;
@@ -59,7 +52,6 @@ export function useOnboardingDialog({
   const github = useGitHubOptional();
   const deployment = useDeployment();
 
-  const [step, setStep] = useState<OnboardingStep>("welcome");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [envLocalKey, setEnvLocalKey] = useState<string | null>(null);
   const [envLocalKeyMatchesDeployment, setEnvLocalKeyMatchesDeployment] =
@@ -74,7 +66,6 @@ export function useOnboardingDialog({
     const validateAndSetPath = async () => {
       if (!isOpen) return;
 
-      setStep("welcome");
       setKeyError(null);
       setManualKey("");
       setShowManualEntry(false);
@@ -204,53 +195,7 @@ export function useOnboardingDialog({
     onClose();
   }, [onClose]);
 
-  const goToStep = useCallback((nextStep: OnboardingStep) => {
-    setKeyError(null);
-    setStep(nextStep);
-  }, []);
-
-  const nextStep = useCallback(() => {
-    switch (step) {
-      case "welcome":
-        goToStep("folder");
-        break;
-      case "folder":
-        goToStep("github");
-        break;
-      case "github":
-        goToStep("deploy-key");
-        break;
-      case "deploy-key":
-        goToStep("done");
-        break;
-      case "done":
-        handleComplete();
-        break;
-    }
-  }, [step, goToStep, handleComplete]);
-
-  const prevStep = useCallback(() => {
-    switch (step) {
-      case "folder":
-        goToStep("welcome");
-        break;
-      case "github":
-        goToStep("folder");
-        break;
-      case "deploy-key":
-        goToStep("github");
-        break;
-      case "done":
-        goToStep("deploy-key");
-        break;
-    }
-  }, [step, goToStep]);
-
   return {
-    step,
-    nextStep,
-    prevStep,
-    goToStep,
     selectedPath,
     handleSelectDirectory,
     envLocalKey,

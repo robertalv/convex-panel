@@ -30,8 +30,11 @@ function buildExecutionTree(logs: LogEntry[]): ExecutionNode[] {
   const nodeMap = new Map<string, ExecutionNode>();
   const rootNodes: ExecutionNode[] = [];
 
-  // Create nodes for all logs
-  logs.forEach((log) => {
+  // Filter to only outcome entries (one per execution, not per log line)
+  const outcomeEntries = logs.filter((log) => log.kind === "outcome");
+
+  // Create nodes for all executions
+  outcomeEntries.forEach((log) => {
     const node: ExecutionNode = {
       executionId: log.executionId,
       functionName: log.functionName || "Unknown",

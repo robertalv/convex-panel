@@ -287,8 +287,11 @@ export async function authenticate(): Promise<ConvexSession> {
 
 export interface SelectedContext {
   teamId: number | null;
+  teamSlug: string | null;
   projectId: number | null;
+  projectSlug: string | null;
   deploymentName: string | null;
+  deploymentType: string | null;
 }
 
 export async function saveSelectedContext(
@@ -300,10 +303,22 @@ export async function saveSelectedContext(
       context.teamId.toString(),
     );
   }
+  if (context.teamSlug) {
+    await LocalStorage.setItem(
+      STORAGE_KEYS.SELECTED_TEAM_SLUG,
+      context.teamSlug,
+    );
+  }
   if (context.projectId) {
     await LocalStorage.setItem(
       STORAGE_KEYS.SELECTED_PROJECT_ID,
       context.projectId.toString(),
+    );
+  }
+  if (context.projectSlug) {
+    await LocalStorage.setItem(
+      STORAGE_KEYS.SELECTED_PROJECT_SLUG,
+      context.projectSlug,
     );
   }
   if (context.deploymentName) {
@@ -312,22 +327,40 @@ export async function saveSelectedContext(
       context.deploymentName,
     );
   }
+  if (context.deploymentType) {
+    await LocalStorage.setItem(
+      STORAGE_KEYS.SELECTED_DEPLOYMENT_TYPE,
+      context.deploymentType,
+    );
+  }
 }
 
 export async function loadSelectedContext(): Promise<SelectedContext> {
   const teamIdStr = await LocalStorage.getItem<string>(
     STORAGE_KEYS.SELECTED_TEAM_ID,
   );
+  const teamSlug = await LocalStorage.getItem<string>(
+    STORAGE_KEYS.SELECTED_TEAM_SLUG,
+  );
   const projectIdStr = await LocalStorage.getItem<string>(
     STORAGE_KEYS.SELECTED_PROJECT_ID,
+  );
+  const projectSlug = await LocalStorage.getItem<string>(
+    STORAGE_KEYS.SELECTED_PROJECT_SLUG,
   );
   const deploymentName = await LocalStorage.getItem<string>(
     STORAGE_KEYS.SELECTED_DEPLOYMENT_NAME,
   );
+  const deploymentType = await LocalStorage.getItem<string>(
+    STORAGE_KEYS.SELECTED_DEPLOYMENT_TYPE,
+  );
 
   return {
     teamId: teamIdStr ? parseInt(teamIdStr, 10) : null,
+    teamSlug: teamSlug ?? null,
     projectId: projectIdStr ? parseInt(projectIdStr, 10) : null,
+    projectSlug: projectSlug ?? null,
     deploymentName: deploymentName ?? null,
+    deploymentType: deploymentType ?? null,
   };
 }

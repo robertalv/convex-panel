@@ -1,30 +1,20 @@
 /**
  * LogDetailSheet Component
  * Displays detailed information about a selected log entry
+ * Matches the design from FunctionExecutionDetailSheet
  */
 
 import { useState } from "react";
-import {
-  Copy,
-  CheckCircle2,
-  XCircle,
-  Zap,
-  Clock,
-  Database,
-  HardDrive,
-  Cpu,
-} from "lucide-react";
-import { ResizableSheet } from "@/views/data/components/ResizableSheet";
-import { IconButton } from "@/components/ui/button";
-import type { LogEntry, DetailTab } from "../types";
+import { Sheet } from "@/components/ui/sheet";
+import type { LogEntry } from "../types";
+import { X, ChevronUp, ChevronDown, AlertCircle, Copy } from "lucide-react";
+import { FunctionCallTree } from "./FunctionCallTree";
 import {
   formatTimestampWithRelative,
   formatBytes,
   formatDuration,
   formatCompute,
 } from "../utils/formatters";
-import { cn } from "@/lib/utils";
-import { FunctionCallTree } from "./FunctionCallTree";
 
 interface LogDetailSheetProps {
   log: LogEntry | null;
@@ -32,367 +22,748 @@ interface LogDetailSheetProps {
   onClose: () => void;
 }
 
-const TABS: { id: DetailTab; label: string }[] = [
-  { id: "execution", label: "Execution" },
-  { id: "request", label: "Request" },
-  { id: "functions", label: "Functions Called" },
-];
+type DetailTab = "execution" | "request" | "functions";
+
+const formatDateTime = (timestamp: number) => {
+  if (!timestamp) return "N/A";
+  const date = new Date(timestamp);
+  return date.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+};
 
 export function LogDetailSheet({ log, allLogs, onClose }: LogDetailSheetProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>("execution");
-  const [copied, setCopied] = useState(false);
+  const [resourcesExpanded, setResourcesExpanded] = useState(true);
 
-  // Don't render if no log selected
-  if (!log) return null;
+  if (!log) {
+    return null;
+  }
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const {
+    executionId,
+    udfType,
+    startedAt,
+    completedAt,
+    durationMs,
+    environment,
+    usageStats,
+    caller,
+    identityType,
+    returnBytes,
+    requestId,
+    functionIdentifier,
+    error,
+    success,
+    logLines,
+    timestamp,
+  } = log;
 
-  const { absolute: timestamp, relative: relativeTime } =
-    formatTimestampWithRelative(log.timestamp);
+  const timestampInfo = formatTimestampWithRelative(timestamp);
+  const hasError = !success || !!error;
 
-  const isSuccess = log.success;
-  const isError = !log.success || !!log.error;
-  const isCached = log.cachedResult || false;
+  // Filter logs to only include those from the same request
+  const requestLogs = allLogs.filter((l) => l.requestId === requestId);
 
-  // Get status info
-  const getStatusInfo = () => {
-    if (isError) {
-      return {
-        icon: XCircle,
-        color: "var(--color-error-base)",
-        label: "Failed",
-      };
-    }
-    if (isCached) {
-      return {
-        icon: Zap,
-        color: "var(--color-warning-base)",
-        label: "Cached",
-      };
-    }
-    if (isSuccess) {
-      return {
-        icon: CheckCircle2,
-        color: "var(--color-success-base)",
-        label: "Success",
-      };
-    }
-    return {
-      icon: Clock,
-      color: "var(--color-text-muted)",
-      label: "Unknown",
-    };
-  };
-
-  const statusInfo = getStatusInfo();
-  const StatusIcon = statusInfo.icon;
-
-  // Get function type label
-  const getFunctionTypeLabel = () => {
-    switch (log.udfType) {
-      case "query":
-        return "Query";
-      case "mutation":
-        return "Mutation";
-      case "action":
-        return "Action";
-      case "httpAction":
-        return "HTTP Action";
-      default:
-        return log.udfType;
-    }
-  };
-
-  return (
-    <ResizableSheet
-      id="log-detail"
-      side="right"
-      defaultWidth={450}
-      minWidth={350}
-      maxWidth={700}
-      title={log.functionName || log.functionIdentifier}
-      subtitle={getFunctionTypeLabel()}
-      onClose={onClose}
-      headerActions={
-        <IconButton
-          size="xs"
-          variant="ghost"
-          tooltip={copied ? "Copied!" : "Copy log ID"}
-          onClick={() => handleCopy(log.id)}
-        >
-          <Copy size={14} />
-        </IconButton>
-      }
+  const sheetContent = (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+      }}
     >
-      {/* Tabs */}
+      {/* Header */}
       <div
-        className="flex gap-1 px-4 py-2"
-        style={{ borderBottom: "1px solid var(--color-border-base)" }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0px 12px",
+          borderBottom: "1px solid var(--color-border-base)",
+          backgroundColor: "var(--color-surface-raised)",
+          height: "45px",
+          flexShrink: 0,
+        }}
       >
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              "px-3 py-1.5 text-xs rounded-md transition-colors",
-              activeTab === tab.id
-                ? "font-medium"
-                : "hover:bg-[var(--color-surface-raised)]",
-            )}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            flex: 1,
+            overflow: "hidden",
+          }}
+        >
+          <div
             style={{
-              backgroundColor:
-                activeTab === tab.id
-                  ? "var(--color-brand-base-alpha)"
-                  : "transparent",
-              color:
-                activeTab === tab.id
-                  ? "var(--color-brand-base)"
-                  : "var(--color-text-muted)",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              overflow: "hidden",
             }}
           >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-4">
-        {activeTab === "execution" && (
-          <div className="space-y-4">
-            {/* Status */}
-            <div className="flex items-center gap-2">
-              <StatusIcon size={18} style={{ color: statusInfo.color }} />
-              <span className="font-medium" style={{ color: statusInfo.color }}>
-                {statusInfo.label}
-              </span>
-              {log.durationMs && (
-                <span
-                  className="text-xs ml-auto"
-                  style={{ color: "var(--color-text-muted)" }}
-                >
-                  {formatDuration(log.durationMs)}
-                </span>
-              )}
-            </div>
-
-            {/* Error message */}
-            {log.error && (
-              <div
-                className="p-3 rounded-md text-sm"
+            <span
+              style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}
+            >
+              {timestampInfo.absolute}
+            </span>
+            <span
+              style={{ fontSize: "12px", color: "var(--color-text-muted)" }}
+            >
+              ({timestampInfo.relative})
+            </span>
+            {hasError && (
+              <span
                 style={{
-                  backgroundColor: "var(--color-error-base-alpha)",
+                  fontSize: "12px",
                   color: "var(--color-error-base)",
-                  border: "1px solid var(--color-error-base)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
                 }}
               >
-                {log.error}
-              </div>
+                <AlertCircle size={14} />
+                failure
+              </span>
             )}
+          </div>
+        </div>
 
-            {/* Timestamp */}
-            <div className="grid grid-cols-2 gap-4 text-xs">
-              <div>
+        {/* Close Button */}
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            padding: "6px",
+            color: "var(--color-text-secondary)",
+            backgroundColor: "transparent",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: "4px",
+            transition: "all 0.2s",
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = "var(--color-text-base)";
+            e.currentTarget.style.backgroundColor = "var(--color-border-base)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = "var(--color-text-secondary)";
+            e.currentTarget.style.backgroundColor = "transparent";
+          }}
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      {/* Error message - show first if present */}
+      {hasError && error && (
+        <div
+          style={{
+            margin: "16px",
+            padding: "12px",
+            backgroundColor: "rgba(239, 68, 68, 0.1)",
+            border: "1px solid rgba(239, 68, 68, 0.3)",
+            borderRadius: "6px",
+            position: "relative",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "8px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "var(--color-error-base)",
+              }}
+            >
+              Error
+            </div>
+          </div>
+          <div
+            style={{
+              fontSize: "12px",
+              color: "var(--color-error-base)",
+              fontFamily: "monospace",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {error}
+          </div>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(error);
+            }}
+            style={{
+              position: "absolute",
+              top: "8px",
+              right: "8px",
+              border: "none",
+              background: "transparent",
+              color: "var(--color-error-base)",
+              cursor: "pointer",
+              padding: "4px",
+              display: "flex",
+              alignItems: "center",
+            }}
+            title="Copy error"
+          >
+            <Copy size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Log messages - show after error, but not if they're just the error message repeated */}
+      {logLines &&
+        logLines.length > 0 &&
+        (() => {
+          // Filter out log lines that are just the error message repeated
+          const nonEmptyLogLines = logLines.filter((line: any) => {
+            if (typeof line === "string") {
+              const trimmed = line.trim();
+              // Don't show empty lines
+              if (trimmed.length === 0) return false;
+              // If there's an error, don't show log lines that are just the error message
+              if (hasError && error && trimmed === error.trim()) return false;
+              return true;
+            }
+            return true;
+          });
+
+          if (nonEmptyLogLines.length === 0) return null;
+
+          const allLogContent = nonEmptyLogLines
+            .map((line: any) => {
+              const logContent =
+                typeof line === "string"
+                  ? line.trim()
+                  : JSON.stringify(line, null, 2);
+              return logContent || "";
+            })
+            .filter((content) => content.length > 0)
+            .join("\n");
+
+          return (
+            <div
+              style={{
+                margin: "16px",
+                padding: "12px",
+                backgroundColor: "var(--color-surface-raised)",
+                border: "1px solid var(--color-border-base)",
+                borderRadius: "6px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "8px",
+                  position: "relative",
+                }}
+              >
                 <div
-                  className="font-medium mb-1"
-                  style={{ color: "var(--color-text-muted)" }}
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "var(--color-text-base)",
+                  }}
                 >
-                  Timestamp
+                  Log Message
                 </div>
-                <div style={{ color: "var(--color-text-base)" }}>
-                  {timestamp}
-                </div>
-                <div
-                  className="text-xs"
-                  style={{ color: "var(--color-text-subtle)" }}
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(allLogContent);
+                  }}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "var(--color-text-muted)",
+                    cursor: "pointer",
+                    padding: "4px",
+                    display: "flex",
+                    alignItems: "center",
+                    borderRadius: "4px",
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = "var(--color-text-base)";
+                    e.currentTarget.style.backgroundColor =
+                      "var(--color-border-base)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = "var(--color-text-muted)";
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                  title="Copy log message"
                 >
-                  {relativeTime}
-                </div>
+                  <Copy size={14} />
+                </button>
               </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  maxHeight: "400px",
+                  overflowY: "auto",
+                }}
+              >
+                {nonEmptyLogLines.map((line: any, index: number) => {
+                  const logContent =
+                    typeof line === "string"
+                      ? line.trim()
+                      : JSON.stringify(line, null, 2);
 
-              <div>
-                <div
-                  className="font-medium mb-1"
-                  style={{ color: "var(--color-text-muted)" }}
-                >
-                  Duration
-                </div>
-                <div style={{ color: "var(--color-text-base)" }}>
-                  {log.durationMs ? formatDuration(log.durationMs) : "-"}
-                </div>
+                  if (!logContent || logContent.length === 0) return null;
+
+                  return (
+                    <div
+                      key={index}
+                      style={{
+                        padding: "8px 12px",
+                        backgroundColor: "var(--color-surface-base)",
+                        borderRadius: "6px",
+                        fontFamily: "monospace",
+                        fontSize: "11px",
+                        color: "var(--color-text-secondary)",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                        position: "relative",
+                      }}
+                    >
+                      {logContent}
+                    </div>
+                  );
+                })}
               </div>
             </div>
+          );
+        })()}
 
-            {/* Usage stats */}
-            {log.usageStats && (
-              <div>
-                <div
-                  className="font-medium mb-2 text-xs"
-                  style={{ color: "var(--color-text-muted)" }}
+      {/* Tabs */}
+      <div
+        style={{
+          borderBottom: "1px solid var(--color-border-base)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <div style={{ display: "flex" }}>
+          {(["execution", "request", "functions"] as DetailTab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                padding: "10px 16px",
+                fontSize: 12,
+                fontWeight: 500,
+                border: "none",
+                borderBottom:
+                  activeTab === tab
+                    ? "2px solid var(--color-brand-base)"
+                    : "2px solid transparent",
+                backgroundColor: "transparent",
+                color:
+                  activeTab === tab
+                    ? "var(--color-text-base)"
+                    : "var(--color-text-muted)",
+                cursor: "pointer",
+              }}
+            >
+              {tab === "execution"
+                ? "Execution"
+                : tab === "request"
+                  ? "Request"
+                  : "Functions Called"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tab content */}
+      <div
+        style={{
+          flex: 1,
+          overflow: "auto",
+        }}
+      >
+        {activeTab === "execution" && (
+          <div
+            style={{
+              backgroundColor: "var(--color-surface-base)",
+              padding: "16px",
+            }}
+          >
+            <div style={{ fontSize: 12 }}>
+              <div
+                style={{
+                  marginBottom: 12,
+                  display: "grid",
+                  gridTemplateColumns: "120px 1fr",
+                  rowGap: 6,
+                }}
+              >
+                <span style={{ color: "var(--color-text-muted)" }}>
+                  Execution ID
+                </span>
+                <span
+                  style={{
+                    fontFamily: "monospace",
+                    color: "var(--color-text-secondary)",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    maxWidth: 200,
+                    display: "inline-block",
+                  }}
+                  title={executionId}
                 >
-                  Usage Statistics
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <UsageStatCard
-                    icon={Database}
-                    label="Database Read"
-                    value={formatBytes(log.usageStats.database_read_bytes)}
-                    subValue={`${log.usageStats.database_read_documents} docs`}
-                  />
-                  <UsageStatCard
-                    icon={Database}
-                    label="Database Write"
-                    value={formatBytes(log.usageStats.database_write_bytes)}
-                  />
-                  <UsageStatCard
-                    icon={HardDrive}
-                    label="Storage Read"
-                    value={formatBytes(log.usageStats.storage_read_bytes)}
-                  />
-                  <UsageStatCard
-                    icon={HardDrive}
-                    label="Storage Write"
-                    value={formatBytes(log.usageStats.storage_write_bytes)}
-                  />
-                  <UsageStatCard
-                    icon={Cpu}
-                    label="Memory"
-                    value={`${log.usageStats.memory_used_mb} MB`}
-                  />
-                  <UsageStatCard
-                    icon={Cpu}
-                    label="Compute"
-                    value={formatCompute(
-                      log.usageStats.memory_used_mb,
-                      log.durationMs,
-                    )}
-                  />
-                </div>
+                  {executionId}
+                </span>
+
+                <span style={{ color: "var(--color-text-muted)" }}>
+                  Function
+                </span>
+                <span
+                  style={{
+                    fontFamily: "monospace",
+                    color: "var(--color-text-secondary)",
+                  }}
+                >
+                  {functionIdentifier}
+                </span>
+
+                <span style={{ color: "var(--color-text-muted)" }}>Type</span>
+                <span
+                  style={{
+                    textTransform: "capitalize",
+                    color: "var(--color-text-secondary)",
+                  }}
+                >
+                  {udfType
+                    ? udfType.charAt(0).toUpperCase() + udfType.slice(1)
+                    : "Unknown"}
+                </span>
+
+                <span style={{ color: "var(--color-text-muted)" }}>
+                  Started at
+                </span>
+                <span style={{ color: "var(--color-text-secondary)" }}>
+                  {formatDateTime(startedAt ?? 0)}
+                </span>
+
+                <span style={{ color: "var(--color-text-muted)" }}>
+                  Completed at
+                </span>
+                <span style={{ color: "var(--color-text-secondary)" }}>
+                  {formatDateTime(completedAt)}
+                </span>
+
+                <span style={{ color: "var(--color-text-muted)" }}>
+                  Duration
+                </span>
+                <span style={{ color: "var(--color-text-secondary)" }}>
+                  {formatDuration(durationMs ?? 0)}
+                </span>
+
+                <span style={{ color: "var(--color-text-muted)" }}>
+                  Environment
+                </span>
+                <span
+                  style={{
+                    color: "var(--color-text-secondary)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                  }}
+                >
+                  {environment || "Convex"}
+                </span>
               </div>
-            )}
+
+              <div
+                style={{
+                  marginTop: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 8,
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 600,
+                    color: "var(--color-text-base)",
+                  }}
+                >
+                  Resources Used
+                </div>
+                <button
+                  onClick={() => setResourcesExpanded(!resourcesExpanded)}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "var(--color-text-muted)",
+                    cursor: "pointer",
+                    padding: "4px",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  {resourcesExpanded ? (
+                    <ChevronUp size={14} />
+                  ) : (
+                    <ChevronDown size={14} />
+                  )}
+                </button>
+              </div>
+
+              {resourcesExpanded && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    fontSize: 12,
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        color: "var(--color-text-muted)",
+                        marginBottom: 2,
+                      }}
+                    >
+                      Compute
+                    </div>
+                    <div
+                      style={{
+                        color: "var(--color-text-secondary)",
+                      }}
+                    >
+                      {formatCompute(
+                        usageStats?.memory_used_mb,
+                        durationMs ?? 0,
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div
+                      style={{
+                        color: "var(--color-text-muted)",
+                        marginBottom: 2,
+                      }}
+                    >
+                      DB Bandwidth
+                    </div>
+                    <div
+                      style={{
+                        color: "var(--color-text-secondary)",
+                      }}
+                    >
+                      {`Accessed ${usageStats?.database_read_documents || 0} documents, ${formatBytes(
+                        usageStats?.database_read_bytes,
+                      )} read, ${formatBytes(usageStats?.database_write_bytes)} written`}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div
+                      style={{
+                        color: "var(--color-text-muted)",
+                        marginBottom: 2,
+                      }}
+                    >
+                      File Bandwidth
+                    </div>
+                    <div
+                      style={{
+                        color: "var(--color-text-secondary)",
+                      }}
+                    >
+                      {`${formatBytes(usageStats?.storage_read_bytes)} read, ${formatBytes(
+                        usageStats?.storage_write_bytes,
+                      )} written`}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div
+                      style={{
+                        color: "var(--color-text-muted)",
+                        marginBottom: 2,
+                      }}
+                    >
+                      Vector Bandwidth
+                    </div>
+                    <div
+                      style={{
+                        color: "var(--color-text-secondary)",
+                      }}
+                    >
+                      {`${formatBytes(usageStats?.vector_index_read_bytes)} read, ${formatBytes(
+                        usageStats?.vector_index_write_bytes,
+                      )} written`}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {returnBytes != null && (
+                <div
+                  style={{
+                    marginTop: 16,
+                    display: "grid",
+                    gridTemplateColumns: "120px 1fr",
+                    rowGap: 6,
+                  }}
+                >
+                  <span style={{ color: "var(--color-text-muted)" }}>
+                    Return Size
+                  </span>
+                  <span style={{ color: "var(--color-text-secondary)" }}>
+                    {formatBytes(returnBytes)} returned
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {activeTab === "request" && (
-          <div className="space-y-4 text-xs">
-            <InfoRow label="Request ID" value={log.requestId} copiable />
-            <InfoRow label="Execution ID" value={log.executionId} copiable />
-            <InfoRow label="Function" value={log.functionIdentifier} copiable />
-            {log.componentPath && (
-              <InfoRow label="Component" value={log.componentPath} />
-            )}
-            <InfoRow label="Identity Type" value={log.identityType} />
-            {log.caller && <InfoRow label="Caller" value={log.caller} />}
-            {log.environment && (
-              <InfoRow label="Environment" value={log.environment} />
-            )}
-            {log.returnBytes !== undefined && (
-              <InfoRow
-                label="Return Size"
-                value={formatBytes(log.returnBytes)}
-              />
-            )}
+          <div
+            style={{
+              padding: "16px",
+              backgroundColor: "var(--color-surface-base)",
+            }}
+          >
+            <div style={{ fontSize: 12 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "120px 1fr",
+                  rowGap: 6,
+                  marginBottom: 12,
+                }}
+              >
+                <span style={{ color: "var(--color-text-muted)" }}>
+                  Request ID
+                </span>
+                <span
+                  style={{
+                    fontFamily: "monospace",
+                    color: "var(--color-text-secondary)",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    maxWidth: 200,
+                    display: "inline-block",
+                  }}
+                  title={requestId}
+                >
+                  {requestId}
+                </span>
+
+                <span style={{ color: "var(--color-text-muted)" }}>
+                  Started at
+                </span>
+                <span style={{ color: "var(--color-text-secondary)" }}>
+                  {formatDateTime(startedAt ?? 0)}
+                </span>
+
+                <span style={{ color: "var(--color-text-muted)" }}>
+                  Completed at
+                </span>
+                <span style={{ color: "var(--color-text-secondary)" }}>
+                  {formatDateTime(completedAt)}
+                </span>
+
+                <span style={{ color: "var(--color-text-muted)" }}>
+                  Duration
+                </span>
+                <span style={{ color: "var(--color-text-secondary)" }}>
+                  {formatDuration(durationMs ?? 0)}
+                </span>
+
+                <span style={{ color: "var(--color-text-muted)" }}>
+                  Identity
+                </span>
+                <span
+                  style={{
+                    color: "var(--color-text-secondary)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                  }}
+                >
+                  {identityType || "Unknown"}
+                </span>
+
+                <span style={{ color: "var(--color-text-muted)" }}>Caller</span>
+                <span
+                  style={{
+                    color: "var(--color-text-secondary)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                  }}
+                >
+                  {caller || "Websocket"}
+                </span>
+
+                <span style={{ color: "var(--color-text-muted)" }}>
+                  Environment
+                </span>
+                <span
+                  style={{
+                    color: "var(--color-text-secondary)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                  }}
+                >
+                  {environment || "Convex"}
+                </span>
+              </div>
+            </div>
           </div>
         )}
 
         {activeTab === "functions" && (
-          <FunctionCallTree
-            logs={allLogs.filter((l) => l.requestId === log.requestId)}
-            currentExecutionId={log.executionId}
-          />
+          <div style={{ padding: "16px" }}>
+            <FunctionCallTree
+              logs={requestLogs}
+              currentExecutionId={executionId}
+            />
+          </div>
         )}
       </div>
-    </ResizableSheet>
-  );
-}
-
-// Helper component for usage stats
-function UsageStatCard({
-  icon: Icon,
-  label,
-  value,
-  subValue,
-}: {
-  icon: typeof Database;
-  label: string;
-  value: string;
-  subValue?: string;
-}) {
-  return (
-    <div
-      className="p-2 rounded"
-      style={{ backgroundColor: "var(--color-surface-raised)" }}
-    >
-      <div className="flex items-center gap-1.5 mb-1">
-        <Icon size={12} style={{ color: "var(--color-text-muted)" }} />
-        <span style={{ color: "var(--color-text-muted)" }}>{label}</span>
-      </div>
-      <div className="font-mono" style={{ color: "var(--color-text-base)" }}>
-        {value}
-      </div>
-      {subValue && (
-        <div style={{ color: "var(--color-text-subtle)" }}>{subValue}</div>
-      )}
     </div>
   );
-}
-
-// Helper component for info rows
-function InfoRow({
-  label,
-  value,
-  copiable = false,
-}: {
-  label: string;
-  value?: string;
-  copiable?: boolean;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  if (!value) return null;
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   return (
-    <div className="flex items-start gap-2">
-      <div
-        className="w-24 shrink-0"
-        style={{ color: "var(--color-text-muted)" }}
-      >
-        {label}
-      </div>
-      <div
-        className="flex-1 font-mono break-all"
-        style={{ color: "var(--color-text-base)" }}
-      >
-        {value}
-      </div>
-      {copiable && (
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="shrink-0 p-1 rounded hover:bg-[var(--color-surface-raised)] transition-colors"
-          title={copied ? "Copied!" : "Copy"}
-        >
-          <Copy
-            size={12}
-            style={{
-              color: copied
-                ? "var(--color-success-base)"
-                : "var(--color-text-muted)",
-            }}
-          />
-        </button>
-      )}
-    </div>
+    <Sheet isOpen={!!log} onClose={onClose} width="420px" renderMode="inline">
+      {sheetContent}
+    </Sheet>
   );
 }
 

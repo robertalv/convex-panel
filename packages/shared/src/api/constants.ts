@@ -54,7 +54,7 @@ export const INTERVALS = {
 
 // API Routes
 export const ROUTES = {
-  STREAM_FUNCTION_LOGS: "/api/stream_function_logs",
+  STREAM_FUNCTION_LOGS: "/api/app_metrics/stream_function_logs",
   STREAM_UDF_EXECUTION: "/api/stream_udf_execution",
   SHAPES2: "/api/shapes2",
   TABLE_COLUMNS: "/api/get_table_column_names",

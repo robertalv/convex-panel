@@ -4,7 +4,5 @@
  */
 
 export * from "./formatters";
-export * from "./log-storage";
 export * from "./log-export";
-export * from "./storage-health";
 export * from "./interleaveLogs";

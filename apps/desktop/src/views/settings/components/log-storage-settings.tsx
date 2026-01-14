@@ -1,9 +1,9 @@
 /**
  * Log Storage Settings Component
- * Settings page section for managing log persistence and storage
+ * Settings page section for managing SQLite log persistence and storage
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -24,37 +24,36 @@ import {
   AlertTriangle,
   CheckCircle,
   RefreshCw,
+  Wrench,
 } from "lucide-react";
-import { StorageHealthMeter } from "../../logs/components/StorageHealthMeter";
-import {
-  loadSettings,
-  saveSettings,
-  getStorageStats,
-  clearAllLogs,
-  pruneLogs,
-  type LogStorageSettings as LogStorageSettingsType,
-} from "../../logs/utils/log-storage";
+import { SQLiteStorageHealth } from "../../logs/components/SQLiteStorageHealth";
+import { useLocalLogStore } from "../../logs/hooks/useLocalLogStore";
 import {
   exportLogsToFile,
   type ExportFormat,
 } from "../../logs/utils/log-export";
-import { getLogs } from "../../logs/utils/log-storage";
 import { formatBytes, formatDateTime } from "../../logs/utils/formatters";
-import { LOG_STORAGE_LIMITS } from "../../logs/utils/storage-health";
+
+const MAX_RETENTION_DAYS = 30;
 
 export function LogStorageSettings() {
-  const [settings, setSettings] = useState<LogStorageSettingsType | null>(null);
-  const [stats, setStats] = useState<{
-    totalLogs: number;
-    logsByDeployment: Map<string, number>;
-    oldestLog: number | null;
-    newestLog: number | null;
-    estimatedSizeBytes: number;
-  } | null>(null);
+  const {
+    settings,
+    stats,
+    updateSettings,
+    refreshStats,
+    queryLogs,
+    clearLogs,
+    deleteOlderThan,
+    optimizeDb,
+    isLoading: hookIsLoading,
+  } = useLocalLogStore();
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [isPruning, setIsPruning] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     type: "success" | "error";
@@ -63,49 +62,18 @@ export function LogStorageSettings() {
 
   // Load settings and stats on mount
   useEffect(() => {
-    async function init() {
-      try {
-        setIsLoading(true);
-        const [loadedSettings, loadedStats] = await Promise.all([
-          loadSettings(),
-          getStorageStats(),
-        ]);
-        setSettings(loadedSettings);
-        setStats(loadedStats);
-      } catch (error) {
-        console.error("[LogStorageSettings] Failed to load:", error);
-        setStatusMessage({
-          type: "error",
-          message: "Failed to load storage settings",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    init();
-  }, []);
-
-  const refreshStats = useCallback(async () => {
-    try {
-      const loadedStats = await getStorageStats();
-      setStats(loadedStats);
-    } catch (error) {
-      console.error("[LogStorageSettings] Failed to refresh stats:", error);
-    }
-  }, []);
+    setIsLoading(hookIsLoading);
+  }, [hookIsLoading]);
 
   const handleSettingChange = async (
-    key: keyof LogStorageSettingsType,
+    key: "enabled" | "retention_days",
     value: boolean | number,
   ) => {
     if (!settings) return;
 
-    const newSettings = { ...settings, [key]: value };
-    setSettings(newSettings);
-
     try {
       setIsSaving(true);
-      await saveSettings(newSettings);
+      await updateSettings({ [key]: value });
       setStatusMessage({
         type: "success",
         message: "Settings saved",
@@ -133,7 +101,7 @@ export function LogStorageSettings() {
 
     try {
       setIsClearing(true);
-      await clearAllLogs();
+      await clearLogs();
       await refreshStats();
       setStatusMessage({
         type: "success",
@@ -156,10 +124,7 @@ export function LogStorageSettings() {
 
     try {
       setIsPruning(true);
-      const deleted = await pruneLogs({
-        maxLogsPerDeployment: settings.maxLogsPerDeployment,
-        retentionDays: settings.retentionDays,
-      });
+      const deleted = await deleteOlderThan(settings.retention_days);
       await refreshStats();
       setStatusMessage({
         type: "success",
@@ -177,11 +142,34 @@ export function LogStorageSettings() {
     }
   };
 
+  const handleOptimizeDb = async () => {
+    try {
+      setIsOptimizing(true);
+      await optimizeDb();
+      setStatusMessage({
+        type: "success",
+        message: "Database optimized successfully",
+      });
+      setTimeout(() => setStatusMessage(null), 5000);
+    } catch (error) {
+      console.error("[LogStorageSettings] Failed to optimize DB:", error);
+      setStatusMessage({
+        type: "error",
+        message: "Failed to optimize database",
+      });
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
   const handleExportLogs = async (format: ExportFormat) => {
     try {
       setIsExporting(true);
-      const logs = await getLogs({ limit: undefined });
-      if (logs.length === 0) {
+
+      // Fetch all logs (no filters, no limit)
+      const result = await queryLogs({}, undefined, undefined);
+
+      if (result.logs.length === 0) {
         setStatusMessage({
           type: "error",
           message: "No logs to export",
@@ -189,11 +177,37 @@ export function LogStorageSettings() {
         return;
       }
 
-      await exportLogsToFile(logs, format);
+      // Convert LocalLogEntry to LogEntry format for export
+      const logsForExport = result.logs.map((log) => {
+        // Parse json_blob to get error and logLines
+        let parsed: any = {};
+        try {
+          parsed = JSON.parse(log.json_blob);
+        } catch (e) {
+          console.warn("[Export] Failed to parse json_blob:", e);
+        }
+
+        return {
+          id: log.id,
+          timestamp: log.ts,
+          functionIdentifier: log.function_path || undefined,
+          functionName: log.function_name || undefined,
+          udfType: log.udf_type || undefined,
+          requestId: log.request_id || undefined,
+          executionId: log.execution_id || undefined,
+          success: log.success || false,
+          durationMs: log.duration_ms || undefined,
+          error: parsed.error || undefined,
+          logLines: parsed.logLines || undefined,
+          raw: parsed,
+        };
+      });
+
+      await exportLogsToFile(logsForExport as any, format);
 
       setStatusMessage({
         type: "success",
-        message: `Exported ${logs.length} logs as ${format.toUpperCase()}`,
+        message: `Exported ${logsForExport.length} logs as ${format.toUpperCase()}`,
       });
       setTimeout(() => setStatusMessage(null), 5000);
     } catch (error) {
@@ -255,7 +269,7 @@ export function LogStorageSettings() {
               color: "var(--color-text-muted)",
             }}
           >
-            Configure local storage for function execution logs
+            Configure local SQLite storage for function execution logs
           </p>
         </div>
 
@@ -285,11 +299,11 @@ export function LogStorageSettings() {
               <CardTitle>Storage Health</CardTitle>
             </div>
             <CardDescription>
-              Monitor your browser storage usage and status
+              SQLite database storage usage and status
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <StorageHealthMeter variant="full" />
+            <SQLiteStorageHealth variant="full" />
           </CardContent>
         </Card>
 
@@ -309,31 +323,14 @@ export function LogStorageSettings() {
               <div className="space-y-0.5">
                 <Label htmlFor="storage-enabled">Enable Log Storage</Label>
                 <div className="text-sm text-muted-foreground">
-                  When enabled, function logs are saved to IndexedDB
+                  When enabled, function logs are saved to SQLite database
                 </div>
               </div>
               <Switch
                 id="storage-enabled"
-                checked={settings?.enabled ?? false}
+                checked={settings?.enabled ?? true}
                 onCheckedChange={(checked) =>
                   handleSettingChange("enabled", checked)
-                }
-                disabled={isSaving}
-              />
-            </div>
-
-            <div className="flex items-center justify-between pt-4 border-t">
-              <div className="space-y-0.5">
-                <Label htmlFor="auto-prune">Auto-Prune Old Logs</Label>
-                <div className="text-sm text-muted-foreground">
-                  Automatically delete logs older than retention period
-                </div>
-              </div>
-              <Switch
-                id="auto-prune"
-                checked={settings?.autoPrune ?? true}
-                onCheckedChange={(checked) =>
-                  handleSettingChange("autoPrune", checked)
                 }
                 disabled={isSaving}
               />
@@ -348,35 +345,11 @@ export function LogStorageSettings() {
               <Clock className="h-5 w-5" />
               <CardTitle>Storage Limits</CardTitle>
             </div>
-            <CardDescription>Configure log retention policies</CardDescription>
+            <CardDescription>
+              Configure time-based log retention policy
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="max-logs">Max Logs per Deployment</Label>
-              <div className="flex items-center gap-3">
-                <Input
-                  id="max-logs"
-                  type="number"
-                  min={1000}
-                  max={LOG_STORAGE_LIMITS.absoluteMaxLogs}
-                  step={10000}
-                  value={settings?.maxLogsPerDeployment ?? 100000}
-                  onChange={(e) =>
-                    handleSettingChange(
-                      "maxLogsPerDeployment",
-                      parseInt(e.target.value) || 100000,
-                    )
-                  }
-                  disabled={isSaving}
-                  className="w-40"
-                />
-                <span className="text-sm text-muted-foreground">
-                  logs (recommended:{" "}
-                  {LOG_STORAGE_LIMITS.recommendedMaxLogs.toLocaleString()})
-                </span>
-              </div>
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="retention-days">Retention Period</Label>
               <div className="flex items-center gap-3">
@@ -384,20 +357,24 @@ export function LogStorageSettings() {
                   id="retention-days"
                   type="number"
                   min={1}
-                  max={LOG_STORAGE_LIMITS.maxRetentionDays}
-                  value={settings?.retentionDays ?? 7}
+                  max={MAX_RETENTION_DAYS}
+                  value={settings?.retention_days ?? 30}
                   onChange={(e) =>
                     handleSettingChange(
-                      "retentionDays",
-                      parseInt(e.target.value) || 7,
+                      "retention_days",
+                      parseInt(e.target.value) || 30,
                     )
                   }
                   disabled={isSaving}
                   className="w-24"
                 />
                 <span className="text-sm text-muted-foreground">
-                  days (max: {LOG_STORAGE_LIMITS.maxRetentionDays})
+                  days (max: {MAX_RETENTION_DAYS})
                 </span>
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Logs older than this will be automatically deleted every 24
+                hours
               </div>
             </div>
           </CardContent>
@@ -439,7 +416,7 @@ export function LogStorageSettings() {
                     className="text-xl font-semibold"
                     style={{ color: "var(--color-text-base)" }}
                   >
-                    {stats.totalLogs.toLocaleString()}
+                    {stats.total_logs.toLocaleString()}
                   </div>
                 </div>
 
@@ -451,13 +428,13 @@ export function LogStorageSettings() {
                     className="text-xs"
                     style={{ color: "var(--color-text-muted)" }}
                   >
-                    Estimated Size
+                    Database Size
                   </div>
                   <div
                     className="text-xl font-semibold"
                     style={{ color: "var(--color-text-base)" }}
                   >
-                    {formatBytes(stats.estimatedSizeBytes)}
+                    {formatBytes(stats.db_size_bytes)}
                   </div>
                 </div>
 
@@ -475,7 +452,7 @@ export function LogStorageSettings() {
                     className="text-sm font-medium"
                     style={{ color: "var(--color-text-base)" }}
                   >
-                    {stats.oldestLog ? formatDateTime(stats.oldestLog) : "N/A"}
+                    {stats.oldest_ts ? formatDateTime(stats.oldest_ts) : "N/A"}
                   </div>
                 </div>
 
@@ -493,11 +470,11 @@ export function LogStorageSettings() {
                     className="text-sm font-medium"
                     style={{ color: "var(--color-text-base)" }}
                   >
-                    {stats.newestLog ? formatDateTime(stats.newestLog) : "N/A"}
+                    {stats.newest_ts ? formatDateTime(stats.newest_ts) : "N/A"}
                   </div>
                 </div>
 
-                {stats.logsByDeployment.size > 0 && (
+                {stats.logs_by_deployment.length > 0 && (
                   <div
                     className="col-span-2 p-3 rounded-lg"
                     style={{ backgroundColor: "var(--color-surface-raised)" }}
@@ -509,24 +486,22 @@ export function LogStorageSettings() {
                       Logs by Deployment
                     </div>
                     <div className="space-y-1 max-h-32 overflow-y-auto">
-                      {Array.from(stats.logsByDeployment.entries()).map(
-                        ([deploymentId, count]) => (
-                          <div
-                            key={deploymentId}
-                            className="flex items-center justify-between text-sm"
+                      {stats.logs_by_deployment.map(([deploymentId, count]) => (
+                        <div
+                          key={deploymentId}
+                          className="flex items-center justify-between text-sm"
+                        >
+                          <span
+                            className="font-mono text-xs truncate max-w-[200px]"
+                            style={{ color: "var(--color-text-base)" }}
                           >
-                            <span
-                              className="font-mono text-xs truncate max-w-[200px]"
-                              style={{ color: "var(--color-text-base)" }}
-                            >
-                              {deploymentId}
-                            </span>
-                            <span style={{ color: "var(--color-text-muted)" }}>
-                              {count.toLocaleString()}
-                            </span>
-                          </div>
-                        ),
-                      )}
+                            {deploymentId}
+                          </span>
+                          <span style={{ color: "var(--color-text-muted)" }}>
+                            {count.toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -543,7 +518,9 @@ export function LogStorageSettings() {
         <Card>
           <CardHeader>
             <CardTitle>Actions</CardTitle>
-            <CardDescription>Export or clear stored logs</CardDescription>
+            <CardDescription>
+              Export, optimize, or clear stored logs
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Export */}
@@ -559,7 +536,7 @@ export function LogStorageSettings() {
                   variant="outline"
                   size="sm"
                   onClick={() => handleExportLogs("json")}
-                  disabled={isExporting || !stats?.totalLogs}
+                  disabled={isExporting || !stats?.total_logs}
                 >
                   <Download className="h-4 w-4 mr-2" />
                   JSON
@@ -568,7 +545,7 @@ export function LogStorageSettings() {
                   variant="outline"
                   size="sm"
                   onClick={() => handleExportLogs("csv")}
-                  disabled={isExporting || !stats?.totalLogs}
+                  disabled={isExporting || !stats?.total_logs}
                 >
                   <Download className="h-4 w-4 mr-2" />
                   CSV
@@ -577,7 +554,7 @@ export function LogStorageSettings() {
                   variant="outline"
                   size="sm"
                   onClick={() => handleExportLogs("txt")}
-                  disabled={isExporting || !stats?.totalLogs}
+                  disabled={isExporting || !stats?.total_logs}
                 >
                   <Download className="h-4 w-4 mr-2" />
                   TXT
@@ -590,19 +567,40 @@ export function LogStorageSettings() {
               <div className="space-y-0.5">
                 <Label>Prune Old Logs</Label>
                 <div className="text-sm text-muted-foreground">
-                  Remove logs older than retention period
+                  Remove logs older than retention period now
                 </div>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handlePruneLogs}
-                disabled={isPruning || !stats?.totalLogs}
+                disabled={isPruning || !stats?.total_logs}
               >
                 <RefreshCw
                   className={`h-4 w-4 mr-2 ${isPruning ? "animate-spin" : ""}`}
                 />
                 {isPruning ? "Pruning..." : "Prune Now"}
+              </Button>
+            </div>
+
+            {/* Optimize */}
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div className="space-y-0.5">
+                <Label>Optimize Database</Label>
+                <div className="text-sm text-muted-foreground">
+                  Rebuild FTS index and reclaim unused space
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOptimizeDb}
+                disabled={isOptimizing}
+              >
+                <Wrench
+                  className={`h-4 w-4 mr-2 ${isOptimizing ? "animate-spin" : ""}`}
+                />
+                {isOptimizing ? "Optimizing..." : "Optimize"}
               </Button>
             </div>
 
@@ -618,7 +616,7 @@ export function LogStorageSettings() {
                 variant="destructive"
                 size="sm"
                 onClick={handleClearAllLogs}
-                disabled={isClearing || !stats?.totalLogs}
+                disabled={isClearing || !stats?.total_logs}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 {isClearing ? "Clearing..." : "Clear All"}

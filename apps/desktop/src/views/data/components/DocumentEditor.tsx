@@ -259,16 +259,13 @@ export function DocumentEditor({
   const title =
     mode === "add" ? `Add document to ${tableName}` : `Edit document`;
 
-  // Build schema hint text
-  const schemaHint =
-    schema?.fields && schema.fields.length > 0
-      ? schema.fields
-          .filter(
-            (f) => f.fieldName !== "_id" && f.fieldName !== "_creationTime",
-          )
-          .map((f) => `${f.fieldName}${f.optional ? "?" : ""}`)
-          .join(", ")
-      : null;
+  // TODO: Build schema hint text for future schema-aware editing
+  // const schemaHint = schema?.fields && schema.fields.length > 0
+  //   ? schema.fields
+  //       .filter((f) => f.fieldName !== "_id" && f.fieldName !== "_creationTime")
+  //       .map((f) => `${f.fieldName}${f.optional ? "?" : ""}`)
+  //       .join(", ")
+  //   : null;
 
   return (
     <ResizableSheet

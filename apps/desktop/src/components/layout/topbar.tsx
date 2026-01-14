@@ -7,6 +7,9 @@ import type { Team, Project, Deployment, User, ThemeType } from "@/types/desktop
 import type { TeamSubscription } from "@/api/bigbrain";
 import { useIsFullscreen } from "../../hooks/useIsFullscreen";
 import { TerminalButton } from "../terminal-button";
+import { FunctionIcon } from "@/components/svg/function-icon";
+import { IconButton } from "@/components/ui/button";
+import { useFunctionRunnerActions, useFunctionRunnerState } from "../../contexts/function-runner-context";
 
 interface TopBarProps {
   user: User | null;
@@ -52,6 +55,8 @@ export function TopBar({
   deploymentsLoading = false,
 }: TopBarProps) {
   const isFullscreen = useIsFullscreen();
+  const { toggleFunctionRunner } = useFunctionRunnerActions();
+  const { isOpen: isRunnerOpen } = useFunctionRunnerState();
 
   const teamOptions = React.useMemo(
     () => teams.map((t) => ({ value: String(t.id), label: t.name })),
@@ -168,7 +173,22 @@ export function TopBar({
       </div>
 
       <div className="flex items-center gap-1">
-        {selectedProject && <TerminalButton onOpenSettings={onOpenSettings} />}
+        {selectedProject && (
+          <>
+            <IconButton
+              type="button"
+              onClick={toggleFunctionRunner}
+              variant="topbar"
+              tooltip="Open Function Runner"
+              tooltipKeybind="⌃1"
+              active={isRunnerOpen}
+              size="sm"
+            >
+              <FunctionIcon size={16} />
+            </IconButton>
+            <TerminalButton onOpenSettings={onOpenSettings} />
+          </>
+        )}
 
         <UserMenu
           user={user}

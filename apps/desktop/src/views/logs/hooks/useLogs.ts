@@ -1,6 +1,11 @@
 /**
  * useLogs Hook
  * Streams and manages log data from the Convex deployment
+ *
+ * Polling Strategy:
+ * - Active streaming (logs received): 500ms between requests (2 req/sec)
+ * - Idle (no logs): 2000ms between requests (0.5 req/sec)
+ * - This prevents excessive polling while maintaining responsiveness
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -9,6 +14,7 @@ import {
   processFunctionLogs,
 } from "@convex-panel/shared/api";
 import type { LogEntry, ModuleFunction } from "../types";
+import type { FunctionExecutionJson } from "@convex-panel/shared/api";
 
 export interface UseLogsOptions {
   deploymentUrl: string | null;
@@ -24,28 +30,31 @@ export interface UseLogsReturn {
   logs: LogEntry[];
   isLoading: boolean;
   error: Error | null;
-  isPaused: boolean;
-  setIsPaused: (paused: boolean) => void;
   clearLogs: () => void;
-  refreshLogs: () => void;
 }
 
-const POLLING_INTERVAL = 2000;
-const MAX_LOGS = 100; // Reduced for pagination - one page worth
+// Match dashboard-common's MAX_LOGS
+const MAX_LOGS = 10000;
+// Backoff configuration for retries
+const INITIAL_BACKOFF_MS = 500;
+const MAX_BACKOFF_MS = 30000;
+const BACKOFF_MULTIPLIER = 2;
+const JITTER_FACTOR = 0.1;
 
-// Singleton cache shared across all hook instances to handle StrictMode double-mounting
-// This prevents duplicate fetches when React mounts/unmounts/remounts in StrictMode
-const globalCache = {
-  seenIds: new Set<string>(),
-  cursor: 0 as number | string,
-  isFetching: false,
-};
+function backoffWithJitter(attemptNumber: number): number {
+  const baseBackoff = Math.min(
+    INITIAL_BACKOFF_MS * Math.pow(BACKOFF_MULTIPLIER, attemptNumber),
+    MAX_BACKOFF_MS,
+  );
+  const jitter = baseBackoff * JITTER_FACTOR * (Math.random() - 0.5);
+  return Math.floor(baseBackoff + jitter);
+}
 
 export function useLogs({
   deploymentUrl,
   authToken,
   useMockData = false,
-  isPaused: externalIsPaused,
+  isPaused = false,
   onError,
   selectedFunction,
   fetchFn = fetch,
@@ -53,117 +62,40 @@ export function useLogs({
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const [isPaused, setIsPausedState] = useState(false);
 
-  // Use refs for values that shouldn't trigger re-renders
-  // Initialize from global cache to handle StrictMode remounts
-  const cursorRef = useRef<number | string>(globalCache.cursor);
+  // Use refs for values that change but shouldn't trigger re-renders
+  const cursorRef = useRef<number | string>(0);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const seenIdsRef = useRef<Set<string>>(new Set(globalCache.seenIds));
-
-  // Sync external pause state
-  useEffect(() => {
-    if (externalIsPaused !== undefined) {
-      setIsPausedState(externalIsPaused);
-    }
-  }, [externalIsPaused]);
-
-  const setIsPaused = useCallback((paused: boolean) => {
-    setIsPausedState(paused);
-  }, []);
-
-  const clearLogs = useCallback(() => {
-    setLogs([]);
-    cursorRef.current = 0;
-    globalCache.cursor = 0;
-    seenIdsRef.current.clear();
-    globalCache.seenIds.clear();
-    setError(null);
-  }, []);
-
-  const refreshLogs = useCallback(() => {
-    clearLogs();
-    setIsPausedState(false);
-  }, [clearLogs]);
-
-  // Use ref for selectedFunction to avoid recreating fetchLogs
   const selectedFunctionRef = useRef(selectedFunction);
+
+  // Update selectedFunction ref without triggering re-render
   useEffect(() => {
     selectedFunctionRef.current = selectedFunction;
   }, [selectedFunction]);
 
-  // Fetch logs function - stable reference
-  const fetchLogs = useCallback(async () => {
-    // Guard against concurrent fetches using global flag
-    if (globalCache.isFetching) {
-      return;
-    }
+  const clearLogs = useCallback(() => {
+    setLogs([]);
+    cursorRef.current = 0;
+    setError(null);
+  }, []);
 
-    if (!deploymentUrl || !authToken || useMockData) {
-      return;
-    }
-
-    // Cancel any previous request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-
-    abortControllerRef.current = new AbortController();
-    globalCache.isFetching = true;
-    setIsLoading(true);
-
-    try {
-      const response = await streamFunctionLogs(
-        deploymentUrl,
-        authToken,
-        cursorRef.current,
-        undefined, // sessionId
-        undefined, // clientRequestCounter
-        50, // limit - reduced for better performance
-        fetchFn,
-      );
-
+  // Process and append new logs
+  const receiveLogs = useCallback(
+    (entries: FunctionExecutionJson[], newCursor: number | string) => {
       // Process the raw entries into FunctionExecutionLog format
       const processedLogs = processFunctionLogs(
-        response.entries,
+        entries,
         selectedFunctionRef.current
           ? { identifier: selectedFunctionRef.current.identifier }
           : null,
       );
 
-      console.log(
-        `[useLogs] Fetched ${response.entries.length} raw entries, processed to ${processedLogs.length} logs. Cursor: ${cursorRef.current} -> ${response.newCursor}`,
-      );
-
       if (processedLogs.length > 0) {
         setLogs((prevLogs) => {
-          // Build a set of existing log IDs from prevLogs for fast lookup
-          const existingIds = new Set(prevLogs.map((l) => l.id));
+          // Merge new logs with existing, newest first
+          const merged = [...processedLogs, ...prevLogs];
 
-          // Filter out logs we've already seen OR that exist in prevLogs
-          const newLogs = processedLogs.filter((log) => {
-            // Skip if we've seen this ID before
-            if (seenIdsRef.current.has(log.id) || existingIds.has(log.id)) {
-              return false;
-            }
-            seenIdsRef.current.add(log.id);
-            return true;
-          });
-
-          console.log(
-            `[useLogs] After dedup: ${newLogs.length} new logs out of ${processedLogs.length} processed. Total in state: ${prevLogs.length}`,
-          );
-
-          // If no new logs, return unchanged
-          if (newLogs.length === 0) {
-            return prevLogs;
-          }
-
-          // Merge and sort by timestamp descending (newest first)
-          const merged = [...newLogs, ...prevLogs];
-
-          // Remove any duplicate IDs that might have slipped through
+          // Deduplicate by ID
           const seen = new Set<string>();
           const deduplicated = merged.filter((log) => {
             if (seen.has(log.id)) {
@@ -173,51 +105,26 @@ export function useLogs({
             return true;
           });
 
-          // Sort by timestamp descending
+          // Sort by timestamp descending (newest first)
           deduplicated.sort((a, b) => b.timestamp - a.timestamp);
 
-          // Limit total logs
-          const limited = deduplicated.slice(0, MAX_LOGS);
-
-          // Update seen IDs to match kept logs
-          const keptIds = new Set(limited.map((l) => l.id));
-          seenIdsRef.current = keptIds;
-          globalCache.seenIds = new Set(keptIds);
-
-          return limited;
+          // Limit total logs to MAX_LOGS
+          return deduplicated.slice(0, MAX_LOGS);
         });
       }
 
       // Update cursor for next fetch
-      if (response.newCursor && response.newCursor !== cursorRef.current) {
-        cursorRef.current = response.newCursor;
-        globalCache.cursor = response.newCursor;
-      }
-
+      cursorRef.current = newCursor;
       setError(null);
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === "AbortError") {
-        return;
-      }
-      const errorObj = err instanceof Error ? err : new Error(String(err));
-      setError(errorObj);
-      onError?.(errorObj.message);
-    } finally {
-      globalCache.isFetching = false;
-      setIsLoading(false);
-    }
-  }, [deploymentUrl, authToken, useMockData, fetchFn, onError]);
+    },
+    [],
+  );
 
-  // Polling effect - only depends on stable values
+  // Long-polling loop - matches dashboard-common implementation
   useEffect(() => {
-    // Clear any existing interval
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-
-    // Don't start polling if paused or missing credentials
+    // Don't start streaming if paused, missing credentials, or using mock data
     if (isPaused || !deploymentUrl || !authToken || useMockData) {
+      // Cancel any in-flight request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
@@ -226,34 +133,109 @@ export function useLogs({
       return;
     }
 
-    // Initial fetch
-    fetchLogs();
+    let isActive = true;
+    let numFailures = 0;
+    let isDisconnected = false;
 
-    // Set up polling interval
-    intervalRef.current = setInterval(() => {
-      fetchLogs();
-    }, POLLING_INTERVAL);
+    // Continuous async loop for long-polling
+    const streamLogs = async () => {
+      while (isActive) {
+        // Create new abort controller for this request
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
 
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
+        try {
+          setIsLoading(true);
+
+          const response = await streamFunctionLogs(
+            deploymentUrl,
+            authToken,
+            cursorRef.current,
+            undefined, // sessionId
+            undefined, // clientRequestCounter
+            50, // limit per request
+            fetchFn,
+          );
+
+          // Only process if still active (not aborted)
+          if (isActive && !controller.signal.aborted) {
+            // If we were disconnected and now reconnected
+            if (isDisconnected) {
+              isDisconnected = false;
+              console.log("[useLogs] Reconnected to log stream");
+            }
+
+            // Reset failure count on success
+            numFailures = 0;
+
+            // Process logs
+            receiveLogs(response.entries, response.newCursor);
+
+            // Add polling delay to prevent excessive requests
+            // Use shorter delay if logs were received (active streaming)
+            // Use longer delay if no logs (idle state)
+            if (isActive) {
+              const delayMs = response.entries.length > 0 ? 500 : 2000;
+              await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
+          }
+        } catch (err: any) {
+          // Check if request was aborted (expected during cleanup)
+          if (err.name === "AbortError" || controller.signal.aborted) {
+            break;
+          }
+
+          // Increment failure count
+          numFailures += 1;
+
+          // Show error after multiple failures
+          if (numFailures > 3 && !isDisconnected) {
+            isDisconnected = true;
+            const errorMsg =
+              err instanceof Error ? err.message : "Failed to stream logs";
+            console.error("[useLogs] Disconnected from log stream:", errorMsg);
+            onError?.(errorMsg);
+            setError(
+              err instanceof Error ? err : new Error("Failed to stream logs"),
+            );
+          }
+
+          // Backoff before retry
+          if (numFailures > 0 && isActive) {
+            const backoffMs = backoffWithJitter(numFailures - 1);
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
+          }
+        } finally {
+          setIsLoading(false);
+        }
       }
+    };
+
+    // Start the streaming loop
+    void streamLogs();
+
+    // Cleanup function
+    return () => {
+      isActive = false;
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPaused, deploymentUrl, authToken, useMockData]);
+  }, [
+    deploymentUrl,
+    authToken,
+    isPaused,
+    useMockData,
+    fetchFn,
+    receiveLogs,
+    onError,
+  ]);
 
   return {
     logs,
     isLoading,
     error,
-    isPaused,
-    setIsPaused,
     clearLogs,
-    refreshLogs,
   };
 }

@@ -146,10 +146,11 @@ export async function streamFunctionLogs(
 }
 
 /**
- * Process function logs
+ * Process function logs - matches dashboard-common's processLogs behavior
+ * Splits each FunctionExecution into multiple log entries (one per log line + one for outcome)
  * @param entries - The function execution logs to process
  * @param selectedFunction - The function to filter by (optional)
- * @returns The processed function logs
+ * @returns The processed function logs (one entry per log line + outcome)
  */
 export function processFunctionLogs(
   entries: FunctionExecutionJson[],
@@ -181,7 +182,10 @@ export function processFunctionLogs(
   const matchingEntries = entries.filter(matchesSelected);
   const effectiveEntries = selectedFunction ? matchingEntries : entries;
 
-  return effectiveEntries.map((entry) => {
+  // Process each entry into multiple log entries (one per log line + one for outcome)
+  const allLogs: FunctionExecutionLog[] = [];
+
+  for (const entry of effectiveEntries) {
     const raw: any = entry as any;
 
     const udfTypeRaw = (raw.udf_type || raw.udfType || "query") as string;
@@ -211,13 +215,6 @@ export function processFunctionLogs(
 
     const rawLogLines = raw.log_lines || raw.logLines;
 
-    const logLines =
-      rawLogLines && Array.isArray(rawLogLines) && rawLogLines.length > 0
-        ? rawLogLines.map((line: any) =>
-            typeof line === "string" ? line : JSON.stringify(line),
-          )
-        : [];
-
     const success =
       raw.error == null &&
       (raw.success === undefined ||
@@ -235,56 +232,44 @@ export function processFunctionLogs(
         ? `${componentPath}:${identifierRaw}`
         : identifierRaw;
 
-    return {
-      id:
-        raw.execution_id ||
-        raw.executionId ||
-        `${identifierRaw}-${startedAtMs}`,
+    const usageStats = (() => {
+      const stats = raw.usage_stats || raw.usageStats;
+      if (stats) {
+        return {
+          database_read_bytes:
+            stats.database_read_bytes ?? stats.databaseReadBytes ?? 0,
+          database_write_bytes:
+            stats.database_write_bytes ?? stats.databaseWriteBytes ?? 0,
+          database_read_documents:
+            stats.database_read_documents ?? stats.databaseReadDocuments ?? 0,
+          storage_read_bytes:
+            stats.storage_read_bytes ?? stats.storageReadBytes ?? 0,
+          storage_write_bytes:
+            stats.storage_write_bytes ?? stats.storageWriteBytes ?? 0,
+          vector_index_read_bytes:
+            stats.vector_index_read_bytes ?? stats.vectorIndexReadBytes ?? 0,
+          vector_index_write_bytes:
+            stats.vector_index_write_bytes ?? stats.vectorIndexWriteBytes ?? 0,
+          memory_used_mb: stats.memory_used_mb ?? stats.memoryUsedMb ?? 0,
+        };
+      }
+      return {
+        database_read_bytes: 0,
+        database_write_bytes: 0,
+        database_read_documents: 0,
+        storage_read_bytes: 0,
+        storage_write_bytes: 0,
+        vector_index_read_bytes: 0,
+        vector_index_write_bytes: 0,
+        memory_used_mb: 0,
+      };
+    })();
+
+    const commonFields = {
       functionIdentifier,
       functionName,
       udfType: (udfTypeRaw.toLowerCase() || "query") as any,
       componentPath,
-      timestamp: startedAtMs,
-      startedAt: startedAtMs,
-      completedAt: completedAtMs,
-      durationMs,
-      success,
-      error: raw.error || raw.error_message,
-      logLines,
-      usageStats: (() => {
-        const stats = raw.usage_stats || raw.usageStats;
-        if (stats) {
-          return {
-            database_read_bytes:
-              stats.database_read_bytes ?? stats.databaseReadBytes ?? 0,
-            database_write_bytes:
-              stats.database_write_bytes ?? stats.databaseWriteBytes ?? 0,
-            database_read_documents:
-              stats.database_read_documents ?? stats.databaseReadDocuments ?? 0,
-            storage_read_bytes:
-              stats.storage_read_bytes ?? stats.storageReadBytes ?? 0,
-            storage_write_bytes:
-              stats.storage_write_bytes ?? stats.storageWriteBytes ?? 0,
-            vector_index_read_bytes:
-              stats.vector_index_read_bytes ?? stats.vectorIndexReadBytes ?? 0,
-            vector_index_write_bytes:
-              stats.vector_index_write_bytes ??
-              stats.vectorIndexWriteBytes ??
-              0,
-            memory_used_mb: stats.memory_used_mb ?? stats.memoryUsedMb ?? 0,
-          };
-        }
-        return {
-          database_read_bytes: 0,
-          database_write_bytes: 0,
-          database_read_documents: 0,
-          storage_read_bytes: 0,
-          storage_write_bytes: 0,
-          vector_index_read_bytes: 0,
-          vector_index_write_bytes: 0,
-          memory_used_mb: 0,
-        };
-      })(),
       requestId: raw.request_id || raw.requestId || "",
       executionId: raw.execution_id || raw.executionId || "",
       parentExecutionId:
@@ -302,6 +287,49 @@ export function processFunctionLogs(
       returnBytes: raw.return_bytes || raw.returnBytes,
       cachedResult: raw.cached_result || raw.cachedResult || false,
       raw: raw,
-    } as FunctionExecutionLog;
-  });
+    };
+
+    // Create one log entry per log line (matching dashboard behavior)
+    if (rawLogLines && Array.isArray(rawLogLines) && rawLogLines.length > 0) {
+      for (const rawLine of rawLogLines) {
+        const lineStr =
+          typeof rawLine === "string" ? rawLine : JSON.stringify(rawLine);
+        const lineTimestamp = (rawLine as any)?.timestamp || startedAtMs;
+
+        allLogs.push({
+          ...commonFields,
+          kind: "log",
+          id: `${commonFields.executionId}-log-${allLogs.length}`,
+          timestamp: lineTimestamp,
+          startedAt: lineTimestamp,
+          completedAt: lineTimestamp,
+          durationMs: 0,
+          success: true, // Individual log lines are not failures
+          error: undefined,
+          logLines: [lineStr], // Single log line
+          usageStats,
+        } as FunctionExecutionLog);
+      }
+    }
+
+    // Create outcome entry (matching dashboard behavior)
+    // Only create if this is a completion (has execution time or error)
+    if (raw.kind === "Completion" || durationMs > 0 || raw.error) {
+      allLogs.push({
+        ...commonFields,
+        kind: "outcome",
+        id: `${commonFields.executionId}-outcome`,
+        timestamp: completedAtMs || startedAtMs,
+        startedAt: startedAtMs,
+        completedAt: completedAtMs,
+        durationMs,
+        success,
+        error: raw.error || raw.error_message,
+        logLines: raw.error ? [raw.error || raw.error_message] : [],
+        usageStats,
+      } as FunctionExecutionLog);
+    }
+  }
+
+  return allLogs;
 }

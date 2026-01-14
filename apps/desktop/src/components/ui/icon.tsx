@@ -59,10 +59,12 @@ import {
   Logout01Icon,
   PaintBoardIcon,
   SquareIcon,
-  CheckmarkSquare02Icon
+  CheckmarkSquare02Icon,
+  MoreVerticalIcon
 } from "@hugeicons/core-free-icons";
 
 const ICON_MAP: Record<string, IconSvgElement> = {
+  "more-vertical": MoreVerticalIcon,
   "log-out": Logout01Icon,
   system: ComputerIcon,
   sun: Sun01Icon,

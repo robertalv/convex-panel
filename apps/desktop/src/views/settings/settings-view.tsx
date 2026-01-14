@@ -50,8 +50,8 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
     id: "app",
     label: "App",
     items: [
-      { id: "appearance", label: "Appearance" },
       { id: "profile", label: "Profile" },
+      { id: "appearance", label: "Appearance" },
       { id: "notifications", label: "Notifications" },
     ],
   },
@@ -144,16 +144,12 @@ export interface SettingsViewProps {
     email: string;
     profilePictureUrl?: string | null;
   } | null;
-  onLogout: () => void;
-  /** Team ID for backup/restore functionality */
   teamId?: number;
-  /** Team access token for backup API calls */
   teamAccessToken?: string | null;
 }
 
 export function SettingsView({
   user,
-  onLogout,
   teamId,
   teamAccessToken,
 }: SettingsViewProps) {
@@ -183,7 +179,7 @@ export function SettingsView({
       case "appearance":
         return <AppearanceSettings theme={theme} onThemeChange={setTheme} />;
       case "profile":
-        return <ProfileSettings user={user} onLogout={onLogout} />;
+        return <ProfileSettings user={user} />;
       case "notifications":
         return <NotificationSettings />;
       case "integrations":

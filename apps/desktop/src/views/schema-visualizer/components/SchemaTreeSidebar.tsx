@@ -174,8 +174,8 @@ export function SchemaTreeSidebar({
     <div className="flex flex-col h-full">
       {/* Component selector - only show when multiple components exist */}
       {components.length > 1 && (
-        <div
-          className="p-2"
+        <div  
+          className="p-2 h-[45px] flex items-center"
           style={{ borderBottom: "1px solid var(--color-border-base)" }}
         >
           <ComponentSelector

@@ -2,10 +2,21 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./topbar";
-import type { Team, Project, Deployment, User, ThemeType } from "@/types/desktop";
+import type {
+  Team,
+  Project,
+  Deployment,
+  User,
+  ThemeType,
+} from "@/types/desktop";
 import type { TeamSubscription, Invoice } from "@/api/bigbrain";
 import { TerminalPanel } from "../../views/terminal";
 import { useTerminalActions } from "../../contexts/terminal-context";
+import { FunctionRunnerPanel } from "../function-runner-panel";
+import {
+  useFunctionRunnerActions,
+  useFunctionRunnerState,
+} from "../../contexts/function-runner-context";
 import { useGlobalHotkeys } from "../../hooks/useGlobalHotkeys";
 import { useBackgroundPrefetch } from "../../hooks/useBackgroundPrefetch";
 import { useProjectPathOptional } from "../../contexts/project-path-context";
@@ -104,6 +115,9 @@ export function AppShell({
   }, []);
 
   const { toggleTerminal } = useTerminalActions();
+  const { toggleFunctionRunner } = useFunctionRunnerActions();
+  const { isOpen: isFunctionRunnerOpen, layoutMode: functionRunnerLayoutMode } =
+    useFunctionRunnerState();
 
   useBackgroundPrefetch({ delay: 1500 });
 
@@ -116,7 +130,7 @@ export function AppShell({
     }
   }, [selectedTeam?.slug]);
 
-  // Register hotkeys for sidebar and terminal toggles
+  // Register hotkeys for sidebar, terminal, and function runner toggles
   const appShellHotkeys = React.useMemo<HotkeyDefinition[]>(
     () => [
       {
@@ -131,8 +145,14 @@ export function AppShell({
         description: "Toggle terminal",
         enableOnFormTags: true,
       },
+      {
+        keys: ["ctrl+1", "meta+1"],
+        action: toggleFunctionRunner,
+        description: "Toggle Function Runner",
+        enableOnFormTags: false,
+      },
     ],
-    [handleToggleCollapse, toggleTerminal],
+    [handleToggleCollapse, toggleTerminal, toggleFunctionRunner],
   );
 
   useGlobalHotkeys(appShellHotkeys);
@@ -211,15 +231,35 @@ export function AppShell({
               position: "relative",
             }}
           >
+            {/* Content wrapper - changes flex direction based on function runner layout */}
             <div
+              className="flex-1 min-h-0 overflow-hidden"
               style={{
-                flex: 1,
-                minHeight: 0,
-                overflow: "auto",
-                position: "relative",
+                display: "flex",
+                flexDirection:
+                  isFunctionRunnerOpen && functionRunnerLayoutMode === "side"
+                    ? "row"
+                    : "column",
               }}
             >
-              {children}
+              {/* Hide main content when function runner is in fullscreen mode */}
+              {!(
+                isFunctionRunnerOpen &&
+                functionRunnerLayoutMode === "fullscreen"
+              ) && (
+                <div
+                  style={{
+                    flex: 1,
+                    minHeight: 0,
+                    minWidth: 0,
+                    overflow: "auto",
+                    position: "relative",
+                  }}
+                >
+                  {children}
+                </div>
+              )}
+              <FunctionRunnerPanel />
             </div>
             <TerminalPanel workingDirectory={projectPath || undefined} />
           </main>

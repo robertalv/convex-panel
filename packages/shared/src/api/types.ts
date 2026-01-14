@@ -274,6 +274,7 @@ export interface FunctionExecutionJson {
  */
 export interface FunctionExecutionLog {
   id: string;
+  kind: "log" | "outcome"; // Distinguishes between log lines and outcome entries
   functionIdentifier: string;
   functionName: string;
   udfType: "query" | "mutation" | "action" | "httpAction";

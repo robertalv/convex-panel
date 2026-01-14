@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import type { ModuleFunction } from "../components/FunctionSelector";
+import type { ModuleFunction } from "@/components/function-selector";
 import { discoverFunctions } from "@convex-panel/shared/api";
 
 export interface UseFunctionsProps {

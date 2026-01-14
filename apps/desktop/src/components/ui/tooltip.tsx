@@ -74,7 +74,7 @@ function TooltipWithKeybind({
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       <TooltipContent side={side} className="py-0.5 px-1.5 rounded-lg">
         <div className="flex items-center gap-1">
-          <span>{content}</span>
+          {content && <span>{content}</span>}
           {keybind && renderKeybind(keybind)}
         </div>
       </TooltipContent>

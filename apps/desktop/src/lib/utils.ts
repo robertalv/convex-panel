@@ -13,3 +13,14 @@ export const openExternalLink = async (url: string) => {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 };
+
+export function getDashboardUrl(
+  teamSlug: string | null | undefined,
+  projectSlug: string | null | undefined,
+  deploymentName: string | undefined,
+): string {
+  if (teamSlug && projectSlug && deploymentName) {
+    return `https://dashboard.convex.dev/t/${teamSlug}/${projectSlug}/${deploymentName}/settings`;
+  }
+  return "https://dashboard.convex.dev";
+}

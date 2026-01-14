@@ -1,11 +1,11 @@
 /**
- * View Convex Components Command
+ * Components Command
  *
  * Browse and install Convex components - independent, modular,
  * TypeScript building blocks for your backend.
  */
 
-import { Action, ActionPanel, Color, Icon, List } from "@raycast/api";
+import { Action, ActionPanel, List } from "@raycast/api";
 import { useState } from "react";
 
 interface Component {
@@ -301,7 +301,7 @@ const COMPONENTS: Component[] = [
   },
 ];
 
-export default function ViewComponentsCommand() {
+export default function ComponentsCommand() {
   const [searchText, setSearchText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
@@ -342,7 +342,7 @@ export default function ViewComponentsCommand() {
       searchText={searchText}
       onSearchTextChange={setSearchText}
       searchBarPlaceholder="Search components..."
-      navigationTitle="View Convex Components"
+      navigationTitle="Components"
       searchBarAccessory={
         <List.Dropdown
           tooltip="Filter by category"
@@ -375,69 +375,18 @@ export default function ViewComponentsCommand() {
               key={component.package}
               title={component.name}
               subtitle={component.description}
-              icon={getCategoryIcon(component.category)}
               accessories={[
                 {
                   text: formatDownloads(component.downloads),
                   tooltip: `${component.downloads} weekly downloads`,
                 },
-                {
-                  tag: {
-                    value: component.category,
-                    color: getCategoryColor(component.category),
-                  },
-                },
               ]}
-              detail={
-                <List.Item.Detail
-                  metadata={
-                    <List.Item.Detail.Metadata>
-                      <List.Item.Detail.Metadata.Label
-                        title="Package"
-                        text={component.package}
-                        icon={Icon.Box}
-                      />
-                      <List.Item.Detail.Metadata.Label
-                        title="Install Command"
-                        text={`npm i ${component.package}`}
-                        icon={Icon.Download}
-                      />
-
-                      <List.Item.Detail.Metadata.Separator />
-
-                      <List.Item.Detail.Metadata.Label
-                        title="Category"
-                        text={component.category}
-                        icon={getCategoryIcon(component.category)}
-                      />
-                      <List.Item.Detail.Metadata.Label
-                        title="Weekly Downloads"
-                        text={component.downloads}
-                        icon={Icon.BarChart}
-                      />
-                      <List.Item.Detail.Metadata.Label
-                        title="Author"
-                        text={component.author}
-                        icon={Icon.Person}
-                      />
-
-                      <List.Item.Detail.Metadata.Separator />
-
-                      <List.Item.Detail.Metadata.Label
-                        title="Description"
-                        text={component.description}
-                      />
-                    </List.Item.Detail.Metadata>
-                  }
-                />
-              }
               actions={
                 <ActionPanel>
                   <ActionPanel.Section>
                     <Action.OpenInBrowser
                       title="View Documentation"
                       url={component.url}
-                      icon={Icon.Book}
                     />
                     <Action.CopyToClipboard
                       title="Copy Install Command"
@@ -454,7 +403,6 @@ export default function ViewComponentsCommand() {
                     <Action.OpenInBrowser
                       title="View on npm"
                       url={`https://www.npmjs.com/package/${component.package}`}
-                      icon={Icon.Link}
                       shortcut={{ modifiers: ["cmd"], key: "o" }}
                     />
                     <Action.OpenInBrowser
@@ -478,37 +426,10 @@ export default function ViewComponentsCommand() {
               ? `No results for "${searchText}"`
               : "No components in this category"
           }
-          icon={Icon.MagnifyingGlass}
         />
       )}
     </List>
   );
-}
-
-function getCategoryIcon(category: string): Icon {
-  const iconMap: Record<string, Icon> = {
-    AI: Icon.Stars,
-    Backend: Icon.Code,
-    Database: Icon.HardDrive,
-    "Durable Functions": Icon.Clock,
-    Integrations: Icon.Plug,
-    Payments: Icon.Wallet,
-  };
-
-  return iconMap[category] || Icon.Box;
-}
-
-function getCategoryColor(category: string): Color {
-  const colorMap: Record<string, Color> = {
-    AI: Color.Purple,
-    Backend: Color.Blue,
-    Database: Color.Green,
-    "Durable Functions": Color.Orange,
-    Integrations: Color.Yellow,
-    Payments: Color.Magenta,
-  };
-
-  return colorMap[category] || Color.SecondaryText;
 }
 
 function formatDownloads(downloads: string): string {

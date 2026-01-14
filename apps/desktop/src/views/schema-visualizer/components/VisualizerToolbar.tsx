@@ -274,475 +274,484 @@ export function VisualizerToolbar({
 
   return (
     <Toolbar
-      padding="0 8px"
+      style={{ padding: "0 8px" }}
       left={
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        {/* Layout selector */}
-        <SearchableSelect
-          value={settings.layout}
-          options={layoutOptions.map((option) => ({
-            value: option.value,
-            label: option.label,
-          }))}
-          onChange={(value) => onLayoutChange(value as LayoutAlgorithm)}
-          placeholder="Layout"
-          searchPlaceholder="Search layout..."
-        />
+          {/* Layout selector */}
+          <SearchableSelect
+            value={settings.layout}
+            options={layoutOptions.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+            onChange={(value) => onLayoutChange(value as LayoutAlgorithm)}
+            placeholder="Layout"
+            searchPlaceholder="Search layout..."
+          />
 
-        {/* Reset layout */}
-        <button
-          onClick={onResetLayout}
-          style={{
-            height: "28px",
-            width: "28px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "transparent",
-            color: "var(--color-text-muted)",
-            border: "none",
-            borderRadius: "8px",
-            cursor: "pointer",
-            transition: "all 0.2s",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = "var(--color-text-base)";
-            e.currentTarget.style.backgroundColor =
-              "var(--color-surface-raised)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = "var(--color-text-muted)";
-            e.currentTarget.style.backgroundColor = "transparent";
-          }}
-          title="Reset layout"
-        >
-          <RefreshCw size={14} />
-        </button>
-
-        {/* Diff Mode Section */}
-        {diffMode && onDiffModeChange && (
-          <>
-            {/* Divider */}
-            <div
-              style={{
-                width: "1px",
-                height: "16px",
-                backgroundColor: "var(--color-border-base)",
-              }}
-            />
-
-            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-              {/* Diff toggle button */}
-              <ToggleButton
-                active={diffMode.enabled}
-                onClick={() => onDiffModeChange({ enabled: !diffMode.enabled })}
-                title={
-                  diffMode.enabled ? "Disable diff mode" : "Enable diff mode"
-                }
-              >
-                <GitCompare size={12} />
-                <span>Diff</span>
-                {hasDiffChanges && diffMode.enabled && (
-                  <span
-                    style={{
-                      width: "6px",
-                      height: "6px",
-                      borderRadius: "50%",
-                      backgroundColor: "#f59e0b",
-                    }}
-                  />
-                )}
-              </ToggleButton>
-
-              {diffMode.enabled && remoteCommits.length > 0 && (
-                <>
-                  <SearchableSelect
-                    value={diffMode.fromSnapshotId || ""}
-                    options={[
-                      // GitHub commits (if connected and repo selected)
-                      ...(isGitHubConnected &&
-                      gitHubRepo &&
-                      remoteCommits.length > 0
-                        ? remoteCommits.map((c) => ({
-                            value: `github:${c.sha}`,
-                            label: `${c.shortSha}: ${c.message.substring(0, 40)}${c.message.length > 40 ? "..." : ""}`,
-                            sublabel: `${c.author} - ${formatTimestamp(c.timestamp)}`,
-                          }))
-                        : []),
-                    ]}
-                    onChange={(value) => {
-                      // Handle GitHub commit selection
-                      if (value?.startsWith("github:")) {
-                        const sha = value.replace("github:", "");
-                        const commit = remoteCommits.find((c) => c.sha === sha);
-                        if (commit && onSelectRemoteCommitForDiff) {
-                          onSelectRemoteCommitForDiff(commit, "from");
-                        }
-                      } else {
-                        onDiffModeChange?.({ fromSnapshotId: value || null });
-                      }
-                    }}
-                    placeholder="From..."
-                    searchPlaceholder="Search commits..."
-                    sublabelAsText={true}
-                  />
-
-                  <ChevronRight
-                    size={14}
-                    style={{ color: "var(--color-text-muted)" }}
-                  />
-
-                  <SearchableSelect
-                    value={diffMode.toSnapshotId || "__current__"}
-                    options={[
-                      // Built-in options
-                      {
-                        value: "__current__",
-                        label: "Current (Deployed)",
-                      },
-                      ...(hasLocalSchema
-                        ? [
-                            {
-                              value: "__local__",
-                              label: "Local (schema.ts)",
-                            },
-                          ]
-                        : []),
-                      // GitHub commits (if connected and repo selected)
-                      ...(isGitHubConnected &&
-                      gitHubRepo &&
-                      remoteCommits.length > 0
-                        ? remoteCommits.map((c) => ({
-                            value: `github:${c.sha}`,
-                            label: `${c.shortSha}: ${c.message.substring(0, 40)}${c.message.length > 40 ? "..." : ""}`,
-                            sublabel: `${c.author} - ${formatTimestamp(c.timestamp)}`,
-                          }))
-                        : []),
-                    ]}
-                    onChange={(value) => {
-                      // Handle GitHub commit selection
-                      if (value?.startsWith("github:")) {
-                        const sha = value.replace("github:", "");
-                        const commit = remoteCommits.find((c) => c.sha === sha);
-                        if (commit && onSelectRemoteCommitForDiff) {
-                          onSelectRemoteCommitForDiff(commit, "to");
-                        }
-                      } else {
-                        // Keep __current__ as the value, but internally treat it as null for the diff logic
-                        onDiffModeChange?.({
-                          toSnapshotId:
-                            value === "__current__" ? null : value || null,
-                        });
-                      }
-                    }}
-                    placeholder="To..."
-                    searchPlaceholder="Search commits..."
-                    sublabelAsText={true}
-                  />
-
-                  {/* View mode selector */}
-                  <SearchableSelect
-                    value={diffMode.viewMode}
-                    options={viewModeOptions.map((o) => ({
-                      value: o.value,
-                      label: o.label,
-                    }))}
-                    onChange={(value) =>
-                      onDiffModeChange?.({ viewMode: value as DiffViewMode })
-                    }
-                    placeholder="View..."
-                    searchPlaceholder="View mode..."
-                  />
-                </>
-              )}
-            </div>
-          </>
-        )}
-        </div>
-      }
-      right={
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        {/* GitHub integration section - ONLY shown when diff mode is enabled */}
-        {diffMode?.enabled && (
-          <>
-            {!isGitHubConnected ? (
-              // Show compact "Add GitHub" button when not connected
-              onConnectGitHub && (
-                <button
-                  onClick={onConnectGitHub}
-                  style={{
-                    height: "28px",
-                    padding: "0 10px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    backgroundColor: "transparent",
-                    color: "var(--color-text-muted)",
-                    border: "1px dashed var(--color-border-base)",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor =
-                      "var(--color-brand-base)";
-                    e.currentTarget.style.color = "var(--color-text-base)";
-                    e.currentTarget.style.backgroundColor =
-                      "var(--color-surface-raised)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor =
-                      "var(--color-border-base)";
-                    e.currentTarget.style.color = "var(--color-text-muted)";
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                  title="Connect GitHub for commit history in diff"
-                >
-                  <Github size={14} />
-                  <span>Add GitHub History</span>
-                </button>
-              )
-            ) : (
-              <>
-                {/* Repo selector - only show if no repo selected yet */}
-                {!gitHubRepo && onRepoChange && (
-                  <SearchableSelect
-                    value=""
-                    options={gitHubRepos.map((repo) => ({
-                      value: repo.full_name,
-                      label: repo.name,
-                      sublabel: repo.owner.login,
-                    }))}
-                    onChange={onRepoChange}
-                    placeholder={
-                      gitHubReposLoading ? "Loading..." : "Select repo..."
-                    }
-                    searchPlaceholder="Search repositories..."
-                    loading={gitHubReposLoading}
-                    onSearchChange={onRepoSearch}
-                    minSearchLength={3}
-                    sublabelAsText
-                  />
-                )}
-
-                {/* Branch selector - only show if repo is selected */}
-                {gitHubRepo &&
-                  (remoteBranches.length > 0 || remoteBranchesLoading) &&
-                  onRemoteBranchChange && (
-                    <SearchableSelect
-                      value={remoteCurrentBranch || ""}
-                      options={remoteBranches.map((branch) => ({
-                        value: branch.name,
-                        label: branch.name,
-                      }))}
-                      onChange={onRemoteBranchChange}
-                      placeholder={
-                        remoteBranchesLoading ? "Loading..." : "Branch..."
-                      }
-                      searchPlaceholder="Search branches..."
-                      loading={remoteBranchesLoading}
-                    />
-                  )}
-              </>
-            )}
-
-            {/* Divider after GitHub section */}
-            <div
-              style={{
-                width: "1px",
-                height: "16px",
-                backgroundColor: "var(--color-border-base)",
-              }}
-            />
-          </>
-        )}
-
-        {/* Health indicator */}
-        <button
-          onClick={onHealthPanelToggle}
-          style={{
-            height: "28px",
-            padding: "0 10px",
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            fontSize: "12px",
-            fontWeight: 500,
-            backgroundColor: showHealthPanel
-              ? "var(--color-surface-raised)"
-              : "transparent",
-            color: showHealthPanel
-              ? "var(--color-text-base)"
-              : "var(--color-text-muted)",
-            border: "none",
-            borderRadius: "8px",
-            cursor: "pointer",
-            transition: "all 0.2s",
-          }}
-          onMouseEnter={(e) => {
-            if (!showHealthPanel) {
-              e.currentTarget.style.backgroundColor =
-                "var(--color-surface-raised)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!showHealthPanel) {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }
-          }}
-        >
-          <AlertTriangle size={14} style={{ color: healthColor }} />
-          <span style={{ color: healthColor }}>{health.score}%</span>
-          {health.warnings.length > 0 && (
-            <span style={{ color: "var(--color-text-muted)" }}>
-              ({health.warnings.length})
-            </span>
-          )}
-        </button>
-
-        {/* Divider */}
-        <div
-          style={{
-            width: "1px",
-            height: "16px",
-            backgroundColor: "var(--color-border-base)",
-          }}
-        />
-
-        {/* Code panel toggle - only for visual overlay mode and when closed */}
-        {!isCodePanelOpen &&
-          !(
-            diffMode?.enabled &&
-            (diffMode.viewMode === "unified" ||
-              diffMode.viewMode === "split" ||
-              diffMode.viewMode === "side-by-side")
-          ) &&
-          onToggleCodePanel && (
-            <IconButton
-              onClick={onToggleCodePanel}
-              variant="ghost"
-              size="sm"
-              tooltip="Show generated schema code"
-              aria-label="Show generated schema code"
-            >
-              <Code2 size={14} />
-            </IconButton>
-          )}
-
-        {/* Export */}
-        <div style={{ position: "relative" }}>
+          {/* Reset layout */}
           <button
-            ref={exportTriggerRef}
-            onClick={() => setShowExportDropdown(!showExportDropdown)}
+            onClick={onResetLayout}
             style={{
               height: "28px",
-              padding: "0 12px",
+              width: "28px",
               display: "flex",
               alignItems: "center",
-              gap: "6px",
-              fontSize: "12px",
-              fontWeight: 500,
-              backgroundColor: "var(--color-brand-base)",
-              color: "white",
+              justifyContent: "center",
+              backgroundColor: "transparent",
+              color: "var(--color-text-muted)",
               border: "none",
               borderRadius: "8px",
               cursor: "pointer",
               transition: "all 0.2s",
             }}
             onMouseEnter={(e) => {
+              e.currentTarget.style.color = "var(--color-text-base)";
               e.currentTarget.style.backgroundColor =
-                "var(--color-brand-hover)";
+                "var(--color-surface-raised)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "var(--color-brand-base)";
+              e.currentTarget.style.color = "var(--color-text-muted)";
+              e.currentTarget.style.backgroundColor = "transparent";
             }}
+            title="Reset layout"
           >
-            <Download size={14} />
-            <span>Export</span>
+            <RefreshCw size={14} />
           </button>
 
-          {showExportDropdown &&
-            exportDropdownPosition &&
-            createPortal(
+          {/* Diff Mode Section */}
+          {diffMode && onDiffModeChange && (
+            <>
+              {/* Divider */}
               <div
-                ref={exportDropdownRef}
                 style={{
-                  position: "fixed",
-                  top: `${exportDropdownPosition.top}px`,
-                  left: `${exportDropdownPosition.left - exportDropdownPosition.width}px`,
-                  minWidth: "200px",
-                  maxWidth: "280px",
-                  width: `${exportDropdownPosition.width}px`,
-                  backgroundColor: "var(--color-surface-overlay)",
-                  border: "1px solid var(--color-border-base)",
-                  borderRadius: "12px",
-                  boxShadow: "var(--shadow-lg)",
-                  zIndex: 100000,
-                  overflow: "hidden",
-                  display: "flex",
-                  flexDirection: "column",
-                  pointerEvents: "auto",
-                  animation: "exportDropdownFadeUp 0.15s ease",
+                  width: "1px",
+                  height: "16px",
+                  backgroundColor: "var(--color-border-base)",
                 }}
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
+              />
+
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "4px" }}
               >
-                {/* Options List */}
-                <div
-                  style={{
-                    padding: "4px",
-                  }}
+                {/* Diff toggle button */}
+                <ToggleButton
+                  active={diffMode.enabled}
+                  onClick={() =>
+                    onDiffModeChange({ enabled: !diffMode.enabled })
+                  }
+                  title={
+                    diffMode.enabled ? "Disable diff mode" : "Enable diff mode"
+                  }
                 >
-                  {exportOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => {
-                        onExport(option.value);
-                        setShowExportDropdown(false);
-                      }}
+                  <GitCompare size={12} />
+                  <span>Diff</span>
+                  {hasDiffChanges && diffMode.enabled && (
+                    <span
                       style={{
-                        width: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: "8px",
-                        padding: "6px 8px",
-                        border: "none",
-                        borderRadius: "10px",
-                        backgroundColor: "transparent",
-                        cursor: "pointer",
-                        transition: "background-color 0.1s ease",
-                        textAlign: "left",
-                        marginBottom: "2px",
+                        width: "6px",
+                        height: "6px",
+                        borderRadius: "50%",
+                        backgroundColor: "#f59e0b",
                       }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor =
-                          "var(--color-surface-raised)";
+                    />
+                  )}
+                </ToggleButton>
+
+                {diffMode.enabled && remoteCommits.length > 0 && (
+                  <>
+                    <SearchableSelect
+                      value={diffMode.fromSnapshotId || ""}
+                      options={[
+                        // GitHub commits (if connected and repo selected)
+                        ...(isGitHubConnected &&
+                        gitHubRepo &&
+                        remoteCommits.length > 0
+                          ? remoteCommits.map((c) => ({
+                              value: `github:${c.sha}`,
+                              label: `${c.shortSha}: ${c.message.substring(0, 40)}${c.message.length > 40 ? "..." : ""}`,
+                              sublabel: `${c.author} - ${formatTimestamp(c.timestamp)}`,
+                            }))
+                          : []),
+                      ]}
+                      onChange={(value) => {
+                        // Handle GitHub commit selection
+                        if (value?.startsWith("github:")) {
+                          const sha = value.replace("github:", "");
+                          const commit = remoteCommits.find(
+                            (c) => c.sha === sha,
+                          );
+                          if (commit && onSelectRemoteCommitForDiff) {
+                            onSelectRemoteCommitForDiff(commit, "from");
+                          }
+                        } else {
+                          onDiffModeChange?.({ fromSnapshotId: value || null });
+                        }
                       }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
+                      placeholder="From..."
+                      searchPlaceholder="Search commits..."
+                      sublabelAsText={true}
+                    />
+
+                    <ChevronRight
+                      size={14}
+                      style={{ color: "var(--color-text-muted)" }}
+                    />
+
+                    <SearchableSelect
+                      value={diffMode.toSnapshotId || "__current__"}
+                      options={[
+                        // Built-in options
+                        {
+                          value: "__current__",
+                          label: "Current (Deployed)",
+                        },
+                        ...(hasLocalSchema
+                          ? [
+                              {
+                                value: "__local__",
+                                label: "Local (schema.ts)",
+                              },
+                            ]
+                          : []),
+                        // GitHub commits (if connected and repo selected)
+                        ...(isGitHubConnected &&
+                        gitHubRepo &&
+                        remoteCommits.length > 0
+                          ? remoteCommits.map((c) => ({
+                              value: `github:${c.sha}`,
+                              label: `${c.shortSha}: ${c.message.substring(0, 40)}${c.message.length > 40 ? "..." : ""}`,
+                              sublabel: `${c.author} - ${formatTimestamp(c.timestamp)}`,
+                            }))
+                          : []),
+                      ]}
+                      onChange={(value) => {
+                        // Handle GitHub commit selection
+                        if (value?.startsWith("github:")) {
+                          const sha = value.replace("github:", "");
+                          const commit = remoteCommits.find(
+                            (c) => c.sha === sha,
+                          );
+                          if (commit && onSelectRemoteCommitForDiff) {
+                            onSelectRemoteCommitForDiff(commit, "to");
+                          }
+                        } else {
+                          // Keep __current__ as the value, but internally treat it as null for the diff logic
+                          onDiffModeChange?.({
+                            toSnapshotId:
+                              value === "__current__" ? null : value || null,
+                          });
+                        }
                       }}
-                    >
-                      <span
+                      placeholder="To..."
+                      searchPlaceholder="Search commits..."
+                      sublabelAsText={true}
+                    />
+
+                    {/* View mode selector */}
+                    <SearchableSelect
+                      value={diffMode.viewMode}
+                      options={viewModeOptions.map((o) => ({
+                        value: o.value,
+                        label: o.label,
+                      }))}
+                      onChange={(value) =>
+                        onDiffModeChange?.({ viewMode: value as DiffViewMode })
+                      }
+                      placeholder="View..."
+                      searchPlaceholder="View mode..."
+                    />
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      }
+      right={
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {/* GitHub integration section - ONLY shown when diff mode is enabled */}
+          {diffMode?.enabled && (
+            <>
+              {!isGitHubConnected ? (
+                // Show compact "Add GitHub" button when not connected
+                onConnectGitHub && (
+                  <button
+                    onClick={onConnectGitHub}
+                    style={{
+                      height: "28px",
+                      padding: "0 10px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                      backgroundColor: "transparent",
+                      color: "var(--color-text-muted)",
+                      border: "1px dashed var(--color-border-base)",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor =
+                        "var(--color-brand-base)";
+                      e.currentTarget.style.color = "var(--color-text-base)";
+                      e.currentTarget.style.backgroundColor =
+                        "var(--color-surface-raised)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor =
+                        "var(--color-border-base)";
+                      e.currentTarget.style.color = "var(--color-text-muted)";
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                    title="Connect GitHub for commit history in diff"
+                  >
+                    <Github size={14} />
+                    <span>Add GitHub History</span>
+                  </button>
+                )
+              ) : (
+                <>
+                  {/* Repo selector - only show if no repo selected yet */}
+                  {!gitHubRepo && onRepoChange && (
+                    <SearchableSelect
+                      value=""
+                      options={gitHubRepos.map((repo) => ({
+                        value: repo.full_name,
+                        label: repo.name,
+                        sublabel: repo.owner.login,
+                      }))}
+                      onChange={onRepoChange}
+                      placeholder={
+                        gitHubReposLoading ? "Loading..." : "Select repo..."
+                      }
+                      searchPlaceholder="Search repositories..."
+                      loading={gitHubReposLoading}
+                      onSearchChange={onRepoSearch}
+                      minSearchLength={3}
+                      sublabelAsText
+                    />
+                  )}
+
+                  {/* Branch selector - only show if repo is selected */}
+                  {gitHubRepo &&
+                    (remoteBranches.length > 0 || remoteBranchesLoading) &&
+                    onRemoteBranchChange && (
+                      <SearchableSelect
+                        value={remoteCurrentBranch || ""}
+                        options={remoteBranches.map((branch) => ({
+                          value: branch.name,
+                          label: branch.name,
+                        }))}
+                        onChange={onRemoteBranchChange}
+                        placeholder={
+                          remoteBranchesLoading ? "Loading..." : "Branch..."
+                        }
+                        searchPlaceholder="Search branches..."
+                        loading={remoteBranchesLoading}
+                      />
+                    )}
+                </>
+              )}
+
+              {/* Divider after GitHub section */}
+              <div
+                style={{
+                  width: "1px",
+                  height: "16px",
+                  backgroundColor: "var(--color-border-base)",
+                }}
+              />
+            </>
+          )}
+
+          {/* Health indicator */}
+          <button
+            onClick={onHealthPanelToggle}
+            style={{
+              height: "28px",
+              padding: "0 10px",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              fontSize: "12px",
+              fontWeight: 500,
+              backgroundColor: showHealthPanel
+                ? "var(--color-surface-raised)"
+                : "transparent",
+              color: showHealthPanel
+                ? "var(--color-text-base)"
+                : "var(--color-text-muted)",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              if (!showHealthPanel) {
+                e.currentTarget.style.backgroundColor =
+                  "var(--color-surface-raised)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!showHealthPanel) {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }
+            }}
+          >
+            <AlertTriangle size={14} style={{ color: healthColor }} />
+            <span style={{ color: healthColor }}>{health.score}%</span>
+            {health.warnings.length > 0 && (
+              <span style={{ color: "var(--color-text-muted)" }}>
+                ({health.warnings.length})
+              </span>
+            )}
+          </button>
+
+          {/* Divider */}
+          <div
+            style={{
+              width: "1px",
+              height: "16px",
+              backgroundColor: "var(--color-border-base)",
+            }}
+          />
+
+          {/* Code panel toggle - only for visual overlay mode and when closed */}
+          {!isCodePanelOpen &&
+            !(
+              diffMode?.enabled &&
+              (diffMode.viewMode === "unified" ||
+                diffMode.viewMode === "split" ||
+                diffMode.viewMode === "side-by-side")
+            ) &&
+            onToggleCodePanel && (
+              <IconButton
+                onClick={onToggleCodePanel}
+                variant="ghost"
+                size="sm"
+                tooltip="Show generated schema code"
+                aria-label="Show generated schema code"
+              >
+                <Code2 size={14} />
+              </IconButton>
+            )}
+
+          {/* Export */}
+          <div style={{ position: "relative" }}>
+            <button
+              ref={exportTriggerRef}
+              onClick={() => setShowExportDropdown(!showExportDropdown)}
+              style={{
+                height: "28px",
+                padding: "0 12px",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "12px",
+                fontWeight: 500,
+                backgroundColor: "var(--color-brand-base)",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer",
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor =
+                  "var(--color-brand-hover)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor =
+                  "var(--color-brand-base)";
+              }}
+            >
+              <Download size={14} />
+              <span>Export</span>
+            </button>
+
+            {showExportDropdown &&
+              exportDropdownPosition &&
+              createPortal(
+                <div
+                  ref={exportDropdownRef}
+                  style={{
+                    position: "fixed",
+                    top: `${exportDropdownPosition.top}px`,
+                    left: `${exportDropdownPosition.left - exportDropdownPosition.width}px`,
+                    minWidth: "200px",
+                    maxWidth: "280px",
+                    width: `${exportDropdownPosition.width}px`,
+                    backgroundColor: "var(--color-surface-overlay)",
+                    border: "1px solid var(--color-border-base)",
+                    borderRadius: "12px",
+                    boxShadow: "var(--shadow-lg)",
+                    zIndex: 100000,
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                    pointerEvents: "auto",
+                    animation: "exportDropdownFadeUp 0.15s ease",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  {/* Options List */}
+                  <div
+                    style={{
+                      padding: "4px",
+                    }}
+                  >
+                    {exportOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          onExport(option.value);
+                          setShowExportDropdown(false);
+                        }}
                         style={{
-                          fontSize: "13px",
-                          color: "var(--color-text-base)",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
+                          width: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: "8px",
+                          padding: "6px 8px",
+                          border: "none",
+                          borderRadius: "10px",
+                          backgroundColor: "transparent",
+                          cursor: "pointer",
+                          transition: "background-color 0.1s ease",
+                          textAlign: "left",
+                          marginBottom: "2px",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor =
+                            "var(--color-surface-raised)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
                         }}
                       >
-                        {option.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                        <span
+                          style={{
+                            fontSize: "13px",
+                            color: "var(--color-text-base)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {option.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
 
-                {/* Keyframe animation styles */}
-                <style>{`
+                  {/* Keyframe animation styles */}
+                  <style>{`
                   @keyframes exportDropdownFadeUp {
                     from {
                       opacity: 0;
@@ -754,10 +763,10 @@ export function VisualizerToolbar({
                     }
                   }
                 `}</style>
-              </div>,
-              document.body,
-            )}
-        </div>
+                </div>,
+                document.body,
+              )}
+          </div>
         </div>
       }
     />

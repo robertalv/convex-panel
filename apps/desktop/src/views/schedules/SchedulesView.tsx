@@ -17,11 +17,11 @@ import { ComponentSelector } from "@/components/component-selector";
 import {
   FunctionSelector,
   isCustomQuery,
-} from "@/views/data/components/FunctionSelector";
+} from "@/components/function-selector";
 import type {
   SelectedFunction,
   ModuleFunction,
-} from "@/views/data/components/FunctionSelector";
+} from "@/components/function-selector";
 import { useComponents } from "@/views/data/hooks/useComponents";
 import { useFunctions } from "@/views/data/hooks/useFunctions";
 import { useDeployment } from "@/contexts/deployment-context";
@@ -57,15 +57,15 @@ export function SchedulesView() {
     useMockData,
   });
 
-  // Multi-select component state
-  const [selectedComponentIds, setSelectedComponentIds] = useState<
-    (string | null)[]
-  >([]);
+  // Single component state
+  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(
+    null,
+  );
 
   // Track if components have been initialized (set once on first load)
   const [componentsInitialized, setComponentsInitialized] = useState(false);
 
-  // Initialize to all components when components are loaded
+  // Initialize to null (root/all) when components are loaded
   useEffect(() => {
     // Wait for components to finish loading before initializing
     if (isLoadingComponents) {
@@ -73,22 +73,21 @@ export function SchedulesView() {
     }
 
     // Only initialize once when components first load
-    if (!componentsInitialized && components.length > 0) {
-      console.log("[SchedulesView] Initializing components", {
+    if (!componentsInitialized && components.length >= 0) {
+      console.log("[SchedulesView] Initializing component to null (all)", {
         components: components.map((c) => ({
           id: c.id,
           name: c.name,
           path: c.path,
         })),
       });
-      const allComponentIds = components.map((c) => c.id);
-      setSelectedComponentIds(allComponentIds);
+      setSelectedComponentId(null);
       setComponentsInitialized(true);
     }
   }, [components, isLoadingComponents, componentsInitialized]);
 
-  // Get primary component ID (first selected or null for root)
-  const primaryComponentId = selectedComponentIds[0] ?? null;
+  // Use the selected component ID directly
+  const primaryComponentId = selectedComponentId;
 
   // Function discovery
   const { functions, isLoading: isLoadingFunctions } = useFunctions({
@@ -96,15 +95,14 @@ export function SchedulesView() {
     useMockData,
   });
 
-  // Selected functions state
-  const [selectedFunctions, setSelectedFunctions] = useState<
-    SelectedFunction[]
-  >([]);
+  // Selected function state (single select)
+  const [selectedFunction, setSelectedFunction] =
+    useState<SelectedFunction>(null);
 
   // Track if functions have been initialized (set once on first load)
   const [functionsInitialized, setFunctionsInitialized] = useState(false);
 
-  // Initialize with all functions selected by default
+  // Initialize with null (all functions) by default
   useEffect(() => {
     // Wait for functions to finish loading before initializing
     if (isLoadingFunctions) {
@@ -112,16 +110,11 @@ export function SchedulesView() {
     }
 
     // Only initialize once when functions first load
-    if (!functionsInitialized && functions.length > 0) {
-      setSelectedFunctions(functions);
+    if (!functionsInitialized && functions.length >= 0) {
+      setSelectedFunction(null);
       setFunctionsInitialized(true);
     }
   }, [functions, functionsInitialized, isLoadingFunctions]);
-
-  // Type guard to check if a selected function is a ModuleFunction
-  const isModuleFunction = (fn: SelectedFunction): fn is ModuleFunction => {
-    return fn !== null && !isCustomQuery(fn);
-  };
 
   // Create a mapping from component ID to component name/path
   // Since functions store component name/path in their componentId field
@@ -179,18 +172,17 @@ export function SchedulesView() {
     [componentIdToNameMap],
   );
 
-  // Get functions that belong to selected components
-  const functionsForSelectedComponents = useMemo(() => {
-    if (selectedComponentIds.length === 0) {
-      return [];
+  // Get functions that belong to selected component
+  const functionsForSelectedComponent = useMemo(() => {
+    if (selectedComponentId === null) {
+      // null means all components
+      return functions;
     }
 
     return functions.filter((fn) =>
-      selectedComponentIds.some((compId) =>
-        functionBelongsToComponent(fn, compId),
-      ),
+      functionBelongsToComponent(fn, selectedComponentId),
     );
-  }, [functions, selectedComponentIds, functionBelongsToComponent]);
+  }, [functions, selectedComponentId, functionBelongsToComponent]);
 
   // When component selection changes after initialization, sync function selection
   // Only run this after both components and functions are initialized
@@ -200,38 +192,24 @@ export function SchedulesView() {
       return;
     }
 
-    // Skip if components haven't been set yet
-    if (selectedComponentIds.length === 0) {
-      return;
-    }
-
-    // Skip if functions haven't been set yet
-    if (selectedFunctions.length === 0) {
-      return;
-    }
-
     // Check if component selection actually changed (user interaction)
-    const prevIds = prevComponentIdsRef.current;
+    const prevId = prevComponentIdsRef.current?.[0] ?? null;
 
     // Initialize the ref on first run after both initialized
-    if (prevIds === null) {
+    if (prevComponentIdsRef.current === null) {
       console.log("[SchedulesView] Initializing component sync ref", {
-        selectedComponentIds,
-        selectedFunctionsCount: selectedFunctions.length,
+        selectedComponentId,
       });
-      prevComponentIdsRef.current = [...selectedComponentIds];
+      prevComponentIdsRef.current = [selectedComponentId];
       return; // Don't sync on initial setup
     }
 
-    const hasChanged =
-      prevIds.length !== selectedComponentIds.length ||
-      !prevIds.every((id, i) => id === selectedComponentIds[i]);
+    const hasChanged = prevId !== selectedComponentId;
 
     console.log("[SchedulesView] Component sync effect triggered", {
-      prevIds,
-      selectedComponentIds,
+      prevId,
+      selectedComponentId,
       hasChanged,
-      selectedFunctionsCount: selectedFunctions.length,
     });
 
     // If component selection didn't change, don't sync
@@ -239,184 +217,27 @@ export function SchedulesView() {
       return;
     }
 
-    // Build new selection based on component changes:
-    // 1. Keep functions from selected components that are currently selected
-    // 2. Remove functions from deselected components
-    // 3. Add functions from newly selected components
-
-    // Get set of currently selected component IDs
-    const currentComponentIds = new Set(selectedComponentIds);
-    const previousComponentIds = new Set(prevIds);
-
-    // Find newly selected components (in current but not in previous)
-    const newlySelectedComponents = selectedComponentIds.filter(
-      (id) => !previousComponentIds.has(id),
+    // When component changes, reset function to null (all functions)
+    console.log(
+      "[SchedulesView] Resetting function selection for component change",
     );
 
-    // Find newly deselected components (in previous but not in current)
-    const deselectedComponents = prevIds.filter(
-      (id) => !currentComponentIds.has(id),
-    );
-
-    console.log("[SchedulesView] Component changes detected", {
-      newlySelectedComponents,
-      deselectedComponents,
-      componentIdToNameMap,
-      deselectedComponentNames: deselectedComponents.map((id) =>
-        id === null ? "root" : componentIdToNameMap[id] || id,
-      ),
-    });
-
-    // Start with current selection
-    let newSelection = [...selectedFunctions];
-
-    // Remove functions from deselected components
-    if (deselectedComponents.length > 0) {
-      const beforeRemoval = newSelection.length;
-
-      // Debug: Check what functions we have and their component IDs
-      console.log("[SchedulesView] Sample of current functions:", {
-        deselectedComponents,
-        deselectedComponentNames: deselectedComponents.map((id) =>
-          id === null ? "root" : componentIdToNameMap[id] || id,
-        ),
-        sampleFunctions: newSelection.slice(0, 10).map((fn) => {
-          if (!fn || isCustomQuery(fn)) return { type: "custom-query" };
-          const moduleFn = fn as ModuleFunction;
-          const belongsToDeselected = deselectedComponents.some((compId) =>
-            functionBelongsToComponent(moduleFn, compId),
-          );
-          return {
-            identifier: moduleFn.identifier,
-            componentId: moduleFn.componentId,
-            belongsToDeselected,
-            matchesAgainst: deselectedComponents.map((compId) => ({
-              compId,
-              compName:
-                compId === null
-                  ? "root"
-                  : componentIdToNameMap[compId] || compId,
-              matches: functionBelongsToComponent(moduleFn, compId),
-            })),
-          };
-        }),
-      });
-
-      newSelection = newSelection.filter((fn) => {
-        if (!fn || isCustomQuery(fn)) return true;
-        // Keep function if it doesn't belong to any deselected component
-        const belongsToDeselected = deselectedComponents.some((compId) =>
-          functionBelongsToComponent(fn as ModuleFunction, compId),
-        );
-        if (belongsToDeselected) {
-          console.log("[SchedulesView] Removing function", {
-            identifier: (fn as ModuleFunction).identifier,
-            componentId: (fn as ModuleFunction).componentId,
-            deselectedComponents,
-          });
-        }
-        return !belongsToDeselected;
-      });
-      console.log(
-        "[SchedulesView] After removing deselected component functions",
-        {
-          beforeRemoval,
-          afterRemoval: newSelection.length,
-          removed: beforeRemoval - newSelection.length,
-        },
-      );
-    }
-
-    // Add functions from newly selected components
-    if (newlySelectedComponents.length > 0) {
-      // Get all functions from newly selected components
-      const functionsToAdd = functions.filter((fn) =>
-        newlySelectedComponents.some((compId) =>
-          functionBelongsToComponent(fn, compId),
-        ),
-      );
-
-      console.log(
-        "[SchedulesView] Functions to add from newly selected components",
-        {
-          count: functionsToAdd.length,
-          identifiers: functionsToAdd.map((f) => f.identifier).slice(0, 5),
-        },
-      );
-
-      // Add functions that aren't already in selection
-      const currentIdentifiers = new Set(
-        newSelection
-          .filter(isModuleFunction)
-          .map((fn) => (fn as ModuleFunction).identifier),
-      );
-
-      const beforeAddition = newSelection.length;
-      for (const fn of functionsToAdd) {
-        if (!currentIdentifiers.has(fn.identifier)) {
-          newSelection.push(fn);
-          currentIdentifiers.add(fn.identifier);
-        }
-      }
-      console.log(
-        "[SchedulesView] After adding newly selected component functions",
-        {
-          beforeAddition,
-          afterAddition: newSelection.length,
-          added: newSelection.length - beforeAddition,
-        },
-      );
-    }
-
-    // Update selection if it changed
-    const selectionChanged =
-      newSelection.length !== selectedFunctions.length ||
-      !newSelection.every((fn, i) => {
-        const selectedFn = selectedFunctions[i];
-        if (!fn || !selectedFn) return fn === selectedFn;
-        if (isCustomQuery(fn) !== isCustomQuery(selectedFn)) return false;
-        if (isCustomQuery(fn)) return true;
-        return (
-          (fn as ModuleFunction).identifier ===
-          (selectedFunctions[i] as ModuleFunction).identifier
-        );
-      });
-
-    console.log("[SchedulesView] Checking if selection changed", {
-      oldCount: selectedFunctions.length,
-      newCount: newSelection.length,
-      selectionChanged,
-    });
-
-    if (selectionChanged) {
-      console.log("[SchedulesView] Updating function selection", {
-        from: selectedFunctions.length,
-        to: newSelection.length,
-      });
-      setSelectedFunctions(newSelection);
-      // Update the ref AFTER successful update
-      prevComponentIdsRef.current = [...selectedComponentIds];
-    } else {
-      // Even if selection didn't change, update ref so we don't keep re-processing
-      prevComponentIdsRef.current = [...selectedComponentIds];
-    }
+    setSelectedFunction(null);
+    prevComponentIdsRef.current = [selectedComponentId];
   }, [
-    selectedComponentIds,
-    functionsForSelectedComponents,
+    selectedComponentId,
+    functionsForSelectedComponent,
     functionsInitialized,
     componentsInitialized,
-    selectedFunctions,
     functions,
     functionBelongsToComponent,
   ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Compute udfPath for filtering (only when a single function is selected)
   const udfPath = useMemo(() => {
-    if (selectedFunctions.length !== 1) return undefined;
-    const selected = selectedFunctions[0];
-    if (!selected || isCustomQuery(selected)) return undefined;
-    return selected.identifier;
-  }, [selectedFunctions]);
+    if (!selectedFunction || isCustomQuery(selectedFunction)) return undefined;
+    return selectedFunction.identifier;
+  }, [selectedFunction]);
 
   // Fetch data based on selected tab
   const { jobs: scheduledJobs, isLoading: isLoadingScheduled } =
@@ -438,73 +259,11 @@ export function SchedulesView() {
 
   const { cancelJob, cancelAllJobs, isCanceling } = useScheduleActions();
 
-  // Helper to normalize function identifiers (remove .js extensions)
-  const normalizeIdentifier = (id: string) =>
-    id.replace(/\.js:/g, ":").replace(/\.js$/g, "");
+  // Filter scheduled jobs - API filtering handles single function selection via udfPath
+  const filteredScheduledJobs = scheduledJobs;
 
-  // Filter scheduled jobs based on selected functions
-  const filteredScheduledJobs = useMemo(() => {
-    if (selectedFunctions.length <= 1) {
-      // When 0 or 1 function selected, the API filtering handles it
-      return scheduledJobs;
-    }
-
-    // When multiple functions selected, filter client-side
-    const selectedIdentifiers = new Set(
-      selectedFunctions
-        .filter(isModuleFunction)
-        .map((fn) => normalizeIdentifier(fn.identifier)),
-    );
-
-    return scheduledJobs.filter((job: any) => {
-      const jobUdfPath = job.udfPath || job.component;
-      if (!jobUdfPath) return false;
-      const normalizedJobPath = normalizeIdentifier(jobUdfPath);
-      return selectedIdentifiers.has(normalizedJobPath);
-    });
-  }, [scheduledJobs, selectedFunctions]);
-
-  // Filter cron jobs based on selected functions
-  const filteredCronJobs = useMemo(() => {
-    if (selectedFunctions.length === 0) {
-      // When no functions selected, show all
-      return cronJobs;
-    }
-
-    const validFunctions = selectedFunctions.filter(isModuleFunction);
-
-    if (validFunctions.length === 0) {
-      return cronJobs;
-    }
-
-    const selectedIdentifiers = new Set(
-      validFunctions.map((fn) => normalizeIdentifier(fn.identifier)),
-    );
-
-    // Check if all available cron functions are selected (show all in that case)
-    const availableCronFunctions = cronJobs
-      .map((job) => job.cronSpec?.udfPath)
-      .filter(Boolean);
-    const allFunctionsSelected =
-      availableCronFunctions.length > 0 &&
-      availableCronFunctions.every((udfPath) => {
-        if (!udfPath) return false;
-        const normalized = normalizeIdentifier(udfPath);
-        return selectedIdentifiers.has(normalized);
-      });
-
-    if (allFunctionsSelected) {
-      return cronJobs;
-    }
-
-    // Filter cron jobs
-    return cronJobs.filter((job) => {
-      const cronUdfPath = job.cronSpec?.udfPath;
-      if (!cronUdfPath) return false;
-      const normalizedCronUdfPath = normalizeIdentifier(cronUdfPath);
-      return selectedIdentifiers.has(normalizedCronUdfPath);
-    });
-  }, [cronJobs, selectedFunctions]);
+  // Filter cron jobs - show all when no function or null selected
+  const filteredCronJobs = cronJobs;
 
   // Calculate available height for table
   useEffect(() => {
@@ -598,101 +357,123 @@ export function SchedulesView() {
       >
         {/* Toolbar */}
         <Toolbar
-          padding="8px"
-          className="gap-2 flex-shrink-0"
-          style={{
-            borderBottomColor: "var(--color-panel-border)",
-            backgroundColor: "var(--color-panel-bg)",
-          }}
           left={
-            <>
-              {/* Component Selector */}
-          {components.length > 1 && (
-            <div style={{ width: "240px" }}>
-              <ComponentSelector
-                multiSelect={true}
-                selectedComponentId={selectedComponentIds}
-                onSelect={setSelectedComponentIds}
-                components={components}
-                variant="input"
-              />
-            </div>
-          )}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              {/* Component selector */}
+              {components.length > 1 && (
+                <>
+                  <ComponentSelector
+                    multiSelect={false}
+                    selectedComponentId={selectedComponentId}
+                    onSelect={setSelectedComponentId}
+                    components={components}
+                    variant="inline"
+                  />
 
-          {/* Function Selector */}
-          <div style={{ width: "240px" }}>
-            <FunctionSelector
-              multiSelect={true}
-              selectedFunction={selectedFunctions}
-              onSelect={setSelectedFunctions}
-              functions={functions}
-              componentId={undefined}
-              showCustomQuery={false}
-            />
-          </div>
+                  {/* Divider */}
+                  <div
+                    style={{
+                      width: "1px",
+                      height: "16px",
+                      backgroundColor: "var(--color-panel-border)",
+                    }}
+                  />
+                </>
+              )}
 
-          {/* Search */}
-          <div style={{ minWidth: "200px", width: "300px" }}>
-            <div className="cp-search-wrapper">
-              <Search size={14} className="cp-search-icon" />
-              <input
-                type="text"
-                placeholder={
-                  selectedTab === "cron"
-                    ? "Search by name..."
-                    : "Search by ID..."
-                }
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="cp-search-input"
+              {/* Function selector */}
+              <FunctionSelector
+                multiSelect={false}
+                selectedFunction={selectedFunction}
+                onSelect={setSelectedFunction}
+                functions={functions}
+                componentId={undefined}
+                showCustomQuery={false}
+                showAllFunctions={true}
+                variant="inline"
               />
+
+              {/* Divider */}
+              <div
+                style={{
+                  width: "1px",
+                  height: "16px",
+                  backgroundColor: "var(--color-panel-border)",
+                }}
+              />
+
+              {/* Search input */}
+              <div style={{ minWidth: "200px", width: "300px" }}>
+                <div className="cp-search-wrapper">
+                  <Search size={14} className="cp-search-icon" />
+                  <input
+                    type="text"
+                    placeholder={
+                      selectedTab === "cron"
+                        ? "Search by name..."
+                        : "Search by ID..."
+                    }
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="cp-search-input"
+                  />
+                </div>
+              </div>
             </div>
-          </div>
-            </>
           }
           right={
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "12px",
+                gap: "8px",
               }}
             >
-            <span
-              style={{
-                fontSize: "12px",
-                fontWeight: 400,
-                color: "var(--color-panel-text-muted)",
-              }}
-            >
-              {selectedTab === "scheduled"
-                ? `Total Jobs ${filteredScheduledJobs.length}`
-                : `Total Crons ${filteredCronJobs.length}`}
-            </span>
-            <ToolbarButton
-              onClick={() => setIsPaused(!isPaused)}
-              variant="ghost"
-            >
-              {isPaused ? (
-                <>
-                  <Play size={14} /> Resume
-                </>
-              ) : (
-                <>
-                  <Pause size={14} /> Pause
-                </>
-              )}
-            </ToolbarButton>
-            {selectedTab === "scheduled" && (
-              <ToolbarButton
-                onClick={handleCancelAll}
-                disabled={isCanceling || !hasData}
-                variant="destructive"
+              <span
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 400,
+                  color: "var(--color-panel-text-muted)",
+                }}
               >
-                <Trash2 size={12} />
-                Cancel All
+                {selectedTab === "scheduled"
+                  ? `Total Jobs ${filteredScheduledJobs.length}`
+                  : `Total Crons ${filteredCronJobs.length}`}
+              </span>
+
+              {/* Divider */}
+              <div
+                style={{
+                  width: "1px",
+                  height: "16px",
+                  backgroundColor: "var(--color-panel-border)",
+                }}
+              />
+
+              <ToolbarButton
+                onClick={() => setIsPaused(!isPaused)}
+                variant="ghost"
+              >
+                {isPaused ? (
+                  <>
+                    <Play size={14} /> Resume
+                  </>
+                ) : (
+                  <>
+                    <Pause size={14} /> Pause
+                  </>
+                )}
               </ToolbarButton>
-            )}
+              {selectedTab === "scheduled" && (
+                <ToolbarButton
+                  onClick={handleCancelAll}
+                  disabled={isCanceling || !hasData}
+                  variant="destructive"
+                >
+                  <Trash2 size={12} />
+                  Cancel All
+                </ToolbarButton>
+              )}
             </div>
           }
         />

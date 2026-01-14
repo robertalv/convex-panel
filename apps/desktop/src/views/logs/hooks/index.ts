@@ -16,11 +16,12 @@ export type {
 export { useFunctions } from "./useFunctions";
 export type { UseFunctionsProps, UseFunctionsReturn } from "./useFunctions";
 
-export { useLogStorage } from "./useLogStorage";
+export { useLocalLogStore } from "./useLocalLogStore";
 export type {
-  UseLogStorageOptions,
-  UseLogStorageReturn,
-} from "./useLogStorage";
+  UseLocalLogStoreReturn,
+  LocalLogEntry,
+  LogStoreSettings,
+} from "./useLocalLogStore";
 
 export { useDeploymentAuditLogs } from "./useDeploymentAuditLogs";
 export type {

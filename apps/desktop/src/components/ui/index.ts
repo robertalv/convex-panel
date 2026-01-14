@@ -38,3 +38,12 @@ export { Icon, type IconProps } from "./icon";
 export { CodeDiffViewer, type CodeDiffViewerProps } from "./code-diff-viewer";
 export { SearchInput, type SearchInputProps } from "./search-input";
 export { Kbd, type KbdProps } from "./kbd";
+export {
+  MultiSelectCombobox,
+  type MultiSelectValue,
+} from "./multi-select-combobox";
+export { Tab } from "./tab";
+export { KeyboardShortcut } from "./keyboard-shortcut";
+export { Callout } from "./callout";
+export { ClosePanelButton } from "./close-panel-button";
+export { InfiniteScrollList } from "./infinite-scroll-list";

@@ -1,95 +1,131 @@
 /**
  * Interleaved Logs Utility
  * Merges execution logs and deployment events in chronological order
- * Based on dashboard-common's interleaveLogs
+ * Ported from dashboard-common to match production behavior exactly
  */
 
 import type { LogEntry } from "../types";
 import type { DeploymentAuditLogEvent } from "../hooks/useDeploymentAuditLogs";
 
 /**
- * Combined log type that can be either an execution log or deployment event
+ * Combined log type that can be an execution log, deployment event, or cleared logs marker
  */
 export type InterleavedLog =
-  | { kind: "ExecutionLog"; executionLog: LogEntry }
-  | { kind: "DeploymentEvent"; deploymentEvent: DeploymentAuditLogEvent };
+  | {
+      kind: "ExecutionLog";
+      executionLog: LogEntry;
+    }
+  | {
+      kind: "DeploymentEvent";
+      deploymentEvent: DeploymentAuditLogEvent;
+    }
+  | {
+      kind: "ClearedLogs";
+      timestamp: number;
+    };
 
 /**
- * Interleaves execution logs and deployment events by timestamp
- * @param executionLogs - Array of execution logs
- * @param deploymentEvents - Array of deployment events
- * @returns Array of interleaved logs sorted by timestamp (newest first)
+ * Get timestamp from InterleavedLog
+ */
+export function getTimestamp(log: InterleavedLog): number {
+  if (!log) {
+    return 0;
+  }
+  switch (log.kind) {
+    case "ExecutionLog":
+      return log.executionLog.timestamp;
+    case "DeploymentEvent":
+      return log.deploymentEvent._creationTime;
+    case "ClearedLogs":
+      return log.timestamp;
+    default:
+      return 0;
+  }
+}
+
+/**
+ * Get a unique key for an InterleavedLog for React rendering
+ * Uses kind, timestamp, and id (if available) to ensure uniqueness
+ */
+export function getLogKey(log: InterleavedLog): string {
+  if (!log) {
+    return "";
+  }
+  const timestamp = getTimestamp(log);
+  if (log.kind === "ExecutionLog") {
+    return `${log.kind}-${timestamp}-${log.executionLog.id}`;
+  }
+  if (log.kind === "DeploymentEvent") {
+    return `${log.kind}-${timestamp}-${log.deploymentEvent._id}`;
+  }
+  return `${log.kind}-${timestamp}`;
+}
+
+/**
+ * Given two arrays of logs sorted from least recent to most recent, interleave
+ * them based on time with support for cleared logs markers.
+ *
+ * @param executionLogs - Array of execution logs (LogEntry)
+ * @param deploymentAuditLogEvents - Array of deployment events
+ * @param clearedLogs - Array of timestamps marking when logs were cleared
+ * @returns Array of interleaved logs
  */
 export function interleaveLogs(
   executionLogs: LogEntry[],
-  deploymentEvents: DeploymentAuditLogEvent[],
+  deploymentAuditLogEvents: DeploymentAuditLogEvent[],
+  clearedLogs: number[],
 ): InterleavedLog[] {
   const result: InterleavedLog[] = [];
-  const seenLogIds = new Set<string>();
-  const seenEventIds = new Set<string>();
 
-  // Convert logs to interleaved format with deduplication
-  for (const log of executionLogs) {
-    if (seenLogIds.has(log.id)) {
-      console.warn(`[interleaveLogs] Skipping duplicate log ID: ${log.id}`);
-      continue;
-    }
-    seenLogIds.add(log.id);
+  const logIterator = executionLogs[Symbol.iterator]();
+  const deploymentEventIterator = deploymentAuditLogEvents[Symbol.iterator]();
+  const latestCleared =
+    clearedLogs.length > 0 ? clearedLogs[clearedLogs.length - 1] : undefined;
+
+  // Add cleared logs marker at the beginning if logs were cleared
+  if (latestCleared !== undefined) {
     result.push({
-      kind: "ExecutionLog",
-      executionLog: log,
+      kind: "ClearedLogs",
+      timestamp: latestCleared,
     });
   }
 
-  // Convert events to interleaved format with deduplication
-  for (const event of deploymentEvents) {
-    if (seenEventIds.has(event._id)) {
-      console.warn(
-        `[interleaveLogs] Skipping duplicate event ID: ${event._id}`,
-      );
-      continue;
+  let executionLog: LogEntry | undefined = logIterator.next().value;
+  let deploymentEvent: DeploymentAuditLogEvent | undefined =
+    deploymentEventIterator.next().value;
+
+  // Interleave logs and events by timestamp, filtering out logs/events before the cleared timestamp
+  while (executionLog !== undefined || deploymentEvent !== undefined) {
+    if (
+      executionLog &&
+      (deploymentEvent === undefined ||
+        executionLog.timestamp < deploymentEvent._creationTime)
+    ) {
+      // Only include logs after the cleared timestamp
+      if (
+        latestCleared === undefined ||
+        executionLog.timestamp > latestCleared
+      ) {
+        result.push({ kind: "ExecutionLog", executionLog: executionLog });
+      }
+      executionLog = logIterator.next().value;
+    } else if (deploymentEvent) {
+      // Only include events after the cleared timestamp
+      if (
+        latestCleared === undefined ||
+        deploymentEvent._creationTime > latestCleared
+      ) {
+        result.push({
+          kind: "DeploymentEvent",
+          deploymentEvent,
+        });
+      }
+      deploymentEvent = deploymentEventIterator.next().value;
     }
-    seenEventIds.add(event._id);
-    result.push({
-      kind: "DeploymentEvent",
-      deploymentEvent: event,
-    });
   }
-
-  // Sort by timestamp (newest first)
-  result.sort((a, b) => {
-    const aTime =
-      a.kind === "ExecutionLog"
-        ? a.executionLog.timestamp
-        : a.deploymentEvent._creationTime;
-    const bTime =
-      b.kind === "ExecutionLog"
-        ? b.executionLog.timestamp
-        : b.deploymentEvent._creationTime;
-    return bTime - aTime; // Descending order (newest first)
-  });
-
   return result;
 }
 
-/**
- * Gets the timestamp from an interleaved log
- * @param log - The interleaved log entry
- * @returns The timestamp in milliseconds
- */
-export function getInterleavedLogTimestamp(log: InterleavedLog): number {
-  return log.kind === "ExecutionLog"
-    ? log.executionLog.timestamp
-    : log.deploymentEvent._creationTime;
-}
-
-/**
- * Gets a unique key for an interleaved log (for React keys)
- * @param log - The interleaved log entry
- * @returns A unique string key
- */
-export function getInterleavedLogKey(log: InterleavedLog): string {
-  return log.kind === "ExecutionLog"
-    ? `log-${log.executionLog.id}`
-    : `event-${log.deploymentEvent._id}`;
-}
+// Legacy function names for backward compatibility
+export const getInterleavedLogTimestamp = getTimestamp;
+export const getInterleavedLogKey = getLogKey;

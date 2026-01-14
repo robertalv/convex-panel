@@ -16,7 +16,6 @@ import {
 } from "@raycast/api";
 import { useState, useEffect } from "react";
 import { useConvexAuth } from "./hooks/useConvexAuth";
-import { useAuthenticatedListGuard } from "./components/AuthenticatedListGuard";
 import {
   useTeams,
   useProjects,
@@ -28,12 +27,20 @@ import type { Team, Project, Deployment } from "./hooks/useConvexData";
 type ViewState = "teams" | "projects" | "deployments";
 
 export default function SwitchProjectCommand() {
-  const { session, logout, selectedContext, setSelectedContext } =
-    useConvexAuth();
+  const {
+    session,
+    isLoading: authLoading,
+    isAuthenticated,
+    login,
+    logout,
+    selectedContext,
+    setSelectedContext,
+  } = useConvexAuth();
 
   const [viewState, setViewState] = useState<ViewState>("teams");
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [searchText, setSearchText] = useState("");
 
   const accessToken = session?.accessToken ?? null;
 
@@ -69,11 +76,31 @@ export default function SwitchProjectCommand() {
     }
   }, [projects, selectedContext.projectId]);
 
-  // Handle authentication
-  const authGuard = useAuthenticatedListGuard(
-    "Connect your Convex account to manage your projects",
-  );
-  if (authGuard) return authGuard;
+  // Handle authentication - show sign in prompt if not authenticated
+  if (authLoading) {
+    return <List isLoading={true} searchBarPlaceholder="Loading..." />;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <List>
+        <List.EmptyView
+          title="Sign in to Convex"
+          description="Connect your Convex account to manage your projects"
+          icon={Icon.Key}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Sign in with Convex"
+                icon={Icon.Key}
+                onAction={login}
+              />
+            </ActionPanel>
+          }
+        />
+      </List>
+    );
+  }
 
   // Loading state
   const isLoading =
@@ -88,10 +115,14 @@ export default function SwitchProjectCommand() {
     setSelectedTeam(team);
     setSelectedProject(null);
     setViewState("projects");
+    setSearchText("");
     setSelectedContext({
       teamId: team.id,
+      teamSlug: team.slug,
       projectId: null,
+      projectSlug: null,
       deploymentName: null,
+      deploymentType: null,
     });
   };
 
@@ -99,16 +130,23 @@ export default function SwitchProjectCommand() {
   const handleSelectProject = (project: Project) => {
     setSelectedProject(project);
     setViewState("deployments");
+    setSearchText("");
     setSelectedContext({
       teamId: selectedTeam?.id ?? selectedContext.teamId,
+      teamSlug: selectedTeam?.slug ?? selectedContext.teamSlug,
       projectId: project.id,
+      projectSlug: project.slug,
       deploymentName: null,
+      deploymentType: null,
     });
   };
 
   // Handle deployment selection
   const handleSelectDeployment = async (deployment: Deployment) => {
-    await setSelectedContext({ deploymentName: deployment.name });
+    await setSelectedContext({
+      deploymentName: deployment.name,
+      deploymentType: deployment.deploymentType,
+    });
     await showToast({
       style: Toast.Style.Success,
       title: "Deployment Selected",
@@ -118,6 +156,7 @@ export default function SwitchProjectCommand() {
 
   // Handle going back
   const handleGoBack = () => {
+    setSearchText("");
     if (viewState === "deployments") {
       setSelectedProject(null);
       setViewState("projects");
@@ -135,6 +174,27 @@ export default function SwitchProjectCommand() {
         ? `${selectedTeam?.name} - Projects`
         : `${selectedProject?.name} - Deployments`;
 
+  // Filter items based on search text
+  const filteredTeams = teams?.filter(
+    (team) =>
+      team.name.toLowerCase().includes(searchText.toLowerCase()) ||
+      team.slug.toLowerCase().includes(searchText.toLowerCase()),
+  );
+
+  const filteredProjects = projects?.filter(
+    (project) =>
+      project.name.toLowerCase().includes(searchText.toLowerCase()) ||
+      project.slug.toLowerCase().includes(searchText.toLowerCase()),
+  );
+
+  const filteredDeployments = deployments?.filter(
+    (deployment) =>
+      deployment.name.toLowerCase().includes(searchText.toLowerCase()) ||
+      deployment.deploymentType
+        .toLowerCase()
+        .includes(searchText.toLowerCase()),
+  );
+
   // Current selection subtitle
   const currentSelection = selectedContext.deploymentName
     ? `Current: ${selectedContext.deploymentName}`
@@ -144,6 +204,8 @@ export default function SwitchProjectCommand() {
     <List
       isLoading={isLoading}
       navigationTitle={navigationTitle}
+      searchText={searchText}
+      onSearchTextChange={setSearchText}
       searchBarPlaceholder={
         viewState === "teams"
           ? "Search teams..."
@@ -213,9 +275,9 @@ export default function SwitchProjectCommand() {
       )}
 
       {/* Teams view */}
-      {viewState === "teams" && teams && (
+      {viewState === "teams" && filteredTeams && (
         <List.Section title="Your Teams">
-          {teams.map((team) => (
+          {filteredTeams.map((team) => (
             <List.Item
               key={team.id}
               title={team.name}
@@ -271,9 +333,9 @@ export default function SwitchProjectCommand() {
             />
           </List.Section>
 
-          {projects && projects.length > 0 && (
+          {filteredProjects && filteredProjects.length > 0 && (
             <List.Section title={`Projects in ${selectedTeam?.name}`}>
-              {projects.map((project) => (
+              {filteredProjects.map((project) => (
                 <List.Item
                   key={project.id}
                   title={project.name}
@@ -333,6 +395,7 @@ export default function SwitchProjectCommand() {
                     title="Go Back to Teams"
                     icon={Icon.ArrowLeftCircle}
                     onAction={() => {
+                      setSearchText("");
                       setSelectedProject(null);
                       setSelectedTeam(null);
                       setViewState("teams");
@@ -344,9 +407,9 @@ export default function SwitchProjectCommand() {
             />
           </List.Section>
 
-          {deployments && deployments.length > 0 && (
+          {filteredDeployments && filteredDeployments.length > 0 && (
             <List.Section title={`Deployments for ${selectedProject?.name}`}>
-              {deployments.map((deployment) => (
+              {filteredDeployments.map((deployment) => (
                 <List.Item
                   key={deployment.id}
                   title={
@@ -405,18 +468,26 @@ export default function SwitchProjectCommand() {
       )}
 
       {/* Empty states */}
-      {viewState === "teams" && teams?.length === 0 && (
+      {viewState === "teams" && filteredTeams?.length === 0 && (
         <List.EmptyView
-          title="No Teams Found"
-          description="You don't have access to any Convex teams"
+          title={searchText ? "No Matching Teams" : "No Teams Found"}
+          description={
+            searchText
+              ? `No teams match "${searchText}"`
+              : "You don't have access to any Convex teams"
+          }
           icon={Icon.TwoPeople}
         />
       )}
 
-      {viewState === "projects" && projects?.length === 0 && (
+      {viewState === "projects" && filteredProjects?.length === 0 && (
         <List.EmptyView
-          title="No Projects Found"
-          description={`No projects in ${selectedTeam?.name}`}
+          title={searchText ? "No Matching Projects" : "No Projects Found"}
+          description={
+            searchText
+              ? `No projects match "${searchText}"`
+              : `No projects in ${selectedTeam?.name}`
+          }
           icon={Icon.Box}
           actions={
             <ActionPanel>
@@ -430,10 +501,16 @@ export default function SwitchProjectCommand() {
         />
       )}
 
-      {viewState === "deployments" && deployments?.length === 0 && (
+      {viewState === "deployments" && filteredDeployments?.length === 0 && (
         <List.EmptyView
-          title="No Deployments Found"
-          description={`No deployments for ${selectedProject?.name}`}
+          title={
+            searchText ? "No Matching Deployments" : "No Deployments Found"
+          }
+          description={
+            searchText
+              ? `No deployments match "${searchText}"`
+              : `No deployments for ${selectedProject?.name}`
+          }
           icon={Icon.Cloud}
           actions={
             <ActionPanel>

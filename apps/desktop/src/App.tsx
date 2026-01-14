@@ -35,7 +35,6 @@ import {
 import { HealthView } from "./views/health";
 import { DataView } from "./views/data";
 import FunctionsView from "./views/functions";
-import { RunnerView } from "./views/runner";
 import { FilesView } from "./views/files";
 import { SchedulesView } from "./views/schedules";
 import { LogsView } from "./views/logs";
@@ -52,6 +51,7 @@ import {
 import { DeploymentProvider } from "./contexts/deployment-context";
 import { useTheme } from "./contexts/theme-context";
 import { TerminalProvider } from "./contexts/terminal-context";
+import { FunctionRunnerProvider } from "./contexts/function-runner-context";
 import { GitHubProvider } from "./contexts/github-context";
 import { ProjectPathProvider } from "./contexts/project-path-context";
 import { AboutDialog } from "./components/about-dialog";
@@ -124,7 +124,7 @@ export default function App({ convex: _initialConvex }: AppProps) {
     );
   });
   const [session, setSession] = useState<DashboardSession | null>(null);
-  const [deployUrl, setDeployUrl] = useState(() =>
+  const [deployUrl, _setDeployUrl] = useState(() =>
     typeof window !== "undefined"
       ? localStorage.getItem(STORAGE_KEYS.deployUrl) || ""
       : "",
@@ -387,7 +387,7 @@ export default function App({ convex: _initialConvex }: AppProps) {
         description: "Open settings",
         enableOnFormTags: true,
       },
-      ...NAV_ITEMS.slice(0, 9).map(
+      ...NAV_ITEMS.slice(0, 8).map(
         (item, index): HotkeyDefinition => ({
           keys: [`ctrl+${index + 1}`, `meta+${index + 1}`],
           action: () => navigate(item.path),
@@ -511,107 +511,108 @@ export default function App({ convex: _initialConvex }: AppProps) {
             projectSlug={selectedProject?.slug ?? null}
           >
             <TerminalProvider>
-              <DeploymentProvider
-                deployment={selectedDeployment}
-                authToken={authToken}
-                accessToken={session?.accessToken}
-                deployUrl={deployUrl}
-                teamId={selectedTeam?.id ?? null}
-                teamSlug={selectedTeam?.slug ?? null}
-                projectSlug={selectedProject?.slug ?? null}
-                fetchFn={tauriFetch}
-              >
-                <OnboardingSync
-                  deploymentName={selectedDeployment?.name}
-                  teamSlug={selectedTeam?.slug}
-                  projectSlug={selectedProject?.slug}
-                />
-                <AppShell
-                  theme={theme}
-                  navItems={NAV_ITEMS}
-                  currentPath={location.pathname}
-                  onNavigate={onNavigate}
-                  onOpenPalette={() => setPaletteOpen(true)}
-                  onThemeChange={setTheme}
-                  onDisconnect={handleDisconnect}
-                  onOpenSettings={() => navigate("/settings")}
-                  onNavigateToProjectSelector={() => {
-                    setSelectedProject(null);
-                    setSelectedDeployment(null);
-                  }}
-                  user={headerUser}
-                  teams={teams}
-                  projects={projects}
-                  deployments={deployments}
-                  selectedTeam={selectedTeam}
-                  selectedProject={selectedProject}
-                  selectedDeployment={selectedDeployment}
-                  subscription={subscription}
-                  invoices={invoices}
-                  onSelectTeam={(team) => {
-                    setSelectedTeam(team);
-                    setSelectedProject(null);
-                    setSelectedDeployment(null);
-                  }}
-                  onSelectProject={(project) => {
-                    setSelectedProject(project);
-                    setSelectedDeployment(null);
-                  }}
-                  onSelectDeployment={setSelectedDeployment}
-                  hideNav={!selectedProject}
-                  deploymentsLoading={deploymentsLoading}
+              <FunctionRunnerProvider>
+                <DeploymentProvider
+                  deployment={selectedDeployment}
+                  authToken={authToken}
+                  accessToken={session?.accessToken}
+                  deployUrl={deployUrl}
+                  teamId={selectedTeam?.id ?? null}
+                  teamSlug={selectedTeam?.slug ?? null}
+                  projectSlug={selectedProject?.slug ?? null}
+                  fetchFn={tauriFetch}
                 >
-                  {selectedProject ? (
-                    <Routes>
-                      <Route path="/health" element={<HealthView />} />
-                      <Route path="/data" element={<DataView />} />
-                      <Route
-                        path="/schema"
-                        element={<SchemaVisualizerView />}
+                  <OnboardingSync
+                    deploymentName={selectedDeployment?.name}
+                    teamSlug={selectedTeam?.slug}
+                    projectSlug={selectedProject?.slug}
+                  />
+                  <AppShell
+                    theme={theme}
+                    navItems={NAV_ITEMS}
+                    currentPath={location.pathname}
+                    onNavigate={onNavigate}
+                    onOpenPalette={() => setPaletteOpen(true)}
+                    onThemeChange={setTheme}
+                    onDisconnect={handleDisconnect}
+                    onOpenSettings={() => navigate("/settings")}
+                    onNavigateToProjectSelector={() => {
+                      setSelectedProject(null);
+                      setSelectedDeployment(null);
+                    }}
+                    user={headerUser}
+                    teams={teams}
+                    projects={projects}
+                    deployments={deployments}
+                    selectedTeam={selectedTeam}
+                    selectedProject={selectedProject}
+                    selectedDeployment={selectedDeployment}
+                    subscription={subscription}
+                    invoices={invoices}
+                    onSelectTeam={(team) => {
+                      setSelectedTeam(team);
+                      setSelectedProject(null);
+                      setSelectedDeployment(null);
+                    }}
+                    onSelectProject={(project) => {
+                      setSelectedProject(project);
+                      setSelectedDeployment(null);
+                    }}
+                    onSelectDeployment={setSelectedDeployment}
+                    hideNav={!selectedProject}
+                    deploymentsLoading={deploymentsLoading}
+                  >
+                    {selectedProject ? (
+                      <Routes>
+                        <Route path="/health" element={<HealthView />} />
+                        <Route path="/data" element={<DataView />} />
+                        <Route
+                          path="/schema"
+                          element={<SchemaVisualizerView />}
+                        />
+                        <Route
+                          path="/advisor"
+                          element={<PerformanceAdvisorView />}
+                        />
+                        <Route path="/functions" element={<FunctionsView />} />
+                        <Route path="/files" element={<FilesView />} />
+                        <Route path="/schedules" element={<SchedulesView />} />
+                        <Route path="/logs" element={<LogsView />} />
+                        <Route
+                          path="/settings"
+                          element={
+                            <SettingsView
+                              user={{
+                                name: headerUser?.name || "",
+                                email: headerUser?.email || "",
+                                profilePictureUrl:
+                                  headerUser?.profilePictureUrl,
+                              }}
+                              teamId={selectedTeam?.id}
+                            />
+                          }
+                        />
+                        <Route
+                          path="*"
+                          element={<Navigate to="/health" replace />}
+                        />
+                      </Routes>
+                    ) : (
+                      <ProjectSelector
+                        user={headerUser}
+                        team={selectedTeam}
+                        projects={projects}
+                        subscription={subscription}
+                        onSelectProject={(project) => {
+                          setSelectedProject(project);
+                          setSelectedDeployment(null);
+                        }}
                       />
-                      <Route
-                        path="/advisor"
-                        element={<PerformanceAdvisorView />}
-                      />
-                      <Route path="/functions" element={<FunctionsView />} />
-                      <Route path="/runner" element={<RunnerView />} />
-                      <Route path="/files" element={<FilesView />} />
-                      <Route path="/schedules" element={<SchedulesView />} />
-                      <Route path="/logs" element={<LogsView />} />
-                      <Route
-                        path="/settings"
-                        element={
-                          <SettingsView
-                            user={{
-                              name: headerUser?.name || "",
-                              email: headerUser?.email || "",
-                              profilePictureUrl: headerUser?.profilePictureUrl,
-                            }}
-                            onLogout={handleDisconnect}
-                            teamId={selectedTeam?.id}
-                          />
-                        }
-                      />
-                      <Route
-                        path="*"
-                        element={<Navigate to="/health" replace />}
-                      />
-                    </Routes>
-                  ) : (
-                    <ProjectSelector
-                      user={headerUser}
-                      team={selectedTeam}
-                      projects={projects}
-                      subscription={subscription}
-                      onSelectProject={(project) => {
-                        setSelectedProject(project);
-                        setSelectedDeployment(null);
-                      }}
-                    />
-                  )}
-                </AppShell>
-                <DeploymentNotificationListener />
-              </DeploymentProvider>
+                    )}
+                  </AppShell>
+                  <DeploymentNotificationListener />
+                </DeploymentProvider>
+              </FunctionRunnerProvider>
             </TerminalProvider>
             <CommandPalette
               open={paletteOpen}

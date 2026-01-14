@@ -15,6 +15,9 @@ import {
   parseFunctionPath,
 } from "../utils/formatters";
 import { cn } from "@/lib/utils";
+import { LogOutput } from "./LogOutput";
+import { LogLevelBadge } from "./LogLevel";
+import { mergeLogLines, getPrimaryLogLevel } from "../utils/parseLogLines";
 
 interface LogRowProps {
   log: LogEntry;
@@ -103,6 +106,10 @@ function LogRowInner({
     isCached,
   } = processLogData(log, functions);
 
+  // Parse console output from log lines
+  const consoleOutput = mergeLogLines(log.logLines);
+  const logLevel = getPrimaryLogLevel(log.logLines);
+
   return (
     <div
       onClick={onClick}
@@ -181,11 +188,16 @@ function LogRowInner({
           gap: "4px",
         }}
       >
-        {isError ? (
-          <span style={{ color: "rgb(239, 68, 68)" }}>Error</span>
-        ) : (
+        {log.kind === "outcome" ? (
+          // Outcome entry: show status + execution time
           <>
-            <span style={{ color: "var(--color-success-base)" }}>200</span>
+            {isError ? (
+              <span style={{ color: "rgb(239, 68, 68)" }}>failure</span>
+            ) : (
+              <span style={{ color: "var(--color-success-base)" }}>
+                {log.success ? "success" : "200"}
+              </span>
+            )}
             {isCached ? (
               <span
                 style={{
@@ -202,6 +214,19 @@ function LogRowInner({
               </span>
             ) : null}
           </>
+        ) : (
+          // Log entry: show horizontal line (matching dashboard)
+          <hr
+            style={{
+              width: "100%",
+              height: "1px",
+              border: "none",
+              backgroundColor: isError
+                ? "rgb(239, 68, 68)"
+                : "var(--color-border-base)",
+              margin: 0,
+            }}
+          />
         )}
       </div>
 
@@ -274,12 +299,45 @@ function LogRowInner({
         >
           {displayFunctionName}
         </span>
+
+        {/* Log level badge */}
+        {logLevel && (
+          <div className="shrink-0">
+            <LogLevelBadge level={logLevel} />
+          </div>
+        )}
+
+        {/* Console output (truncated) */}
+        {consoleOutput && (
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              overflow: "hidden",
+            }}
+          >
+            <LogOutput output={consoleOutput} secondary />
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// Memoize to prevent unnecessary re-renders
-export const LogRow = memo(LogRowInner);
+/**
+ * Custom equality check for memo optimization
+ * Only re-render if the log ID, selection state, or functions reference changes
+ * This prevents unnecessary re-renders when parent component updates
+ */
+function areEqual(prevProps: LogRowProps, nextProps: LogRowProps): boolean {
+  return (
+    prevProps.log.id === nextProps.log.id &&
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.functions === nextProps.functions // Reference equality check
+  );
+}
+
+// Memoize with custom equality check to prevent unnecessary re-renders
+export const LogRow = memo(LogRowInner, areEqual);
 
 export default LogRow;

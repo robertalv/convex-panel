@@ -232,6 +232,20 @@ function DataViewContent() {
     }
   }, [initialDocId, selectedTable, tables, setFilters, setSearchParams]);
 
+  // Handle openRunner URL parameter - open CustomQuerySheet
+  useEffect(() => {
+    const openRunner = searchParams.get("openRunner");
+    if (openRunner === "true" && sheetState.type !== "customQuery") {
+      setSheetState({ type: "customQuery" });
+      // Remove the parameter from URL to avoid re-opening on refresh
+      setSearchParams((params) => {
+        const newParams = new URLSearchParams(params);
+        newParams.delete("openRunner");
+        return newParams;
+      });
+    }
+  }, [searchParams, sheetState.type]);
+
   // Handle view mode change
   const handleViewModeChange = useCallback((mode: DataViewMode) => {
     setViewMode(mode);

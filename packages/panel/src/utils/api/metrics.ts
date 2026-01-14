@@ -554,9 +554,7 @@ export async function fetchUdfRate(
       authToken,
       cursor,
       fetchFn,
-    );
-
-    if (!executionResponse || !executionResponse.entries) {
+    );    if (!executionResponse || !executionResponse.entries) {
       return [];
     }
 

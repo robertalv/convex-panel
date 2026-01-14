@@ -9,6 +9,7 @@ export * from "./auth";
 
 // Main Components
 export { default as ComponentSelector } from "./component-selector";
+export * from "./function-selector";
 export * from "./project-onboarding-dialog";
 export * from "./env-badge";
 export * from "./feature-panel";

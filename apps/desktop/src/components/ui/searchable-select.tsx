@@ -12,6 +12,8 @@ interface SearchableSelectOption {
   value: string;
   label: string;
   sublabel?: string;
+  badge?: string;
+  badgeColor?: string;
 }
 
 interface SearchableSelectPropsBase {
@@ -24,21 +26,13 @@ interface SearchableSelectPropsBase {
   selectedDeployment?: Deployment;
   showEnvironmentBadge?: boolean;
   loading?: boolean;
-  /** When true, renders sublabel as plain text instead of EnvironmentBadge */
   sublabelAsText?: boolean;
-  /** Callback when search input changes - use for server-side search */
   onSearchChange?: (query: string) => void;
-  /** Minimum characters before triggering onSearchChange (default: 0) */
   minSearchLength?: number;
-  /** Icon to display in the trigger button (when provided, uses component-selector style) */
   triggerIcon?: React.ReactNode;
-  /** Whether the select is disabled */
   disabled?: boolean;
-  /** Custom className for the button element */
   buttonClassName?: string;
-  /** Custom style for the button element */
   buttonStyle?: React.CSSProperties;
-  /** Visual style variant for the trigger button */
   variant?: "ghost" | "outline" | "primary" | "secondary";
 }
 
@@ -97,7 +91,6 @@ export function SearchableSelect(props: SearchableSelectProps) {
   const optionsRef = React.useRef<HTMLDivElement>(null);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
-  // Helper to check if a value is selected
   const isSelected = (optionValue: string) => {
     if (multiSelect) {
       return (value as string[]).includes(optionValue);
@@ -105,7 +98,6 @@ export function SearchableSelect(props: SearchableSelectProps) {
     return value === optionValue;
   };
 
-  // Get selected options for display
   const selectedOptions = React.useMemo(() => {
     if (multiSelect) {
       return options.filter((opt) => (value as string[]).includes(opt.value));
@@ -115,9 +107,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
 
   const selectedOption = !multiSelect ? selectedOptions[0] : null;
 
-  // If onSearchChange is provided, skip client-side filtering (server does it)
   const filteredOptions = React.useMemo(() => {
-    // When using server-side search, don't filter client-side
     if (onSearchChange) return options;
     if (!search) return options;
     const lower = search.toLowerCase();
@@ -128,7 +118,6 @@ export function SearchableSelect(props: SearchableSelectProps) {
     );
   }, [options, search, onSearchChange]);
 
-  // Call onSearchChange when search changes (debounced behavior should be handled by caller)
   React.useEffect(() => {
     if (onSearchChange && search.length >= minSearchLength) {
       onSearchChange(search);
@@ -177,14 +166,13 @@ export function SearchableSelect(props: SearchableSelectProps) {
     }
   }, [isOpen]);
 
-  // Calculate dropdown position when opening
   React.useEffect(() => {
     if (isOpen && buttonRef.current) {
       const updatePosition = () => {
         if (buttonRef.current) {
           const rect = buttonRef.current.getBoundingClientRect();
           setDropdownPosition({
-            top: rect.bottom + window.scrollY + 4, // 4px gap (mt-1)
+            top: rect.bottom + window.scrollY + 4,
             left: rect.left + window.scrollX,
             width: rect.width,
           });
@@ -193,7 +181,6 @@ export function SearchableSelect(props: SearchableSelectProps) {
 
       updatePosition();
 
-      // Update position on scroll/resize
       window.addEventListener("scroll", updatePosition, true);
       window.addEventListener("resize", updatePosition);
 
@@ -232,7 +219,6 @@ export function SearchableSelect(props: SearchableSelectProps) {
         ? currentValues.filter((v) => v !== optionValue)
         : [...currentValues, optionValue];
       (onChange as (values: string[]) => void)(newValues);
-      // Don't close dropdown in multi-select mode
     } else {
       (onChange as (value: string) => void)(optionValue);
       setIsOpen(false);
@@ -348,7 +334,8 @@ export function SearchableSelect(props: SearchableSelectProps) {
             />
           )}
         </div>
-        <Icon name="chevron-down"
+        <Icon
+          name="chevron-down"
           className={cn(
             "h-3 w-3 text-text-subtle transition-transform shrink-0",
             isOpen && "rotate-180",
@@ -377,7 +364,8 @@ export function SearchableSelect(props: SearchableSelectProps) {
           >
             <div className="border-b border-border-muted">
               <div className="relative">
-                <Icon name="search"
+                <Icon
+                  name="search"
                   size={12}
                   className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none z-10"
                 />
@@ -446,16 +434,33 @@ export function SearchableSelect(props: SearchableSelectProps) {
                         {multiSelect && (
                           <span className="shrink-0">
                             {selected ? (
-                              <Icon name="square-check" className="h-3.5 w-3.5 stroke-brand-base" />
+                              <Icon
+                                name="square-check"
+                                className="h-3.5 w-3.5 text-accent"
+                              />
                             ) : (
-                              <Icon name="square" className="h-3.5 w-3.5 stroke-text-muted" />
+                              <Icon
+                                name="square"
+                                className="h-3.5 w-3.5 text-text-muted"
+                              />
                             )}
                           </span>
                         )}
                         <div className="truncate flex-1 min-w-0">
                           {option.label}
                         </div>
+                        {option.badge && (
+                          <span
+                            className={cn(
+                              "text-[10px] font-medium uppercase shrink-0",
+                              option.badgeColor || "text-text-muted",
+                            )}
+                          >
+                            {option.badge}
+                          </span>
+                        )}
                         {option.sublabel &&
+                          !option.badge &&
                           (sublabelAsText ? (
                             <span className="text-[11px] text-text-muted truncate">
                               {option.sublabel}
@@ -467,7 +472,10 @@ export function SearchableSelect(props: SearchableSelectProps) {
                           ))}
                       </div>
                       {!multiSelect && selected && (
-                        <Icon name="checkmark-circle" className="h-4 w-4 shrink-0 stroke-brand-base" />
+                        <Icon
+                          name="checkmark-circle"
+                          className="h-4 w-4 shrink-0 text-accent"
+                        />
                       )}
                     </button>
                   );

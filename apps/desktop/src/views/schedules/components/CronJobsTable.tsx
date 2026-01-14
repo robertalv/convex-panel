@@ -70,6 +70,7 @@ export function CronJobsTable({
     style: React.CSSProperties;
   }) => {
     const job = filteredJobs[index];
+
     if (!job) return null;
 
     const state = job.nextRun?.state || "scheduled";
@@ -83,6 +84,7 @@ export function CronJobsTable({
 
     return (
       <div
+        className="cron-job-row"
         style={{
           ...style,
           display: "flex",
@@ -94,15 +96,8 @@ export function CronJobsTable({
           color: "var(--color-panel-text-secondary)",
           backgroundColor: "var(--color-panel-bg)",
           cursor: "pointer",
-          transition: "background-color 0.15s",
         }}
         onClick={() => onRowClick?.(job)}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = "var(--color-panel-hover)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "var(--color-panel-bg)";
-        }}
       >
         {/* Name Column */}
         <div
@@ -113,32 +108,19 @@ export function CronJobsTable({
             whiteSpace: "nowrap",
           }}
         >
-          <button
+          <span
+            className="cron-job-name"
             onClick={(e) => handleCopyName(job.name, e)}
             style={{
-              background: "none",
-              border: "none",
               color: "var(--color-panel-text)",
               fontFamily: "monospace",
               fontSize: "11px",
               cursor: "pointer",
-              padding: 0,
-              textAlign: "left",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              width: "100%",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = "var(--color-panel-accent)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = "var(--color-panel-text)";
             }}
             title="Click to copy name"
           >
             {job.name}
-          </button>
+          </span>
         </div>
 
         {/* Schedule Column */}
@@ -166,6 +148,7 @@ export function CronJobsTable({
         >
           {onFunctionClick ? (
             <button
+              className="cron-job-function-button"
               onClick={(e) => {
                 e.stopPropagation();
                 const path = job.cronSpec.udfPath;
@@ -185,14 +168,6 @@ export function CronJobsTable({
                 whiteSpace: "nowrap",
                 display: "inline-block",
                 maxWidth: "100%",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = "var(--color-panel-accent)";
-                e.currentTarget.style.textDecoration = "underline";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = "var(--color-panel-text)";
-                e.currentTarget.style.textDecoration = "none";
               }}
               title={`${functionName} (click to view function)`}
             >
@@ -267,6 +242,19 @@ export function CronJobsTable({
             </span>
           </div>
         </div>
+
+        <style>{`
+          .cron-job-row:hover {
+            background-color: var(--color-panel-hover) !important;
+          }
+          .cron-job-name:hover {
+            color: var(--color-panel-accent) !important;
+          }
+          .cron-job-function-button:hover {
+            color: var(--color-panel-accent) !important;
+            text-decoration: underline !important;
+          }
+        `}</style>
       </div>
     );
   };

@@ -14,7 +14,7 @@ import { fetch } from "@tauri-apps/plugin-http";
 import { useLogs } from "./hooks/useLogs";
 import { useComponents } from "@/hooks/useComponents";
 import { useFunctions } from "./hooks/useFunctions";
-import { useLogStorage } from "./hooks/useLogStorage";
+import { useLocalLogStore } from "./hooks/useLocalLogStore";
 import { useDeploymentAuditLogs } from "./hooks/useDeploymentAuditLogs";
 
 // Components
@@ -58,12 +58,6 @@ function LogsViewContent() {
   // Filter state
   const [filters, setFilters] = useState<LogFilters>(initialFilters);
 
-  // Pagination state
-  const PAGE_SIZE = 100;
-  const [currentPage, setCurrentPage] = useState(1);
-  const [storedLogs, setStoredLogs] = useState<LogEntry[]>([]);
-  const [isLoadingStoredLogs, setIsLoadingStoredLogs] = useState(false);
-
   // Selected log for detail view
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
 
@@ -106,20 +100,12 @@ function LogsViewContent() {
     useMockData,
   });
 
-  // Log storage hook
-  const { isEnabled: isStorageEnabled, persistLogs, loadLogs } = useLogStorage({
-    deploymentId,
-    enabled: false, // Default to off, user can enable
-  });
+  // Local SQLite log store hook
+  const { ingestLogs: ingestToSqlite, stats: localStats } = useLocalLogStore();
 
   // Compute effective pause state
-  // Pause streaming when on pages > 1 (viewing historical logs)
   const isDetailOpen = selectedLog !== null;
-  const isViewingHistoricalLogs = currentPage > 1;
-  const effectiveIsPaused =
-    isViewingHistoricalLogs ||
-    manuallyPaused ||
-    (isScrolledAway && !isDetailOpen);
+  const effectiveIsPaused = manuallyPaused || (isScrolledAway && !isDetailOpen);
 
   // Logs hook
   const {
@@ -158,94 +144,36 @@ function LogsViewContent() {
     enabled: !useMockData && !!adminClient, // Enable when we have a real admin client
   });
 
-  // Interleave logs and deployment events
-  const interleavedLogs = useMemo(() => {
-    return interleaveLogs(logs, deploymentEvents || []);
-  }, [logs, deploymentEvents]);
-
-  // Persist new logs to storage when enabled
+  // Persist new logs to SQLite storage when enabled
   const prevLogsLengthRef = useRef(0);
   useEffect(() => {
-    if (isStorageEnabled && logs.length > prevLogsLengthRef.current) {
+    if (logs.length > prevLogsLengthRef.current) {
       const newLogs = logs.slice(0, logs.length - prevLogsLengthRef.current);
       if (newLogs.length > 0) {
-        persistLogs(newLogs);
+        // Ingest to SQLite (fire-and-forget, non-blocking)
+        ingestToSqlite(newLogs, deploymentId).catch((err) => {
+          console.error("[LogsView] Failed to ingest to SQLite:", err);
+        });
       }
     }
     prevLogsLengthRef.current = logs.length;
-  }, [logs, isStorageEnabled, persistLogs]);
+  }, [logs, ingestToSqlite, deploymentId]);
 
-  // Load stored logs when viewing pages > 1
-  // Load a larger batch to account for filtering, then paginate after filtering
-  useEffect(() => {
-    if (isViewingHistoricalLogs && isStorageEnabled) {
-      setIsLoadingStoredLogs(true);
-      // Load a larger batch (10 pages worth) to account for filtering
-      // We'll filter and paginate in memory
-      const batchSize = PAGE_SIZE * 10;
-      loadLogs({
-        limit: batchSize,
-        offset: 0, // Start from beginning, we'll paginate after filtering
-        order: "desc",
-      })
-        .then((stored) => {
-          // Convert StoredLogEntry to LogEntry (remove storage metadata)
-          const convertedLogs: LogEntry[] = stored.map((log) => {
-            const { deploymentId: _, storedAt: __, ...logEntry } = log;
-            return logEntry;
-          });
-          setStoredLogs(convertedLogs);
-        })
-        .catch((err) => {
-          console.error("[LogsView] Failed to load stored logs:", err);
-          setDisplayError(
-            `Failed to load stored logs: ${err instanceof Error ? err.message : String(err)}`,
-          );
-          setStoredLogs([]);
-        })
-        .finally(() => {
-          setIsLoadingStoredLogs(false);
-        });
-    } else if (!isViewingHistoricalLogs) {
-      // Clear stored logs when back on page 1
-      setStoredLogs([]);
-    }
-    // PAGE_SIZE is a constant, so we don't need it in dependencies
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isViewingHistoricalLogs, isStorageEnabled, loadLogs]);
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filters]);
-
-  // Determine which logs to use (streaming for page 1, stored for pages > 1)
-  const logsToFilter = useMemo(() => {
-    if (isViewingHistoricalLogs) {
-      // Use stored logs for historical pages
-      return storedLogs;
-    }
-    // Use streaming logs for page 1
-    return logs;
-  }, [isViewingHistoricalLogs, storedLogs, logs]);
-
-  // Interleave logs and deployment events (only for page 1 with streaming logs)
-  const interleavedLogsForPage1 = useMemo(() => {
-    if (isViewingHistoricalLogs) {
-      // Don't interleave deployment events for historical pages
-      return logsToFilter.map((log) => ({
-        kind: "ExecutionLog" as const,
-        executionLog: log,
-      }));
-    }
-    return interleaveLogs(logsToFilter, deploymentEvents || []);
-  }, [logsToFilter, deploymentEvents, isViewingHistoricalLogs]);
+  // Interleave logs and deployment events
+  const interleavedLogs = useMemo(() => {
+    return interleaveLogs(logs, deploymentEvents || [], []);
+  }, [logs, deploymentEvents]);
 
   // Filter logs based on current filter state
-  const filteredInterleavedLogs = useMemo(() => {
-    return interleavedLogsForPage1.filter((item) => {
+  const filteredLogs = useMemo(() => {
+    return interleavedLogs.filter((item) => {
       // Deployment events always pass through (no filtering for now)
       if (item.kind === "DeploymentEvent") {
+        return true;
+      }
+
+      // ClearedLogs markers always pass through
+      if (item.kind === "ClearedLogs") {
         return true;
       }
 
@@ -260,7 +188,7 @@ function LogsViewContent() {
           log.functionIdentifier?.toLowerCase().includes(query) ||
           log.requestId?.toLowerCase().includes(query) ||
           log.error?.toLowerCase().includes(query) ||
-          log.logLines?.some((line) =>
+          log.logLines?.some((line: string) =>
             (typeof line === "string" ? line : JSON.stringify(line))
               .toLowerCase()
               .includes(query),
@@ -305,46 +233,12 @@ function LogsViewContent() {
 
       return true;
     });
-  }, [interleavedLogsForPage1, filters]);
-
-  // Apply pagination to filtered logs
-  const paginatedLogs = useMemo(() => {
-    const startIndex = (currentPage - 1) * PAGE_SIZE;
-    const endIndex = startIndex + PAGE_SIZE;
-    return filteredInterleavedLogs.slice(startIndex, endIndex);
-  }, [filteredInterleavedLogs, currentPage]);
-
-  // Calculate total pages
-  const totalPages = useMemo(() => {
-    return Math.max(1, Math.ceil(filteredInterleavedLogs.length / PAGE_SIZE));
-  }, [filteredInterleavedLogs.length]);
-
-  // Handle page navigation
-  const handlePageChange = useCallback(
-    (newPage: number) => {
-      if (newPage >= 1 && newPage <= totalPages) {
-        setCurrentPage(newPage);
-        // Scroll to top when changing pages
-        logsListRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-        setIsScrolledAway(false);
-      }
-    },
-    [totalPages],
-  );
-
-  const handlePrevPage = useCallback(() => {
-    handlePageChange(currentPage - 1);
-  }, [currentPage, handlePageChange]);
-
-  const handleNextPage = useCallback(() => {
-    handlePageChange(currentPage + 1);
-  }, [currentPage, handlePageChange]);
+  }, [interleavedLogs, filters]);
 
   // Handle pause toggle
   const handleTogglePause = useCallback(() => {
     if (effectiveIsPaused) {
-      // Resume: scroll to top, go to page 1, and unpause
-      setCurrentPage(1);
+      // Resume: scroll to top and unpause
       logsListRef.current?.scrollTo({ top: 0, behavior: "smooth" });
       setManuallyPaused(false);
       setIsScrolledAway(false);
@@ -418,7 +312,7 @@ function LogsViewContent() {
   // Handle export
   const handleExport = useCallback(async () => {
     // Filter out deployment events for export (only export execution logs)
-    const logsToExport = filteredInterleavedLogs
+    const logsToExport = filteredLogs
       .filter((item) => item.kind === "ExecutionLog")
       .map((item) => item.executionLog);
 
@@ -437,7 +331,7 @@ function LogsViewContent() {
     } finally {
       setIsExporting(false);
     }
-  }, [filteredInterleavedLogs, deploymentId]);
+  }, [filteredLogs, deploymentId]);
 
   // Scroll to top button
   const handleScrollToTop = useCallback(() => {
@@ -487,23 +381,19 @@ function LogsViewContent() {
           onClearLogs={clearLogs}
           onExport={handleExport}
           isExporting={isExporting}
-          logCount={filteredInterleavedLogs.length}
-          isLoading={isLoading || isLoadingStoredLogs}
+          logCount={filteredLogs.length}
+          isLoading={isLoading}
           components={components}
           functions={functions}
           onSearchChange={handleSearchChange}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPrevPage={handlePrevPage}
-          onNextPage={handleNextPage}
-          isViewingHistoricalLogs={isViewingHistoricalLogs}
+          localLogCount={localStats?.total_logs}
         />
 
         {/* Logs list */}
         <div className="flex-1 min-h-0 overflow-hidden relative">
           {/* Log header row - matches dashboard-common format */}
           <div
-            className="flex items-center px-4 py-2 text-xs sticky top-0 z-10"
+            className="flex items-center px-4 py-2 text-xs sticky top-0 z-10 h-[41px]"
             style={{
               backgroundColor: "var(--color-surface-base)",
               borderBottom: "1px solid var(--color-border-base)",
@@ -521,19 +411,17 @@ function LogsViewContent() {
           <div
             ref={logsListRef}
             onScroll={handleLogsScroll}
-            className="h-[calc(100%-32px)] overflow-auto"
+            className="h-[calc(100%-32px)] overflow-auto bg-background-base"
           >
-            {paginatedLogs.length === 0 ? (
+            {filteredLogs.length === 0 ? (
               <div
                 className="flex items-center justify-center h-full text-sm"
                 style={{ color: "var(--color-text-muted)" }}
               >
-                {isLoading || isLoadingStoredLogs
-                  ? "Loading logs..."
-                  : "No logs to display"}
+                {isLoading ? "Loading logs..." : "No logs to display"}
               </div>
             ) : (
-              paginatedLogs.map((item) => {
+              filteredLogs.map((item) => {
                 const key = getInterleavedLogKey(item);
 
                 if (item.kind === "DeploymentEvent") {
@@ -550,6 +438,12 @@ function LogsViewContent() {
                   );
                 }
 
+                if (item.kind === "ClearedLogs") {
+                  // Render a "logs cleared" marker (can be implemented later)
+                  return null;
+                }
+
+                // ExecutionLog
                 return (
                   <LogRow
                     key={key}

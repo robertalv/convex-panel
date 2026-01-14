@@ -39,6 +39,12 @@ parking_lot = "0.12"
 # PTY (pseudo-terminal) support
 portable-pty = "0.8"
 
+# SQLite log storage
+rusqlite = { version = "0.32", features = ["bundled", "modern_sqlite"] }
+tokio = { version = "1", features = ["full"] }
+hex = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+
 [target."cfg(target_os = \"macos\")".dependencies]
 objc2 = "0.5"
 objc2-app-kit = { version = "0.2", features = ["NSColor", "NSWindow", "NSApplication"] }
