@@ -2,12 +2,11 @@ import { useState, useEffect } from "react";
 import {
   isPermissionGranted,
   requestPermission,
-  sendNotification,
 } from "@tauri-apps/plugin-notification";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, Circle, Info } from "lucide-react";
+import { CheckCircle2, Circle } from "lucide-react";
 
 // ============================================================================
 // Section Container Component (matching profile-settings pattern)
@@ -131,12 +130,13 @@ export function NotificationSettings() {
     });
   const [isCheckingPermission, setIsCheckingPermission] = useState(true);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
-  const [isSendingTest, setIsSendingTest] = useState(false);
+  // Note: These are only used in the commented-out test notification section
+  // const [isSendingTest, setIsSendingTest] = useState(false);
   const [isOpeningSettings, setIsOpeningSettings] = useState(false);
-  const [testNotificationStatus, setTestNotificationStatus] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
+  // const [testNotificationStatus, setTestNotificationStatus] = useState<{
+  //   type: "success" | "error";
+  //   message: string;
+  // } | null>(null);
 
   // Check permission on mount
   useEffect(() => {
@@ -187,16 +187,13 @@ export function NotificationSettings() {
       await invoke("open_notification_settings");
     } catch (error) {
       console.error("Failed to open system notification settings:", error);
-      setTestNotificationStatus({
-        type: "error",
-        message: `Failed to open system settings: ${error instanceof Error ? error.message : String(error)}`,
-      });
-      setTimeout(() => setTestNotificationStatus(null), 5000);
+      // Error handling can be added back when test notification section is re-enabled
     } finally {
       setIsOpeningSettings(false);
     }
   };
 
+  /* Test notification is currently disabled - kept for future use
   const handleTestNotification = async () => {
     setIsSendingTest(true);
     setTestNotificationStatus(null);
@@ -279,6 +276,7 @@ export function NotificationSettings() {
       setIsSendingTest(false);
     }
   };
+  */
 
   const handleToggleNotifications = (enabled: boolean) => {
     if (enabled && !permissionGranted) {
@@ -630,11 +628,7 @@ export function NotificationSettings() {
   );
 }
 
-/**
- * A read-only row showing a system-managed notification setting.
- * These settings cannot be changed from within the app - the user must
- * go to System Settings to modify them.
- */
+/* SystemManagedRow component - kept for future use if system-managed settings are needed
 function SystemManagedRow({
   label,
   description,
@@ -678,3 +672,4 @@ function SystemManagedRow({
     </div>
   );
 }
+*/

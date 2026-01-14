@@ -13,6 +13,7 @@ import {
   type Identity,
   type DiscordAccount,
 } from "../../../api/bigbrain";
+import { useProfileCache } from "../hooks/useProfileCache";
 import { ConfirmDialog } from "../../data/components/ConfirmDialog";
 import { Input } from "../../../components/ui/input";
 import { Button } from "../../../components/ui/button";
@@ -703,6 +704,7 @@ function DiscordAccountsSection({
 
 export function ProfileSettings({ user }: ProfileSettingsProps) {
   const { accessToken, fetchFn } = useDeployment();
+  const cache = useProfileCache(accessToken);
 
   // State for API data
   const [emails, setEmails] = useState<ProfileEmail[]>([]);
@@ -726,17 +728,26 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
     );
   }, [user, accessToken]);
 
-  // Fetch profile data on mount
+  // Fetch profile data on mount with caching
   useEffect(() => {
     if (!accessToken) return;
 
     // Fetch profile for name
     const loadProfile = async () => {
       try {
+        // Check cache first
+        const cachedProfile = cache.getCached<{ name: string }>("profile");
+        if (cachedProfile) {
+          console.log("[ProfileSettings] Using cached profile");
+          setCurrentName(cachedProfile.name);
+          return;
+        }
+
         const data = await getProfile(accessToken, fetchFn);
         console.log("Profile API response:", data);
         if (data?.name) {
           setCurrentName(data.name);
+          cache.setCached("profile", { name: data.name });
         }
       } catch (err) {
         console.error("Failed to load profile:", err);
@@ -745,6 +756,15 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
 
     const loadEmails = async () => {
       try {
+        // Check cache first
+        const cachedEmails = cache.getCached<ProfileEmail[]>("emails");
+        if (cachedEmails) {
+          console.log("[ProfileSettings] Using cached emails");
+          setEmails(cachedEmails);
+          setEmailsLoading(false);
+          return;
+        }
+
         const data = await getProfileEmails(accessToken, fetchFn);
         console.log("Emails API response:", data);
         // Handle case where API returns object with emails property
@@ -752,6 +772,7 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
           ? data
           : ((data as unknown as { emails?: ProfileEmail[] })?.emails ?? []);
         setEmails(emailsArray);
+        cache.setCached("emails", emailsArray);
       } catch (err) {
         console.error("Failed to load emails:", err);
       } finally {
@@ -761,6 +782,15 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
 
     const loadIdentities = async () => {
       try {
+        // Check cache first
+        const cachedIdentities = cache.getCached<Identity[]>("identities");
+        if (cachedIdentities) {
+          console.log("[ProfileSettings] Using cached identities");
+          setIdentities(cachedIdentities);
+          setIdentitiesLoading(false);
+          return;
+        }
+
         const data = await getIdentities(accessToken, fetchFn);
         console.log("Identities API response:", data);
         // Handle case where API returns object with identities property
@@ -769,6 +799,7 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
           : ((data as unknown as { identities?: Identity[] })?.identities ??
             []);
         setIdentities(identitiesArray);
+        cache.setCached("identities", identitiesArray);
       } catch (err) {
         console.error("Failed to load identities:", err);
       } finally {
@@ -778,10 +809,21 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
 
     const loadDiscord = async () => {
       try {
+        // Check cache first
+        const cachedDiscord = cache.getCached<DiscordAccount[]>("discord");
+        if (cachedDiscord) {
+          console.log("[ProfileSettings] Using cached Discord accounts");
+          setDiscordAccounts(cachedDiscord);
+          setDiscordLoading(false);
+          return;
+        }
+
         const data = await getDiscordAccounts(accessToken, fetchFn);
         console.log("Discord API response:", data);
         // Already handled in API function, but ensure it's an array
-        setDiscordAccounts(Array.isArray(data) ? data : []);
+        const discordArray = Array.isArray(data) ? data : [];
+        setDiscordAccounts(discordArray);
+        cache.setCached("discord", discordArray);
       } catch (err) {
         console.error("Failed to load Discord accounts:", err);
       } finally {
@@ -793,7 +835,7 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
     loadEmails();
     loadIdentities();
     loadDiscord();
-  }, [accessToken, fetchFn]);
+  }, [accessToken, fetchFn, cache]);
 
   // Update current name when user prop changes (fallback if profile API fails)
   useEffect(() => {
@@ -808,8 +850,10 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
       if (!accessToken) throw new Error("Not authenticated");
       await updateProfileName(accessToken, name, fetchFn);
       setCurrentName(name);
+      // Invalidate profile cache after update
+      cache.clearCache("profile");
     },
-    [accessToken, fetchFn],
+    [accessToken, fetchFn, cache],
   );
 
   const handleUnlinkIdentity = useCallback(
@@ -825,8 +869,10 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
           }))
           .filter((i) => i.providers.length > 0),
       );
+      // Invalidate identities cache after update
+      cache.clearCache("identities");
     },
-    [accessToken, fetchFn],
+    [accessToken, fetchFn, cache],
   );
 
   const handleUnlinkDiscord = useCallback(
@@ -834,8 +880,10 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
       if (!accessToken) throw new Error("Not authenticated");
       await unlinkDiscordAccount(accessToken, discordUserId, fetchFn);
       setDiscordAccounts((prev) => prev.filter((a) => a.id !== discordUserId));
+      // Invalidate discord cache after update
+      cache.clearCache("discord");
     },
-    [accessToken, fetchFn],
+    [accessToken, fetchFn, cache],
   );
 
   return (
