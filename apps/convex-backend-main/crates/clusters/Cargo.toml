@@ -1,0 +1,21 @@
+[package]
+name = "clusters"
+version = "0.1.0"
+authors = ["Convex, Inc. <no-reply@convex.dev>"]
+edition = "2024"
+license = "LicenseRef-FSL-1.1-Apache-2.0"
+
+[features]
+testing = ["common/testing"]
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+common = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+common = { workspace = true, features = ["testing"] }
+
+[lints]
+workspace = true

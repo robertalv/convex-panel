@@ -186,6 +186,9 @@ function EmailsSection({ emails, isLoading }: EmailsSectionProps) {
     return 0;
   });
 
+  console.log("sortedEmails", sortedEmails);
+  console.log("emails", emails);
+
   return (
     <div>
       <p

@@ -1,0 +1,28 @@
+[package]
+name = "metrics"
+version = "0.1.0"
+authors = ["Convex, Inc. <no-reply@convex.dev>"]
+edition = "2024"
+license = "LicenseRef-FSL-1.1-Apache-2.0"
+
+[package.metadata.cargo-machete]
+ignored = ["vergen"] # Build dependencies not understood
+
+[lib]
+doctest = false
+
+[features]
+testing = []
+
+[dependencies]
+ahash = { workspace = true }
+anyhow = { workspace = true }
+derive_more = { workspace = true }
+parking_lot = { workspace = true }
+paste = { workspace = true }
+prometheus = { workspace = true }
+sentry = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

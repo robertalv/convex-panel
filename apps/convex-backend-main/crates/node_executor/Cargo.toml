@@ -1,0 +1,70 @@
+[package]
+name = "node_executor"
+version = "0.1.0"
+edition = "2024"
+license = "LicenseRef-FSL-1.1-Apache-2.0"
+
+[lib]
+doctest = false
+
+[features]
+testing = [
+    "common/testing",
+    "errors/testing",
+    "isolate/testing",
+    "keybroker/testing",
+    "metrics/testing",
+    "model/testing",
+    "storage/testing",
+    "value/testing",
+    "udf/testing",
+]
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+cmd_util = { workspace = true }
+common = { workspace = true }
+errors = { workspace = true }
+fastrace = { workspace = true }
+futures = { workspace = true }
+futures-async-stream = { workspace = true }
+home = { workspace = true }
+isolate = { workspace = true }
+keybroker = { workspace = true }
+maplit = { workspace = true }
+metrics = { workspace = true }
+model = { workspace = true }
+portpicker = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sourcemap = { workspace = true }
+storage = { workspace = true }
+sync_types = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+udf = { workspace = true }
+value = { workspace = true }
+
+[build-dependencies]
+anyhow = "1"
+
+[dev-dependencies]
+common = { workspace = true, features = ["testing"] }
+convex_macro = { workspace = true }
+errors = { workspace = true, features = ["testing"] }
+isolate = { workspace = true, features = ["testing"] }
+keybroker = { workspace = true, features = ["testing"] }
+maplit = { workspace = true }
+metrics = { workspace = true, features = ["testing"] }
+model = { workspace = true, features = ["testing"] }
+runtime = { workspace = true, features = ["testing"] }
+storage = { workspace = true, features = ["testing"] }
+tempfile = { workspace = true }
+udf = { workspace = true, features = ["testing"] }
+value = { workspace = true, features = ["testing"] }
+
+[lints]
+workspace = true

@@ -8,28 +8,56 @@ import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import {
-  Bell,
-  TestTube2,
-  CheckCircle,
-  XCircle,
-  ExternalLink,
-  Info,
-} from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { CheckCircle, XCircle, Info } from "lucide-react";
+
+// ============================================================================
+// Section Container Component (matching profile-settings pattern)
+// ============================================================================
+
+interface SectionProps {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}
+
+function Section({ title, description, children }: SectionProps) {
+  return (
+    <div
+      style={{
+        padding: "16px",
+        backgroundColor: "var(--color-surface-raised)",
+        borderRadius: "12px",
+        border: "1px solid var(--color-border-base)",
+        marginBottom: "16px",
+      }}
+    >
+      <h3
+        style={{
+          fontSize: "14px",
+          fontWeight: 600,
+          color: "var(--color-text-base)",
+          margin: 0,
+          marginBlockEnd: description ? "4px" : "12px",
+        }}
+      >
+        {title}
+      </h3>
+      {description && (
+        <p
+          style={{
+            fontSize: "12px",
+            color: "var(--color-text-muted)",
+            margin: 0,
+            marginBlockEnd: "12px",
+          }}
+        >
+          {description}
+        </p>
+      )}
+      {children}
+    </div>
+  );
+}
 
 // Storage keys for notification preferences
 const STORAGE_KEY = "convex-panel-notifications-enabled";
@@ -232,67 +260,83 @@ export function NotificationSettings() {
     <div
       style={{
         flex: 1,
-        overflow: "auto",
-        backgroundColor: "var(--color-surface-base)",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        backgroundColor: "var(--color-background-base)",
       }}
     >
-      <div style={{ maxWidth: "800px", margin: "0 auto", padding: "24px" }}>
-        {/* Header */}
-        <div style={{ marginBottom: "24px" }}>
-          <h1
-            style={{
-              fontSize: "24px",
-              fontWeight: 600,
-              color: "var(--color-text-base)",
-              marginBottom: "8px",
-            }}
-          >
-            Notifications
-          </h1>
-          <p
-            style={{
-              fontSize: "14px",
-              color: "var(--color-text-muted)",
-            }}
-          >
-            Manage system notifications for deployment events and errors
-          </p>
-        </div>
-
-        {/* Permission Status */}
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Bell className="h-5 w-5" />
-              <CardTitle>Notification Permissions</CardTitle>
-            </div>
-            <CardDescription>
-              Allow the app to send system notifications
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isCheckingPermission ? (
-              <div className="text-sm text-muted-foreground">
+      {/* Content */}
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: "16px",
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
+        <div style={{ maxWidth: "600px", width: "100%" }}>
+          {/* Permission Status Section */}
+          {isCheckingPermission ? (
+            <Section title="Notification Permissions">
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  color: "var(--color-text-muted)",
+                  fontSize: "13px",
+                }}
+              >
                 Checking permissions...
               </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
+            </Section>
+          ) : (
+            <Section
+              title="Notification Permissions"
+              description="Allow the app to send system notifications"
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                }}
+              >
+                {/* Permission Status Display */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <div>
                     <Label htmlFor="permission-status">Permission Status</Label>
-                    <div className="text-sm text-muted-foreground">
+                    <div style={{ fontSize: "12px", marginTop: "4px" }}>
                       {permissionGranted ? (
-                        <span className="text-green-600 dark:text-green-400">
+                        <span
+                          style={{
+                            color: "var(--color-success-base, #22c55e)",
+                            fontWeight: 500,
+                          }}
+                        >
                           Granted
                         </span>
                       ) : (
-                        <span className="text-yellow-600 dark:text-yellow-400">
+                        <span
+                          style={{
+                            color: "var(--color-warning-base, #eab308)",
+                            fontWeight: 500,
+                          }}
+                        >
                           Not granted
                         </span>
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div style={{ display: "flex", gap: "8px" }}>
                     {!permissionGranted && (
                       <Button
                         onClick={handleRequestPermission}
@@ -310,21 +354,36 @@ export function NotificationSettings() {
                       size="sm"
                       variant="outline"
                     >
-                      <ExternalLink className="h-4 w-4 mr-2" />
                       {isOpeningSettings ? "Opening..." : "System Settings"}
                     </Button>
                   </div>
                 </div>
 
+                {/* Enable Notifications Toggle */}
                 {permissionGranted && (
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <div className="space-y-0.5">
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      paddingTop: "12px",
+                      borderTop: "1px solid var(--color-border-base)",
+                    }}
+                  >
+                    <div>
                       <Label htmlFor="notifications-enabled">
                         Enable Notifications
                       </Label>
-                      <div className="text-sm text-muted-foreground">
+                      <p
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--color-text-muted)",
+                          margin: 0,
+                          marginTop: "4px",
+                        }}
+                      >
                         Receive notifications for deployment updates
-                      </div>
+                      </p>
                     </div>
                     <Switch
                       id="notifications-enabled"
@@ -333,191 +392,250 @@ export function NotificationSettings() {
                     />
                   </div>
                 )}
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* System-Managed Options */}
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <CardTitle>System-Managed Options</CardTitle>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p>
-                      These settings are managed by your operating system. Click
-                      "System Settings" above to adjust them.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <CardDescription>
-              Controlled by macOS/Windows System Settings
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <SystemManagedRow
-              label="Alert Style"
-              value="Banners or Alerts"
-              description="How notifications appear on screen"
-            />
-            <Separator />
-            <SystemManagedRow
-              label="Show on Lock Screen"
-              value="System controlled"
-              description="Display notifications when device is locked"
-            />
-            <Separator />
-            <SystemManagedRow
-              label="Show in Notification Center"
-              value="System controlled"
-              description="Keep notifications in the notification center"
-            />
-            <Separator />
-            <SystemManagedRow
-              label="Badge App Icon"
-              value="System controlled"
-              description="Show notification count on app icon"
-            />
-            <Separator />
-            <SystemManagedRow
-              label="Play Sound"
-              value="System controlled"
-              description="Play a sound when notifications arrive"
-            />
-            <Separator />
-            <SystemManagedRow
-              label="Show Previews"
-              value="System controlled"
-              description="Show notification content in previews"
-            />
-            <Separator />
-            <SystemManagedRow
-              label="Notification Grouping"
-              value="System controlled"
-              description="How notifications are grouped together"
-            />
-          </CardContent>
-        </Card>
-
-        {/* Notification Types */}
-        {permissionGranted && notificationsEnabled && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Notification Types</CardTitle>
-              <CardDescription>
-                Choose which events trigger notifications
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="deployment-notifications">
-                    Deployment Updates
-                  </Label>
-                  <div className="text-sm text-muted-foreground">
-                    Get notified when new code is pushed to your deployment
-                  </div>
-                </div>
-                <Switch
-                  id="deployment-notifications"
-                  checked={notificationTypes.deploymentUpdates}
-                  onCheckedChange={(checked) =>
-                    handleToggleNotificationType("deploymentUpdates", checked)
-                  }
-                />
               </div>
+            </Section>
+          )}
 
-              <div className="flex items-center justify-between opacity-50">
-                <div className="space-y-0.5">
-                  <Label htmlFor="error-notifications">
-                    Error Notifications
-                  </Label>
-                  <div className="text-sm text-muted-foreground">
-                    Get notified when errors occur in your deployment
-                  </div>
-                </div>
-                <Switch
-                  id="error-notifications"
-                  checked={notificationTypes.errorNotifications}
-                  onCheckedChange={(checked) =>
-                    handleToggleNotificationType("errorNotifications", checked)
-                  }
-                  disabled
-                />
-              </div>
-
-              <div className="flex items-center justify-between opacity-50">
-                <div className="space-y-0.5">
-                  <Label htmlFor="build-notifications">Build Status</Label>
-                  <div className="text-sm text-muted-foreground">
-                    Get notified about build successes and failures
-                  </div>
-                </div>
-                <Switch
-                  id="build-notifications"
-                  checked={notificationTypes.buildStatus}
-                  onCheckedChange={(checked) =>
-                    handleToggleNotificationType("buildStatus", checked)
-                  }
-                  disabled
-                />
-              </div>
-
-              <p className="text-xs text-muted-foreground italic pt-2">
-                Additional notification types coming soon
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Test Notification */}
-        {permissionGranted && notificationsEnabled && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <TestTube2 className="h-5 w-5" />
-                <CardTitle>Test Notifications</CardTitle>
-              </div>
-              <CardDescription>
-                Send a test notification to verify everything is working
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button
-                onClick={handleTestNotification}
-                variant="outline"
-                disabled={isSendingTest}
+          {/* Notification Types Section */}
+          {permissionGranted && notificationsEnabled && (
+            <Section
+              title="Notification Types"
+              description="Choose which events trigger notifications"
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                }}
               >
-                <Bell className="h-4 w-4 mr-2" />
-                {isSendingTest ? "Sending..." : "Send Test Notification"}
-              </Button>
-
-              {testNotificationStatus && (
+                {/* Deployment Updates */}
                 <div
-                  className={`flex items-center gap-2 p-3 rounded-md text-sm ${
-                    testNotificationStatus.type === "success"
-                      ? "bg-green-50 dark:bg-green-950 text-green-900 dark:text-green-100"
-                      : "bg-red-50 dark:bg-red-950 text-red-900 dark:text-red-100"
-                  }`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
                 >
-                  {testNotificationStatus.type === "success" ? (
-                    <CheckCircle className="h-4 w-4 flex-shrink-0" />
-                  ) : (
-                    <XCircle className="h-4 w-4 flex-shrink-0" />
-                  )}
-                  <span>{testNotificationStatus.message}</span>
+                  <div>
+                    <Label htmlFor="deployment-notifications">
+                      Deployment Updates
+                    </Label>
+                    <p
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--color-text-muted)",
+                        margin: 0,
+                        marginTop: "4px",
+                      }}
+                    >
+                      Get notified when new code is pushed to your deployment
+                    </p>
+                  </div>
+                  <Switch
+                    id="deployment-notifications"
+                    checked={notificationTypes.deploymentUpdates}
+                    onCheckedChange={(checked) =>
+                      handleToggleNotificationType("deploymentUpdates", checked)
+                    }
+                  />
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+
+                {/* Error Notifications (Disabled) */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    opacity: 0.5,
+                  }}
+                >
+                  <div>
+                    <Label htmlFor="error-notifications">
+                      Error Notifications
+                    </Label>
+                    <p
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--color-text-muted)",
+                        margin: 0,
+                        marginTop: "4px",
+                      }}
+                    >
+                      Get notified when errors occur in your deployment
+                    </p>
+                  </div>
+                  <Switch
+                    id="error-notifications"
+                    checked={notificationTypes.errorNotifications}
+                    onCheckedChange={(checked) =>
+                      handleToggleNotificationType(
+                        "errorNotifications",
+                        checked,
+                      )
+                    }
+                    disabled
+                  />
+                </div>
+
+                {/* Build Status (Disabled) */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    opacity: 0.5,
+                  }}
+                >
+                  <div>
+                    <Label htmlFor="build-notifications">Build Status</Label>
+                    <p
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--color-text-muted)",
+                        margin: 0,
+                        marginTop: "4px",
+                      }}
+                    >
+                      Get notified about build successes and failures
+                    </p>
+                  </div>
+                  <Switch
+                    id="build-notifications"
+                    checked={notificationTypes.buildStatus}
+                    onCheckedChange={(checked) =>
+                      handleToggleNotificationType("buildStatus", checked)
+                    }
+                    disabled
+                  />
+                </div>
+
+                <p
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--color-text-muted)",
+                    fontStyle: "italic",
+                    margin: 0,
+                    marginTop: "8px",
+                  }}
+                >
+                  Additional notification types coming soon
+                </p>
+              </div>
+            </Section>
+          )}
+
+          {/* Test Notification Section */}
+          {permissionGranted && notificationsEnabled && (
+            <Section
+              title="Test Notifications"
+              description="Send a test notification to verify everything is working"
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                }}
+              >
+                <Button
+                  onClick={handleTestNotification}
+                  variant="outline"
+                  disabled={isSendingTest}
+                  style={{ width: "100%" }}
+                >
+                  {isSendingTest ? "Sending..." : "Send Test Notification"}
+                </Button>
+
+                {testNotificationStatus && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "10px 12px",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      backgroundColor:
+                        testNotificationStatus.type === "success"
+                          ? "var(--color-success-base-alpha, rgba(34, 197, 94, 0.1))"
+                          : "var(--color-error-base-alpha, rgba(239, 68, 68, 0.1))",
+                      color:
+                        testNotificationStatus.type === "success"
+                          ? "var(--color-success-base, #22c55e)"
+                          : "var(--color-error-base, #ef4444)",
+                    }}
+                  >
+                    {testNotificationStatus.type === "success" ? (
+                      <CheckCircle size={16} className="flex-shrink-0" />
+                    ) : (
+                      <XCircle size={16} className="flex-shrink-0" />
+                    )}
+                    <span>{testNotificationStatus.message}</span>
+                  </div>
+                )}
+              </div>
+            </Section>
+          )}
+
+          {/* System-Managed Options Section */}
+          <Section
+            title="System-Managed Options"
+            description="These settings are controlled by your operating system"
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+              <SystemManagedRow
+                label="Alert Style"
+                description="How notifications appear on screen"
+              />
+              <SystemManagedRow
+                label="Show on Lock Screen"
+                description="Display notifications when device is locked"
+              />
+              <SystemManagedRow
+                label="Show in Notification Center"
+                description="Keep notifications in the notification center"
+              />
+              <SystemManagedRow
+                label="Badge App Icon"
+                description="Show notification count on app icon"
+              />
+              <SystemManagedRow
+                label="Play Sound"
+                description="Play a sound when notifications arrive"
+              />
+              <SystemManagedRow
+                label="Show Previews"
+                description="Show notification content in previews"
+              />
+              <SystemManagedRow
+                label="Notification Grouping"
+                description="How notifications are grouped together"
+              />
+            </div>
+
+            <div
+              style={{
+                marginTop: "12px",
+                padding: "8px 12px",
+                borderRadius: "8px",
+                backgroundColor:
+                  "var(--color-info-base-alpha, rgba(59, 130, 246, 0.1))",
+                color: "var(--color-info-base, #3b82f6)",
+                fontSize: "12px",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "8px",
+              }}
+            >
+              <Info size={14} className="flex-shrink-0 margin-top-1" />
+              <p style={{ margin: 0 }}>
+                To change these settings, click the System Settings button
+                above.
+              </p>
+            </div>
+          </Section>
+        </div>
       </div>
     </div>
   );
@@ -530,21 +648,43 @@ export function NotificationSettings() {
  */
 function SystemManagedRow({
   label,
-  value,
   description,
 }: {
   label: string;
-  value: string;
   description: string;
 }) {
   return (
-    <div className="flex items-center justify-between py-1">
-      <div className="space-y-0.5">
-        <div className="text-sm font-medium text-foreground">{label}</div>
-        <div className="text-xs text-muted-foreground">{description}</div>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "10px 0",
+        borderBottom: "1px solid var(--color-border-base)",
+      }}
+    >
+      <div>
+        <div
+          style={{
+            fontSize: "13px",
+            fontWeight: 500,
+            color: "var(--color-text-base)",
+          }}
+        >
+          {label}
+        </div>
+        <div
+          style={{
+            fontSize: "11px",
+            color: "var(--color-text-muted)",
+            marginTop: "2px",
+          }}
+        >
+          {description}
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">{value}</span>
+      <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
+        System controlled
       </div>
     </div>
   );

@@ -1,0 +1,37 @@
+{
+  "name": "id-encoding",
+  "version": "0.1.2",
+  "description": "",
+  "type": "module",
+  "main": "./dist/esm/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "types": "dist/esm/index.d.ts",
+  "scripts": {
+    "build": "shx rm -rf dist && npm run build-esm && npm run build-cjs",
+    "build-esm": "tsc",
+    "build-cjs": "tsc --module commonjs --outDir dist/cjs --target es2015 && echo '{\"type\": \"commonjs\"}' > dist/cjs/package.json",
+    "clean": "shx rm -rf dist",
+    "prepare": "npm run build",
+    "test": "vitest",
+    "test-esm": "node -e 'import(\"./dist/esm/index.js\")'"
+  },
+  "author": "Convex, Inc.",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "~5.0.3",
+    "tsx": "^4.19.4",
+    "shx": "~0.3.4",
+    "vitest": "^3.2.4",
+    "@types/node": "^18.17.0"
+  },
+  "dependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "prettier": "3.6.2"
+  }
+}

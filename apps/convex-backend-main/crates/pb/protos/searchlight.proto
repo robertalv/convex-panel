@@ -1,0 +1,382 @@
+syntax = "proto3";
+
+import "common.proto";
+import "google/protobuf/empty.proto";
+
+package searchlight;
+
+service Searchlight {
+  rpc ExecuteVectorQuery(VectorQueryRequest) returns (VectorQueryResponse);
+  rpc ExecuteVectorCompaction(VectorCompactionRequest) returns (VectorCompactionResponse);
+  rpc QueueVectorPrefetch(VectorPrefetchRequest) returns (VectorPrefetchResponse);
+
+  rpc FetchTermOrdinals(FetchTermOrdinalsRequest) returns (FetchTermOrdinalsResponse);
+
+  // Query a set of tokens against the term dictionary, optionally allowing
+  // for fuzzy matching and prefix matching. Take the top `K` results with
+  // respect to to `(edit distance, term)` lexicographical order.
+  rpc QueryTokens(QueryTokensRequest) returns (QueryTokensResponse);
+
+  // For the given index, compute the total number of documents and terms
+  // in the index. Also, given a list of pointers to terms within the index,
+  // compute the document frequency of each term.
+  rpc QueryBm25Stats(QueryBm25StatsRequest) returns (QueryBm25StatsResponse);
+
+  // Given a AND + OR query of term pointers and BM25 statistics for the OR
+  // terms, return the top `K` results with respect to BM25 score.
+  rpc QueryPostingLists(QueryPostingListsRequest) returns (QueryPostingListsResponse);
+
+  // Given a set of text segments in a particular text index, merge them into a single segment, upload it and
+  // return pointers to the new segment.
+  rpc ExecuteTextCompaction(TextCompactionRequest) returns (TextCompactionResponse);
+}
+
+message QueryRequest {
+  SearchIndexConfig index_config = 2;
+  TextQuery query = 3;
+  Bm25StatisticsDiff memory_statistics_diff = 4;
+  TermShortlist memory_shortlisted_terms = 5;
+  uint32 limit = 6;
+  StorageKey disk_index = 7;
+  StorageType storage_type = 8;
+  reserved 9;
+}
+
+message TextQuery {
+  repeated TextQueryTerm search_terms = 1;
+  repeated bytes filter_conditions = 2;
+}
+
+message TextQueryTerm {
+  oneof term_type {
+     ExactTextTerm exact = 1;
+     FuzzyTextTerm fuzzy = 2;
+  }
+}
+
+message ExactTextTerm {
+  string token = 1;
+}
+
+message FuzzyTextTerm {
+  string token = 1;
+  uint32 max_distance = 2;
+  bool prefix = 3;
+}
+
+message Bm25StatisticsDiff {
+  map<string, int64> term_statistics = 1;
+  int64 num_documents_diff = 2;
+  int64 num_search_tokens_diff = 3;
+}
+
+message TermShortlist {
+  repeated string shortlist = 1;
+  repeated QueryTermShortlistItems query_term_shortlist_items = 2;
+}
+
+message QueryTermShortlistItems {
+  TextQueryTerm query_term = 1;
+  repeated ShortlistItem items = 2;
+}
+
+message ShortlistItem {
+  uint32 shortlist_id = 1;
+  uint32 distance = 2;
+}
+
+message QueryResponse {
+  repeated CandidateRevisionPositions results = 1;
+  Bm25StatisticsDiff combined_statistics = 2;
+  TermShortlist combined_shortlisted_terms = 3;
+}
+
+message CandidateRevisionPositions {
+  CandidateRevision revision = 1;
+  repeated ShortlistPositions positions = 2;
+}
+
+message ShortlistPositions {
+  uint32 shortlist_id = 1;
+  repeated uint32 positions = 2;
+}
+
+message SearchIndexConfig {
+  common.FieldPath search_field_path = 1;
+  repeated common.FieldPath filter_fields = 2;
+}
+
+message FilterField {
+  common.FieldPath path = 1;
+  uint32 field = 2;
+}
+
+message CandidateRevision {
+  float score = 1;
+  reserved 3;
+  optional uint64 ts = 4;
+  double creation_time = 5;
+  bytes internal_id = 6;
+}
+
+
+message TextCompactionRequest {
+   repeated FragmentedTextSegmentPaths segments = 1;
+   StorageType storage_type = 2;
+  reserved 3;
+}
+
+message FragmentedTextSegment {
+  optional StorageKey segment = 1;
+  optional StorageKey id_tracker = 2;
+  optional StorageKey deleted_terms_table = 3;
+  optional StorageKey alive_bitset = 4;
+  optional uint64 num_indexed_documents = 5;
+  optional uint64 num_deleted_documents = 6;
+  optional uint64 size_bytes_total = 7;
+  optional string id = 8;
+}
+
+message TextCompactionResponse {
+    FragmentedTextSegment segment = 1;
+}
+
+// Next field id: 6
+message VectorQueryRequest {
+  reserved 1;
+  VectorIndexConfig index_config = 2;
+  CompiledVectorQuery query = 3;
+  uint32 overfetch_delta = 4;
+  FragmentedVectorSegmentPathsList segments = 5;
+  StorageType storage_type = 6;
+  reserved 7;
+}
+
+message VectorPrefetchRequest {
+  FragmentedVectorSegmentPathsList segments = 1;
+  StorageType storage_type = 2;
+  reserved 3;
+}
+
+message VectorPrefetchResponse {}
+
+message VectorCompactionRequest {
+  FragmentedVectorSegmentPathsList segments = 1;
+  uint32 dimension = 2;
+  StorageType storage_type = 3;
+  reserved 4;
+}
+
+message VectorCompactionResponse {
+  FragmentedVectorSegment segment = 1;
+}
+
+message VectorIndexConfig {
+  uint32 dimension = 1;
+  common.FieldPath vector_field_path = 2;
+  repeated common.FieldPath filter_fields = 3;
+}
+
+message CompiledVectorQuery {
+  repeated float vector = 1;
+  uint32 limit = 2;
+  repeated CompiledVectorQueryFilterCondition filter_conditions = 3;
+}
+
+message CompiledVectorQueryFilterCondition {
+  common.FieldPath path = 1;
+  oneof filter {
+    bytes eq_condition = 2;
+    CompiledVectorQueryFilterInCondition in_condition = 3;
+  }
+}
+
+message CompiledVectorQueryFilterInCondition {
+  repeated bytes eq_conditions = 1;
+}
+
+message VectorQueryResponse {
+  repeated VectorQueryResult results = 1;
+}
+
+message VectorQueryResult {
+  float score = 1;
+  bytes internal_id = 2;
+  optional uint64 ts = 3;
+}
+
+// oneof doesn't support repeated fields without nesting.
+message FragmentedVectorSegmentPathsList {
+  repeated FragmentedVectorSegmentPaths segments = 2;
+}
+
+message FragmentedVectorSegmentPaths {
+  StorageKey segment = 1;
+  StorageKey id_tracker = 2;
+  StorageKey deleted_bitset = 3;
+}
+
+message FragmentedVectorSegment {
+  string segment_key = 1;
+  string id_tracker_key = 2;
+  string deleted_bitset_key = 3;
+  uint32 num_vectors = 4;
+  uint32 num_deleted = 5;
+  string id = 6;
+}
+
+message StorageKey {
+  string storage_key = 1;
+}
+
+message S3Storage {
+  string prefix = 1;
+  string bucket = 2;
+}
+
+message LocalStorage {
+  string path = 1;
+}
+
+message StorageType {
+  oneof storage_type {
+    S3Storage s3 = 1;
+    LocalStorage local = 2;
+  }
+}
+
+message FetchTermOrdinalsRequest {
+    StorageType storage_type = 1;
+    StorageKey segment = 2;
+    repeated FieldAndTermValues field_and_term_values = 3;
+    reserved 4;
+}
+
+message FetchTermOrdinalsResponse {
+    repeated FieldAndTermOrdinals field_and_term_ordinals = 1;
+}
+
+message FieldAndTermValues {
+    optional uint32 field = 1;
+    repeated bytes term_values = 2;
+}
+
+message FieldAndTermOrdinals {
+    optional uint32 field = 1;
+    // This must exactly match the count and order of the input from FieldAndTermValues
+    repeated uint64 term_ordinals = 2;
+}
+
+message FieldTermMetadata {
+  optional uint32 field = 1;
+  repeated TermOrdDeleteCount term_ords_and_delete_counts = 2;
+  optional uint64 num_terms_deleted = 3;
+}
+
+message TermOrdDeleteCount {
+  optional uint64 term_ord = 1;
+  optional uint32 num_docs_deleted = 2;
+}
+
+message QueryTokensRequest {
+  StorageType storage_type = 1;
+  FragmentedTextSegmentPaths segment = 2;
+  repeated TokenQuery token_queries = 3;
+  optional uint32 max_results = 4;
+  reserved 5;
+}
+
+message FragmentedTextSegmentPaths {
+  StorageKey segment = 1;
+  reserved 2;
+  oneof segment_metadata {
+    MultiSegmentMetadata multi_segment = 3;
+  }
+}
+
+message MultiSegmentMetadata {
+  StorageKey id_tracker = 1;
+  StorageKey deleted_terms_table = 2;
+  StorageKey alive_bitset = 3;
+}
+
+message TokenQuery {
+  optional bytes term = 1;
+  optional uint32 max_distance = 2;
+  optional bool prefix = 3;
+}
+
+message QueryTokensResponse {
+  repeated TokenMatch token_matches = 2;
+}
+
+message TokenMatch {
+  optional uint32 distance = 1;
+  optional bool prefix = 2;
+  optional bytes tantivy_bytes = 3;
+  // Offset into `QueryTokensRequest.token_queries`.
+  optional uint32 token_ord = 4;
+}
+
+message QueryBm25StatsRequest {
+  StorageType storage_type = 1;
+  FragmentedTextSegmentPaths segment = 2;
+  repeated bytes terms = 3;
+  reserved 4;
+}
+
+message QueryBm25StatsResponse {
+  repeated NumTermsByField num_terms_by_field = 1;
+  optional uint64 num_documents = 2;
+  repeated DocFrequency doc_frequencies = 3;
+}
+
+message NumTermsByField {
+  optional uint32 field = 1;
+  optional uint64 num_terms = 2;
+}
+
+message DocFrequency {
+  optional bytes term = 1;
+  optional uint64 frequency = 2;
+}
+
+message QueryPostingListsRequest {
+  StorageType storage_type = 1;
+  FragmentedTextSegmentPaths segment = 2;
+  PostingListQuery query = 3;
+  reserved 4;
+}
+
+message PostingListQuery {
+  repeated bytes deleted_internal_ids = 1;
+
+  // Global BM25 stats
+  repeated NumTermsByField num_terms_by_field = 2;
+  optional uint64 num_documents = 3;
+
+  repeated OrTerm or_terms = 4;
+  repeated bytes and_terms = 5;
+
+  optional uint32 max_results = 6;
+}
+
+message OrTerm {
+  optional bytes term = 1;
+  optional uint64 doc_frequency = 2;
+  optional float bm25_boost = 3;
+}
+
+message QueryPostingListsResponse {
+  repeated PostingListMatch matches = 1;
+}
+
+message PostingListMatch {
+  optional bytes internal_id = 1;
+  oneof ts {
+    uint64 committed = 2;
+    google.protobuf.Empty pending = 3;
+  }
+  optional double creation_time = 4;
+  optional float bm25_score = 5;
+}

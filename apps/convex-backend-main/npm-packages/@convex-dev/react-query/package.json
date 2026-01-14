@@ -1,0 +1,89 @@
+{
+  "name": "@convex-dev/react-query",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm-run-all --parallel dev:db dev:frontend",
+    "dev:db": "convex dev",
+    "dev:frontend": "vite --open --clearScreen false",
+    "build": "tshy",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "test:types": "tsc --noEmit",
+    "prepare": "tshy",
+    "test": "vitest run --typecheck",
+    "prepack": "node src/scripts/dont-publish-alpha-as-latest.mjs"
+  },
+  "files": [
+    "dist",
+    "src/index.ts",
+    "LICENSE"
+  ],
+  "tshy": {
+    "dialects": [
+      "esm",
+      "commonjs"
+    ],
+    "exports": {
+      ".": "./src/index.ts",
+      "./package.json": "./package.json"
+    },
+    "exclude": [
+      "src/example.tsx",
+      "src/suspense.tsx",
+      "src/**/*.test.ts",
+      "convex/**/*"
+    ],
+    "selfLink": false
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.0.0",
+    "convex": "^1.29.3"
+  },
+  "devDependencies": {
+    "@convex-dev/auth": "^0.0.90",
+    "@convex-dev/eslint-plugin": "workspace:*",
+    "@eslint/compat": "~1.3.0",
+    "@eslint/eslintrc": "^3",
+    "@eslint/js": "~9.34.0",
+    "@tanstack/eslint-plugin-query": "^5.74.7",
+    "@tanstack/react-query": "^5.90.2",
+    "@tanstack/react-query-devtools": "^5.90.2",
+    "@types/node": "^18.17.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "convex": "workspace:*",
+    "convex-helpers": "^0.1.105",
+    "eslint": "^9.37.0",
+    "eslint-config-prettier": "^10.0.0",
+    "npm-run-all2": "^7.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "tshy": "^3.0.0",
+    "typescript": "~5.0.3",
+    "typescript-eslint": "^8.45.0",
+    "vite": "^6.4.1",
+    "vitest": "^3.2.4"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/index.d.ts",
+        "default": "./dist/commonjs/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "module": "./dist/esm/index.js",
+  "main": "./dist/commonjs/index.js",
+  "types": "./dist/commonjs/index.d.ts",
+  "overrides": {
+    "typescript": "~5.0.3"
+  }
+}

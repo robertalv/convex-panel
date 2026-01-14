@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package errors;
+
+enum ErrorCode {
+  BAD_REQUEST = 0;
+  UNAUTHENTICATED = 1;
+  FORBIDDEN = 2;
+  TRANSIENT_NOT_FOUND = 3;
+  CLIENT_DISCONNECT = 4;
+  OVERLOADED = 5;
+  OCC = 6;
+  PAGINATION_LIMIT = 7;
+  OUT_OF_RETENTION = 8;
+  OPERATIONAL_INTERNAL_SERVER_ERROR = 9;
+  REJECTED_BEFORE_EXECUTION = 10;
+  RATE_LIMITED = 11;
+  MISDIRECTED_REQUEST = 12;
+  AUTH_UPDATE_FAILED = 13;
+  CONFLICT = 14;
+  FEATURE_TEMPORARILY_UNAVAILABLE = 15;
+}
+
+message OccInfo {
+  optional string table_name = 1;
+  optional string document_id = 2;
+  optional string write_source = 3;
+  bool is_system = 4;
+}
+
+message ErrorMetadata {
+  ErrorCode code = 1;
+  optional string short_msg = 2;
+  optional string msg = 3;
+  optional OccInfo occ_info = 4;
+  optional string source = 5;
+}
+
+// The message we put in tonic::Status details.
+// It is important this message parses from empty bytes.
+message StatusDetails {
+  // The metadata is indeed optional.
+  ErrorMetadata error_metadata = 1;
+}

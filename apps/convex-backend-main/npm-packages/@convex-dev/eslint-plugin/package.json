@@ -1,0 +1,69 @@
+{
+  "name": "@convex-dev/eslint-plugin",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "tshy",
+    "test": "vitest run && node src/scripts/check-version.mjs",
+    "test:types": "tsc --noEmit",
+    "test:watch": "vitest",
+    "prepare": "tshy",
+    "lint": "eslint .",
+    "prepublishOnly": "node src/scripts/check-version.mjs",
+    "prepack": "node src/scripts/dont-publish-alpha-as-latest.mjs"
+  },
+  "dependencies": {
+    "@typescript-eslint/utils": "~8.38.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "~9.34.0",
+    "@types/eslint": "~9.6.1",
+    "@types/node": "^18.17.0",
+    "@typescript-eslint/rule-tester": "~8.38.0",
+    "@typescript-eslint/types": "~8.38.0",
+    "eslint": "^9.37.0",
+    "eslint-doc-generator": "^1.7.1",
+    "eslint-plugin-eslint-plugin": "~7.0.0",
+    "globals": "~16.3.0",
+    "tshy": "^3.0.0",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.45.0",
+    "vitest": "^3.2.4"
+  },
+  "tshy": {
+    "dialects": [
+      "esm",
+      "commonjs"
+    ],
+    "exports": {
+      ".": "./src/index.ts",
+      "./package.json": "./package.json"
+    },
+    "exclude": [
+      "src/**/*.test.ts"
+    ],
+    "selfLink": false
+  },
+  "files": [
+    "dist",
+    "src/index.ts",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/index.d.ts",
+        "default": "./dist/commonjs/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "module": "./dist/esm/index.js",
+  "main": "./dist/commonjs/index.js",
+  "types": "./dist/commonjs/index.d.ts"
+}

@@ -1,0 +1,63 @@
+---
+title: "Self Hosting"
+sidebar_position: 100
+description: "Self Hosting Convex Projects"
+---
+
+If you're excited about self-hosting, you can run the Convex backend on your own
+servers. Self-hosted Convex runs the
+[open-source backend](https://github.com/get-convex/convex-backend), and
+contains the same fully up-to-date code the cloud service uses.
+
+To get started with self hosting, follow the self-hosting guide:
+
+<CardLink
+  className="convex-hero-card"
+  item={{
+    href: "https://github.com/get-convex/convex-backend/blob/main/self-hosted/README.md",
+    label: "Self-hosting guide",
+  }}
+/>
+
+Join the `#self-hosted` channel in the
+[Discord community](https://convex.dev/community) for self-hosting support.
+
+Self hosting is not for everyone. If you're looking for a more hands-off
+solution, we recommend using the
+[Convex-hosted product](https://convex.dev/pricing).
+
+## Open Source Convex Backend
+
+The majority of the backend is written in Rust, with a healthy dose of
+TypeScript supporting the server-side function environment.
+
+You can learn more about open-sourcing at Convex in our
+[announcement](https://news.convex.dev/convex-goes-open-source/) and the
+[software engineering daily podcast](https://softwareengineeringdaily.com/2024/03/20/going-open-source-at-convex-with-james-cowling/).
+It is released under the [FSL Apache 2.0 License](https://fsl.software/).
+
+## Other Convex Open Source Projects
+
+The Convex backend, client libraries, dashboard, and CLI are all open-source.
+You can explore everything on the
+[Convex GitHub page](https://github.com/get-convex).
+
+### Convex Clients
+
+All Convex Clients are open-source.
+
+- [Convex JavaScript/TypeScript clients & CLI](https://github.com/get-convex/convex-js)
+- [Convex Python Client](https://github.com/get-convex/convex-py)
+- [Convex Rust Client](https://github.com/get-convex/convex-rs)
+
+### Much Much More
+
+Convex also open-sources many other helpful projects including
+[helpers](https://github.com/get-convex/convex-helpers),
+[templates](https://github.com/orgs/get-convex/repositories?type=all&q=template),
+[demos](https://github.com/get-convex/convex-demos), a
+[testing harness](https://github.com/get-convex/convex-test) and much more. See
+the complete list of all our public repositories
+[at GitHub](https://github.com/orgs/get-convex/repositories?type=all).
+
+<StackPosts query="open-source" />

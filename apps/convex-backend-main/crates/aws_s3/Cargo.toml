@@ -1,0 +1,38 @@
+[package]
+name = "aws_s3"
+version = "0.1.0"
+edition = "2024"
+license = "LicenseRef-FSL-1.1-Apache-2.0"
+
+[lib]
+doctest = false
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+aws-config = { workspace = true }
+aws-sdk-s3 = { workspace = true }
+aws-smithy-http = { workspace = true }
+aws_utils = { workspace = true }
+bytes = { workspace = true }
+common = { workspace = true }
+errors = { workspace = true }
+fastrace = { workspace = true }
+futures = { workspace = true }
+metrics = { workspace = true }
+pb = { workspace = true }
+serde_json = { workspace = true }
+storage = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+common = { workspace = true, features = ["testing"] }
+convex_macro = { workspace = true }
+errors = { workspace = true, features = ["testing"] }
+metrics = { workspace = true, features = ["testing"] }
+runtime = { workspace = true }
+storage = { workspace = true, features = ["testing"] }
+tokio-stream = { workspace = true }
+
+[lints]
+workspace = true

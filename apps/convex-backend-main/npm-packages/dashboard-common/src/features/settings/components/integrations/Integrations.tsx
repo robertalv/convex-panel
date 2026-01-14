@@ -1,0 +1,162 @@
+import React, { useContext } from "react";
+import { LocalDevCallout } from "@common/elements/LocalDevCallout";
+import { Sheet } from "@ui/Sheet";
+import {
+  AuthIntegration,
+  EXC_INTEGRATIONS,
+  EXPORT_INTEGRATIONS,
+  ExceptionReportingIntegration,
+  LOG_INTEGRATIONS,
+  LogIntegration,
+} from "@common/lib/integrationHelpers";
+
+import Link from "next/link";
+import {
+  DeploymentInfo,
+  DeploymentInfoContext,
+} from "@common/lib/deploymentContext";
+import { Doc } from "system-udfs/convex/_generated/dataModel";
+import { PanelCard } from "./PanelCard";
+
+export function Integrations({
+  team,
+  entitlements,
+  integrations,
+  workosData,
+}: {
+  team: ReturnType<DeploymentInfo["useCurrentTeam"]>;
+  entitlements: ReturnType<DeploymentInfo["useTeamEntitlements"]>;
+  integrations: Doc<"_log_sinks">[];
+  workosData: ReturnType<DeploymentInfo["useDeploymentWorkOSEnvironment"]>;
+}) {
+  const {
+    useCurrentDeployment,
+    useHasProjectAdminPermissions,
+    workosIntegrationEnabled,
+  } = useContext(DeploymentInfoContext);
+  const deployment = useCurrentDeployment();
+  const hasAdminPermissions = useHasProjectAdminPermissions(
+    deployment?.projectId,
+  );
+  const cannotManageBecauseProd =
+    deployment?.deploymentType === "prod" && !hasAdminPermissions;
+
+  const logStreamingEntitlementGranted = entitlements?.logStreamingEnabled;
+  const streamingExportEntitlementGranted =
+    entitlements?.streamingExportEnabled;
+
+  const configuredIntegrationsMap = Object.fromEntries(
+    integrations.map((integration) => [integration.config.type, integration]),
+  );
+
+  const logIntegrations: LogIntegration[] = LOG_INTEGRATIONS.map(
+    (integrationKind) => {
+      const existing = configuredIntegrationsMap[integrationKind];
+      return {
+        kind: integrationKind,
+        existing: existing ?? null,
+      } as LogIntegration;
+    },
+  );
+
+  const authIntegrations: AuthIntegration[] = workosIntegrationEnabled
+    ? [
+        {
+          kind: "workos",
+          // Consider this integration to exist if a WorkOS enviroment has been provisioned
+          existing: workosData?.environment ?? null,
+        },
+      ]
+    : [];
+
+  const exceptionReportingIntegrations: ExceptionReportingIntegration[] =
+    EXC_INTEGRATIONS.map((kind) => {
+      const existing = configuredIntegrationsMap[kind];
+      return {
+        kind,
+        existing: existing ?? null,
+      } as ExceptionReportingIntegration;
+    });
+
+  const devCallouts = [];
+  if (!logStreamingEntitlementGranted) {
+    devCallouts.push(
+      <LocalDevCallout
+        tipText="Tip: Run this to enable log streaming locally:"
+        command={`cargo run --bin big-brain-tool -- --dev grant-entitlement --team-entitlement log_streaming_enabled --team-id ${team?.id} --reason "local" true --for-real`}
+      />,
+    );
+  }
+  if (!streamingExportEntitlementGranted) {
+    devCallouts.push(
+      <LocalDevCallout
+        className="flex-col"
+        tipText="Tip: Run this to enable streaming export locally:"
+        command={`cargo run --bin big-brain-tool -- --dev grant-entitlement --team-entitlement streaming_export_enabled --team-id ${team?.id} --reason "local" true --for-real`}
+      />,
+    );
+  }
+  const logIntegrationUnvaliableReason = !logStreamingEntitlementGranted
+    ? "MissingEntitlement"
+    : cannotManageBecauseProd
+      ? "CannotManageProd"
+      : null;
+
+  const streamingExportIntegrationUnavailableReason =
+    !streamingExportEntitlementGranted ? "MissingEntitlement" : null;
+
+  // Show configured integrations first
+  const allIntegrations = [
+    ...authIntegrations,
+    ...exceptionReportingIntegrations,
+    ...logIntegrations,
+  ].sort((a, b) => {
+    if (a.existing !== null && b.existing === null) {
+      return -1;
+    }
+    if (a.existing === null && b.existing !== null) {
+      return 1;
+    }
+    return 0;
+  });
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Sheet className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <h3>Integrations</h3>
+          <div className="max-w-prose text-sm">
+            Integrations allow you to send logs, report exceptions, and export
+            Convex data to external services.{" "}
+            <Link
+              href="https://docs.convex.dev/production/integrations/"
+              target="_blank"
+              className="text-content-link hover:underline"
+            >
+              Learn more
+            </Link>{" "}
+            about integrations.
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          {allIntegrations.map((i) => (
+            <PanelCard
+              key={i.kind}
+              integration={i}
+              unavailableReason={logIntegrationUnvaliableReason}
+              teamSlug={team?.slug}
+            />
+          ))}
+          {EXPORT_INTEGRATIONS.map((i) => (
+            <PanelCard
+              integration={{ kind: i }}
+              unavailableReason={streamingExportIntegrationUnavailableReason}
+              teamSlug={team?.slug}
+            />
+          ))}
+        </div>
+      </Sheet>
+      {devCallouts}
+    </div>
+  );
+}

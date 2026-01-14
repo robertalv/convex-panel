@@ -1,0 +1,7 @@
+{
+  "$schema": "../../convex/schemas/convex.schema.json",
+  "codegen": {
+    "fileType": "js/dts",
+    "legacyComponentApi": true
+  }
+}

@@ -1,0 +1,34 @@
+[package]
+name = "errors"
+version = "0.1.0"
+authors = ["Convex, Inc. <no-reply@convex.dev>"]
+edition = "2024"
+license = "LicenseRef-FSL-1.1-Apache-2.0"
+
+[lib]
+doctest = false
+
+[features]
+testing = ["metrics/testing", "proptest", "proptest-derive"]
+
+[dependencies]
+anyhow = { workspace = true }
+http = { workspace = true }
+metrics = { workspace = true }
+prometheus = { workspace = true }
+proptest = { workspace = true, optional = true }
+proptest-derive = { workspace = true, optional = true }
+sentry = { workspace = true }
+thiserror = { workspace = true }
+tonic = { workspace = true }
+tracing = { workspace = true }
+tungstenite = { workspace = true }
+
+[dev-dependencies]
+cmd_util = { workspace = true }
+metrics = { workspace = true, features = ["testing"] }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
+
+[lints]
+workspace = true

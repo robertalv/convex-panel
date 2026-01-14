@@ -1,0 +1,23 @@
+{
+  "name": "udf-tests",
+  "version": "0.0.0",
+  "dependencies": {
+    "convex": "workspace:*",
+    "shapes": "workspace:*",
+    "id-encoding": "workspace:*",
+    "chai": "~4.5.0",
+    "chai-as-promised": "~8.0.0",
+    "@types/chai-as-promised": "~8.0.0",
+    "prettier": "3.6.2",
+    "udf-syscall-ffi": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~5.0.3",
+    "@types/node": "^18.17.0",
+    "@types/chai": "~4.3.5"
+  },
+  "scripts": {
+    "build": "",
+    "test": "tsc -p convex"
+  }
+}

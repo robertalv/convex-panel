@@ -1,0 +1,98 @@
+[package]
+name = "model"
+version = "0.1.0"
+authors = ["Convex, Inc. <no-reply@convex.dev>"]
+edition = "2024"
+license = "LicenseRef-FSL-1.1-Apache-2.0"
+
+[lib]
+doctest = false
+
+[features]
+testing = [
+    "common/testing",
+    "database/testing",
+    "errors/testing",
+    "keybroker/testing",
+    "metrics/testing",
+    "migrations_model/testing",
+    "proptest",
+    "proptest-derive",
+    "proptest-http",
+    "runtime/testing",
+    "search/testing",
+    "storage/testing",
+    "usage_tracking/testing",
+    "value/testing",
+]
+
+[dependencies]
+anyhow = { workspace = true }
+async-recursion = { workspace = true }
+async-trait = { workspace = true }
+async_lru = { workspace = true }
+async_zip_0_0_9 = { workspace = true }
+bytes = { workspace = true }
+chrono = { workspace = true }
+cmd_util = { workspace = true }
+common = { workspace = true }
+convex_fivetran_destination = { workspace = true }
+convex_macro = { workspace = true }
+database = { workspace = true }
+derive_more = { workspace = true }
+errors = { workspace = true }
+fastrace = { workspace = true }
+futures = { workspace = true }
+futures-async-stream = { workspace = true }
+humansize = { workspace = true }
+keybroker = { workspace = true }
+maplit = { workspace = true }
+metrics = { workspace = true }
+migrations_model = { workspace = true }
+openidconnect = { workspace = true }
+pb = { workspace = true }
+proptest = { workspace = true, optional = true }
+proptest-derive = { workspace = true, optional = true }
+proptest-http = { workspace = true, optional = true }
+rand = { workspace = true }
+reqwest = { workspace = true }
+runtime = { workspace = true }
+saffron = { workspace = true }
+search = { workspace = true }
+semver = { workspace = true }
+sentry = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+serde_json = { workspace = true }
+storage = { workspace = true }
+strum = { workspace = true }
+sync_types = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tracing = { workspace = true }
+usage_tracking = { workspace = true }
+value = { workspace = true }
+
+[dev-dependencies]
+common = { workspace = true, features = ["testing"] }
+database = { workspace = true, features = ["testing"] }
+errors = { workspace = true, features = ["testing"] }
+keybroker = { workspace = true, features = ["testing"] }
+metrics = { workspace = true, features = ["testing"] }
+migrations_model = { workspace = true, features = ["testing"] }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
+proptest-http = { workspace = true }
+runtime = { workspace = true, features = ["testing"] }
+search = { workspace = true, features = ["testing"] }
+storage = { workspace = true, features = ["testing"] }
+sync_types = { workspace = true, features = [
+    "testing",
+] }
+tempfile = { workspace = true }
+usage_tracking = { workspace = true, features = ["testing"] }
+value = { workspace = true, features = ["testing"] }
+
+[lints]
+workspace = true

@@ -1,0 +1,332 @@
+[workspace]
+members = [ "crates/*", "crates/convex/sync_types" ]
+resolver = "2"
+exclude = [ "crates/py_client", "crates/python_client_tests" ]
+
+[workspace.dependencies]
+application = { path = "crates/application" }
+async_lru = { path = "crates/async_lru" }
+authentication = { path = "crates/authentication" }
+aws_s3 = { path = "crates/aws_s3" }
+aws_utils = { path = "crates/aws_utils" }
+backend_harness = { path = "crates/backend_harness" }
+big_brain_client = { path = "crates/big_brain_client" }
+big_brain_private_api_types = { path = "crates/big_brain_private_api_types" }
+clusters = { path = "crates/clusters" }
+cmd_util = { path = "crates/cmd_util" }
+common = { path = "crates/common" }
+convex = { path = "crates/convex" }
+convex_fivetran_common = { path = "crates/fivetran_common" }
+convex_fivetran_destination = { path = "crates/fivetran_destination" }
+convex_fivetran_source = { path = "crates/fivetran_source" }
+convex_macro = { path = "crates/convex_macro" }
+convex_sync_types = { path = "crates/convex/sync_types" }
+database = { path = "crates/database" }
+db_connection = { path = "crates/db_connection" }
+errors = { path = "crates/errors" }
+events = { path = "crates/events" }
+exports = { path = "crates/exports" }
+file_storage = { path = "crates/file_storage" }
+function_runner = { path = "crates/function_runner" }
+health_check = { path = "crates/health_check" }
+http_client = { path = "crates/http_client" }
+imbl_slab = { path = "crates/imbl_slab" }
+indexing = { path = "crates/indexing" }
+interval_map = { path = "crates/interval_map" }
+isolate = { path = "crates/isolate" }
+json_trait = { path = "crates/json_trait" }
+keybroker = { path = "crates/keybroker" }
+log_interleaver = { path = "crates/log_interleaver" }
+log_streaming = { path = "crates/log_streaming" }
+metrics = { path = "crates/metrics" }
+migrations_model = { path = "crates/migrations_model" }
+model = { path = "crates/model" }
+mysql = { path = "crates/mysql" }
+node_executor = { path = "crates/node_executor" }
+packed_value = { path = "crates/packed_value" }
+pb = { path = "crates/pb" }
+pb_build = { path = "crates/pb_build" }
+pb_extras = { path = "crates/pb_extras" }
+performance_stats = { path = "crates/performance_stats" }
+postgres = { path = "crates/postgres" }
+runtime = { path = "crates/runtime" }
+search = { path = "crates/search" }
+shape_inference = { path = "crates/shape_inference" }
+sodium_secretbox = { path = "crates/sodium_secretbox" }
+sqlite = { path = "crates/sqlite" }
+storage = { path = "crates/storage" }
+storage_zip_reader = { path = "crates/storage_zip_reader" }
+sync = { path = "crates/sync" }
+sync_types = { package = "convex_sync_types", path = "crates/convex/sync_types" }
+text_search = { path = "crates/text_search" }
+tuple_struct = { path = "crates/tuple_struct" }
+udf = { path = "crates/udf" }
+udf_metrics = { path = "crates/udf_metrics" }
+usage_tracking = { path = "crates/usage_tracking" }
+value = { path = "crates/value" }
+vector = { path = "crates/vector" }
+aes = { version = "0.8.4" }
+ahash = "0.8"
+anyhow = "1"
+async-broadcast = "0.7.0"
+async-channel = "2.3.1"
+async-compression = { version = "0.4.11", features = [ "tokio", "zstd", "gzip" ] }
+async-recursion = "1.1.1"
+async-trait = "0.1"
+async_zip = { version = "0.0.17", default-features = false, features = [ "deflate", "tokio", "zstd" ] }
+async_zip_0_0_9 = { package = "async_zip", version = "0.0.9", default-features = false, features = [ "zstd", "deflate" ] }
+atomic_refcell = "0.1.13"
+aws-config = { version = "1.6", default-features = false, features = [ "client-hyper", "default-https-client", "rustls", "rt-tokio", "sso" ] }
+aws-credential-types = "1"
+aws-lc-rs = { version = "1.13", default-features = false, features = [ "aws-lc-sys", "prebuilt-nasm" ] }
+aws-sdk-s3 = { version = "1.83", default-features = false, features = [ "default-https-client", "rt-tokio", "sigv4a" ] }
+aws-smithy-http = "0.62.0"
+aws-smithy-types-convert = { version = "0.60", features = [ "convert-streams" ] }
+aws-types = "1"
+axum = { version = "0.8", features = [ "ws", "original-uri", "macros", "multipart" ] }
+axum-extra = { version = "0.10", features = [ "typed-header", "cookie" ] }
+backoff = { version = "0.4", features = [ "tokio" ] }
+base-62 = { rev = "6f91a3da4b83f20379469835f64195bd52d7b9dd", git = "https://github.com/kryptco/base62.rs" }
+base32 = "0.5.0"
+base64 = "0.13"
+biscuit = { rev = "05bdaab2f43d144aedc9ef2dfcdb87d304540afd", git = "https://github.com/get-convex/biscuit" }
+bitvec = "1.0.1"
+byteorder = "1.5.0"
+bytes = "1.6.0"
+bytesize = "2.0.0"
+cbc = { version = "0.1.2" }
+cfg-if = "1.0"
+chrono = "0.4.38"
+clap = { version = "^4.1.8", features = [ "derive", "env" ] }
+colored = "3"
+compact_str = "0.9.0"
+const-oid = "0.9.6"
+const_format = { version = "0.2.34", features = [ "fmt" ] }
+criterion = "0.5"
+crossbeam-channel = "0.5.15"
+csf = "0.1.11"
+cstr = "0.2.11"
+csv-async = "1.2"
+ctrlc = "3.4"
+data-url = "0.3.1"
+deno_core = "0.366.0"
+deno_core_icudata = "0.74.0"
+derive_more = { version = "2", features = [ "full" ] }
+divan = "0.1.14"
+dotenvy = "0.15.7"
+dynfmt = "0.1.5"
+either = "1.9.0"
+elliptic-curve = { version = "0.13", features = [ "std", "pem" ] }
+encoding_rs = "0.8.32"
+enum-iterator = "2.1.0"
+event-listener = "5.3.1"
+fastrace = { git = "https://github.com/get-convex/fastrace", rev = "c9e5e5d8c3abf317f605eb845fe769915304d39a", version = "0.7", features = [ "enable" ] }
+fastrand = "2.3.0"
+flate2 = { version = "1", features = [ "zlib-ng" ] }
+flexbuffers = "25"
+float_next_after = "1.0.0"
+fnv = "1.0.7"
+futures = "0.3"
+futures-async-stream = "0.2.11"
+futures-util = "0.3.30"
+fxhash = "0.2.1"
+governor = "0.10.0"
+hashlink = "0.10"
+hdrhistogram = "7.5.4"
+headers = "0.4"
+hex = "0.4"
+home = "0.5"
+http = "1.0.0"
+http-body-util = "0.1.2"
+http-cache = { version = "0.20.1", default-features = false }
+http-cache-reqwest = { version = "0.15.1", features = [ "manager-moka" ] }
+humansize = { version = "2.1.3", features = [ "impl_style" ] }
+hyper = "1.3.1"
+hyper-util = { version = "0.1.5", features = [ "server-graceful", "tokio" ] }
+imbl = "5.0.0"
+itertools = "0.14"
+jemalloc_pprof = "0.6"
+jsonschema = "0.30"
+levenshtein_automata = "0.2.1"
+libc = "0.2"
+libsodium-sys-stable = { version = "1.22.2", features = [ "minimal" ] }
+lru = "0.14.0"
+maplit = "1"
+mime = "0.3"
+mime2ext = "0.1.52"
+moka = { version = "0.12", features = [ "future", "sync" ] }
+multer = "3.1.0"
+must-let = { git = "https://github.com/sujayakar/must-let", rev = "5b487d78db235e396e61dd03ce261ced0eafff9d" }
+mysql_async = { git = "https://github.com/goffrie/mysql_async", rev = "90ff86d613d8c466baa4da7b0c49c148bc14a019", default-features = false, features = [ "default-rustls" ] }
+num_cpus = "1.16.0"
+oauth2 = { version = "5", default-features = false, features = [ "reqwest" ] }
+openidconnect = { git = "https://github.com/get-convex/openidconnect-rs", rev = "15a9c551eafcf3b60d307feb94332352ac56c099", default-features = false, features = [ "accept-rfc3339-timestamps", "timing-resistant-secret-traits", "reqwest" ] }
+openssl = { version = "0.10.72", features = [ "aws-lc" ] }
+p256 = { version = "0.13", features = [ "ecdh" ] }
+p384 = "0.13"
+parking_lot = { version = "0.12", features = [ "hardware-lock-elision" ] }
+paste = { version = "1.0.12" }
+phf = { version = "0.11.2", features = [ "macros" ] }
+pin-project = "1"
+portpicker = "0.1"
+postgres-protocol = { version = "0.6" }
+pretty_assertions = "1"
+proc-macro2 = { version = "1.0" }
+prometheus = { git = "https://github.com/get-convex/rust-prometheus", rev = "8794d2bbf2a5a9adc501067ee4440dde6b5e6e25" }
+proptest = "1"
+proptest-derive = "0.5.0"
+proptest-http = { git = "https://github.com/nipunn1313/proptest-http", rev = "0e658bd4f6dbb73bdd3be66f0d2c34c00cc3a446" }
+prost = { version = "0.13", features = [ "no-recursion-limit" ] }
+prost-reflect = { version = "0.15.0", features = [ "text-format", "miette" ] }
+prost-types = "0.13"
+pyo3 = "0.27"
+pyo3-async-runtimes = { version = "0.27", features = [ "tokio-runtime" ] }
+pyo3-build-config = { version = "0.27", features = [ "resolve-config" ] }
+qdrant_common = { git = "https://github.com/get-convex/qdrant", rev = "a5d1b7bc9fd04861316b6455204c8a946d43117e", package = "qdrant_common" }
+qdrant_segment = { git = "https://github.com/get-convex/qdrant", rev = "a5d1b7bc9fd04861316b6455204c8a946d43117e", package = "segment" }
+quote = "1.0"
+rand = "0.9"
+rand_chacha = "0.9.0"
+rand_distr = "0.5"
+rc-zip = { version = "5", features = [ "deflate", "deflate64", "zstd" ] }
+ref-cast = "1.0.20"
+regex = "1"
+reqwest = { version = "0.12.7", features = [ "json", "stream", "gzip", "native-tls-vendored" ] }
+reqwest-middleware = "0.4.1"
+rsa = "0.9.6"
+rusqlite = { version = "0.32", features = [ "bundled" ] }
+rustls = { version = "0.23", default-features = false }
+rustls-native-certs = { version = "0.8" }
+rustls-pki-types = { version = "1" }
+saffron = { git = "https://github.com/get-convex/saffron", rev = "1d842379919fb5c1988ac127cebd6167b1eb9bec", features = [ "std" ] }
+schemars = { version = "0.8" }
+semver = { version = "1", features = [ "serde" ] }
+sentry = { version = "0.37", features = [ "anyhow", "tower", "tower-http" ] }
+sentry-tracing = "0.37"
+serde = { version = "1", features = [ "derive" ] }
+serde_bytes = "0.11.14"
+serde_json = { version = "1", features = [ "float_roundtrip", "preserve_order", "raw_value", "unbounded_depth" ] }
+sha1 = { version = "0.10.5", features = [ "oid" ] }
+sha2 = { version = "0.10.8" }
+short_future = { version = "0.1.1" }
+slab = "0.4.9"
+smallvec = "1"
+sourcemap = "9"
+spki = "0.7.3"
+strum = { version = "0.27", features = [ "derive" ] }
+sucds = { version = "0.8.1", features = [ "intrinsics" ] }
+syn = { version = "2.0", features = [ "full" ] }
+tantivy = { git = "https://github.com/get-convex/tantivy", rev = "c745b0977df94bc22fe4fc75db0200a8023f9a2c" }
+tantivy-common = { git = "https://github.com/get-convex/tantivy", rev = "c745b0977df94bc22fe4fc75db0200a8023f9a2c" }
+tempfile = "3"
+textplots = "0.8"
+thiserror = "2"
+thousands = "0.2.0"
+tikv-jemalloc-sys = { version = "0.6", features = [ "profiling", "unprefixed_malloc_on_supported_platforms" ] }
+tikv-jemallocator = { version = "0.6", features = [ "profiling", "unprefixed_malloc_on_supported_platforms" ] }
+tld = "2.36.0"
+tokio = { version = "1.47.1", features = [ "full" ] }
+tokio-metrics = { version = "0.4.0" }
+tokio-metrics-collector = { version = "0.3.1" }
+tokio-postgres = { version = "0.7.13", features = [ "with-serde_json-1" ] }
+tokio-postgres-rustls = { version = "0.13" }
+tokio-stream = { version = "0.1", features = [ "io-util", "sync", "signal" ] }
+tokio-tungstenite = { version = "0.26.2", features = [ "native-tls-vendored" ] }
+tokio-util = { version = "0.7.13", features = [ "io", "rt", "io-util" ] }
+tonic = { package = "tonic", version = "0.13", features = [ "gzip", "tls-aws-lc", "tls-native-roots" ] }
+tonic-build = "0.13"
+tonic-health = "0.13"
+tonic-middleware = "0.3"
+tower = { version = "0.5.2", features = [ "limit", "timeout", "util" ] }
+tower-cookies = "0.11"
+tower-http = { version = "0.6", features = [ "trace", "cors", "decompression-br", "limit" ] }
+tracing = "0.1"
+tracing-appender = { version = "0.2" }
+tracing-subscriber = { version = "0.3.17", features = [ "env-filter", "json" ] }
+tracy-client = { version = "0.18.0", default-features = false, features = [ "fibers" ] }
+tungstenite = { version = "0.26.2", features = [ "url", "native-tls-vendored" ] }
+url = "2.5.4"
+urlencoding = "2.1.3"
+utoipa = { version = "5.3", features = [ "axum_extras", "preserve_path_order", "openapi_extensions" ] }
+utoipa-axum = { version = "0.2" }
+uuid = { version = "1.6", features = [ "fast-rng", "serde", "v4" ] }
+vergen = { version = "8.1.0" }
+walkdir = "2"
+xorf = { git = "https://github.com/sujayakar/xorf.git", rev = "62a32de47bb3ad8b34d6d4feac034a24be2c881a" }
+
+[profile.release]
+opt-level = 3
+overflow-checks = true
+panic = "abort"
+
+[profile.slim-release]
+inherits = "release"
+strip = "debuginfo"
+
+[patch.crates-io]
+prometheus = { git = "https://github.com/get-convex/rust-prometheus", rev = "8794d2bbf2a5a9adc501067ee4440dde6b5e6e25" }
+tokio-postgres = { git = "https://github.com/get-convex/rust-postgres", rev = "5751201b0fe9f8b1f0a1812fb04e21c5469ad0c6" }
+postgres-protocol = { git = "https://github.com/get-convex/rust-postgres", rev = "5751201b0fe9f8b1f0a1812fb04e21c5469ad0c6" }
+
+[workspace.lints.rust]
+unused_extern_crates = "warn"
+
+[workspace.lints.clippy]
+await_holding_lock = "warn"
+await_holding_refcell_ref = "warn"
+large_enum_variant = "allow"
+manual_is_multiple_of = "allow"
+manual_map = "allow"
+new_without_default = "allow"
+op_ref = "allow"
+ptr_arg = "allow"
+result_large_err = "allow"
+single_match = "allow"
+too_many_arguments = "allow"
+type_complexity = "allow"
+upper_case_acronyms = "allow"
+useless_format = "allow"
+useless_vec = "allow"
+
+[profile.dev.package.proptest]
+opt-level = 3
+codegen-units = 16
+
+[profile.dev.package.levenshtein_automata]
+opt-level = 3
+codegen-units = 16
+
+[profile.dev.package.flexbuffers]
+opt-level = 3
+codegen-units = 16
+
+[profile.dev.package.regex-syntax]
+opt-level = 3
+codegen-units = 16
+
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+codegen-units = 16
+
+[profile.dev.package.sha2]
+opt-level = 3
+codegen-units = 16
+
+[profile.dev.package.digest]
+opt-level = 3
+codegen-units = 16
+
+[profile.dev.package.num-bigint-dig]
+opt-level = 3
+codegen-units = 16
+
+[profile.dev.package.tokio]
+opt-level = 3
+codegen-units = 16
+
+[profile.dev.package.tokio-stream]
+opt-level = 3
+codegen-units = 16
+
+[profile.release.package.segment]
+overflow-checks = false

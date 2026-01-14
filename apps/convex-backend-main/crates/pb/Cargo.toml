@@ -1,0 +1,41 @@
+[package]
+name = "pb"
+version = "0.1.0"
+edition = "2024"
+license = "LicenseRef-FSL-1.1-Apache-2.0"
+
+[package.metadata.cargo-machete]
+ignored = [
+    # Prost/Tonic required via tonic macro
+    "prost-types",
+    # Build dependencies not understood
+    "pb_build",
+]
+
+[lib]
+doctest = false
+
+[dependencies]
+anyhow = { workspace = true }
+convex_sync_types = { workspace = true }
+errors = { workspace = true }
+http = { workspace = true }
+pb_extras = { workspace = true }
+prost = { workspace = true }
+prost-reflect = { workspace = true }
+prost-types = { workspace = true }
+tonic = { workspace = true }
+value = { workspace = true }
+
+[build-dependencies]
+pb_build = { workspace = true }
+
+[dev-dependencies]
+cmd_util = { workspace = true }
+convex_sync_types = { workspace = true, features = ["testing"] }
+errors = { workspace = true, features = ["testing"] }
+proptest = { workspace = true }
+value = { workspace = true, features = ["testing"] }
+
+[lints]
+workspace = true
