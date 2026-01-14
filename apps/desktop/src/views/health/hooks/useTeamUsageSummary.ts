@@ -15,8 +15,8 @@ const desktopFetch: FetchFn = (input, init) => tauriFetch(input, init);
 // Query key factory
 export const teamUsageKeys = {
   all: ["teamUsage"] as const,
-  summary: (teamId: number) =>
-    [...teamUsageKeys.all, "summary", teamId] as const,
+  summary: (teamId: number, projectId: number | null) =>
+    [...teamUsageKeys.all, "summary", teamId, projectId] as const,
 };
 
 interface TeamUsageResult {
@@ -27,24 +27,25 @@ interface TeamUsageResult {
 }
 
 /**
- * Hook for fetching team usage summary from BigBrain API.
- * This provides billing-period usage data at the team level.
+ * Hook for fetching project usage summary from BigBrain API.
+ * This provides billing-period usage data scoped to the current project.
  */
 export function useTeamUsageSummary(): TeamUsageResult {
-  const { teamId, accessToken } = useDeployment();
+  const { teamId, accessToken, deployment } = useDeployment();
+  const projectId = deployment?.projectId ?? null;
   const queryClient = useQueryClient();
 
   const enabled = Boolean(teamId && accessToken);
 
   const query = useQuery<UsageSummary | null>({
-    queryKey: teamUsageKeys.summary(teamId ?? 0),
+    queryKey: teamUsageKeys.summary(teamId ?? 0, projectId),
     queryFn: async () => {
       if (!teamId || !accessToken) return null;
 
       return fetchTeamUsageSummary(
         accessToken,
         teamId,
-        undefined,
+        { projectId },
         desktopFetch,
       );
     },
@@ -58,10 +59,10 @@ export function useTeamUsageSummary(): TeamUsageResult {
   const refetch = useCallback(() => {
     if (teamId) {
       queryClient.invalidateQueries({
-        queryKey: teamUsageKeys.summary(teamId),
+        queryKey: teamUsageKeys.summary(teamId, projectId),
       });
     }
-  }, [queryClient, teamId]);
+  }, [queryClient, teamId, projectId]);
 
   return {
     data: query.data ?? null,

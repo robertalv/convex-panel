@@ -200,8 +200,8 @@ export function TeamUsageSummaryCard({
 
   return (
     <HealthCard
-      title="Billing Period Usage"
-      tip="Team-level usage metrics for the current billing period. This data comes from Convex's billing system."
+      title="Project Usage"
+      tip="Project-level usage metrics for the current billing period. This data comes from Convex's billing system and shows usage for this project only."
       loading={isLoading}
       error={error}
       className={className}
