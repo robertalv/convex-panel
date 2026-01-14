@@ -30,6 +30,60 @@ import {
 } from "../../../utils/terminal-commands";
 import { useDebounceCallback } from "../../../hooks/useDebounce";
 
+// ============================================================================
+// Section Container Component
+// ============================================================================
+
+interface SectionProps {
+  title: string;
+  icon?: React.ReactNode;
+  description?: string;
+  children: React.ReactNode;
+}
+
+function Section({ title, icon, description, children }: SectionProps) {
+  return (
+    <div
+      style={{
+        marginBottom: "32px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          marginBottom: "8px",
+        }}
+      >
+        {icon}
+        <h3
+          style={{
+            fontSize: "13px",
+            fontWeight: 600,
+            color: "var(--color-panel-text)",
+            margin: 0,
+          }}
+        >
+          {title}
+        </h3>
+      </div>
+      {description && (
+        <p
+          style={{
+            fontSize: "12px",
+            color: "var(--color-panel-text-secondary)",
+            marginBottom: "12px",
+          }}
+        >
+          {description}
+        </p>
+      )}
+      {children}
+    </div>
+  );
+}
+
 export function DesktopIntegrations() {
   const {
     projectPath,
@@ -211,41 +265,16 @@ export function DesktopIntegrations() {
       >
         <div style={{ maxWidth: "600px" }}>
           {/* Project Directory Section */}
-          <div style={{ marginBottom: "32px" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                marginBottom: "8px",
-              }}
-            >
+          <Section
+            title="Project Directory"
+            icon={
               <FolderOpen
                 size={16}
                 style={{ color: "var(--color-panel-accent)" }}
               />
-              <h3
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "var(--color-panel-text)",
-                  margin: 0,
-                }}
-              >
-                Project Directory
-              </h3>
-            </div>
-            <p
-              style={{
-                fontSize: "12px",
-                color: "var(--color-panel-text-secondary)",
-                marginBottom: "12px",
-              }}
-            >
-              Your Convex project directory for terminal commands, automatic
-              schema fixes, and file operations
-            </p>
-
+            }
+            description="Your Convex project directory for terminal commands, automatic schema fixes, and file operations"
+          >
             {/* Validation error */}
             {validationError && (
               <div
@@ -356,41 +385,16 @@ export function DesktopIntegrations() {
                 </button>
               )}
             </div>
-          </div>
+          </Section>
 
           {/* Editor Preference Section */}
-          <div style={{ marginBottom: "32px" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                marginBottom: "8px",
-              }}
-            >
+          <Section
+            title="Preferred Editor"
+            icon={
               <Code2 size={16} style={{ color: "var(--color-panel-accent)" }} />
-              <h3
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "var(--color-panel-text)",
-                  margin: 0,
-                }}
-              >
-                Preferred Editor
-              </h3>
-            </div>
-            <p
-              style={{
-                fontSize: "12px",
-                color: "var(--color-panel-text-secondary)",
-                marginBottom: "12px",
-              }}
-            >
-              Choose which code editor to open when applying schema fixes. Make
-              sure your editor is installed and available in your PATH.
-            </p>
-
+            }
+            description="Choose which code editor to open when applying schema fixes. Make sure your editor is installed and available in your PATH."
+          >
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {Object.keys(allEditors).map((editorKey) => {
                 const editor = allEditors[editorKey];
@@ -877,43 +881,19 @@ export function DesktopIntegrations() {
                 </div>
               </div>
             )}
-          </div>
+          </Section>
 
           {/* GitHub Section */}
-          <div style={{ marginBottom: "32px" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                marginBottom: "8px",
-              }}
-            >
+          <Section
+            title="GitHub"
+            icon={
               <Github
                 size={16}
                 style={{ color: "var(--color-panel-accent)" }}
               />
-              <h3
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "var(--color-panel-text)",
-                  margin: 0,
-                }}
-              >
-                GitHub
-              </h3>
-            </div>
-            <p
-              style={{
-                fontSize: "12px",
-                color: "var(--color-panel-text-secondary)",
-                marginBottom: "12px",
-              }}
-            >
-              Connect to GitHub to view schema history from your repository
-            </p>
-
+            }
+            description="Connect to GitHub to view schema history from your repository"
+          >
             {!github?.hasConvexProject ? (
               <div
                 style={{
@@ -1150,30 +1130,13 @@ export function DesktopIntegrations() {
                 )}
               </div>
             )}
-          </div>
+          </Section>
 
           {/* External Integrations Link */}
-          <div>
-            <h3
-              style={{
-                fontSize: "13px",
-                fontWeight: 600,
-                color: "var(--color-panel-text)",
-                marginBottom: "8px",
-              }}
-            >
-              Other Integrations
-            </h3>
-            <p
-              style={{
-                fontSize: "12px",
-                color: "var(--color-panel-text-secondary)",
-                marginBottom: "12px",
-              }}
-            >
-              Configure log streaming, exception reporting, and data export in
-              the Convex Dashboard
-            </p>
+          <Section
+            title="Other Integrations"
+            description="Configure log streaming, exception reporting, and data export in the Convex Dashboard"
+          >
             <a
               href="https://docs.convex.dev/production/integrations/"
               target="_blank"
@@ -1196,7 +1159,7 @@ export function DesktopIntegrations() {
               Learn about integrations
               <ExternalLink size={12} />
             </a>
-          </div>
+          </Section>
         </div>
       </div>
     </div>
