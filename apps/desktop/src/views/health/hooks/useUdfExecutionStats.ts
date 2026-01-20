@@ -8,6 +8,7 @@ import {
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { useDeployment } from "@/contexts/deployment-context";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/query-context";
+import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
 
 // Use Tauri's fetch for CORS-free HTTP requests
 const desktopFetch: FetchFn = (input, init) => tauriFetch(input, init);
@@ -28,6 +29,9 @@ export const udfExecutionStatsKeys = {
 export function useUdfExecutionStats(cursor?: number) {
   const { deploymentUrl, authToken } = useDeployment();
   const queryClient = useQueryClient();
+  
+  // Only refetch when tab is visible
+  const refetchInterval = useVisibilityRefetch(REFETCH_INTERVAL.functionStats);
 
   const enabled = Boolean(deploymentUrl && authToken);
   
@@ -51,8 +55,9 @@ export function useUdfExecutionStats(cursor?: number) {
     },
     enabled,
     staleTime: STALE_TIME.functionStats,
-    refetchInterval: REFETCH_INTERVAL.functionStats,
+    refetchInterval,
     refetchOnMount: false,
+    refetchOnWindowFocus: false,
     // Add placeholder data to prevent blocking renders - show previous data if available, otherwise empty array
     placeholderData: (previousData) => previousData ?? [],
   });

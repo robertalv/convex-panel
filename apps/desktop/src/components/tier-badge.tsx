@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { getPlanInfo } from "./get-plan-info";
-import type { TeamSubscription } from "@/api/bigbrain";
+import type { TeamSubscription } from "@convex-panel/shared/api";
 
 export function TierBadge({
     subscription,

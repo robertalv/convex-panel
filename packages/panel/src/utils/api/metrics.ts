@@ -663,9 +663,7 @@ export async function fetchRecentErrors(
         log.status === "failure" ||
         log.log_level === "ERROR" ||
         log.error_message,
-    );
-
-    // Count errors by message
+    );    // Count errors by message
     const errorCounts = new Map<string, number>();
     errorLogs.forEach((log) => {
       const message = log.error_message || log.message || "Unknown error";

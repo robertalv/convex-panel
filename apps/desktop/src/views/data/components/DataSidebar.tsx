@@ -4,7 +4,15 @@
  */
 
 import { useState, useMemo, useEffect } from "react";
-import { Database, Table2, Search, Plus, X, Clock } from "lucide-react";
+import {
+  Database,
+  Table2,
+  Search,
+  Plus,
+  X,
+  Clock,
+  FileText,
+} from "lucide-react";
 import type {
   TableDefinition,
   RecentlyViewedTable,
@@ -24,6 +32,7 @@ interface DataSidebarProps {
   onComponentSelect?: (componentId: string | null) => void;
   components?: ConvexComponent[];
   onCreateTable?: (tableName: string) => Promise<void>;
+  onOpenSchemaSheet?: () => void;
 }
 
 export function DataSidebar({
@@ -35,6 +44,7 @@ export function DataSidebar({
   onComponentSelect,
   components = [],
   onCreateTable,
+  onOpenSchemaSheet,
 }: DataSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [expanded, setExpanded] = useState({
@@ -380,18 +390,49 @@ export function DataSidebar({
 
       {/* Stats footer */}
       <div
-        className="p-2 text-[10px] flex items-center justify-between"
+        className="flex flex-col"
         style={{
           borderTop: "1px solid var(--color-border-base)",
-          color: "var(--color-text-muted)",
         }}
       >
-        <span>{Object.keys(tables).length} tables</span>
-        {selectedTable && (
-          <span className="truncate max-w-[100px]" title={selectedTable}>
-            {selectedTable}
-          </span>
+        {/* Schema button */}
+        {onOpenSchemaSheet && (
+          <button
+            onClick={onOpenSchemaSheet}
+            className="w-full p-2 text-xs font-medium flex items-center justify-center gap-2 transition-colors"
+            style={{
+              color: "var(--color-text-muted)",
+              borderBottom: "1px solid var(--color-border-base)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor =
+                "var(--color-surface-raised)";
+              e.currentTarget.style.color = "var(--color-text-base)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+              e.currentTarget.style.color = "var(--color-text-muted)";
+            }}
+          >
+            <FileText size={12} />
+            <span>View Full Schema</span>
+          </button>
         )}
+
+        {/* Stats row */}
+        <div
+          className="p-2 text-[10px] flex items-center justify-between"
+          style={{
+            color: "var(--color-text-muted)",
+          }}
+        >
+          <span>{Object.keys(tables).length} tables</span>
+          {selectedTable && (
+            <span className="truncate max-w-[100px]" title={selectedTable}>
+              {selectedTable}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

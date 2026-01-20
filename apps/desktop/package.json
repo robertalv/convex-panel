@@ -17,6 +17,7 @@
     "tauri:build:test": "NODE_ENV=production tauri build --bundles app && ./scripts/post-build.sh"
   },
   "dependencies": {
+    "@convex-panel/registry": "workspace:*",
     "@convex-panel/shared": "workspace:*",
     "@headlessui/react": "^2.2.9",
     "@hugeicons/core-free-icons": "^3.1.1",
@@ -57,6 +58,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hotkeys-hook": "^4.6.2",
+    "react-markdown": "^10.1.0",
     "react-popper": "^2.3.0",
     "react-resizable-panels": "^4.4.1",
     "react-router-dom": "^7.1.1",

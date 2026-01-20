@@ -12,7 +12,7 @@ import {
   Loader2,
   Database,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Toolbar } from "@/components/ui/toolbar";
 import { ToolbarButton, IconButton } from "@/components/ui/button";
 import { ComponentSelector } from "@/components/component-selector";
@@ -79,6 +79,15 @@ export function LogsToolbar({
   localLogCount,
 }: LogsToolbarProps) {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+
+  // Track if we've completed initial functions load
+  const hasCompletedInitialLoad = useRef(false);
+
+  useEffect(() => {
+    if (!isLoading) {
+      hasCompletedInitialLoad.current = true;
+    }
+  }, [isLoading]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
@@ -215,14 +224,16 @@ export function LogsToolbar({
             />
           )}
 
-          {/* Loading indicator - only show initially, not constantly */}
-          {isLoading && functions.length === 0 && (
-            <Loader2
-              size={14}
-              className="animate-spin"
-              style={{ color: "var(--color-text-muted)" }}
-            />
-          )}
+          {/* Loading indicator - only show during initial load */}
+          {isLoading &&
+            functions.length === 0 &&
+            !hasCompletedInitialLoad.current && (
+              <Loader2
+                size={14}
+                className="animate-spin"
+                style={{ color: "var(--color-text-muted)" }}
+              />
+            )}
         </>
       }
       right={
@@ -277,11 +288,11 @@ export function LogsToolbar({
               onClose={() => setMoreMenuOpen(false)}
               align="right"
             >
-              {/* View Storage */}
+              {/* View Historical Logs */}
               {onViewStorage && (
                 <MenuItem
                   icon={<Database size={14} />}
-                  label="View Storage"
+                  label="View Historical Logs"
                   onClick={() => {
                     onViewStorage();
                     setMoreMenuOpen(false);

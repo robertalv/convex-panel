@@ -83,6 +83,7 @@ export {
   getDeployments,
   getProfile,
   getTeamSubscription,
+  getTeamMembers,
   // Token & Auth functions
   getTokenDetails,
   getTeamFromDeployment,
@@ -104,6 +105,8 @@ export {
   getDiscordAccounts,
   unlinkDiscordAccount,
   deleteAccount,
+  // Invoice functions
+  getInvoices,
   // Constants
   BIG_BRAIN_URL,
   BIG_BRAIN_DASHBOARD_PATH,
@@ -119,6 +122,7 @@ export {
   type Deployment,
   type UserProfile,
   type TeamSubscription,
+  type TeamMember,
   type TokenDetails,
   type AccessToken,
   type TeamAndProject,
@@ -128,4 +132,12 @@ export {
   type ProfileEmail,
   type Identity,
   type DiscordAccount,
+  type Invoice,
 } from "./bigbrain";
+
+// Export marketplace API functions
+export {
+  fetchMarketplaceComponents,
+  parseComponentsFromHtml,
+  clearMarketplaceCache,
+} from "./marketplace";

@@ -9,7 +9,7 @@ import type {
   User,
   ThemeType,
 } from "@/types/desktop";
-import type { TeamSubscription, Invoice } from "@/api/bigbrain";
+import type { TeamSubscription, Invoice } from "@convex-panel/shared/api";
 import { TerminalPanel } from "../../views/terminal";
 import { useTerminalActions } from "../../contexts/terminal-context";
 import { FunctionRunnerPanel } from "../function-runner-panel";
@@ -40,6 +40,7 @@ interface AppShellProps {
   onDisconnect: () => void;
   onOpenSettings?: () => void;
   onNavigateToProjectSelector?: () => void;
+  onRefreshProjects?: () => void;
   theme: "light" | "dark" | "system";
   user: User | null;
   teams: Team[];
@@ -50,12 +51,15 @@ interface AppShellProps {
   selectedDeployment: Deployment | null;
   subscription: TeamSubscription | null;
   invoices: Invoice[];
-  onSelectTeam: (team: Team) => void;
-  onSelectProject: (project: Project) => void;
-  onSelectDeployment: (deployment: Deployment) => void;
+  onSelectTeam?: (team: Team) => void;
+  onSelectProject?: (project: Project) => void;
+  onSelectDeployment?: (deployment: Deployment) => void;
   className?: string;
   hideNav?: boolean;
+  teamsLoading?: boolean;
   deploymentsLoading?: boolean;
+  /** Whether the app is in deploy key mode (restricted features) */
+  isDeployKeyMode?: boolean;
 }
 
 export function AppShell({
@@ -68,6 +72,7 @@ export function AppShell({
   onDisconnect,
   onOpenSettings,
   onNavigateToProjectSelector,
+  onRefreshProjects,
   theme,
   user,
   teams,
@@ -83,7 +88,9 @@ export function AppShell({
   onSelectDeployment,
   className,
   hideNav = false,
+  teamsLoading = false,
   deploymentsLoading = false,
+  isDeployKeyMode: _isDeployKeyMode = false,
 }: AppShellProps) {
   const projectPathContext = useProjectPathOptional();
   const projectPath = projectPathContext?.projectPath ?? null;
@@ -196,7 +203,9 @@ export function AppShell({
           onDisconnect={onDisconnect}
           onOpenSettings={onOpenSettings}
           onNavigateToProjectSelector={onNavigateToProjectSelector}
+          onRefreshProjects={onRefreshProjects}
           theme={theme}
+          teamsLoading={teamsLoading}
           deploymentsLoading={deploymentsLoading}
         />
         {showFailedPaymentBanner && selectedTeam && (

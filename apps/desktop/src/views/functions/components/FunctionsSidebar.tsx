@@ -200,7 +200,7 @@ export function FunctionsSidebar({
 
       {/* Search input */}
       <div
-        className="p-2"
+        className="p-2 h-[45px]"
         style={{ borderBottom: "1px solid var(--color-border-base)" }}
       >
         <div className="relative">

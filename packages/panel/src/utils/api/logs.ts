@@ -199,7 +199,8 @@ export async function streamUdfExecution(
 
   let entries = (data.entries || []) as FunctionExecutionJson[];
 
-  let newCursor: number | string = cursor;
+  // Use the new cursor from the response, falling back to the provided cursor
+  let newCursor: number | string = data.new_cursor ?? cursor;
 
   return {
     entries,

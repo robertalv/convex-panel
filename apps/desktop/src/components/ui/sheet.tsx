@@ -83,7 +83,7 @@ export const Sheet: React.FC<SheetProps> = ({
   const isInline = renderMode === "inline";
   const portalTarget = container || document.body;
   const positionType = isInline
-    ? "relative"
+    ? "absolute"
     : isInContainer
       ? "absolute"
       : "fixed";
@@ -113,14 +113,10 @@ export const Sheet: React.FC<SheetProps> = ({
       <div
         style={{
           position: positionType,
-          top: isInline ? undefined : 0,
-          left: isInline
-            ? undefined
-            : fullscreen && isInContainer
-              ? 0
-              : undefined,
-          right: isInline ? undefined : 0,
-          bottom: isInline ? undefined : 0,
+          top: isInline ? 0 : 0,
+          left: isInline ? "auto" : fullscreen && isInContainer ? 0 : undefined,
+          right: isInline ? 0 : 0,
+          bottom: isInline ? 0 : 0,
           width: isInline
             ? width
             : fullscreen && isInContainer

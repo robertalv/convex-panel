@@ -117,7 +117,6 @@ export const fetchSourceCode = async (
   const response = await fetch(url, {
     headers: {
       Authorization: normalizedToken,
-      "Content-Type": "application/json",
       "Convex-Client": "dashboard-0.0.0",
     },
   });
@@ -129,32 +128,8 @@ export const fetchSourceCode = async (
     );
   }
 
-  const text = await response.text();
-
-  if (text === "null" || text.trim() === "") {
-    return null;
-  }
-
-  try {
-    const json = JSON.parse(text);
-
-    if (json === null || json === undefined) {
-      return null;
-    }
-    if (typeof json === "object" && "code" in json) {
-      return (json as any).code || null;
-    }
-    if (typeof json === "object" && "source" in json) {
-      return (json as any).source || null;
-    }
-    if (typeof json === "string") {
-      return json;
-    }
-  } catch {
-    // Not JSON, fall through and return raw text
-  }
-
-  return text;
+  // The API returns JSON - either null or a string
+  return await response.json();
 };
 
 /**
@@ -301,7 +276,8 @@ export async function discoverFunctions(
         }
       } else if (fn.componentPath) {
         const component = componentsList.find(
-          (c: any) => c.path === fn.componentPath || c.name === fn.componentPath,
+          (c: any) =>
+            c.path === fn.componentPath || c.name === fn.componentPath,
         );
         if (component && component.name) {
           componentId = component.name;
@@ -395,5 +371,3 @@ export function findFunctionByIdentifier(
       (componentId === undefined || fn.componentId === componentId),
   );
 }
-
-

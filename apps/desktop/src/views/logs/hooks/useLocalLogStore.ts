@@ -114,20 +114,47 @@ export function useLocalLogStore(): UseLocalLogStoreReturn {
     async (logs: LogEntry[], deployment: string): Promise<IngestResult> => {
       try {
         setError(null);
+
+        // Helper to convert float fields to integers in nested objects
+        const sanitizeNumericFields = (obj: any): any => {
+          if (obj === null || obj === undefined) return obj;
+          if (typeof obj !== "object") return obj;
+          if (Array.isArray(obj)) return obj.map(sanitizeNumericFields);
+
+          const sanitized: any = {};
+          for (const [key, value] of Object.entries(obj)) {
+            // Convert known timestamp and duration fields to integers
+            if (
+              (key.includes("timestamp") ||
+                key.includes("time") ||
+                key === "execution_time" ||
+                key === "ts") &&
+              typeof value === "number"
+            ) {
+              sanitized[key] = Math.floor(value);
+            } else if (typeof value === "object") {
+              sanitized[key] = sanitizeNumericFields(value);
+            } else {
+              sanitized[key] = value;
+            }
+          }
+          return sanitized;
+        };
+
         // Convert LogEntry to IngestLogEntry format expected by Rust
         const ingestEntries = logs.map((log) => ({
           id: log.id,
-          timestamp: log.timestamp,
+          timestamp: Math.floor(log.timestamp), // Ensure integer
           functionIdentifier: log.functionIdentifier,
           functionName: log.functionName,
           udfType: log.udfType,
           requestId: log.requestId,
           executionId: log.executionId,
           success: log.success,
-          durationMs: log.durationMs,
+          durationMs: Math.floor(log.durationMs), // Convert float to integer
           error: log.error,
           logLines: log.logLines,
-          raw: log.raw,
+          raw: sanitizeNumericFields(log.raw), // Sanitize nested timestamp fields
         }));
 
         const result = await invoke<IngestResult>("ingest_logs", {
@@ -329,9 +356,22 @@ export function useLocalLogStore(): UseLocalLogStoreReturn {
 
   // Load initial stats and settings on mount
   useEffect(() => {
-    getStats();
-    getSettings();
-  }, [getStats, getSettings]);
+    let mounted = true;
+
+    const loadData = async () => {
+      if (!mounted) return;
+      await getStats();
+      if (!mounted) return;
+      await getSettings();
+    };
+
+    loadData();
+
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   return {
     ingestLogs,

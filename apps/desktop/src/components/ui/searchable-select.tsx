@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "./input";
 import { Team, Deployment } from "@/types/desktop";
 import { TierBadge } from "../tier-badge";
-import type { TeamSubscription } from "@/api/bigbrain";
+import type { TeamSubscription } from "@convex-panel/shared/api";
 import { EnvironmentBadge } from "../env-badge";
 import Icon from "../ui/icon";
 
@@ -34,6 +34,7 @@ interface SearchableSelectPropsBase {
   buttonClassName?: string;
   buttonStyle?: React.CSSProperties;
   variant?: "ghost" | "outline" | "primary" | "secondary";
+  onOpen?: () => void;
 }
 
 interface SearchableSelectSingleProps extends SearchableSelectPropsBase {
@@ -73,6 +74,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
     buttonClassName,
     buttonStyle,
     variant = "ghost",
+    onOpen,
   } = props;
 
   const multiSelect = props.multiSelect || false;
@@ -271,7 +273,15 @@ export function SearchableSelect(props: SearchableSelectProps) {
       <button
         ref={buttonRef}
         type="button"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={() => {
+          if (!disabled) {
+            const willOpen = !isOpen;
+            setIsOpen(willOpen);
+            if (willOpen && onOpen) {
+              onOpen();
+            }
+          }
+        }}
         disabled={disabled}
         style={buttonStyle}
         className={cn(

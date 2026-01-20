@@ -1,7 +1,0 @@
-**/api
-**/build
-**/public
-pnpm-lock.yaml
-routeTree.gen.ts
-convex/_generated/*
-dist/*

@@ -1,0 +1,933 @@
+{
+  "version": "1.0.0",
+  "updatedAt": "2026-01-20T04:10:59.137Z",
+  "components": [
+    {
+      "id": "agent",
+      "name": "AI Agent",
+      "description": "Build AI agents that can use tools, maintain memory, and have conversations with users.",
+      "longDescription": "The AI Agent component provides a framework for building sophisticated AI agents that can interact with your Convex backend. Agents can use tools to perform actions, maintain conversation history, and provide intelligent responses to user queries.",
+      "category": "ai",
+      "status": "stable",
+      "npmPackage": "@convex-dev/agent",
+      "repoUrl": "https://github.com/get-convex/agent",
+      "docsUrl": "https://docs.convex.dev/components/agent",
+      "weeklyDownloads": 17303,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/ai-agent.png",
+        "alt": "AI Agent"
+      },
+      "tags": [
+        "ai",
+        "agent",
+        "llm",
+        "tools",
+        "chat"
+      ]
+    },
+    {
+      "id": "rag",
+      "name": "RAG",
+      "description": "Document search component to aid RAG. Add, search, and manage content with hybrid text and vector search capabilities.",
+      "longDescription": "The RAG component provides a comprehensive document search system for building Retrieval-Augmented Generation applications. It supports adding content from various sources, automatic chunking, hybrid search combining text and vector search, filter-based queries, and lifecycle management. Features include content deduplication, async processing, and customizable chunking strategies.",
+      "category": "ai",
+      "status": "stable",
+      "npmPackage": "@convex-dev/rag",
+      "repoUrl": "https://github.com/get-convex/rag",
+      "weeklyDownloads": 7039,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/RAG.png",
+        "alt": "RAG"
+      },
+      "tags": [
+        "ai",
+        "rag",
+        "embeddings",
+        "vector",
+        "search",
+        "document-search"
+      ]
+    },
+    {
+      "id": "persistent-text-streaming",
+      "name": "Persistent Text Streaming",
+      "description": "Stream text back to a client over HTTP while persisting it on the server for reloading/sharing.",
+      "longDescription": "This Convex component enables persistent text streaming. It provides a React hook for streaming text from HTTP actions while simultaneously storing the data in the database. This persistence allows the text to be accessed after the stream ends or by other users. The most common use case is for AI chat applications.",
+      "category": "ai",
+      "status": "stable",
+      "npmPackage": "@convex-dev/persistent-text-streaming",
+      "repoUrl": "https://github.com/get-convex/persistent-text-streaming",
+      "docsUrl": "https://www.convex.dev/components/persistent-text-streaming",
+      "weeklyDownloads": 4893,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/persistent-text-streaming.png",
+        "alt": "Persistent Text Streaming"
+      },
+      "tags": [
+        "ai",
+        "streaming",
+        "llm",
+        "text",
+        "http",
+        "chat"
+      ]
+    },
+    {
+      "id": "neutral-cost",
+      "name": "Neutral Cost",
+      "description": "Organizes all of your costs into one place. Seamlessly track your AI usage and tool costs and charge accordingly.",
+      "longDescription": "This component makes it easy to define and track AI costs and tool costs, giving you visibility into your actual costs, customer profitability, flexible billing with prepaid credits and configurable markup multipliers, and sophisticated rate limiting. Knowing your costs is the foundation for building your business AND your business model.",
+      "category": "ai",
+      "status": "stable",
+      "npmPackage": "neutral-cost",
+      "repoUrl": "https://github.com/neutralbase/neutral-cost",
+      "docsUrl": "https://www.convex.dev/components/neutralcost",
+      "weeklyDownloads": 151,
+      "author": {
+        "name": "neutralbase",
+        "avatar": "https://avatars.githubusercontent.com/u/129193010",
+        "github": "neutralbase"
+      },
+      "image": {
+        "src": "/neutralcost.png",
+        "alt": "Neutral Cost"
+      },
+      "tags": [
+        "ai",
+        "cost-tracking",
+        "billing",
+        "pricing",
+        "analytics",
+        "usage-tracking"
+      ]
+    },
+    {
+      "id": "better-auth",
+      "name": "Better Auth",
+      "description": "Full-featured authentication with social logins, magic links, and more.",
+      "longDescription": "Better Auth provides a comprehensive authentication solution for Convex applications. It includes support for email/password, social providers (Google, GitHub, Discord, Twitter, and more), magic links, two-factor authentication, and session management. Framework agnostic with support for React, Vue, Svelte, Astro, Solid, Next.js, Nuxt, Tanstack Start, Hono, and more. Full documentation available at labs.convex.dev/better-auth.",
+      "category": "auth",
+      "status": "stable",
+      "npmPackage": "@convex-dev/better-auth",
+      "repoUrl": "https://github.com/get-convex/better-auth",
+      "docsUrl": "https://www.convex.dev/components/better-auth",
+      "weeklyDownloads": 22350,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/betterauth.png",
+        "alt": "Better Auth"
+      },
+      "tags": [
+        "auth",
+        "authentication",
+        "social-login",
+        "magic-link"
+      ]
+    },
+    {
+      "id": "workos-authkit",
+      "name": "WorkOS AuthKit",
+      "description": "Integrate WorkOS AuthKit authentication with your Convex project. Sync user data reliably and respond to events with Convex functions.",
+      "longDescription": "This component is the official way to integrate WorkOS AuthKit authentication with your Convex project. It syncs user data from WorkOS to your Convex database reliably and durably, and allows you to respond to events with Convex functions. Features include user data syncing, webhook handling, and event processing.",
+      "category": "auth",
+      "status": "stable",
+      "npmPackage": "@convex-dev/workos-authkit",
+      "repoUrl": "https://github.com/get-convex/workos-authkit",
+      "docsUrl": "https://workos.com/docs/user-management/convex",
+      "weeklyDownloads": 2869,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/workos.png",
+        "alt": "WorkOS AuthKit"
+      },
+      "tags": [
+        "auth",
+        "workos",
+        "authentication",
+        "sso",
+        "enterprise"
+      ]
+    },
+    {
+      "id": "rate-limiter",
+      "name": "Rate Limiter",
+      "description": "This component provides application-level rate limiting.",
+      "longDescription": "Define and use application-layer rate limits in Convex. Type-safe, transactional, fair, safe, and configurable sharding to scale. Supports both fixed window and token bucket algorithms, per-user rate limits, capacity reservation, and React hooks for client-side rate limit checking.",
+      "category": "backend",
+      "status": "stable",
+      "npmPackage": "@convex-dev/rate-limiter",
+      "repoUrl": "https://github.com/get-convex/rate-limiter",
+      "docsUrl": "https://www.convex.dev/components/rate-limiter",
+      "weeklyDownloads": 29194,
+      "author": {
+        "name": "Convex",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/rate-limiter.png",
+        "alt": "Rate Limiter"
+      },
+      "tags": [
+        "backend",
+        "rate-limit",
+        "security",
+        "throttle",
+        "token-bucket",
+        "fixed-window"
+      ]
+    },
+    {
+      "id": "presence",
+      "name": "Presence",
+      "description": "Track user presence and show who's online in real-time.",
+      "longDescription": "A Convex component for managing presence functionality, i.e., a live-updating list of users in a \"room\" including their status for when they were last online. It implements presence via Convex scheduled functions such that clients only receive updates when a user joins or leaves the room. The most common use case is via the usePresence hook, which takes care of sending heartbeat messages to the server and gracefully disconnecting a user when the tab is closed.",
+      "category": "backend",
+      "status": "stable",
+      "npmPackage": "@convex-dev/presence",
+      "repoUrl": "https://github.com/get-convex/presence",
+      "docsUrl": "https://www.convex.dev/components/presence",
+      "weeklyDownloads": 7708,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/presence.png",
+        "alt": "Presence"
+      },
+      "tags": [
+        "backend",
+        "presence",
+        "realtime",
+        "users"
+      ]
+    },
+    {
+      "id": "action-cache",
+      "name": "Action Cache",
+      "description": "Cache expensive action results to improve performance and reduce costs.",
+      "longDescription": "Sometimes your app needs to fetch information from a third-party API that is slow or costs money. Caching can help! This is a Convex component that can cache the results of expensive functions and set an optional TTL. Expired entries are cleaned up via a cron job once a day. The cache key is the ActionCache's name (defaults to function name) and the arguments to the action that generates the cache values.",
+      "category": "backend",
+      "status": "stable",
+      "npmPackage": "@convex-dev/action-cache",
+      "repoUrl": "https://github.com/get-convex/action-cache",
+      "docsUrl": "https://www.convex.dev/components/action-cache",
+      "weeklyDownloads": 7500,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/action-cache.png",
+        "alt": "Action Cache"
+      },
+      "tags": [
+        "backend",
+        "cache",
+        "performance",
+        "actions"
+      ]
+    },
+    {
+      "id": "files-control",
+      "name": "Files Control",
+      "description": "Secure file uploads, access control, download grants, and lifecycle cleanup. Works with Convex storage and Cloudflare R2.",
+      "longDescription": "A Convex component for secure file uploads, access control, download grants, and lifecycle cleanup. Works with Convex storage and Cloudflare R2, and ships with an optional HTTP upload/download router plus a React upload hook. Features include two-step uploads (presigned URL) with access keys and optional expiration, optional HTTP upload/download routes with auth hooks, download grants with max uses and expiration, access-key based authorization, built-in cleanup for expired uploads and grants, and the ability to transfer files between Convex and R2.",
+      "category": "backend",
+      "status": "stable",
+      "npmPackage": "@gilhrpenner/convex-files-control",
+      "repoUrl": "https://github.com/gilhrpenner/convex-files-control",
+      "docsUrl": "https://www.convex.dev/components/files-control",
+      "weeklyDownloads": 273,
+      "author": {
+        "name": "gilhrpenner",
+        "avatar": "https://avatars.githubusercontent.com/u/24423300",
+        "github": "gilhrpenner"
+      },
+      "image": {
+        "src": "/files-control.png",
+        "alt": "Files Control"
+      },
+      "tags": [
+        "backend",
+        "files",
+        "storage",
+        "upload",
+        "download",
+        "access-control"
+      ]
+    },
+    {
+      "id": "timeline",
+      "name": "Timeline",
+      "description": "Undo/redo state management with named checkpoints and automatic pruning.",
+      "longDescription": "A Convex component for undo/redo state management with named checkpoints. Timeline maintains a linear history of state snapshots organized by scope. It provides undo/redo functionality to navigate backward and forward through state history, named checkpoints that persist independently of the timeline, and automatic pruning with configurable limits to prevent unbounded growth. The pruning behavior matches the standard undo/redo model used by editors like Google Docs, VSCode, and Notion.",
+      "category": "backend",
+      "status": "stable",
+      "npmPackage": "convex-timeline",
+      "repoUrl": "https://github.com/MeshanKhosla/convex-timeline",
+      "docsUrl": "https://www.convex.dev/components/timeline",
+      "weeklyDownloads": 236,
+      "author": {
+        "name": "MeshanKhosla",
+        "avatar": "https://avatars.githubusercontent.com/u/24885081",
+        "github": "MeshanKhosla"
+      },
+      "image": {
+        "src": "/timeline.png",
+        "alt": "Timeline"
+      },
+      "tags": [
+        "backend",
+        "timeline",
+        "undo",
+        "redo",
+        "checkpoint",
+        "state-management"
+      ]
+    },
+    {
+      "id": "nano-banana",
+      "name": "Nano Banana",
+      "description": "AI image generation component for Convex, powered by Google Gemini. Generate and edit images with persistent storage and real-time status tracking.",
+      "longDescription": "AI Image Generation Component for Convex, powered by Google Gemini. Generate stunning AI images directly in your Convex backend with persistent storage, real-time status tracking, and a clean TypeScript API. Features include text-to-image generation, image editing with text instructions, automatic storage in Convex file storage, reactive queries that update as generation progresses, support for multiple Gemini models, and generation history tracking. Bring your own Gemini API key for secure, server-side usage.",
+      "category": "backend",
+      "status": "stable",
+      "npmPackage": "convex-nano-banana",
+      "repoUrl": "https://github.com/dperussina/convex-nano-banana",
+      "docsUrl": "https://www.convex.dev/components/nano-banana",
+      "weeklyDownloads": 55,
+      "author": {
+        "name": "dperussina",
+        "avatar": "https://avatars.githubusercontent.com/u/379170",
+        "github": "dperussina"
+      },
+      "image": {
+        "src": "/nano-banana.png",
+        "alt": "Nano Banana"
+      },
+      "tags": [
+        "backend",
+        "ai",
+        "image-generation",
+        "gemini",
+        "images"
+      ]
+    },
+    {
+      "id": "migrations",
+      "name": "Migrations",
+      "description": "Run data migrations safely with progress tracking and rollback support.",
+      "longDescription": "The Migrations component provides a robust framework for running data migrations in your Convex database. It allows you to define functions that run on all documents in a table (or a specified subset), running in batches asynchronously as online migrations. The component tracks migration state to avoid running twice, pick up where it left off in case of failures, and expose migration state in realtime via Convex queries. Supports running migrations one at a time or serially, dry-run testing, custom batch sizes, and parallelization options.",
+      "category": "database",
+      "status": "stable",
+      "npmPackage": "@convex-dev/migrations",
+      "repoUrl": "https://github.com/get-convex/migrations",
+      "docsUrl": "https://www.convex.dev/components/migrations",
+      "weeklyDownloads": 25348,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/migrations.png",
+        "alt": "Migrations"
+      },
+      "tags": [
+        "database",
+        "migrations",
+        "data",
+        "schema"
+      ]
+    },
+    {
+      "id": "aggregate",
+      "name": "Aggregate",
+      "description": "Efficiently compute aggregations like counts, sums, and averages.",
+      "longDescription": "This Convex component calculates count and sums of values for efficient aggregation. It provides O(log(n))-time lookups instead of O(n) that would result from naive usage. The Aggregate component maintains a data structure with denormalized counts and sums, effectively a key-value store sorted by key. Supports grouping by prefix, namespacing for partitioning, batch operations for better performance, and reactive queries that automatically update. Perfect for leaderboards, pagination, random access, and analytics queries.",
+      "category": "database",
+      "status": "stable",
+      "npmPackage": "@convex-dev/aggregate",
+      "repoUrl": "https://github.com/get-convex/aggregate",
+      "docsUrl": "https://www.convex.dev/components/aggregate",
+      "weeklyDownloads": 11910,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/aggregate.png",
+        "alt": "Aggregate"
+      },
+      "tags": [
+        "database",
+        "aggregate",
+        "count",
+        "sum",
+        "analytics"
+      ]
+    },
+    {
+      "id": "sharded-counter",
+      "name": "Sharded Counter",
+      "description": "High-performance distributed counters that scale with your application.",
+      "longDescription": "This component adds counters to Convex. It acts as a key-value store from string to number, with sharding to increase throughput when updating values. Since it's built on Convex, everything is automatically consistent, reactive, and cached. Since it's built with Components, the operations are isolated and increment/decrement are atomic even if run in parallel. The ShardedCounter distributes counts across multiple documents called \"shards\" to achieve high throughput - increments and decrements update a random shard while queries read from all shards. Perfect for counters that change frequently but are read less often.",
+      "category": "database",
+      "status": "stable",
+      "npmPackage": "@convex-dev/sharded-counter",
+      "repoUrl": "https://github.com/get-convex/sharded-counter",
+      "docsUrl": "https://www.convex.dev/components/sharded-counter",
+      "weeklyDownloads": 4125,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/sharded-counter.png",
+        "alt": "Sharded Counter"
+      },
+      "tags": [
+        "database",
+        "counter",
+        "distributed",
+        "performance"
+      ]
+    },
+    {
+      "id": "geospatial",
+      "name": "Geospatial",
+      "description": "Store and query geographic data with efficient spatial indexing.",
+      "longDescription": "This component adds a geospatial index to Convex, allowing you to efficiently store and query points on the Earth's surface. Insert points into the geospatial key-value store along with their geographic coordinates, efficiently query for all points within a given rectangle on the sphere, control the sort order for results with a custom sorting key, and filter query results with equality and IN clauses. Supports querying points within rectangles and finding nearest points with optional maximum distance. Since it's built on Convex, everything is automatically consistent, reactive, and cached. Currently in beta - tested up to about 1,000,000 points.",
+      "category": "database",
+      "status": "beta",
+      "npmPackage": "@convex-dev/geospatial",
+      "repoUrl": "https://github.com/get-convex/geospatial",
+      "docsUrl": "https://www.convex.dev/components/geospatial",
+      "weeklyDownloads": 1405,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/geospatial.png",
+        "alt": "Geospatial"
+      },
+      "tags": [
+        "database",
+        "geospatial",
+        "location",
+        "maps"
+      ]
+    },
+    {
+      "id": "workpool",
+      "name": "Work Pool",
+      "description": "Process background jobs with configurable concurrency and retries.",
+      "longDescription": "This Convex component pools actions and mutations to restrict parallel requests. Configure multiple pools with different parallelism to separate and throttle async workloads. Retry failed actions with backoff and jitter for idempotent actions, fully configurable while respecting parallelism. Includes an onComplete callback to build durable, reliable workflows that are called when work finishes, whether it succeeded, failed, or was canceled. Helps reduce database write conflicts by limiting parallelism and provides reactive status tracking for asynchronous work.",
+      "category": "durable-functions",
+      "status": "stable",
+      "npmPackage": "@convex-dev/workpool",
+      "repoUrl": "https://github.com/get-convex/workpool",
+      "docsUrl": "https://www.convex.dev/components/workpool",
+      "weeklyDownloads": 44567,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/workpool.png",
+        "alt": "Work Pool"
+      },
+      "tags": [
+        "durable-functions",
+        "jobs",
+        "queue",
+        "background"
+      ]
+    },
+    {
+      "id": "workflow",
+      "name": "Workflow",
+      "description": "Build complex multi-step workflows with state machines and persistence.",
+      "longDescription": "This component adds durably executed workflows to Convex. Combine Convex queries, mutations, and actions into long-lived workflows that always fully execute to completion. Workflows can run for months and survive server restarts. Run steps in parallel or sequence, with output from previous steps available to pass to subsequent steps. Specify retry behavior on a per-step basis, control how many workflow steps can run in parallel to manage load, cancel long-running workflows, and observe workflow status reactively via subscriptions. Supports waiting for external events, running nested workflows, and custom scheduling with delays.",
+      "category": "durable-functions",
+      "status": "stable",
+      "npmPackage": "@convex-dev/workflow",
+      "repoUrl": "https://github.com/get-convex/workflow",
+      "docsUrl": "https://www.convex.dev/components/workflow",
+      "weeklyDownloads": 18074,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/workflow.png",
+        "alt": "Workflow"
+      },
+      "tags": [
+        "durable-functions",
+        "workflow",
+        "state-machine",
+        "orchestration"
+      ]
+    },
+    {
+      "id": "retrier",
+      "name": "Action Retrier",
+      "description": "Automatically retry failed operations with configurable backoff strategies.",
+      "longDescription": "Actions can sometimes fail due to network errors, server restarts, or issues with a 3rd party API. The Action Retrier component makes retrying them really easy. It will automatically retry your action up to four times (configurable) before giving up, sleeping with exponential backoff between retries. Supports configurable initial backoff, exponential base, and maximum failures. Includes status tracking, cancellation support, onComplete callbacks, and automatic cleanup of completed runs after 7 days.",
+      "category": "durable-functions",
+      "status": "stable",
+      "npmPackage": "@convex-dev/action-retrier",
+      "repoUrl": "https://github.com/get-convex/action-retrier",
+      "docsUrl": "https://www.convex.dev/components/retrier",
+      "weeklyDownloads": 13358,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/retrier.png",
+        "alt": "Action Retrier"
+      },
+      "tags": [
+        "durable-functions",
+        "retry",
+        "backoff",
+        "resilience"
+      ]
+    },
+    {
+      "id": "crons",
+      "name": "Crons",
+      "description": "Schedule recurring tasks with cron expressions and timezone support.",
+      "longDescription": "This Convex component provides functionality for registering and managing cron jobs at runtime. Unlike Convex's built-in cron jobs which must be statically defined at deployment time, this library allows for dynamic registration of cron jobs at runtime. Supports both cron schedules using the standard Unix cron format and intervals in milliseconds. Provides methods to register, get, list, and delete cron jobs by name or ID. Crons are created transactionally and guaranteed to exist after the mutation that creates them has run, enabling self-deleting cron jobs and other dynamic workflows.",
+      "category": "durable-functions",
+      "status": "stable",
+      "npmPackage": "@convex-dev/crons",
+      "repoUrl": "https://github.com/get-convex/crons",
+      "docsUrl": "https://www.convex.dev/components/crons",
+      "weeklyDownloads": 4564,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/crons.png",
+        "alt": "Crons"
+      },
+      "tags": [
+        "durable-functions",
+        "cron",
+        "schedule",
+        "recurring"
+      ]
+    },
+    {
+      "id": "resend",
+      "name": "Resend",
+      "description": "Send transactional emails with Resend's modern email API.",
+      "longDescription": "This component is the official way to integrate the Resend email service with your Convex project. Features include queueing for reliable delivery, automatic batching of large groups of emails sent to Resend's batch endpoint efficiently, durable execution using Convex workpools to ensure emails are eventually delivered even in the face of temporary failures, idempotency management with Resend idempotency keys to guarantee emails are delivered exactly once, and rate limiting that honors API rate limits. Supports webhooks for delivery status tracking, React Email integration, Resend templates, and manual email sending for advanced use cases like attachments.",
+      "category": "integrations",
+      "status": "stable",
+      "npmPackage": "@convex-dev/resend",
+      "repoUrl": "https://github.com/get-convex/resend",
+      "docsUrl": "https://www.convex.dev/components/resend",
+      "weeklyDownloads": 20900,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/resend_component.png",
+        "alt": "Resend"
+      },
+      "tags": [
+        "integrations",
+        "email",
+        "resend",
+        "notifications"
+      ]
+    },
+    {
+      "id": "twilio",
+      "name": "Twilio SMS",
+      "description": "Send and receive SMS messages in your Convex app using Twilio.",
+      "longDescription": "This Convex component integrates with Twilio to enable sending and receiving SMS messages in your Convex application. Features include sending SMS messages via Convex actions with automatic status tracking, receiving incoming SMS messages via webhook handlers, querying messages by various criteria (by SID, phone number, counterparty), automatic delivery status updates that are written to the database, custom callbacks for handling incoming messages, and configurable webhook routing. The component subscribes to Twilio status updates and maintains the most up-to-date message status in your Convex database.",
+      "category": "integrations",
+      "status": "stable",
+      "npmPackage": "@convex-dev/twilio",
+      "repoUrl": "https://github.com/get-convex/twilio",
+      "docsUrl": "https://www.convex.dev/components/twilio",
+      "weeklyDownloads": 1849,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/twilio-sms.png",
+        "alt": "Twilio SMS"
+      },
+      "tags": [
+        "integrations",
+        "sms",
+        "twilio",
+        "communication",
+        "messaging",
+        "webhooks"
+      ]
+    },
+    {
+      "id": "push-notifications",
+      "name": "Expo Push Notifications",
+      "description": "Send push notifications to mobile devices using Expo's push notification API.",
+      "longDescription": "This Convex component integrates with Expo's push notification API to allow sending mobile push notifications to users of your app. It batches calls to Expo's API and handles retrying delivery. Features include registering users for push notifications with token management, sending notifications to specific users, pausing and resuming push notifications for users, querying notification status and viewing all notifications for a user, configurable logging for troubleshooting, and graceful shutdown and restart capabilities.",
+      "category": "integrations",
+      "status": "stable",
+      "npmPackage": "@convex-dev/expo-push-notifications",
+      "repoUrl": "https://github.com/get-convex/expo-push-notifications",
+      "docsUrl": "https://www.convex.dev/components/push-notifications",
+      "weeklyDownloads": 3267,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/expo-push.png",
+        "alt": "Expo Push Notifications"
+      },
+      "tags": [
+        "integrations",
+        "push",
+        "notifications",
+        "mobile",
+        "expo",
+        "react-native"
+      ]
+    },
+    {
+      "id": "prosemirror-sync",
+      "name": "ProseMirror Sync",
+      "description": "Real-time collaborative text editing with ProseMirror.",
+      "longDescription": "Add a collaborative editor that syncs to the cloud. With this component, users can edit the same document in multiple tabs or devices, and the changes will be synced to the cloud. The data lives in your Convex database and can be stored alongside the rest of your app's data. Features include safely merging changes between clients via operational transformations (OT), simple React hooks to fetch the initial document and keep it in sync, support for both Tiptap and BlockNote editors, server-side entrypoints for authorizing reads, writes, and snapshots, debounced snapshots that allow new clients to avoid reading the full history, and the ability to transform documents server-side for AI interoperation.",
+      "category": "integrations",
+      "status": "stable",
+      "npmPackage": "@convex-dev/prosemirror-sync",
+      "repoUrl": "https://github.com/get-convex/prosemirror-sync",
+      "docsUrl": "https://www.convex.dev/components/prosemirror-sync",
+      "weeklyDownloads": 3817,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/prosemirror.png",
+        "alt": "ProseMirror Sync"
+      },
+      "tags": [
+        "integrations",
+        "prosemirror",
+        "collaboration",
+        "editor",
+        "tiptap",
+        "blocknote",
+        "real-time"
+      ]
+    },
+    {
+      "id": "launchdarkly",
+      "name": "LaunchDarkly Feature Flags",
+      "description": "Feature flagging and experimentation using LaunchDarkly. Syncs your LaunchDarkly environment to your Convex deployment.",
+      "longDescription": "This Convex component syncs your LaunchDarkly environment to your Convex deployment, allowing you to use feature flags in your Convex functions to dynamically control the behavior of your app. Features include real-time syncing of LaunchDarkly flags and segments to Convex, using feature flags in Convex queries, mutations, and actions, running A/B tests and feature experiments, webhook-based synchronization that keeps flags up-to-date without additional API requests, support for multiple LaunchDarkly environments in one Convex app, and secure webhook handling with shared secrets. The component provides the LaunchDarkly SDK interface for evaluating flags and variations.",
+      "category": "integrations",
+      "status": "beta",
+      "npmPackage": "@convex-dev/launchdarkly",
+      "repoUrl": "https://github.com/get-convex/launchdarkly",
+      "docsUrl": "https://www.convex.dev/components/launchdarkly",
+      "weeklyDownloads": 1349,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/launchdarkly.png",
+        "alt": "LaunchDarkly Feature Flags"
+      },
+      "tags": [
+        "integrations",
+        "feature-flags",
+        "ab-testing",
+        "launchdarkly",
+        "experimentation"
+      ]
+    },
+    {
+      "id": "oss-stats",
+      "name": "OSS Stats",
+      "description": "Keep GitHub and npm data for your open source projects synced to your Convex database.",
+      "longDescription": "This Convex component syncs GitHub and npm statistics for your open source projects to your Convex database. Features include syncing GitHub star counts and dependent counts for owners, orgs, and individual repos, syncing npm download counts for packages and orgs, real-time updates via GitHub webhooks for live star counts, React hooks for querying stats and displaying forecasted download counts, day-of-week averages for analyzing trends, support for multiple GitHub owners and npm orgs, and manual sync options via cron jobs or HTTP endpoints. Perfect for displaying project statistics on your website or dashboard.",
+      "category": "integrations",
+      "status": "stable",
+      "npmPackage": "@erquhart/convex-oss-stats",
+      "repoUrl": "https://github.com/erquhart/convex-oss-stats",
+      "docsUrl": "https://www.convex.dev/components/oss-stats",
+      "weeklyDownloads": 123,
+      "author": {
+        "name": "erquhart",
+        "avatar": "https://avatars.githubusercontent.com/u/2112202?s=48&v=4",
+        "github": "erquhart"
+      },
+      "image": {
+        "src": "/oss-stats.png",
+        "alt": "OSS Stats"
+      },
+      "tags": [
+        "integrations",
+        "github",
+        "npm",
+        "statistics",
+        "open-source",
+        "analytics"
+      ]
+    },
+    {
+      "id": "cloudinary",
+      "name": "Cloudinary",
+      "description": "Image and video upload, transformation, and asset management with Cloudinary integration.",
+      "longDescription": "This Convex component provides a complete integration with Cloudinary for image and video management. Features include two upload methods: base64 upload for small files (<10MB) and direct upload for large files (100MB+) that bypasses Convex's 16MB limit with real-time progress tracking, automatic asset tracking in Convex with optimized indexes, dynamic image transformations generated on-the-fly, full TypeScript support with exported validators, React hooks for upload, transformation, and asset operations, reactive upload status tracking across browser tabs, server-side signature generation for security, and direct API integration using Cloudinary REST APIs for better control and reduced dependencies.",
+      "category": "integrations",
+      "status": "stable",
+      "npmPackage": "@imaxis/cloudinary-convex",
+      "repoUrl": "https://github.com/imaxisXD/cloudinary-convex",
+      "docsUrl": "https://www.convex.dev/components/cloudinary",
+      "weeklyDownloads": 34,
+      "author": {
+        "name": "imaxisXD",
+        "avatar": "https://avatars.githubusercontent.com/u/56172425?s=48&v=4",
+        "github": "imaxisXD"
+      },
+      "image": {
+        "src": "/cloudinary.png",
+        "alt": "Cloudinary"
+      },
+      "tags": [
+        "integrations",
+        "cloudinary",
+        "images",
+        "video",
+        "upload",
+        "transformation",
+        "asset-management"
+      ]
+    },
+    {
+      "id": "cloudflare-r2",
+      "name": "Cloudflare R2",
+      "description": "Store and serve files with Cloudflare R2 object storage.",
+      "longDescription": "The Cloudflare R2 component provides a complete integration for storing and serving files with Cloudflare R2. It supports file uploads using signed URLs, React and Svelte hooks for seamless client-side uploads, automatic metadata syncing to your Convex database, file serving via URL generation with configurable expiration, file deletion, and metadata access. Features include two-step uploads (presigned URL) with access keys, optional HTTP upload/download routes, download grants with max uses and expiration, and the ability to store files from actions.",
+      "category": "storage",
+      "status": "stable",
+      "npmPackage": "@convex-dev/r2",
+      "repoUrl": "https://github.com/get-convex/r2",
+      "docsUrl": "https://www.convex.dev/components/cloudflare-r2",
+      "weeklyDownloads": 7606,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/cloudflare-r2.png",
+        "alt": "Cloudflare R2"
+      },
+      "tags": [
+        "storage",
+        "cloudflare",
+        "r2",
+        "files",
+        "upload",
+        "object-storage"
+      ]
+    },
+    {
+      "id": "convex-fs",
+      "name": "ConvexFS",
+      "description": "Virtual filesystem for Convex, backed by Bunny.net Edge Storage & CDN.",
+      "longDescription": "ConvexFS is a Convex component that provides filesystem-like operations for managing files in your Convex application. Instead of dealing with raw blob storage, you work with familiar concepts like paths, files, and directories—while getting the performance benefits of a global CDN. Features include path-based file management, atomic transactions, reference-counted blobs, signed CDN URLs, soft deletes, flexible authentication, file expiration, and custom CDN parameters.",
+      "category": "storage",
+      "status": "alpha",
+      "npmPackage": "convex-fs",
+      "repoUrl": "https://github.com/jamwt/convex-fs",
+      "docsUrl": "https://www.convex.dev/components/convex-fs",
+      "weeklyDownloads": 300,
+      "author": {
+        "name": "jamwt",
+        "avatar": "https://avatars.githubusercontent.com/u/61509",
+        "github": "jamwt"
+      },
+      "image": {
+        "src": "/convex-fs.png",
+        "alt": "ConvexFS"
+      },
+      "tags": [
+        "storage",
+        "filesystem",
+        "files",
+        "cdn",
+        "bunny"
+      ]
+    },
+    {
+      "id": "stripe",
+      "name": "Stripe",
+      "description": "Accept payments, manage subscriptions, and handle billing with Stripe.",
+      "longDescription": "A Convex component for integrating Stripe payments, subscriptions, and billing into your Convex application. Features include checkout sessions for one-time payments and subscriptions, subscription management (create, update, cancel, reactivate), automatic customer creation and linking, customer portal for users to manage their billing, seat-based pricing for team billing with subscription quantity updates, user/organization linking for payments and subscriptions, automatic webhook handling that syncs Stripe data to your Convex database, and real-time queries for payments, subscriptions, and invoices. The component automatically handles webhook events for customers, subscriptions, payments, invoices, and checkout sessions.",
+      "category": "payments",
+      "status": "stable",
+      "npmPackage": "@convex-dev/stripe",
+      "repoUrl": "https://github.com/get-convex/stripe",
+      "docsUrl": "https://www.convex.dev/components/stripe",
+      "weeklyDownloads": 4627,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/stripe.png",
+        "alt": "Stripe"
+      },
+      "tags": [
+        "payments",
+        "stripe",
+        "subscriptions",
+        "billing",
+        "checkout",
+        "invoices"
+      ]
+    },
+    {
+      "id": "polar",
+      "name": "Polar",
+      "description": "Add subscriptions and billing to your Convex app with Polar.",
+      "longDescription": "This Convex component integrates with Polar to add subscriptions and billing to your Convex application. Features include webhook-based synchronization of subscription data from Polar to your Convex database, React components for checkout links and customer portal access, subscription management (change, cancel, reactivate subscriptions), product and pricing display with support for monthly and yearly plans, automatic user linking for subscription data, real-time subscription status queries, and support for both single and multiple active subscriptions per user. Perfect for open source projects and applications that need subscription billing.",
+      "category": "payments",
+      "status": "stable",
+      "npmPackage": "@convex-dev/polar",
+      "repoUrl": "https://github.com/erquhart/convex-polar",
+      "docsUrl": "https://www.convex.dev/components/polar",
+      "weeklyDownloads": 3644,
+      "author": {
+        "name": "Convex",
+        "avatar": "https://avatars.githubusercontent.com/u/81530787",
+        "github": "get-convex"
+      },
+      "image": {
+        "src": "/polar.png",
+        "alt": "Polar"
+      },
+      "tags": [
+        "payments",
+        "polar",
+        "open-source",
+        "subscriptions",
+        "billing"
+      ]
+    },
+    {
+      "id": "autumn",
+      "name": "Autumn",
+      "description": "Usage-based billing and metering for SaaS applications.",
+      "longDescription": "Autumn is your pricing and customer database—an abstraction over Stripe that lets you model any pricing (subscriptions, usage-based, seats, trials, credits) and implement it in your codebase with just three functions: check for access, track for metering, and checkout for purchases. Features include flexible pricing models (subscriptions, usage-based, seats, trials, credits), React hooks and components for frontend integration, automatic customer identification and linking, feature access checking and usage tracking, checkout and billing portal integration, product listing and management, referral code creation and redemption, entity billing support for organizations, and real-time customer data queries. Perfect for SaaS applications that need flexible billing and metering capabilities.",
+      "category": "payments",
+      "status": "beta",
+      "npmPackage": "@useautumn/convex",
+      "repoUrl": "https://github.com/useautumn/autumn-js",
+      "docsUrl": "https://www.convex.dev/components/autumn",
+      "weeklyDownloads": 2111,
+      "author": {
+        "name": "useautumn",
+        "avatar": "https://avatars.githubusercontent.com/u/194405912?s=200&v=4",
+        "github": "useautumn"
+      },
+      "image": {
+        "src": "/autumn.png",
+        "alt": "Autumn"
+      },
+      "tags": [
+        "payments",
+        "billing",
+        "usage-based",
+        "metering",
+        "subscriptions",
+        "stripe"
+      ]
+    },
+    {
+      "id": "dodopayments",
+      "name": "Dodo Payments",
+      "description": "Official Dodo Payments integration for Convex with checkout sessions, customer portal, and webhooks.",
+      "longDescription": "This component is the official way to integrate Dodo Payments in your Convex project. Features include checkout session integration with just a couple of lines of code, customer portal for managing subscriptions and payment details, efficient webhook handling with automatic verification—just write your business logic and handle the events you want, customer identification and mapping to Dodo Payments customers, support for product carts with multiple items and quantities, discount code support, and flexible return URL configuration. The component handles webhook verification automatically, allowing you to focus on your business logic for events like payment succeeded, subscription activated, and other payment events.",
+      "category": "payments",
+      "status": "stable",
+      "npmPackage": "@dodopayments/convex",
+      "repoUrl": "https://github.com/dodopayments/dodo-adapters",
+      "docsUrl": "https://www.convex.dev/components/dodopayments",
+      "weeklyDownloads": 203,
+      "author": {
+        "name": "dodopayments",
+        "avatar": "https://avatars.githubusercontent.com/u/168640166?s=200&v=4",
+        "github": "dodopayments"
+      },
+      "image": {
+        "src": "/dodo.png",
+        "alt": "Dodo Payments"
+      },
+      "tags": [
+        "payments",
+        "checkout",
+        "subscriptions",
+        "webhooks",
+        "customer-portal"
+      ]
+    }
+  ]
+}

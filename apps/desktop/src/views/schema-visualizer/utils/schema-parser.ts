@@ -105,10 +105,19 @@ function parseValidator(
 function parseTable(tableDef: TableDefinitionJSON): SchemaTable {
   const fields: SchemaField[] = [];
 
+  console.log(
+    `[parseTable] Parsing table ${tableDef.tableName}:`,
+    tableDef.documentType,
+  );
+
   // Parse document type fields
   if (tableDef.documentType) {
     if (tableDef.documentType.type === "object") {
       const objType = tableDef.documentType;
+      console.log(
+        `[parseTable] Object type value for ${tableDef.tableName}:`,
+        objType.value,
+      );
       Object.entries(objType.value).forEach(([fieldName, fieldDef]) => {
         fields.push(
           parseValidator(fieldName, fieldDef.fieldType, fieldDef.optional),
@@ -124,40 +133,50 @@ function parseTable(tableDef: TableDefinitionJSON): SchemaTable {
     }
   }
 
+  console.log(
+    `[parseTable] Parsed ${fields.length} fields for ${tableDef.tableName}`,
+  );
+
   // Parse indexes
   const indexes: SchemaIndex[] = [];
 
   // DB indexes
-  tableDef.indexes.forEach((idx) => {
-    indexes.push({
-      name: idx.indexDescriptor,
-      fields: idx.fields,
-      type: "db",
-      staged: false,
+  if (tableDef.indexes) {
+    tableDef.indexes.forEach((idx) => {
+      indexes.push({
+        name: idx.indexDescriptor,
+        fields: idx.fields,
+        type: "db",
+        staged: false,
+      });
     });
-  });
+  }
 
   // Staged DB indexes
-  tableDef.stagedDbIndexes?.forEach((idx) => {
-    indexes.push({
-      name: idx.indexDescriptor,
-      fields: idx.fields,
-      type: "db",
-      staged: true,
+  if (tableDef.stagedDbIndexes) {
+    tableDef.stagedDbIndexes.forEach((idx) => {
+      indexes.push({
+        name: idx.indexDescriptor,
+        fields: idx.fields,
+        type: "db",
+        staged: true,
+      });
     });
-  });
+  }
 
   // Search indexes
-  tableDef.searchIndexes.forEach((idx) => {
-    indexes.push({
-      name: idx.indexDescriptor,
-      fields: [...idx.filterFields],
-      type: "search",
-      staged: false,
-      searchField: idx.searchField,
-      filterFields: idx.filterFields,
+  if (tableDef.searchIndexes) {
+    tableDef.searchIndexes.forEach((idx) => {
+      indexes.push({
+        name: idx.indexDescriptor,
+        fields: [...idx.filterFields],
+        type: "search",
+        staged: false,
+        searchField: idx.searchField,
+        filterFields: idx.filterFields,
+      });
     });
-  });
+  }
 
   // Staged search indexes
   tableDef.stagedSearchIndexes?.forEach((idx) => {

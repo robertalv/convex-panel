@@ -1,6 +1,11 @@
 export { ThemeProvider, useTheme } from "./theme-context";
 export { DeploymentProvider, useDeployment } from "./deployment-context";
 export {
+  AuthModeProvider,
+  useAuthMode,
+  useIsDeployKeyMode,
+} from "./auth-mode-context";
+export {
   TerminalProvider,
   useTerminal,
   useTerminalActions,

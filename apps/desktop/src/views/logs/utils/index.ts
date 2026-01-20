@@ -6,3 +6,4 @@
 export * from "./formatters";
 export * from "./log-export";
 export * from "./interleaveLogs";
+export * from "./keyboard-navigation";

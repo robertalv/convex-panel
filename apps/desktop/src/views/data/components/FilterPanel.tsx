@@ -209,15 +209,18 @@ export function FilterPanel({
     });
   }, [newClauseField, newClauseOp, draftFilters]);
 
-  // Remove a filter clause
+  // Remove a filter clause (auto-applies the change)
   const handleRemoveClause = useCallback(
     (id: string) => {
-      setDraftFilters({
+      const newFilters = {
         ...draftFilters,
         clauses: draftFilters.clauses.filter((c) => c.id !== id),
-      });
+      };
+      setDraftFilters(newFilters);
+      onFiltersChange(newFilters);
+      addToHistory(newFilters);
     },
-    [draftFilters],
+    [draftFilters, onFiltersChange, addToHistory],
   );
 
   // Toggle clause enabled state

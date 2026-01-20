@@ -1,4 +1,4 @@
-import { Invoice } from "@/api/bigbrain";
+import type { Invoice } from "@convex-panel/shared/api";
 
 interface FailedPaymentBannerProps {
   teamSlug: string;

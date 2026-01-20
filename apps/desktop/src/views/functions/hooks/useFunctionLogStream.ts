@@ -36,19 +36,17 @@ export function useFunctionLogStream({
   const [logs, setLogs] = useState<FunctionExecutionLog[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  // Cursor is an opaque token from Convex, not a wall-clock timestamp.
-  // Start from 0 so we actually receive recent executions; the server will
-  // advance us via `new_cursor` on each response.
-  const [cursor, setCursor] = useState<number | string>(() => 0);
 
   const abortRef = useRef<AbortController | null>(null);
   const isStreamingRef = useRef(false);
+  // Use a ref for cursor so the streaming loop always has access to the latest value
+  const cursorRef = useRef<number | string>(0);
 
   const reset = () => {
     setLogs([]);
     // Reset back to the initial cursor so we can refetch from the server's
     // notion of the beginning; it will immediately advance us.
-    setCursor(0);
+    cursorRef.current = 0;
     setError(null);
 
     abortRef.current?.abort();
@@ -57,6 +55,7 @@ export function useFunctionLogStream({
 
   useEffect(() => {
     reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFunction?.identifier]);
 
   useEffect(() => {
@@ -82,9 +81,28 @@ export function useFunctionLogStream({
       setIsLoading(true);
       while (!cancelled && isStreamingRef.current) {
         try {
+          // Use cursorRef.current to always get the latest cursor value
+          const currentCursor = cursorRef.current;
+          const signal = abortRef.current?.signal;
           const { entries, newCursor } = useProgressEvents
-            ? await streamFunctionLogs(deploymentUrl, authToken, cursor)
-            : await streamUdfExecution(deploymentUrl, authToken, cursor);
+            ? await streamFunctionLogs(
+                deploymentUrl,
+                authToken,
+                currentCursor,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                signal,
+              )
+            : await streamUdfExecution(
+                deploymentUrl,
+                authToken,
+                currentCursor,
+                undefined,
+                undefined,
+                signal,
+              );
 
           const processed = processFunctionLogs(entries, selectedFunction);
           if (processed.length > 0) {
@@ -102,8 +120,9 @@ export function useFunctionLogStream({
             });
           }
 
-          if (typeof newCursor === "number") {
-            setCursor(newCursor);
+          // Update the cursor ref with the new cursor from the API
+          if (newCursor !== undefined && newCursor !== null) {
+            cursorRef.current = newCursor;
           }
           setError(null);
 
@@ -140,14 +159,13 @@ export function useFunctionLogStream({
     isPaused,
     useProgressEvents,
     useMockData,
-    cursor,
   ]);
 
   return {
     logs,
     isLoading,
     error,
-    cursor,
+    cursor: cursorRef.current,
     reset,
   };
 }

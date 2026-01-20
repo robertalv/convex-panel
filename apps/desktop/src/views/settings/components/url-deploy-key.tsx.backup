@@ -1,0 +1,1699 @@
+import { useState, useEffect } from "react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Check,
+  AlertCircle,
+  AlertTriangle,
+  Plus,
+  Loader2,
+  Key,
+  Trash2,
+  CheckCircle2,
+  RefreshCw,
+} from "lucide-react";
+import { useDeployment } from "../../../contexts/deployment-context";
+import {
+  getDeploymentAccessTokens,
+  createAccessToken,
+  deleteAccessToken,
+  type AccessToken,
+} from "../../../api/bigbrain";
+import {
+  getKeyPreview,
+  readDeployKeyFromEnvLocal,
+  writeDeployKeyToEnvLocal,
+} from "../../../lib/envFile";
+import { useProjectPathOptional } from "../../../contexts/project-path-context";
+
+/**
+ * Get the deployment type from a deployment name
+ */
+function getDeploymentType(
+  deploymentName: string | undefined,
+): "prod" | "dev" | "preview" | null {
+  if (!deploymentName) return null;
+  if (deploymentName.includes("-prod-") || deploymentName.endsWith("-prod")) {
+    return "prod";
+  }
+  if (deploymentName.includes("-dev-") || deploymentName.endsWith("-dev")) {
+    return "dev";
+  }
+  if (
+    deploymentName.includes("-preview-") ||
+    deploymentName.endsWith("-preview")
+  ) {
+    return "preview";
+  }
+  // Default to prod if no pattern matches (older deployments)
+  return "prod";
+}
+
+/**
+ * Check if a serialized access token matches the current deploy key
+ * Handles both formatted keys (type:deployment|token) and raw tokens
+ */
+function isTokenActive(
+  currentDeployKey: string | null | undefined,
+  serializedAccessToken: string,
+  deploymentName: string,
+): boolean {
+  if (!currentDeployKey) return false;
+
+  // Direct match (both in same format)
+  if (currentDeployKey === serializedAccessToken) return true;
+
+  // Check if currentDeployKey contains the serializedAccessToken
+  // currentDeployKey format: "dev:deployment-name|token"
+  // serializedAccessToken might be: "token" or "dev:deployment-name|token"
+  if (currentDeployKey.includes("|")) {
+    const tokenPart = currentDeployKey.split("|")[1];
+    if (tokenPart === serializedAccessToken) return true;
+  }
+
+  // Check if we need to construct the full key format to compare
+  const type = getDeploymentType(deploymentName) || "prod";
+  const constructedKey = `${type}:${deploymentName}|${serializedAccessToken}`;
+  if (currentDeployKey === constructedKey) return true;
+
+  return false;
+}
+
+export function UrlDeployKey() {
+  const projectPathContext = useProjectPathOptional();
+  const projectPath = projectPathContext?.projectPath ?? null;
+  const deployment = useDeployment();
+  const [isExpanded, setIsExpanded] = useState(true);
+  const [copiedValue, setCopiedValue] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // .env.local state
+  const [envLocalKey, setEnvLocalKey] = useState<string | null>(null);
+  const [isWritingEnvLocal, setIsWritingEnvLocal] = useState(false);
+
+  // API keys state
+  const [apiKeys, setApiKeys] = useState<AccessToken[]>([]);
+  const [isLoadingKeys, setIsLoadingKeys] = useState(false);
+  const [isCreatingKey, setIsCreatingKey] = useState(false);
+  const [deletingKeyId, setDeletingKeyId] = useState<string | null>(null);
+  const [deletedKeyIds, setDeletedKeyIds] = useState<Set<string>>(new Set());
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [keyToDelete, setKeyToDelete] = useState<{
+    accessToken: string;
+    name: string;
+    isActive: boolean;
+  } | null>(null);
+
+  const deploymentUrl = deployment.deploymentUrl || "";
+  // HTTP Actions URL - construct it from deployment URL if not available
+  const httpActionsUrl = deployment.deploymentUrl
+    ? deployment.deploymentUrl.replace(".convex.cloud", ".convex.site")
+    : "";
+  const deploymentType = getDeploymentType(deployment.deployment?.name);
+  const isDev = deploymentType === "dev";
+  const isNonProd = deploymentType !== "prod";
+
+  // Load API keys
+  useEffect(() => {
+    loadApiKeys();
+  }, [deployment.deployment?.name, deployment.accessToken, deployment.fetchFn]);
+
+  // Load .env.local key
+  useEffect(() => {
+    if (projectPath) {
+      readDeployKeyFromEnvLocal(projectPath)
+        .then(setEnvLocalKey)
+        .catch(() => setEnvLocalKey(null));
+    }
+  }, [projectPath]);
+
+  const loadApiKeys = async () => {
+    console.log("[UrlDeployKey] loadApiKeys called", {
+      hasAccessToken: Boolean(deployment.accessToken),
+      deploymentName: deployment.deployment?.name,
+      hasFetchFn: Boolean(deployment.fetchFn),
+      deploymentId: deployment.deployment?.id,
+    });
+
+    if (
+      !deployment.accessToken ||
+      !deployment.deployment?.name ||
+      !deployment.fetchFn
+    ) {
+      console.log("[UrlDeployKey] Missing required data, not loading API keys");
+      setApiKeys([]);
+      return;
+    }
+
+    setIsLoadingKeys(true);
+    try {
+      console.log(
+        "[UrlDeployKey] Fetching deployment access tokens for:",
+        deployment.deployment.name,
+      );
+      const tokens = await getDeploymentAccessTokens(
+        deployment.accessToken,
+        deployment.deployment.name,
+        deployment.fetchFn,
+      );
+      console.log("[UrlDeployKey] Loaded API keys:", tokens.length);
+      setApiKeys(tokens);
+    } catch (err) {
+      console.error("[UrlDeployKey] Failed to load API keys:", err);
+      setApiKeys([]);
+    } finally {
+      setIsLoadingKeys(false);
+    }
+  };
+
+  const copyToClipboard = async (text: string, identifier: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedValue(identifier);
+      setTimeout(() => setCopiedValue(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  const handleCreateDeployKey = async () => {
+    if (
+      !deployment.accessToken ||
+      !deployment.deployment ||
+      !deployment.fetchFn ||
+      !deployment.teamId
+    ) {
+      setError("Missing required information to create deploy key");
+      return;
+    }
+
+    const trimmedName = newKeyName.trim();
+    if (!trimmedName) {
+      return;
+    }
+
+    setIsCreatingKey(true);
+    setError(null);
+    try {
+      const result = await createAccessToken(
+        deployment.accessToken,
+        {
+          name: trimmedName,
+          teamId: deployment.teamId,
+          deploymentId: deployment.deployment.id,
+        },
+        deployment.fetchFn,
+      );
+
+      // Use the newly created key
+      await deployment.setManualDeployKey(result.accessToken);
+
+      // Reload keys
+      await loadApiKeys();
+
+      setNewKeyName("");
+      setShowCreateDialog(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create key");
+    } finally {
+      setIsCreatingKey(false);
+    }
+  };
+
+  const handleDeleteKey = async () => {
+    if (!deployment.accessToken || !deployment.fetchFn || !keyToDelete) {
+      return;
+    }
+
+    // Check if we're deleting the currently active key
+    const isDeletingActiveKey = keyToDelete.isActive;
+
+    setDeletingKeyId(keyToDelete.accessToken);
+    try {
+      await deleteAccessToken(
+        deployment.accessToken,
+        keyToDelete.accessToken,
+        deployment.fetchFn,
+      );
+
+      // Mark as deleted (shows "Deleted!" message)
+      setDeletedKeyIds((prev) => new Set(prev).add(keyToDelete.accessToken));
+      setDeletingKeyId(null);
+
+      // If we deleted the active key, clear it from the deployment context
+      if (isDeletingActiveKey) {
+        await deployment.clearManualDeployKey();
+      }
+
+      // Wait 1 second to show "Deleted!" message, then remove from list
+      setTimeout(() => {
+        setApiKeys((prev) =>
+          prev.filter((k) => k.accessToken !== keyToDelete.accessToken),
+        );
+        setDeletedKeyIds((prev) => {
+          const next = new Set(prev);
+          next.delete(keyToDelete.accessToken);
+          return next;
+        });
+      }, 1000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete key");
+      setDeletingKeyId(null);
+    } finally {
+      setKeyToDelete(null);
+    }
+  };
+
+  const handleSelectKey = async (serializedToken: string) => {
+    if (!deployment.deployment?.name) {
+      setError("No deployment selected");
+      return;
+    }
+
+    try {
+      // Check if the key already has the correct format (type:deployment|token)
+      // If it does, use it as-is. If not, construct the proper format.
+      let deployKey: string;
+
+      if (serializedToken.includes(":") && serializedToken.includes("|")) {
+        // Key already in correct format
+        deployKey = serializedToken;
+      } else {
+        // Construct the proper format: {type}:{deployment-name}|{token}
+        const deploymentName = deployment.deployment.name;
+        const type = getDeploymentType(deploymentName) || "prod";
+        deployKey = `${type}:${deploymentName}|${serializedToken}`;
+      }
+
+      await deployment.setManualDeployKey(deployKey);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to activate key");
+    }
+  };
+
+  const handleWriteToEnvLocal = async () => {
+    if (!projectPath || !deployment.cliDeployKey) return;
+
+    setIsWritingEnvLocal(true);
+    setError(null);
+
+    try {
+      await writeDeployKeyToEnvLocal(projectPath, deployment.cliDeployKey);
+      setEnvLocalKey(deployment.cliDeployKey);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to write deploy key",
+      );
+    } finally {
+      setIsWritingEnvLocal(false);
+    }
+  };
+
+  const handleRegenerateKey = async () => {
+    if (deployment.cliDeployKeyLoading) {
+      console.log(
+        "[UrlDeployKey] Key regeneration already in progress, skipping",
+      );
+      return;
+    }
+
+    try {
+      await deployment.regenerateDeployKey();
+      await loadApiKeys();
+    } catch (err) {
+      await loadApiKeys();
+    }
+  };
+
+  if (!deployment.deployment) {
+    return (
+      <div className="flex flex-1 flex-col overflow-hidden bg-background-base">
+        <div className="flex h-[49px] items-center justify-between border-b border-border-base bg-background-base px-2">
+          <h2 className="m-0 text-sm font-bold text-text-base">
+            Deployment URL and Deploy Key
+          </h2>
+        </div>
+        <div className="flex flex-1 items-center justify-center p-8 text-sm text-text-muted">
+          No deployment selected
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        backgroundColor: "var(--color-background-base)",
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          height: "49px",
+          borderBottom: "1px solid var(--color-border-base)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 8px",
+          backgroundColor: "var(--color-background-base)",
+        }}
+      >
+        <h2
+          style={{
+            fontSize: "14px",
+            fontWeight: 700,
+            color: "var(--color-text-base)",
+            margin: 0,
+          }}
+        >
+          Deployment URL and Deploy Key
+        </h2>
+      </div>
+
+      {/* Content */}
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: "16px",
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: "600px",
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            gap: "16px",
+          }}
+        >
+          {/* Description paragraphs */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+              fontSize: "14px",
+              lineHeight: "1.6",
+              color: "var(--color-text-muted)",
+            }}
+          >
+            <p style={{ margin: 0 }}>
+              {deploymentType === "dev"
+                ? "This personal development Convex deployment also has deployment credentials. Edits you make to functions in your editor sync automatically, but it is also possible to deploy to it from somewhere else using a deploy key."
+                : "Manage deploy keys for your Convex deployment. Deploy keys allow you to deploy to this deployment from CI/CD pipelines or other environments."}
+            </p>
+          </div>
+
+          {/* Non-prod Warning */}
+          {isNonProd && deploymentType && (
+            <div
+              style={{
+                padding: "16px",
+                borderRadius: "8px",
+                backgroundColor:
+                  "var(--color-warning-base-alpha, rgba(234, 179, 8, 0.1))",
+                border:
+                  "1px solid var(--color-warning-border, rgba(234, 179, 8, 0.3))",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "12px",
+              }}
+            >
+              <AlertTriangle
+                size={20}
+                style={{
+                  color: "var(--color-warning-base)",
+                  flexShrink: 0,
+                  marginTop: "2px",
+                }}
+              />
+              <div>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: "var(--color-warning-base)",
+                    marginBottom: "4px",
+                  }}
+                >
+                  {deploymentType === "dev"
+                    ? "Development Deployment"
+                    : "Preview Deployment"}
+                </p>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "12px",
+                    color: "var(--color-text-muted)",
+                  }}
+                >
+                  {deploymentType === "dev"
+                    ? "This deploy key is for your development deployment. Data here is separate from production."
+                    : "This deploy key is for a preview deployment. Preview deployments are temporary and may be deleted."}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Active Deploy Key Status */}
+          <div
+            style={{
+              padding: "16px",
+              backgroundColor: "var(--color-surface-raised)",
+              borderRadius: "12px",
+              border: "1px solid var(--color-border-base)",
+            }}
+          >
+            <h3
+              style={{
+                fontSize: "14px",
+                fontWeight: 600,
+                color: "var(--color-text-base)",
+                margin: 0,
+                marginBottom: "4px",
+              }}
+            >
+              Active Deploy Key
+            </h3>
+            <p
+              style={{
+                fontSize: "12px",
+                color: "var(--color-text-muted)",
+                margin: 0,
+                marginBottom: "12px",
+              }}
+            >
+              Currently active key for CLI commands in the terminal
+            </p>
+
+            <div
+              style={{
+                padding: "12px",
+                borderRadius: "8px",
+                border: "1px solid var(--color-border-base)",
+                backgroundColor: "var(--color-surface-base)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "10px",
+                      height: "10px",
+                      borderRadius: "50%",
+                      backgroundColor: deployment.cliDeployKeyError
+                        ? "var(--color-error-base)"
+                        : deployment.cliDeployKeyLoading
+                          ? "var(--color-warning-base, #eab308)"
+                          : deployment.cliDeployKey
+                            ? "var(--color-success-base, #22c55e)"
+                            : "var(--color-text-muted)",
+                    }}
+                  />
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 500,
+                        color: "var(--color-text-base)",
+                      }}
+                    >
+                      {deployment.cliDeployKeyError
+                        ? "Error"
+                        : deployment.cliDeployKeyLoading
+                          ? "Loading..."
+                          : deployment.cliDeployKey
+                            ? deployment.cliDeployKeyIsManual
+                              ? "Manual Key Active"
+                              : "Authenticated"
+                            : "No Key Active"}
+                    </div>
+                    {deployment.cliDeployKey && (
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--color-text-muted)",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {getKeyPreview(deployment.cliDeployKey)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {!deployment.cliDeployKeyLoading && (
+                  <button
+                    onClick={handleRegenerateKey}
+                    disabled={deployment.cliDeployKeyLoading}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "6px 10px",
+                      borderRadius: "6px",
+                      border: "1px solid var(--color-border-base)",
+                      backgroundColor: "transparent",
+                      color: "var(--color-text-base)",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor =
+                        "var(--color-surface-overlay)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
+                    <RefreshCw size={14} />
+                    Regenerate
+                  </button>
+                )}
+              </div>
+
+              {deployment.cliDeployKeyError && (
+                <div
+                  style={{
+                    marginTop: "12px",
+                    padding: "12px",
+                    borderRadius: "8px",
+                    backgroundColor:
+                      "var(--color-error-base-alpha, rgba(239, 68, 68, 0.1))",
+                    border: "1px solid var(--color-error-base)",
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: "12px",
+                      color: "var(--color-error-base)",
+                    }}
+                  >
+                    {deployment.cliDeployKeyError}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Collapsible Development Credentials Section */}
+          <div
+            style={{
+              border: "1px solid var(--color-border-base)",
+              borderRadius: "8px",
+              overflow: "hidden",
+              backgroundColor: "var(--color-surface-raised)",
+            }}
+          >
+            {/* Collapsible Header */}
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                backgroundColor: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: "var(--color-text-base)",
+                fontSize: "14px",
+                textAlign: "left",
+                transition: "background-color 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor =
+                  "var(--color-surface-overlay)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }}
+            >
+              {isExpanded ? (
+                <ChevronUp
+                  size={16}
+                  style={{ color: "var(--color-text-muted)" }}
+                />
+              ) : (
+                <ChevronDown
+                  size={16}
+                  style={{ color: "var(--color-text-muted)" }}
+                />
+              )}
+              <span style={{ fontWeight: 500 }}>
+                {deploymentType === "dev"
+                  ? "Show development credentials"
+                  : "Show deployment credentials"}
+              </span>
+            </button>
+
+            {/* Collapsible Content */}
+            {isExpanded && (
+              <div
+                style={{
+                  padding: "16px",
+                  borderTop: "1px solid var(--color-border-base)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "24px",
+                }}
+              >
+                {/* Deployment URL Section */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                  }}
+                >
+                  <h3
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      color: "var(--color-text-base)",
+                      margin: 0,
+                    }}
+                  >
+                    Deployment URL
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: "13px",
+                      color: "var(--color-text-muted)",
+                      margin: 0,
+                    }}
+                  >
+                    This {deploymentType === "dev" ? "development" : ""} Convex
+                    deployment is hosted at the following URL. Configure a
+                    Convex client with this URL while developing locally.
+                  </p>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        flex: 1,
+                        padding: "8px 12px",
+                        backgroundColor: "var(--color-background-base)",
+                        border: "1px solid var(--color-border-base)",
+                        borderRadius: "6px",
+                        fontSize: "13px",
+                        fontFamily: "monospace",
+                        color: "var(--color-text-base)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {deploymentUrl || "Loading..."}
+                    </div>
+                    <button
+                      onClick={() =>
+                        deploymentUrl &&
+                        copyToClipboard(deploymentUrl, "deployment-url")
+                      }
+                      style={{
+                        padding: "8px",
+                        backgroundColor: "transparent",
+                        border: "1px solid var(--color-border-base)",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color:
+                          copiedValue === "deployment-url"
+                            ? "var(--color-brand-base)"
+                            : "var(--color-text-muted)",
+                        transition: "all 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (copiedValue !== "deployment-url") {
+                          e.currentTarget.style.color =
+                            "var(--color-text-base)";
+                          e.currentTarget.style.borderColor =
+                            "var(--color-brand-base)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (copiedValue !== "deployment-url") {
+                          e.currentTarget.style.color =
+                            "var(--color-text-muted)";
+                          e.currentTarget.style.borderColor =
+                            "var(--color-border-base)";
+                        }
+                      }}
+                      title="Copy deployment URL"
+                    >
+                      {copiedValue === "deployment-url" ? (
+                        <Check size={16} />
+                      ) : (
+                        <Copy size={16} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* HTTP Actions URL Section */}
+                {httpActionsUrl && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px",
+                    }}
+                  >
+                    <h3
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "var(--color-text-base)",
+                        margin: 0,
+                      }}
+                    >
+                      HTTP Actions URL
+                    </h3>
+                    <p
+                      style={{
+                        fontSize: "13px",
+                        color: "var(--color-text-muted)",
+                        margin: 0,
+                      }}
+                    >
+                      This {deploymentType === "dev" ? "development" : ""}{" "}
+                      Convex deployment hosts{" "}
+                      <a
+                        href="https://docs.convex.dev/functions/http-actions"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          color: "var(--color-brand-base)",
+                          textDecoration: "none",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.textDecoration = "underline";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.textDecoration = "none";
+                        }}
+                      >
+                        HTTP Actions
+                      </a>{" "}
+                      at the following URL. In Convex functions, this is
+                      available as process.env.CONVEX_SITE_URL.
+                    </p>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          flex: 1,
+                          padding: "8px 12px",
+                          backgroundColor: "var(--color-background-base)",
+                          border: "1px solid var(--color-border-base)",
+                          borderRadius: "6px",
+                          fontSize: "13px",
+                          fontFamily: "monospace",
+                          color: "var(--color-text-base)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {httpActionsUrl || "Loading..."}
+                      </div>
+                      <button
+                        onClick={() =>
+                          httpActionsUrl &&
+                          copyToClipboard(httpActionsUrl, "http-actions-url")
+                        }
+                        style={{
+                          padding: "8px",
+                          backgroundColor: "transparent",
+                          border: "1px solid var(--color-border-base)",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color:
+                            copiedValue === "http-actions-url"
+                              ? "var(--color-brand-base)"
+                              : "var(--color-text-muted)",
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (copiedValue !== "http-actions-url") {
+                            e.currentTarget.style.color =
+                              "var(--color-text-base)";
+                            e.currentTarget.style.borderColor =
+                              "var(--color-brand-base)";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (copiedValue !== "http-actions-url") {
+                            e.currentTarget.style.color =
+                              "var(--color-text-muted)";
+                            e.currentTarget.style.borderColor =
+                              "var(--color-border-base)";
+                          }
+                        }}
+                        title="Copy HTTP Actions URL"
+                      >
+                        {copiedValue === "http-actions-url" ? (
+                          <Check size={16} />
+                        ) : (
+                          <Copy size={16} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Deploy Keys Section */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "12px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <div>
+                      <h3
+                        style={{
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "var(--color-text-base)",
+                          margin: 0,
+                          marginBottom: "4px",
+                        }}
+                      >
+                        Deploy Keys
+                      </h3>
+                      <p
+                        style={{
+                          fontSize: "13px",
+                          color: "var(--color-text-muted)",
+                          margin: 0,
+                        }}
+                      >
+                        {isDev
+                          ? "It's rare to need a development deploy key."
+                          : "Create and manage deploy keys for CI/CD and other environments."}
+                      </p>
+                    </div>
+                    {deployment.accessToken && deployment.teamId && (
+                      <button
+                        onClick={() => setShowCreateDialog(true)}
+                        disabled={isLoadingKeys}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          padding: "6px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid var(--color-border-base)",
+                          backgroundColor: "transparent",
+                          color: "var(--color-text-base)",
+                          fontSize: "12px",
+                          fontWeight: 500,
+                          cursor: isLoadingKeys ? "not-allowed" : "pointer",
+                          opacity: isLoadingKeys ? 0.5 : 1,
+                          transition: "all 0.15s",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isLoadingKeys) {
+                            e.currentTarget.style.backgroundColor =
+                              "var(--color-surface-overlay)";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <Plus size={14} /> Create Deploy Key
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Create Dialog */}
+                  {showCreateDialog && (
+                    <div
+                      style={{
+                        padding: "16px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--color-brand-base)",
+                        backgroundColor: "var(--color-surface-base)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginBottom: "12px",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 500,
+                            color: "var(--color-text-base)",
+                          }}
+                        >
+                          Create New Deploy Key
+                        </span>
+                        <button
+                          onClick={() => {
+                            setShowCreateDialog(false);
+                            setNewKeyName("");
+                          }}
+                          style={{
+                            fontSize: "11px",
+                            color: "var(--color-text-muted)",
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: "4px 8px",
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={newKeyName}
+                        onChange={(e) => setNewKeyName(e.target.value)}
+                        placeholder="e.g., CI/CD Deploy Key"
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          borderRadius: "8px",
+                          border: "1px solid var(--color-border-base)",
+                          backgroundColor: "var(--color-surface-raised)",
+                          color: "var(--color-text-base)",
+                          fontSize: "12px",
+                          outline: "none",
+                          marginBottom: "12px",
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor =
+                            "var(--color-brand-base)";
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor =
+                            "var(--color-border-base)";
+                        }}
+                      />
+                      <button
+                        onClick={handleCreateDeployKey}
+                        disabled={!newKeyName.trim() || isCreatingKey}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "6px",
+                          width: "100%",
+                          padding: "10px 16px",
+                          borderRadius: "8px",
+                          border: "none",
+                          backgroundColor:
+                            !newKeyName.trim() || isCreatingKey
+                              ? "var(--color-brand-base-alpha, rgba(99, 102, 241, 0.3))"
+                              : "var(--color-brand-base)",
+                          color: "white",
+                          fontSize: "12px",
+                          fontWeight: 500,
+                          cursor:
+                            !newKeyName.trim() || isCreatingKey
+                              ? "not-allowed"
+                              : "pointer",
+                          transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (newKeyName.trim() && !isCreatingKey) {
+                            e.currentTarget.style.opacity = "0.9";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.opacity = "1";
+                        }}
+                      >
+                        {isCreatingKey ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          <>
+                            <Plus size={14} />
+                            Create and Activate
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Keys List */}
+                  <div
+                    style={{
+                      borderRadius: "8px",
+                      border: "1px solid var(--color-border-base)",
+                      backgroundColor: "var(--color-surface-base)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {isLoadingKeys ? (
+                      <div
+                        style={{
+                          padding: "24px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "12px",
+                        }}
+                      >
+                        <Loader2 size={18} className="animate-spin" />
+                        <span
+                          style={{
+                            fontSize: "12px",
+                            color: "var(--color-text-muted)",
+                          }}
+                        >
+                          Loading keys...
+                        </span>
+                      </div>
+                    ) : apiKeys.length === 0 ? (
+                      <div
+                        style={{
+                          padding: "24px",
+                          textAlign: "center",
+                        }}
+                      >
+                        <Key
+                          size={32}
+                          style={{
+                            color: "var(--color-text-muted)",
+                            opacity: 0.3,
+                            margin: "0 auto 12px",
+                          }}
+                        />
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: "12px",
+                            color: "var(--color-text-muted)",
+                          }}
+                        >
+                          No deploy keys found. Create one to get started.
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        {apiKeys.map((key, index) => {
+                          const isActive = isTokenActive(
+                            deployment.cliDeployKey,
+                            key.serializedAccessToken,
+                            deployment.deployment?.name || "",
+                          );
+                          const isDeleting = deletingKeyId === key.accessToken;
+                          const isDeleted = deletedKeyIds.has(key.accessToken);
+
+                          return (
+                            <div
+                              key={key.accessToken}
+                              style={{
+                                padding: "12px 16px",
+                                borderBottom:
+                                  index < apiKeys.length - 1
+                                    ? "1px solid var(--color-border-base)"
+                                    : "none",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                backgroundColor: isDeleted
+                                  ? "var(--color-success-base-alpha, rgba(34, 197, 94, 0.05))"
+                                  : isActive
+                                    ? "var(--color-success-base-alpha, rgba(34, 197, 94, 0.05))"
+                                    : "transparent",
+                                opacity: isDeleted ? 0.7 : 1,
+                                transition: "all 0.3s ease",
+                              }}
+                            >
+                              {isDeleting || isDeleted ? (
+                                // Deleting/Deleted state
+                                <div
+                                  style={{
+                                    flex: 1,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: "8px",
+                                  }}
+                                >
+                                  {isDeleting ? (
+                                    <>
+                                      <Loader2
+                                        size={16}
+                                        className="animate-spin"
+                                        style={{
+                                          color: "var(--color-text-muted)",
+                                        }}
+                                      />
+                                      <span
+                                        style={{
+                                          fontSize: "13px",
+                                          fontWeight: 500,
+                                          color: "var(--color-text-muted)",
+                                        }}
+                                      >
+                                        Deleting...
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle2
+                                        size={16}
+                                        style={{
+                                          color:
+                                            "var(--color-success-base, #22c55e)",
+                                        }}
+                                      />
+                                      <span
+                                        style={{
+                                          fontSize: "13px",
+                                          fontWeight: 500,
+                                          color:
+                                            "var(--color-success-base, #22c55e)",
+                                        }}
+                                      >
+                                        Deleted!
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              ) : (
+                                // Normal state
+                                <>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "8px",
+                                        marginBottom: "4px",
+                                      }}
+                                    >
+                                      <span
+                                        style={{
+                                          fontSize: "13px",
+                                          fontWeight: 500,
+                                          color: "var(--color-text-base)",
+                                        }}
+                                      >
+                                        {key.name}
+                                      </span>
+                                      {isActive && (
+                                        <span
+                                          style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "4px",
+                                            fontSize: "11px",
+                                            color:
+                                              "var(--color-success-base, #22c55e)",
+                                            padding: "2px 6px",
+                                            borderRadius: "4px",
+                                            backgroundColor:
+                                              "var(--color-success-base-alpha, rgba(34, 197, 94, 0.1))",
+                                          }}
+                                        >
+                                          <CheckCircle2 size={12} />
+                                          Active
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "11px",
+                                        color: "var(--color-text-muted)",
+                                        fontFamily: "monospace",
+                                        marginBottom: "4px",
+                                      }}
+                                    >
+                                      {getKeyPreview(key.serializedAccessToken)}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "11px",
+                                        color: "var(--color-text-muted)",
+                                      }}
+                                    >
+                                      {key.lastUsedTime
+                                        ? `Last used: ${new Date(key.lastUsedTime).toLocaleDateString()}`
+                                        : "Never used"}{" "}
+                                      • Created:{" "}
+                                      {new Date(
+                                        key.creationTime,
+                                      ).toLocaleDateString()}
+                                    </div>
+                                  </div>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "8px",
+                                    }}
+                                  >
+                                    {!isActive && (
+                                      <button
+                                        onClick={() =>
+                                          handleSelectKey(
+                                            key.serializedAccessToken,
+                                          )
+                                        }
+                                        style={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: "4px",
+                                          padding: "6px 10px",
+                                          borderRadius: "6px",
+                                          border:
+                                            "1px solid var(--color-border-base)",
+                                          backgroundColor: "transparent",
+                                          color: "var(--color-success-base)",
+                                          fontSize: "12px",
+                                          fontWeight: 500,
+                                          cursor: "pointer",
+                                          transition: "all 0.15s",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.backgroundColor =
+                                            "var(--color-success-base-alpha, rgba(34, 197, 94, 0.1))";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.backgroundColor =
+                                            "transparent";
+                                        }}
+                                      >
+                                        <Check size={12} />
+                                        Use This Key
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() =>
+                                        setKeyToDelete({
+                                          accessToken: key.accessToken,
+                                          name: key.name,
+                                          isActive,
+                                        })
+                                      }
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "4px",
+                                        padding: "6px 10px",
+                                        borderRadius: "6px",
+                                        border:
+                                          "1px solid var(--color-border-base)",
+                                        backgroundColor: "transparent",
+                                        color: "var(--color-error-base)",
+                                        fontSize: "12px",
+                                        fontWeight: 500,
+                                        cursor: "pointer",
+                                        transition: "all 0.15s",
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.currentTarget.style.backgroundColor =
+                                          "var(--color-error-base-alpha, rgba(239, 68, 68, 0.1))";
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.currentTarget.style.backgroundColor =
+                                          "transparent";
+                                      }}
+                                    >
+                                      <Trash2 size={12} />
+                                      Delete
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* .env.local Section */}
+          {projectPath && (
+            <div
+              style={{
+                padding: "16px",
+                backgroundColor: "var(--color-surface-raised)",
+                borderRadius: "12px",
+                border: "1px solid var(--color-border-base)",
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  color: "var(--color-text-base)",
+                  margin: 0,
+                  marginBottom: "4px",
+                }}
+              >
+                Project .env.local
+              </h3>
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "var(--color-text-muted)",
+                  margin: 0,
+                  marginBottom: "12px",
+                }}
+              >
+                Sync your deploy key with the project for CLI tools
+              </p>
+
+              <div
+                style={{
+                  padding: "12px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--color-border-base)",
+                  backgroundColor: "var(--color-surface-base)",
+                }}
+              >
+                {envLocalKey ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 500,
+                          color: "var(--color-text-base)",
+                        }}
+                      >
+                        Key in .env.local
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--color-text-muted)",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {getKeyPreview(envLocalKey)}
+                      </div>
+                    </div>
+                    {deployment.cliDeployKey &&
+                    envLocalKey === deployment.cliDeployKey ? (
+                      <span
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          fontSize: "12px",
+                          color: "var(--color-success-base)",
+                        }}
+                      >
+                        <Check size={14} />
+                        Synced
+                      </span>
+                    ) : deployment.cliDeployKey ? (
+                      <button
+                        onClick={handleWriteToEnvLocal}
+                        disabled={isWritingEnvLocal}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          padding: "6px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid var(--color-border-base)",
+                          backgroundColor: "transparent",
+                          color: "var(--color-warning-base)",
+                          fontSize: "12px",
+                          fontWeight: 500,
+                          cursor: isWritingEnvLocal ? "not-allowed" : "pointer",
+                          opacity: isWritingEnvLocal ? 0.5 : 1,
+                          transition: "all 0.15s",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isWritingEnvLocal) {
+                            e.currentTarget.style.backgroundColor =
+                              "var(--color-warning-base-alpha, rgba(234, 179, 8, 0.1))";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        {isWritingEnvLocal ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <RefreshCw size={14} />
+                        )}
+                        Update
+                      </button>
+                    ) : null}
+                  </div>
+                ) : deployment.cliDeployKey ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "13px",
+                        color: "var(--color-text-muted)",
+                      }}
+                    >
+                      No key in .env.local
+                    </span>
+                    <button
+                      onClick={handleWriteToEnvLocal}
+                      disabled={isWritingEnvLocal}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "6px 10px",
+                        borderRadius: "6px",
+                        border: "1px solid var(--color-border-base)",
+                        backgroundColor: "transparent",
+                        color: "var(--color-text-base)",
+                        fontSize: "12px",
+                        fontWeight: 500,
+                        cursor: isWritingEnvLocal ? "not-allowed" : "pointer",
+                        opacity: isWritingEnvLocal ? 0.5 : 1,
+                        transition: "all 0.15s",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isWritingEnvLocal) {
+                          e.currentTarget.style.backgroundColor =
+                            "var(--color-surface-overlay)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }}
+                    >
+                      {isWritingEnvLocal ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          Writing...
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={14} />
+                          Write to .env.local
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <span
+                    style={{
+                      fontSize: "13px",
+                      color: "var(--color-text-muted)",
+                    }}
+                  >
+                    No active deploy key to sync
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Error message */}
+          {error && (
+            <div
+              style={{
+                padding: "12px",
+                backgroundColor:
+                  "var(--color-error-base-alpha, rgba(239, 68, 68, 0.1))",
+                border: "1px solid var(--color-error-base)",
+                borderRadius: "6px",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                color: "var(--color-error-base)",
+                fontSize: "13px",
+              }}
+            >
+              <AlertCircle size={16} />
+              {error}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      {keyToDelete && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+          onClick={() => setKeyToDelete(null)}
+        >
+          <div
+            style={{
+              backgroundColor: "var(--color-background-base)",
+              borderRadius: "12px",
+              padding: "24px",
+              maxWidth: "400px",
+              width: "90%",
+              boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              style={{
+                margin: "0 0 12px 0",
+                fontSize: "16px",
+                fontWeight: 600,
+                color: "var(--color-text-base)",
+              }}
+            >
+              Delete Deploy Key?
+            </h3>
+            <p
+              style={{
+                margin: "0 0 20px 0",
+                fontSize: "14px",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              Are you sure you want to delete "{keyToDelete.name}"?
+              {keyToDelete.isActive &&
+                " This is your currently active key and will be cleared from authentication."}
+            </p>
+            <div
+              style={{
+                display: "flex",
+                gap: "12px",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                onClick={() => setKeyToDelete(null)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--color-border-base)",
+                  backgroundColor: "transparent",
+                  color: "var(--color-text-base)",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteKey}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "6px",
+                  border: "none",
+                  backgroundColor: "var(--color-error-base)",
+                  color: "white",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

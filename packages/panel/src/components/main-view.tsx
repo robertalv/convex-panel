@@ -26,6 +26,9 @@ const LogsView = lazy(() =>
 const ComponentsView = lazy(() =>
   import("../views/components").then((m) => ({ default: m.ComponentsView })),
 );
+const MarketplaceView = lazy(() =>
+  import("../views/marketplace").then((m) => ({ default: m.MarketplaceView })),
+);
 const SettingsView = lazy(() =>
   import("../views/settings").then((m) => ({ default: m.SettingsView })),
 );
@@ -165,6 +168,13 @@ const tabRenderers: Record<TabId, TabRenderer> = {
     />
   ),
   components: () => <ComponentsView />,
+  marketplace: ({ projectPath, detectedPackageManager, onInstall }) => (
+    <MarketplaceView
+      projectPath={projectPath}
+      detectedPackageManager={detectedPackageManager}
+      onInstall={onInstall}
+    />
+  ),
   settings: ({ deployUrl, accessToken, adminClient, teamAccessToken }) => (
     <SettingsView
       adminClient={adminClient}

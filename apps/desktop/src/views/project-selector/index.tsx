@@ -6,7 +6,7 @@ import { ProjectCard } from "./ProjectCard";
 import { WelcomeBanner } from "./WelcomeBanner";
 import { cn, openExternalLink } from "@/lib/utils";
 import { TierBadge } from "@/components/tier-badge";
-import type { TeamSubscription } from "@/api/bigbrain";
+import type { TeamSubscription } from "@convex-panel/shared/api";
 import { Icon } from "@/components/ui/icon";
 import { CodeDiffViewer } from "@/components/ui/code-diff-viewer";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";

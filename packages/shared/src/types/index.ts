@@ -19,3 +19,6 @@ export * from "./functions";
 
 // Schedules types
 export * from "./schedules";
+
+// Marketplace types
+export * from "./marketplace";

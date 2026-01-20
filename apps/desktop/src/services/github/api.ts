@@ -416,19 +416,33 @@ export async function listAllBranches(
 /**
  * Search repositories the user has access to using GitHub Search API
  * Triggers after 3+ characters typed
+ *
+ * Note: We search across all repos user can access (not just owned repos)
+ * because `user:@me` doesn't work reliably with Device Flow OAuth tokens.
+ * We then filter to repos the user has push access to or is a collaborator on.
  */
 export async function searchUserRepos(
   token: string,
   query: string,
-  options?: { perPage?: number; signal?: AbortSignal },
+  options?: { perPage?: number; signal?: AbortSignal; username?: string },
 ): Promise<GitHubRepo[]> {
   const perPage = options?.perPage ?? 30;
 
   try {
-    // GitHub Search API: search in user's repos
-    // We use `user:@me` to search only in repos the current user owns/has access to
+    // Build search query
+    // If we have a username, search user's repos and orgs they belong to
+    // Otherwise, just search by name which will include repos user has access to
+    let searchQuery = `${query} in:name`;
+
+    // If username is provided, add user qualifier for better results
+    if (options?.username) {
+      // Search for repos where user is owner OR is a member of the org
+      // Using `user:` finds repos owned by that user
+      searchQuery = `${query} in:name user:${options.username}`;
+    }
+
     const response = await fetchWithRetry(
-      `${GITHUB_API_URL}/search/repositories?q=${encodeURIComponent(query)}+in:name+user:@me&per_page=${perPage}&sort=updated`,
+      `${GITHUB_API_URL}/search/repositories?q=${encodeURIComponent(searchQuery)}&per_page=${perPage}&sort=updated`,
       {
         headers: githubHeaders(token),
         signal: options?.signal,

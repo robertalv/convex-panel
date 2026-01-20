@@ -32,6 +32,8 @@ export interface UseGitSchemaHistoryOptions {
   maxCommits?: number;
   /** Whether to auto-load on mount */
   autoLoad?: boolean;
+  /** Deployment ID for scoping snapshots to specific deployment */
+  deploymentId?: string;
 }
 
 export interface UseGitSchemaHistoryReturn {
@@ -60,6 +62,7 @@ export function useGitSchemaHistory({
   projectPath,
   maxCommits = 50,
   autoLoad = true,
+  deploymentId,
 }: UseGitSchemaHistoryOptions): UseGitSchemaHistoryReturn {
   const [commits, setCommits] = useState<GitCommit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -240,10 +243,11 @@ export function useGitSchemaHistory({
           throw new Error("Could not parse schema content");
         }
 
-        // Check if we already have this snapshot
+        // Check if we already have this snapshot for this deployment
         const existingSnapshots = await getAllSnapshots("git");
         const existing = existingSnapshots.find(
-          (s) => s.commitHash === commit.hash,
+          (s) =>
+            s.commitHash === commit.hash && s.deploymentId === deploymentId,
         );
         if (existing) {
           console.log(
@@ -259,6 +263,7 @@ export function useGitSchemaHistory({
           source: "git",
           commitHash: commit.hash,
           commitMessage: commit.message,
+          deploymentId,
         });
 
         await saveSnapshot(snapshot);

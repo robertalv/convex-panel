@@ -114,12 +114,10 @@ export function getFunctionTypeIcon(
 
   if (normalizedType === "query") return "Q";
   if (normalizedType === "mutation") return "M";
-  if (
-    normalizedType === "action" ||
-    normalizedType === "httpaction" ||
-    normalizedType === "http_action"
-  )
-    return "A";
+  // HTTP Actions should show as "H", not "A"
+  if (normalizedType === "httpaction" || normalizedType === "http_action")
+    return "H";
+  if (normalizedType === "action") return "A";
   if (topic === "http") return "H";
   return "L";
 }

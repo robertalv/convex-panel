@@ -194,9 +194,7 @@ function LogRowInner({
             {isError ? (
               <span style={{ color: "rgb(239, 68, 68)" }}>failure</span>
             ) : (
-              <span style={{ color: "var(--color-success-base)" }}>
-                {log.success ? "success" : "200"}
-              </span>
+              <span style={{ color: "var(--color-success-base)" }}>200</span>
             )}
             {isCached ? (
               <span
@@ -247,10 +245,16 @@ function LogRowInner({
         <span
           style={{
             width: "16px",
+            height: "16px",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
             textAlign: "center",
-            color: isError
-              ? "var(--color-error-text)"
-              : "var(--color-text-muted)",
+            color: isError ? "#fff" : "var(--color-text-muted)",
+            backgroundColor: isError
+              ? "color-mix(in srgb, var(--color-error) 10%, transparent)"
+              : "var(--color-surface-raised)",
+            borderRadius: "6px",
             fontWeight: 700,
             fontSize: "10px",
             flexShrink: 0,

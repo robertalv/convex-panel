@@ -7,6 +7,12 @@ import {
   validateDeployKey,
   doesKeyMatchDeployment,
 } from "../lib/envFile";
+import { createDeployKey } from "@convex-panel/shared/api";
+import {
+  saveDeploymentKey,
+  loadDeploymentKey,
+  getOAuthTokenFromStorage,
+} from "../lib/secureStorage";
 
 interface UseOnboardingDialogProps {
   isOpen: boolean;
@@ -18,6 +24,7 @@ interface UseOnboardingDialogProps {
 interface UseOnboardingDialogReturn {
   // Project path
   selectedPath: string | null;
+  projectPathError: string | null;
   handleSelectDirectory: () => Promise<void>;
 
   // Deploy key state
@@ -27,6 +34,7 @@ interface UseOnboardingDialogReturn {
   keyError: string | null;
   manualKey: string;
   showManualEntry: boolean;
+  generatedKey: string | null;
   setManualKey: (key: string) => void;
   setShowManualEntry: (show: boolean) => void;
   handleGenerateKey: () => Promise<void>;
@@ -48,11 +56,16 @@ export function useOnboardingDialog({
   onComplete,
   deploymentName,
 }: UseOnboardingDialogProps): UseOnboardingDialogReturn {
-  const { projectPath, setProjectPath } = useProjectPath();
+  const {
+    projectPath,
+    setProjectPath,
+    validationError: contextValidationError,
+  } = useProjectPath();
   const github = useGitHubOptional();
   const deployment = useDeployment();
 
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  // Use context projectPath as source of truth for selectedPath
+  const [selectedPath, setSelectedPath] = useState<string | null>(projectPath);
   const [envLocalKey, setEnvLocalKey] = useState<string | null>(null);
   const [envLocalKeyMatchesDeployment, setEnvLocalKeyMatchesDeployment] =
     useState(false);
@@ -60,6 +73,16 @@ export function useOnboardingDialog({
   const [keyError, setKeyError] = useState<string | null>(null);
   const [manualKey, setManualKey] = useState("");
   const [showManualEntry, setShowManualEntry] = useState(false);
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+
+  // Sync selectedPath with context projectPath
+  useEffect(() => {
+    console.log(
+      "[useOnboardingDialog] Syncing selectedPath with projectPath:",
+      projectPath,
+    );
+    setSelectedPath(projectPath);
+  }, [projectPath]);
 
   // Initialize/reset state when dialog opens
   useEffect(() => {
@@ -69,6 +92,32 @@ export function useOnboardingDialog({
       setKeyError(null);
       setManualKey("");
       setShowManualEntry(false);
+
+      // Try to load cached deployment key
+      if (deploymentName) {
+        try {
+          const cachedKey = await loadDeploymentKey(deploymentName);
+          if (cachedKey) {
+            const validation = validateDeployKey(cachedKey, deploymentName);
+            if (validation.valid) {
+              console.log(
+                "[useOnboardingDialog] Loaded cached key for",
+                deploymentName,
+              );
+              setGeneratedKey(cachedKey);
+            } else {
+              setGeneratedKey(null);
+            }
+          } else {
+            setGeneratedKey(null);
+          }
+        } catch (err) {
+          console.warn("[useOnboardingDialog] Failed to load cached key:", err);
+          setGeneratedKey(null);
+        }
+      } else {
+        setGeneratedKey(null);
+      }
 
       if (deploymentName && projectPath) {
         try {
@@ -141,28 +190,131 @@ export function useOnboardingDialog({
   }, [setProjectPath]);
 
   const handleGenerateKey = useCallback(async () => {
+    console.log("[useOnboardingDialog] handleGenerateKey called");
+    console.log("[useOnboardingDialog] Props:", {
+      deploymentName,
+    });
+    console.log("[useOnboardingDialog] Deployment state:", {
+      deployment: deployment?.deployment,
+      deploymentNameFromContext: deployment?.deployment?.name,
+      hasAccessToken: !!deployment?.accessToken,
+      accessToken: deployment?.accessToken ? "exists" : "null",
+      cliDeployKeyLoading: deployment?.cliDeployKeyLoading,
+      cliDeployKey: deployment?.cliDeployKey ? "exists" : "null",
+      fetchFn: typeof deployment?.fetchFn === "function" ? "exists" : "null",
+    });
+
+    // Use deploymentName from props if available, otherwise fall back to context
+    const targetDeploymentName = deploymentName || deployment?.deployment?.name;
+
+    if (!targetDeploymentName) {
+      console.error("[useOnboardingDialog] No deployment name available");
+      setKeyError("No deployment selected. Please select a deployment first.");
+      setIsGeneratingKey(false);
+      return;
+    }
+
+    // Try to get access token from deployment context, or fall back to localStorage
+    let accessToken = deployment?.accessToken;
+    if (!accessToken) {
+      console.log(
+        "[useOnboardingDialog] Access token not in context, trying localStorage...",
+      );
+      accessToken = getOAuthTokenFromStorage();
+    }
+
+    if (!accessToken) {
+      console.error("[useOnboardingDialog] No access token available");
+      setKeyError(
+        "No access token available. Please reconnect to your account.",
+      );
+      setIsGeneratingKey(false);
+      return;
+    }
+
+    console.log(
+      "[useOnboardingDialog] Using access token:",
+      accessToken ? "exists" : "null",
+    );
+
+    if (!deployment?.fetchFn) {
+      console.error("[useOnboardingDialog] No fetch function available");
+      setKeyError("Network error. Please try again.");
+      setIsGeneratingKey(false);
+      return;
+    }
+
     setIsGeneratingKey(true);
     setKeyError(null);
+
     try {
-      await deployment.regenerateDeployKey();
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      console.log("[useOnboardingDialog] Creating deploy key directly...");
+      const projectId = deployment?.deployment?.projectId;
+      const keyName = projectId
+        ? `cp-${projectId}-${Date.now()}`
+        : `cp-desktop-${Date.now()}`;
+
+      console.log("[useOnboardingDialog] Calling createDeployKey with:", {
+        deploymentName: targetDeploymentName,
+        keyName,
+      });
+
+      const result = await createDeployKey(
+        accessToken,
+        targetDeploymentName,
+        keyName,
+        deployment.fetchFn,
+      );
+
+      console.log("[useOnboardingDialog] Deploy key created successfully");
+
+      // Store the key in local state for display
+      setGeneratedKey(result.key);
+
+      // Save the key to the deployment context
+      if (deployment.setManualDeployKey) {
+        await deployment.setManualDeployKey(result.key, targetDeploymentName);
+        console.log("[useOnboardingDialog] Key saved to deployment context");
+      }
+
+      // Also save to localStorage for persistence
+      try {
+        await saveDeploymentKey(targetDeploymentName, result.key, {
+          projectId: deployment?.deployment?.projectId,
+          teamId: deployment?.teamId ?? undefined,
+        });
+        console.log("[useOnboardingDialog] Key saved to localStorage");
+      } catch (saveError) {
+        console.warn(
+          "[useOnboardingDialog] Failed to save key to localStorage:",
+          saveError,
+        );
+        // Don't fail the whole operation if localStorage save fails
+      }
+
+      console.log(
+        "[useOnboardingDialog] Key generation completed successfully!",
+      );
     } catch (err) {
+      console.error("[useOnboardingDialog] Error generating key:", err);
       setKeyError(
         err instanceof Error ? err.message : "Failed to generate key",
       );
     } finally {
+      console.log("[useOnboardingDialog] Setting isGeneratingKey to false");
       setIsGeneratingKey(false);
     }
-  }, [deployment]);
+  }, [deployment, deploymentName]);
 
   const handleUseEnvLocalKey = useCallback(async () => {
     if (!envLocalKey) return;
     try {
-      await deployment.setManualDeployKey(envLocalKey);
+      setGeneratedKey(envLocalKey);
+      await deployment.setManualDeployKey(envLocalKey, deploymentName);
     } catch (err) {
       setKeyError(err instanceof Error ? err.message : "Failed to use key");
     }
-  }, [envLocalKey, deployment]);
+  }, [envLocalKey, deployment, deploymentName]);
 
   const handleSaveManualKey = useCallback(async () => {
     const trimmedKey = manualKey.trim();
@@ -178,7 +330,8 @@ export function useOnboardingDialog({
     }
 
     try {
-      await deployment.setManualDeployKey(trimmedKey);
+      setGeneratedKey(trimmedKey);
+      await deployment.setManualDeployKey(trimmedKey, deploymentName);
       setManualKey("");
       setShowManualEntry(false);
     } catch (err) {
@@ -197,6 +350,7 @@ export function useOnboardingDialog({
 
   return {
     selectedPath,
+    projectPathError: contextValidationError,
     handleSelectDirectory,
     envLocalKey,
     envLocalKeyMatchesDeployment,
@@ -204,6 +358,7 @@ export function useOnboardingDialog({
     keyError,
     manualKey,
     showManualEntry,
+    generatedKey,
     setManualKey,
     setShowManualEntry,
     handleGenerateKey,

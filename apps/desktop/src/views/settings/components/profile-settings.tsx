@@ -12,7 +12,7 @@ import {
   type ProfileEmail,
   type Identity,
   type DiscordAccount,
-} from "../../../api/bigbrain";
+} from "@convex-panel/shared/api";
 import { useProfileCache } from "../hooks/useProfileCache";
 import { ConfirmDialog } from "../../data/components/ConfirmDialog";
 import { Input } from "../../../components/ui/input";
@@ -37,27 +37,8 @@ interface SectionProps {
 
 function Section({ title, children }: SectionProps) {
   return (
-    <div
-      style={{
-        padding: "16px",
-        backgroundColor: "var(--color-surface-raised)",
-        borderRadius: "12px",
-        border: "1px solid var(--color-border-base)",
-        marginBottom: "16px",
-      }}
-    >
-      <h3
-        style={{
-          fontSize: "14px",
-          fontWeight: 600,
-          color: "var(--color-text-base)",
-          marginBottom: "12px",
-          margin: 0,
-          marginBlockEnd: "12px",
-        }}
-      >
-        {title}
-      </h3>
+    <div className="mb-4 rounded-xl border border-border-base bg-surface-raised p-4">
+      <h3 className="m-0 mb-3 text-sm font-semibold text-text-base">{title}</h3>
       {children}
     </div>
   );
@@ -105,17 +86,11 @@ function ProfileNameForm({ currentName, onSave }: ProfileNameFormProps) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-        <div style={{ flex: 1 }}>
+      <div className="flex items-start gap-2">
+        <div className="flex-1">
           <label
             htmlFor="profile-name"
-            style={{
-              display: "block",
-              fontSize: "12px",
-              fontWeight: 500,
-              color: "var(--color-text-muted)",
-              marginBottom: "4px",
-            }}
+            className="mb-1 block text-xs font-medium text-text-muted"
           >
             Name
           </label>
@@ -125,26 +100,14 @@ function ProfileNameForm({ currentName, onSave }: ProfileNameFormProps) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             error={!!error}
-            style={{ width: "100%" }}
+            className="w-full"
           />
-          {error && (
-            <p
-              style={{
-                fontSize: "12px",
-                color: "var(--color-error-base)",
-                marginTop: "4px",
-                margin: 0,
-                marginBlockStart: "4px",
-              }}
-            >
-              {error}
-            </p>
-          )}
+          {error && <p className="m-0 mt-1 text-xs text-error-base">{error}</p>}
         </div>
         <Button
           type="submit"
           disabled={name === currentName || name.length > 128 || isLoading}
-          style={{ marginTop: "20px" }}
+          className="mt-5"
         >
           {isLoading ? <Loader2 size={14} className="animate-spin" /> : "Save"}
         </Button>
@@ -165,16 +128,9 @@ interface EmailsSectionProps {
 function EmailsSection({ emails, isLoading }: EmailsSectionProps) {
   if (isLoading) {
     return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          color: "var(--color-text-muted)",
-        }}
-      >
+      <div className="flex items-center gap-2 text-[13px] text-text-muted">
         <Loader2 size={14} className="animate-spin" />
-        <span style={{ fontSize: "13px" }}>Loading emails...</span>
+        <span>Loading emails...</span>
       </div>
     );
   }
@@ -187,68 +143,31 @@ function EmailsSection({ emails, isLoading }: EmailsSectionProps) {
     return 0;
   });
 
-  console.log("sortedEmails", sortedEmails);
-  console.log("emails", emails);
-
   return (
     <div>
-      <p
-        style={{
-          fontSize: "12px",
-          color: "var(--color-text-muted)",
-          marginBottom: "12px",
-          margin: 0,
-          marginBlockEnd: "12px",
-        }}
-      >
+      <p className="m-0 mb-3 text-xs text-text-muted">
         Your emails are used for team invitations and communications.
       </p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <div className="flex flex-col gap-2">
         {sortedEmails.map((email) => (
           <div
             key={email.email}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "8px 12px",
-              backgroundColor: "var(--color-surface-base)",
-              borderRadius: "8px",
-              border: "1px solid var(--color-border-base)",
-            }}
+            className="flex items-center justify-between rounded-lg border border-border-base bg-surface-base px-3 py-2"
           >
-            <span style={{ fontSize: "13px", color: "var(--color-text-base)" }}>
-              {email.email}
-            </span>
-            <div style={{ display: "flex", gap: "8px" }}>
+            <span className="text-[13px] text-text-base">{email.email}</span>
+            <div className="flex gap-2">
               {email.primary && (
-                <span
-                  style={{
-                    fontSize: "11px",
-                    padding: "2px 8px",
-                    borderRadius: "4px",
-                    backgroundColor: "var(--color-brand-base-alpha)",
-                    color: "var(--color-brand-base)",
-                    fontWeight: 500,
-                  }}
-                >
+                <span className="rounded bg-brand-base/10 px-2 py-0.5 text-[11px] font-medium text-brand-base">
                   Primary
                 </span>
               )}
               <span
-                style={{
-                  fontSize: "11px",
-                  padding: "2px 8px",
-                  borderRadius: "4px",
-                  backgroundColor: email.verified
-                    ? "var(--color-success-base-alpha, rgba(34, 197, 94, 0.1))"
-                    : "var(--color-warning-base-alpha, rgba(234, 179, 8, 0.1))",
-                  color: email.verified
-                    ? "var(--color-success-base, #22c55e)"
-                    : "var(--color-warning-base, #eab308)",
-                  fontWeight: 500,
-                }}
+                className={`rounded px-2 py-0.5 text-[11px] font-medium ${
+                  email.verified
+                    ? "bg-success-base/10 text-success-base"
+                    : "bg-warning-base/10 text-warning-base"
+                }`}
               >
                 {email.verified ? "Verified" : "Unverified"}
               </span>
@@ -261,15 +180,7 @@ function EmailsSection({ emails, isLoading }: EmailsSectionProps) {
         href="https://dashboard.convex.dev/profile"
         target="_blank"
         rel="noopener noreferrer"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "4px",
-          marginTop: "12px",
-          fontSize: "12px",
-          color: "var(--color-brand-base)",
-          textDecoration: "none",
-        }}
+        className="mt-3 inline-flex items-center gap-1 text-xs text-brand-base no-underline hover:underline"
       >
         Manage emails on dashboard
         <ExternalLink size={12} />
@@ -330,16 +241,9 @@ function ConnectedIdentitiesSection({
 
   if (isLoading) {
     return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          color: "var(--color-text-muted)",
-        }}
-      >
+      <div className="flex items-center gap-2 text-[13px] text-text-muted">
         <Loader2 size={14} className="animate-spin" />
-        <span style={{ fontSize: "13px" }}>Loading identities...</span>
+        <span>Loading identities...</span>
       </div>
     );
   }
@@ -362,13 +266,7 @@ function ConnectedIdentitiesSection({
 
   if (providerEntries.length === 0) {
     return (
-      <p
-        style={{
-          fontSize: "12px",
-          color: "var(--color-text-muted)",
-          margin: 0,
-        }}
-      >
+      <p className="m-0 text-xs text-text-muted">
         No connected identities found.
       </p>
     );
@@ -391,70 +289,31 @@ function ConnectedIdentitiesSection({
 
   return (
     <div>
-      <p
-        style={{
-          fontSize: "12px",
-          color: "var(--color-text-muted)",
-          marginBottom: "12px",
-          margin: 0,
-          marginBlockEnd: "12px",
-        }}
-      >
+      <p className="m-0 mb-3 text-xs text-text-muted">
         Connected accounts allow you to sign in with different providers.
       </p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <div className="flex flex-col gap-2">
         {providerEntries.map((entry) => {
           const info = getProviderInfo(entry.provider);
           return (
             <div
               key={`${entry.identityId}-${entry.provider}`}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "10px 12px",
-                backgroundColor: "var(--color-surface-base)",
-                borderRadius: "8px",
-                border: "1px solid var(--color-border-base)",
-              }}
+              className="flex items-center justify-between rounded-lg border border-border-base bg-surface-base px-3 py-2.5"
             >
-              <div
-                style={{ display: "flex", alignItems: "center", gap: "10px" }}
-              >
+              <div className="flex items-center gap-2.5">
                 <div
-                  style={{
-                    width: "28px",
-                    height: "28px",
-                    borderRadius: "6px",
-                    backgroundColor: info.color,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "white",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                  }}
+                  style={{ backgroundColor: info.color }}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-xs font-semibold text-white"
                 >
                   {info.name[0]}
                 </div>
                 <div>
-                  <div
-                    style={{
-                      fontSize: "13px",
-                      fontWeight: 500,
-                      color: "var(--color-text-base)",
-                    }}
-                  >
+                  <div className="text-[13px] font-medium text-text-base">
                     {info.name}
                   </div>
                   {entry.email && (
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        color: "var(--color-text-muted)",
-                      }}
-                    >
+                    <div className="text-[11px] text-text-muted">
                       {entry.email}
                     </div>
                   )}
@@ -533,16 +392,9 @@ function DiscordAccountsSection({
 
   if (isLoading) {
     return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          color: "var(--color-text-muted)",
-        }}
-      >
+      <div className="flex items-center gap-2 text-[13px] text-text-muted">
         <Loader2 size={14} className="animate-spin" />
-        <span style={{ fontSize: "13px" }}>Loading Discord accounts...</span>
+        <span>Loading Discord accounts...</span>
       </div>
     );
   }
@@ -550,29 +402,14 @@ function DiscordAccountsSection({
   if (validAccounts.length === 0) {
     return (
       <div>
-        <p
-          style={{
-            fontSize: "12px",
-            color: "var(--color-text-muted)",
-            marginBottom: "12px",
-            margin: 0,
-            marginBlockEnd: "12px",
-          }}
-        >
+        <p className="m-0 mb-3 text-xs text-text-muted">
           Link your Discord account to access the Convex community features.
         </p>
         <a
           href="https://discord.gg/convex"
           target="_blank"
           rel="noopener noreferrer"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "4px",
-            fontSize: "12px",
-            color: "var(--color-brand-base)",
-            textDecoration: "none",
-          }}
+          className="inline-flex items-center gap-1 text-xs text-brand-base no-underline hover:underline"
         >
           Join Convex Discord
           <ExternalLink size={12} />
@@ -615,49 +452,23 @@ function DiscordAccountsSection({
 
   return (
     <div>
-      <p
-        style={{
-          fontSize: "12px",
-          color: "var(--color-text-muted)",
-          marginBottom: "12px",
-          margin: 0,
-          marginBlockEnd: "12px",
-        }}
-      >
+      <p className="m-0 mb-3 text-xs text-text-muted">
         Your linked Discord accounts for the Convex community.
       </p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <div className="flex flex-col gap-2">
         {validAccounts.map((account) => (
           <div
             key={account.id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "10px 12px",
-              backgroundColor: "var(--color-surface-base)",
-              borderRadius: "8px",
-              border: "1px solid var(--color-border-base)",
-            }}
+            className="flex items-center justify-between rounded-lg border border-border-base bg-surface-base px-3 py-2.5"
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div className="flex items-center gap-2.5">
               <img
                 src={getDiscordAvatarUrl(account)}
                 alt={account.details.username}
-                style={{
-                  width: "28px",
-                  height: "28px",
-                  borderRadius: "50%",
-                }}
+                className="h-7 w-7 rounded-full"
               />
-              <span
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  color: "var(--color-text-base)",
-                }}
-              >
+              <span className="text-[13px] font-medium text-text-base">
                 {getDiscordDisplayName(account)}
               </span>
             </div>
@@ -681,15 +492,7 @@ function DiscordAccountsSection({
         href="https://discord.gg/convex"
         target="_blank"
         rel="noopener noreferrer"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "4px",
-          marginTop: "12px",
-          fontSize: "12px",
-          color: "var(--color-brand-base)",
-          textDecoration: "none",
-        }}
+        className="mt-3 inline-flex items-center gap-1 text-xs text-brand-base no-underline hover:underline"
       >
         Join Convex Discord
         <ExternalLink size={12} />
@@ -887,26 +690,10 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
   );
 
   return (
-    <div
-      style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-        backgroundColor: "var(--color-background-base)",
-      }}
-    >
+    <div className="flex flex-1 flex-col overflow-hidden bg-background-base">
       {/* Content */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "16px",
-          display: "flex",
-          justifyContent: "center",
-        }}
-      >
-        <div style={{ maxWidth: "600px", width: "100%" }}>
+      <div className="flex flex-1 justify-center overflow-y-auto p-4">
+        <div className="w-full max-w-[600px]">
           {/* Profile Information */}
           <Section title="Profile Information">
             <ProfileNameForm

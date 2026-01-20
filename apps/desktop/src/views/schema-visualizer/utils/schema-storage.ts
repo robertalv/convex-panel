@@ -477,3 +477,60 @@ export async function getStorageStats(): Promise<{
     gitCount: git.length,
   };
 }
+
+/**
+ * Delete all snapshots that don't have a deploymentId (legacy snapshots)
+ * This helps clean up snapshots created before the deploymentId feature
+ */
+export async function deleteLegacySnapshots(): Promise<number> {
+  const db = await getDB();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(SNAPSHOTS_STORE, "readwrite");
+    const store = transaction.objectStore(SNAPSHOTS_STORE);
+    const getAllRequest = store.getAll();
+
+    getAllRequest.onerror = () => {
+      console.error(
+        "[schema-storage] Failed to get snapshots for cleanup:",
+        getAllRequest.error,
+      );
+      reject(getAllRequest.error);
+    };
+
+    getAllRequest.onsuccess = () => {
+      const snapshots = getAllRequest.result || [];
+      const legacySnapshots = snapshots.filter((s) => !s.deploymentId);
+
+      console.log(
+        `[schema-storage] Found ${legacySnapshots.length} legacy snapshots to delete`,
+      );
+
+      let deletedCount = 0;
+      const deletePromises: Promise<void>[] = [];
+
+      for (const snapshot of legacySnapshots) {
+        const deletePromise = new Promise<void>(
+          (resolveDelete, rejectDelete) => {
+            const deleteRequest = store.delete(snapshot.id);
+            deleteRequest.onsuccess = () => {
+              deletedCount++;
+              resolveDelete();
+            };
+            deleteRequest.onerror = () => rejectDelete(deleteRequest.error);
+          },
+        );
+        deletePromises.push(deletePromise);
+      }
+
+      Promise.all(deletePromises)
+        .then(() => {
+          console.log(
+            `[schema-storage] Deleted ${deletedCount} legacy snapshots`,
+          );
+          resolve(deletedCount);
+        })
+        .catch(reject);
+    };
+  });
+}

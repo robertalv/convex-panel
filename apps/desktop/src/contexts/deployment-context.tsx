@@ -11,10 +11,12 @@ import {
 import { ConvexReactClient } from "convex/react";
 import { ConvexHttpClient } from "convex/browser";
 import type { Deployment } from "@/types/desktop";
-import { createDeployKey } from "../api/bigbrain";
+import { createDeployKey } from "@convex-panel/shared/api";
 import {
   getOAuthTokenFromStorage,
   isOAuthTokenExpired,
+  saveDeploymentKey,
+  loadDeploymentKey,
 } from "../lib/secureStorage";
 import {
   writeDeployKeyToEnvLocal,
@@ -40,7 +42,10 @@ interface DeploymentContextValue {
   cliDeployKeyLoading: boolean;
   cliDeployKeyIsManual: boolean;
   regenerateDeployKey: () => Promise<void>;
-  setManualDeployKey: (key: string) => Promise<void>;
+  setManualDeployKey: (
+    key: string,
+    targetDeploymentName?: string,
+  ) => Promise<void>;
   clearManualDeployKey: () => Promise<void>;
   writeKeyToEnvLocal: (projectPath: string) => Promise<void>;
   readKeyFromEnvLocal: (projectPath: string) => Promise<string | null>;
@@ -92,11 +97,12 @@ export function DeploymentProvider({
   const keyDeploymentRef = useRef<string | null>(null);
   const generatingKeyRef = useRef<string | null>(null);
   const fetchFnRef = useRef(fetchFn);
-  
+
   useEffect(() => {
     fetchFnRef.current = fetchFn;
   }, [fetchFn]);
 
+  // Load cached deploy key on deployment change
   useEffect(() => {
     const deploymentName = deployment?.name;
     const token = accessToken;
@@ -119,36 +125,62 @@ export function DeploymentProvider({
       return;
     }
 
-    if (cliDeployKey) {
+    // If we already have a valid key for this deployment, keep it
+    if (cliDeployKey && keyDeploymentRef.current === deploymentName) {
       const validation = validateDeployKey(cliDeployKey, deploymentName);
-      
-      if (validation.valid && keyDeploymentRef.current === deploymentName) {
+      if (validation.valid) {
         console.log(
           `[DeploymentContext] Existing deploy key is valid for ${deploymentName}`,
         );
         return;
-      } else {
-        console.log(
-          `[DeploymentContext] Existing deploy key is invalid or for different deployment. Clearing.`,
-        );
-        setCliDeployKey(null);
-        setCliDeployKeyError(
-          validation.error || "Deploy key does not match current deployment",
-        );
-        keyDeploymentRef.current = null;
-        return;
       }
     }
 
-    if (!cliDeployKey && !cliDeployKeyError) {
+    // Try to load cached key from localStorage
+    const loadCachedKey = async () => {
+      try {
+        const cachedKey = await loadDeploymentKey(deploymentName);
+        if (cachedKey) {
+          const validation = validateDeployKey(cachedKey, deploymentName);
+          if (validation.valid) {
+            console.log(
+              `[DeploymentContext] Restored cached deploy key for ${deploymentName}`,
+            );
+            setCliDeployKey(cachedKey);
+            keyDeploymentRef.current = deploymentName;
+            setCliDeployKeyError(null);
+            setCliDeployKeyIsManual(true); // Treat restored keys as manual
+            return;
+          } else {
+            console.log(
+              `[DeploymentContext] Cached key invalid for ${deploymentName}, clearing`,
+            );
+          }
+        }
+      } catch (err) {
+        console.warn("[DeploymentContext] Failed to load cached key:", err);
+      }
+
+      // No cached key or invalid, show error prompting user to create one
       console.log(
-        `[DeploymentContext] No deploy key for ${deploymentName}. User must create one manually.`,
+        `[DeploymentContext] No valid deploy key for ${deploymentName}. User must create one manually.`,
       );
       setCliDeployKeyError(
         "No deploy key set. Please create one in Settings or enter one manually.",
       );
+    };
+
+    // Clear any existing invalid key first
+    if (cliDeployKey && keyDeploymentRef.current !== deploymentName) {
+      console.log(
+        `[DeploymentContext] Deploy key is for different deployment. Clearing.`,
+      );
+      setCliDeployKey(null);
+      keyDeploymentRef.current = null;
     }
-  }, [deployment?.name, accessToken, cliDeployKey]);
+
+    loadCachedKey();
+  }, [deployment?.name, accessToken]);
 
   useEffect(() => {
     if (adminClient) {
@@ -161,17 +193,30 @@ export function DeploymentProvider({
       setHttpClient(null);
     }
 
+    console.log("[DeploymentContext] AdminClient effect triggered:", {
+      deploymentUrl,
+      hasAuthToken: Boolean(authToken),
+    });
+
     if (!deploymentUrl || !authToken) {
+      console.log(
+        "[DeploymentContext] Missing deploymentUrl or authToken, skipping client creation",
+      );
       return;
     }
 
     try {
+      console.log(
+        "[DeploymentContext] Creating ConvexReactClient for:",
+        deploymentUrl,
+      );
       const client = new ConvexReactClient(deploymentUrl, {
         reportDebugInfoToConvex: true,
       });
 
       if (typeof (client as any).setAdminAuth === "function") {
         (client as any).setAdminAuth(authToken);
+        console.log("[DeploymentContext] Called setAdminAuth on client");
       }
       (client as any)._adminAuth = authToken;
       (client as any)._adminKey = authToken;
@@ -181,10 +226,14 @@ export function DeploymentProvider({
         (http as any).setAdminAuth(authToken);
       }
 
+      console.log("[DeploymentContext] AdminClient created successfully");
       setAdminClient(client);
       setHttpClient(http);
     } catch (err) {
-      console.error("Error creating Convex admin client:", err);
+      console.error(
+        "[DeploymentContext] Error creating Convex admin client:",
+        err,
+      );
     }
 
     return () => {
@@ -238,8 +287,15 @@ export function DeploymentProvider({
 
           setCliDeployKey(result.key);
           keyDeploymentRef.current = deploymentName;
+
+          // Persist the key to localStorage
+          await saveDeploymentKey(deploymentName, result.key, {
+            projectId: deployment?.projectId,
+            teamId: teamId ?? undefined,
+          });
+
           console.log(
-            `[DeploymentContext] Deploy key regenerated for ${deploymentName}`,
+            `[DeploymentContext] Deploy key regenerated and saved for ${deploymentName}`,
           );
           generatingKeyRef.current = null;
           return;
@@ -300,11 +356,11 @@ export function DeploymentProvider({
     } finally {
       setCliDeployKeyLoading(false);
     }
-  }, [deployment?.name, deployment?.projectId, accessToken]);
+  }, [deployment?.name, deployment?.projectId, accessToken, teamId]);
 
   const setManualDeployKey = useCallback(
-    async (key: string) => {
-      const deploymentName = deployment?.name;
+    async (key: string, targetDeploymentName?: string) => {
+      const deploymentName = targetDeploymentName || deployment?.name;
       if (!deploymentName) {
         setCliDeployKeyError("No deployment selected");
         return;
@@ -325,8 +381,15 @@ export function DeploymentProvider({
         keyDeploymentRef.current = deploymentName;
         setCliDeployKeyError(null);
         setCliDeployKeyIsManual(true);
+
+        // Persist the key to localStorage
+        await saveDeploymentKey(deploymentName, key, {
+          projectId: deployment?.projectId,
+          teamId: teamId ?? undefined,
+        });
+
         console.log(
-          `[DeploymentContext] Manual deploy key set for ${deploymentName}`,
+          `[DeploymentContext] Manual deploy key set and saved for ${deploymentName}`,
         );
       } catch (error) {
         console.error(
@@ -338,7 +401,7 @@ export function DeploymentProvider({
         );
       }
     },
-    [deployment?.name],
+    [deployment?.name, deployment?.projectId, teamId],
   );
 
   const clearManualDeployKey = useCallback(async () => {

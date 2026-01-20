@@ -127,11 +127,9 @@ export function useLocalSchema(
     loadSchema();
   }, [loadSchema]);
 
-  // Watch for file changes
-  useFileWatcher({
-    path: enableWatch && projectPath ? getSchemaFilePath(projectPath) : null,
-    recursive: false,
-    onFileChange: (event) => {
+  // Memoize the file change handler to prevent infinite re-renders
+  const handleFileChange = useCallback(
+    (event: any) => {
       console.log("[useLocalSchema] File change detected:", event);
       // Auto-reload schema when file changes
       loadSchema().then(() => {
@@ -140,6 +138,14 @@ export function useLocalSchema(
         }
       });
     },
+    [loadSchema, showToast],
+  );
+
+  // Watch for file changes
+  useFileWatcher({
+    path: enableWatch && projectPath ? getSchemaFilePath(projectPath) : null,
+    recursive: false,
+    onFileChange: handleFileChange,
   });
 
   return {
@@ -303,14 +309,19 @@ function parseTableDefinition(
  * Parse the document type from table content
  */
 function parseDocumentType(content: string): ValidatorJSON | null {
-  // Find the object literal that defines the document type
-  // Pattern: { field: v.string(), ... }
-  const objectMatch = content.match(/^\s*\{([^}]*)\}/);
-  if (!objectMatch) {
+  // Use extractBalanced to properly handle nested braces
+  // The old regex /^\s*\{([^}]*)\}/ would stop at the first }, breaking for nested objects
+  const trimmedContent = content.trimStart();
+  if (!trimmedContent.startsWith("{")) {
     return null;
   }
 
-  const fields = parseFieldDefinitions(objectMatch[1]);
+  const objectContent = extractBalanced(trimmedContent, 0, "{", "}");
+  if (!objectContent) {
+    return null;
+  }
+
+  const fields = parseFieldDefinitions(objectContent);
   if (Object.keys(fields).length === 0) {
     return null;
   }
@@ -323,6 +334,7 @@ function parseDocumentType(content: string): ValidatorJSON | null {
 
 /**
  * Parse field definitions from an object literal
+ * Handles nested structures properly by tracking depth
  */
 function parseFieldDefinitions(
   content: string,
@@ -332,17 +344,97 @@ function parseFieldDefinitions(
     { fieldType: ValidatorJSON; optional: boolean }
   > = {};
 
-  // Pattern: fieldName: v.type() or fieldName: v.optional(v.type())
-  const fieldPattern = /(\w+)\s*:\s*(v\.[\w.()[\]<>,\s"'`]+)/g;
+  // Parse fields by finding "fieldName: v...." patterns while respecting nesting
+  let i = 0;
+  while (i < content.length) {
+    // Skip whitespace
+    while (i < content.length && /\s/.test(content[i])) i++;
+    if (i >= content.length) break;
 
-  let match;
-  while ((match = fieldPattern.exec(content)) !== null) {
-    const fieldName = match[1];
-    const validatorExpr = match[2];
+    // Try to match a field name (identifier)
+    const fieldNameMatch = content.slice(i).match(/^(\w+)\s*:/);
+    if (!fieldNameMatch) {
+      // Not a field, skip to next comma or end
+      i++;
+      continue;
+    }
 
-    const { validator, optional } = parseValidatorExpression(validatorExpr);
+    const fieldName = fieldNameMatch[1];
+    i += fieldNameMatch[0].length;
+
+    // Skip whitespace after colon
+    while (i < content.length && /\s/.test(content[i])) i++;
+
+    // Now extract the validator expression
+    // It should start with 'v.' and we need to find where it ends
+    // by tracking balanced parentheses/braces/brackets
+    if (!content.slice(i).startsWith("v.")) {
+      // Not a validator, skip to next comma
+      while (i < content.length && content[i] !== ",") i++;
+      i++; // skip the comma
+      continue;
+    }
+
+    const validatorStart = i;
+    let depth = 0;
+    let inString = false;
+    let stringChar = "";
+
+    // Find the end of the validator expression
+    while (i < content.length) {
+      const char = content[i];
+      const prevChar = i > 0 ? content[i - 1] : "";
+
+      // Handle string literals
+      if (!inString && (char === '"' || char === "'" || char === "`")) {
+        inString = true;
+        stringChar = char;
+        i++;
+        continue;
+      }
+
+      if (inString && char === stringChar && prevChar !== "\\") {
+        inString = false;
+        i++;
+        continue;
+      }
+
+      if (inString) {
+        i++;
+        continue;
+      }
+
+      // Track nesting depth
+      if (char === "(" || char === "{" || char === "[") {
+        depth++;
+      } else if (char === ")" || char === "}" || char === "]") {
+        depth--;
+      }
+
+      // End of validator: comma at depth 0, or we hit a depth < 0
+      if (depth === 0 && char === ",") {
+        break;
+      }
+      if (depth < 0) {
+        break;
+      }
+
+      i++;
+    }
+
+    const validatorExpr = content.slice(validatorStart, i).trim();
+
+    // Remove trailing comma if present
+    const cleanedExpr = validatorExpr.replace(/,\s*$/, "");
+
+    const { validator, optional } = parseValidatorExpression(cleanedExpr);
     if (validator) {
       fields[fieldName] = { fieldType: validator, optional };
+    }
+
+    // Skip comma if present
+    if (i < content.length && content[i] === ",") {
+      i++;
     }
   }
 

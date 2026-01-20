@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { ConvexReactClient } from "convex/react";
+import type { TeamMember } from "@convex-panel/shared/api";
 
 export interface DeploymentAuditLogEvent {
   _id: string;
@@ -49,19 +50,33 @@ interface UseDeploymentAuditLogsOptions {
   adminClient: ConvexReactClient | null;
   fromTimestamp?: number;
   enabled?: boolean;
+  teamMembers?: TeamMember[];
 }
 
-function getMemberName(event: any): string {
+function getMemberName(event: any, teamMembers: TeamMember[] = []): string {
   if (event.member_id === null || event.member_id === undefined) {
     return "Convex";
   }
-  // For now, we don't have team member data, so just return "Team Member"
-  // This can be enhanced later with actual team member lookup
+
+  // Try to find the member in the team members list
+  // member_id in the event is a bigint, team member id is a number
+  const memberId =
+    typeof event.member_id === "bigint"
+      ? Number(event.member_id)
+      : event.member_id;
+
+  const member = teamMembers.find((m) => m.id === memberId);
+
+  if (member) {
+    return member.name || member.email || "Unknown member";
+  }
+
   return "Team Member";
 }
 
 function processDeploymentAuditLogEvent(
   event: any,
+  teamMembers: TeamMember[] = [],
 ): DeploymentAuditLogEvent | null {
   if (!VALID_ACTIONS.includes(event.action)) {
     return null;
@@ -71,7 +86,7 @@ function processDeploymentAuditLogEvent(
     _id: event._id,
     _creationTime: event._creationTime,
     member_id: event.member_id,
-    memberName: getMemberName(event),
+    memberName: getMemberName(event, teamMembers),
     action: event.action,
     metadata: event.metadata,
   };
@@ -81,11 +96,16 @@ export function useDeploymentAuditLogs({
   adminClient,
   fromTimestamp = 0,
   enabled = true,
+  teamMembers = [],
 }: UseDeploymentAuditLogsOptions) {
   const [events, setEvents] = useState<DeploymentAuditLogEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const isMountedRef = useRef(true);
+
+  // Store team members in a ref to avoid recreating fetchEvents
+  const teamMembersRef = useRef(teamMembers);
+  teamMembersRef.current = teamMembers;
 
   const fetchEvents = useCallback(async () => {
     if (!adminClient || !enabled) {
@@ -108,7 +128,9 @@ export function useDeploymentAuditLogs({
 
       const rawEvents = (result || []) as any[];
       const processedEvents = rawEvents
-        .map(processDeploymentAuditLogEvent)
+        .map((event) =>
+          processDeploymentAuditLogEvent(event, teamMembersRef.current),
+        )
         .filter((e): e is DeploymentAuditLogEvent => e !== null)
         .filter((e) => e.action !== "build_indexes") // Filter out redundant build_indexes
         .reverse(); // Most recent first
@@ -135,6 +157,14 @@ export function useDeploymentAuditLogs({
       isMountedRef.current = false;
     };
   }, [fetchEvents]);
+
+  // Re-process events when team members change (to update member names)
+  useEffect(() => {
+    if (events.length > 0 && teamMembers.length > 0) {
+      // Trigger a refetch to re-process events with updated team members
+      fetchEvents();
+    }
+  }, [teamMembers.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll for new events every 5 seconds
   useEffect(() => {

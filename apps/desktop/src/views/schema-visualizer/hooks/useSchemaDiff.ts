@@ -18,6 +18,7 @@ import { diffSchemas, createSnapshot } from "../utils/schema-diff";
 import {
   saveSnapshot,
   getAllSnapshots,
+  getSnapshotsForDeployment,
   pruneSnapshots,
   type StoredSnapshot,
 } from "../utils/schema-storage";
@@ -133,7 +134,20 @@ export function useSchemaDiff({
   const loadSnapshots = useCallback(async () => {
     try {
       setLoading(true);
-      const snapshots = await getAllSnapshots();
+      let snapshots: StoredSnapshot[];
+
+      if (deploymentId) {
+        // If we have a deploymentId, get snapshots for this deployment
+        snapshots = await getSnapshotsForDeployment(deploymentId);
+      } else {
+        // No deploymentId - only show "deployed" source snapshots without a deploymentId
+        // Don't show git/github snapshots from other projects
+        const allSnapshots = await getAllSnapshots();
+        snapshots = allSnapshots.filter(
+          (s) => !s.deploymentId && s.source === "deployed",
+        );
+      }
+
       setStoredSnapshots(snapshots);
       setError(null);
     } catch (err) {
@@ -142,7 +156,7 @@ export function useSchemaDiff({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [deploymentId]);
 
   useEffect(() => {
     loadSnapshots();

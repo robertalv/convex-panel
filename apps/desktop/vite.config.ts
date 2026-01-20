@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { execSync } from "child_process";
-import { readFileSync } from "fs";
+import { readFileSync, copyFileSync, existsSync, mkdirSync, readdirSync } from "fs";
 import { fileURLToPath } from "url";
 
 // Get __dirname equivalent for ESM
@@ -47,9 +47,40 @@ function getPackageVersion(): string {
   }
 }
 
+// Copy registry public assets to desktop public folder
+function copyRegistryAssets() {
+  const registryPublicDir = path.resolve(__dirname, "../../packages/registry/public");
+  const desktopPublicDir = path.resolve(__dirname, "./public");
+  
+  if (existsSync(registryPublicDir)) {
+    const files = readdirSync(registryPublicDir);
+    files.forEach((file) => {
+      if (file.endsWith(".png") || file.endsWith(".jpg") || file.endsWith(".jpeg") || file.endsWith(".svg") || file.endsWith(".webp")) {
+        const src = path.join(registryPublicDir, file);
+        const dest = path.join(desktopPublicDir, file);
+        if (existsSync(src)) {
+          copyFileSync(src, dest);
+        }
+      }
+    });
+  }
+}
+
+// Copy assets on config load
+copyRegistryAssets();
+
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    {
+      name: "copy-registry-assets",
+      buildStart() {
+        copyRegistryAssets();
+      },
+    },
+  ],
 
   // Always use relative paths for Tauri builds (needed for tauri:// protocol in production)
   base: "./",

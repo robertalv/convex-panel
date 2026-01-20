@@ -6,13 +6,13 @@ import {
   getProfile,
   getTeamSubscription,
   getInvoices,
-  Team,
-  Project,
-  Deployment,
-  UserProfile,
-  TeamSubscription,
-  Invoice,
-} from "../api/bigbrain";
+  type Team,
+  type Project,
+  type Deployment,
+  type UserProfile,
+  type TeamSubscription,
+  type Invoice,
+} from "@convex-panel/shared/api";
 import type { DashboardFetch } from "../lib/convex/dashboardCommonAdapter";
 
 export function useBigBrain(
@@ -29,21 +29,25 @@ export function useBigBrain(
   const [invoices, setInvoices] = useState<Invoice[]>([]);
 
   const [loading, setLoading] = useState(false);
+  const [teamsLoading, setTeamsLoading] = useState(false);
   const [deploymentsLoading, setDeploymentsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadTeams = useCallback(async () => {
     if (!accessToken) return;
     setLoading(true);
+    setTeamsLoading(true);
     try {
       const data = await getTeams(accessToken, fetchFn);
       setTeams(data);
       return data;
     } catch (err) {
+      console.error("Failed to load teams:", err);
       setError(err instanceof Error ? err.message : "Failed to load teams");
       return [];
     } finally {
       setLoading(false);
+      setTeamsLoading(false);
     }
   }, [accessToken, fetchFn]);
 
@@ -156,6 +160,7 @@ export function useBigBrain(
     loadSubscription,
     loadInvoices,
     loading,
+    teamsLoading,
     deploymentsLoading,
     error,
   };

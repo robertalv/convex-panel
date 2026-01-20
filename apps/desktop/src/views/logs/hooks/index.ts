@@ -28,3 +28,5 @@ export type {
   DeploymentAuditLogEvent,
   DeploymentAction,
 } from "./useDeploymentAuditLogs";
+
+export { useTeamMembers } from "./useTeamMembers";

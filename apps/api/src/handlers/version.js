@@ -8,7 +8,7 @@
 const express = require("express");
 const router = express.Router();
 
-const REPO_OWNER = process.env.GITHUB_REPO_OWNER || "robertalvarez";
+const REPO_OWNER = process.env.GITHUB_REPO_OWNER || "robertalv";
 const REPO_NAME = process.env.GITHUB_REPO_NAME || "convex-panel";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 

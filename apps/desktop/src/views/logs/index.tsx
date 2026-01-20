@@ -16,16 +16,20 @@ import { useComponents } from "@/hooks/useComponents";
 import { useFunctions } from "./hooks/useFunctions";
 import { useLocalLogStore } from "./hooks/useLocalLogStore";
 import { useDeploymentAuditLogs } from "./hooks/useDeploymentAuditLogs";
+import { useTeamMembers } from "./hooks/useTeamMembers";
 
 // Components
 import { LogsToolbar } from "./components/LogsToolbar";
 import { LogRow } from "./components/LogRow";
+import { LogsSkeletonList } from "./components/LogRowSkeleton";
 import { LogDetailSheet } from "./components/LogDetailSheet";
 import { DeploymentEventListItem } from "./components/DeploymentEventListItem";
+import { HistoricalLogsView } from "./components/HistoricalLogsView";
 
 // Utils
 import { exportLogsToFile } from "./utils/log-export";
 import { interleaveLogs, getInterleavedLogKey } from "./utils/interleaveLogs";
+import { useKeyboardNavigation } from "./utils/keyboard-navigation";
 
 // Types
 import type { LogEntry, LogFilters } from "./types";
@@ -49,11 +53,21 @@ const initialFilters: LogFilters = {
  * Main LogsView content component
  */
 function LogsViewContent() {
-  const { deploymentUrl, authToken, useMockData, adminClient, deployment } =
-    useDeployment();
+  const {
+    deploymentUrl,
+    authToken,
+    accessToken,
+    useMockData,
+    adminClient,
+    deployment,
+    teamId,
+  } = useDeployment();
 
   // Get deployment ID for storage
   const deploymentId = deployment?.id?.toString() || deploymentUrl || "unknown";
+
+  // Historical logs modal state
+  const [showHistoricalLogs, setShowHistoricalLogs] = useState(false);
 
   // Filter state
   const [filters, setFilters] = useState<LogFilters>(initialFilters);
@@ -72,6 +86,9 @@ function LogsViewContent() {
 
   // Export state
   const [isExporting, setIsExporting] = useState(false);
+
+  // Track if we've completed initial load
+  const hasCompletedInitialLoad = useRef(false);
 
   // Stable error handler
   const handleError = useCallback((err: string) => {
@@ -101,7 +118,11 @@ function LogsViewContent() {
   });
 
   // Local SQLite log store hook
-  const { ingestLogs: ingestToSqlite, stats: localStats } = useLocalLogStore();
+  const {
+    ingestLogs: ingestToSqlite,
+    stats: localStats,
+    settings: logStoreSettings,
+  } = useLocalLogStore();
 
   // Compute effective pause state
   const isDetailOpen = selectedLog !== null;
@@ -122,6 +143,13 @@ function LogsViewContent() {
     fetchFn: fetch,
   });
 
+  // Track when initial load completes
+  useEffect(() => {
+    if (!isLoading) {
+      hasCompletedInitialLoad.current = true;
+    }
+  }, [isLoading]);
+
   // Final deduplication safety check before rendering
   const logs = useMemo(() => {
     const seen = new Set<string>();
@@ -135,6 +163,13 @@ function LogsViewContent() {
     });
   }, [rawLogs]);
 
+  // Fetch team members for resolving deployment event author names
+  const { members: teamMembers } = useTeamMembers({
+    accessToken,
+    teamId,
+    enabled: !useMockData && !!teamId && !!accessToken,
+  });
+
   // Deployment audit logs hook
   // Fetch deployment events from the last 24 hours
   const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
@@ -142,26 +177,50 @@ function LogsViewContent() {
     adminClient,
     fromTimestamp: twentyFourHoursAgo,
     enabled: !useMockData && !!adminClient, // Enable when we have a real admin client
+    teamMembers,
   });
 
   // Persist new logs to SQLite storage when enabled
   const prevLogsLengthRef = useRef(0);
   useEffect(() => {
+    // Only ingest if storage is enabled
+    if (!logStoreSettings?.enabled) {
+      prevLogsLengthRef.current = logs.length;
+      return;
+    }
+
     if (logs.length > prevLogsLengthRef.current) {
-      const newLogs = logs.slice(0, logs.length - prevLogsLengthRef.current);
+      // Get NEW logs (from previous length to end)
+      const newLogs = logs.slice(prevLogsLengthRef.current);
       if (newLogs.length > 0) {
+        console.log(
+          `[LogsView] Auto-storing ${newLogs.length} new logs to SQLite`,
+        );
         // Ingest to SQLite (fire-and-forget, non-blocking)
-        ingestToSqlite(newLogs, deploymentId).catch((err) => {
-          console.error("[LogsView] Failed to ingest to SQLite:", err);
-        });
+        ingestToSqlite(newLogs, deploymentId)
+          .then((result) => {
+            console.log(
+              `[LogsView] Successfully ingested ${result.inserted} logs (${result.duplicates} duplicates, ${result.errors} errors)`,
+            );
+          })
+          .catch((err) => {
+            console.error("[LogsView] Failed to ingest to SQLite:", err);
+          });
       }
     }
     prevLogsLengthRef.current = logs.length;
-  }, [logs, ingestToSqlite, deploymentId]);
+  }, [logs, ingestToSqlite, deploymentId, logStoreSettings?.enabled]);
 
   // Interleave logs and deployment events
   const interleavedLogs = useMemo(() => {
-    return interleaveLogs(logs, deploymentEvents || [], []);
+    // Both logs and deploymentEvents are sorted descending (newest first)
+    // but interleaveLogs expects ascending (oldest first), so reverse them
+    const logsAscending = [...logs].reverse();
+    const eventsAscending = [...(deploymentEvents || [])].reverse();
+
+    // Interleave in ascending order, then reverse the result back to descending
+    const interleaved = interleaveLogs(logsAscending, eventsAscending, []);
+    return interleaved.reverse();
   }, [logs, deploymentEvents]);
 
   // Filter logs based on current filter state
@@ -234,6 +293,25 @@ function LogsViewContent() {
       return true;
     });
   }, [interleavedLogs, filters]);
+
+  // Extract just log entries for keyboard navigation (exclude deployment events)
+  const navigableLogs = useMemo(() => {
+    return filteredLogs
+      .filter(
+        (item) =>
+          item.kind !== "DeploymentEvent" && item.kind !== "ClearedLogs",
+      )
+      .map((item) => item.executionLog);
+  }, [filteredLogs]);
+
+  // Keyboard navigation
+  useKeyboardNavigation({
+    items: navigableLogs,
+    selectedItem: selectedLog,
+    onSelectItem: setSelectedLog,
+    isDetailOpen: !!selectedLog,
+    onCloseDetail: () => setSelectedLog(null),
+  });
 
   // Handle pause toggle
   const handleTogglePause = useCallback(() => {
@@ -387,6 +465,7 @@ function LogsViewContent() {
           functions={functions}
           onSearchChange={handleSearchChange}
           localLogCount={localStats?.total_logs}
+          onViewStorage={() => setShowHistoricalLogs(true)}
         />
 
         {/* Logs list */}
@@ -407,81 +486,107 @@ function LogsViewContent() {
             <div style={{ flex: 1 }}>Function</div>
           </div>
 
-          {/* Scrollable logs */}
-          <div
-            ref={logsListRef}
-            onScroll={handleLogsScroll}
-            className="h-[calc(100%-32px)] overflow-auto bg-background-base"
-          >
-            {filteredLogs.length === 0 ? (
-              <div
-                className="flex items-center justify-center h-full text-sm"
-                style={{ color: "var(--color-text-muted)" }}
-              >
-                {isLoading ? "Loading logs..." : "No logs to display"}
-              </div>
-            ) : (
-              filteredLogs.map((item) => {
-                const key = getInterleavedLogKey(item);
+          {/* Container for logs and detail sheet */}
+          <div className="relative h-[calc(100%-41px)]">
+            {/* Scrollable logs */}
+            <div
+              ref={logsListRef}
+              onScroll={handleLogsScroll}
+              className="h-full overflow-auto bg-background-base"
+            >
+              {isLoading && !hasCompletedInitialLoad.current ? (
+                // Show skeleton while initial log load is in progress
+                <LogsSkeletonList count={25} />
+              ) : filteredLogs.length === 0 ? (
+                <div
+                  className="flex items-center justify-center h-full text-sm"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  No logs to display
+                </div>
+              ) : (
+                filteredLogs.map((item) => {
+                  const key = getInterleavedLogKey(item);
 
-                if (item.kind === "DeploymentEvent") {
+                  if (item.kind === "DeploymentEvent") {
+                    return (
+                      <DeploymentEventListItem
+                        key={key}
+                        event={item.deploymentEvent}
+                        setShownLog={() => {
+                          // For now, deployment events don't open details
+                          // We can add this functionality later
+                        }}
+                        logKey={key}
+                      />
+                    );
+                  }
+
+                  if (item.kind === "ClearedLogs") {
+                    // Render a "logs cleared" marker (can be implemented later)
+                    return null;
+                  }
+
+                  // ExecutionLog
                   return (
-                    <DeploymentEventListItem
+                    <LogRow
                       key={key}
-                      event={item.deploymentEvent}
-                      setShownLog={() => {
-                        // For now, deployment events don't open details
-                        // We can add this functionality later
-                      }}
-                      logKey={key}
+                      log={item.executionLog}
+                      onClick={() => handleLogClick(item.executionLog)}
+                      isSelected={selectedLog?.id === item.executionLog.id}
+                      functions={functions}
                     />
                   );
-                }
+                })
+              )}
+            </div>
 
-                if (item.kind === "ClearedLogs") {
-                  // Render a "logs cleared" marker (can be implemented later)
-                  return null;
-                }
+            {/* Scroll to top button when scrolled away */}
+            {isScrolledAway && (
+              <button
+                type="button"
+                onClick={handleScrollToTop}
+                className="absolute bottom-4 right-4 flex items-center gap-1.5 px-3 py-2 rounded-full shadow-lg transition-all hover:scale-105"
+                style={{
+                  backgroundColor: "var(--color-brand-base)",
+                  color: "white",
+                }}
+              >
+                <ArrowUp size={14} />
+                <span className="text-xs font-medium">Scroll to top</span>
+              </button>
+            )}
 
-                // ExecutionLog
-                return (
-                  <LogRow
-                    key={key}
-                    log={item.executionLog}
-                    onClick={() => handleLogClick(item.executionLog)}
-                    isSelected={selectedLog?.id === item.executionLog.id}
-                    functions={functions}
-                  />
-                );
-              })
+            {/* Detail sheet - rendered inside logs container below header */}
+            {selectedLog && (
+              <LogDetailSheet
+                log={selectedLog}
+                allLogs={logs}
+                onClose={handleCloseDetail}
+              />
             )}
           </div>
-
-          {/* Scroll to top button when scrolled away */}
-          {isScrolledAway && (
-            <button
-              type="button"
-              onClick={handleScrollToTop}
-              className="absolute bottom-4 right-4 flex items-center gap-1.5 px-3 py-2 rounded-full shadow-lg transition-all hover:scale-105"
-              style={{
-                backgroundColor: "var(--color-brand-base)",
-                color: "white",
-              }}
-            >
-              <ArrowUp size={14} />
-              <span className="text-xs font-medium">Scroll to top</span>
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Detail sheet */}
-      {selectedLog && (
-        <LogDetailSheet
-          log={selectedLog}
-          allLogs={logs}
-          onClose={handleCloseDetail}
-        />
+      {/* Historical Logs Modal */}
+      {showHistoricalLogs && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
+          onClick={() => setShowHistoricalLogs(false)}
+        >
+          <div
+            className="relative w-[95vw] h-[90vh] !rounded-2xl overflow-hidden border border-border-base"
+            style={{ backgroundColor: "var(--color-surface-base)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <HistoricalLogsView
+              deploymentId={deploymentId}
+              onClose={() => setShowHistoricalLogs(false)}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

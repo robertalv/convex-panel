@@ -8,6 +8,7 @@ import {
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { useDeployment } from "@/contexts/deployment-context";
 import { STALE_TIME } from "@/contexts/query-context";
+import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
 
 // Use Tauri's fetch for CORS-free HTTP requests
 const desktopFetch: FetchFn = (input, init) => tauriFetch(input, init);
@@ -37,6 +38,10 @@ export const insightsKeys = {
 export function useInsights(): InsightsState {
   const { deploymentUrl, authToken } = useDeployment();
   const queryClient = useQueryClient();
+  
+  // Insights don't change frequently, so use a longer interval (5 minutes)
+  // Only refetch when tab is visible
+  const refetchInterval = useVisibilityRefetch(5 * 60 * 1000);
 
   const enabled = Boolean(deploymentUrl && authToken);
 
@@ -52,7 +57,10 @@ export function useInsights(): InsightsState {
     },
     enabled,
     staleTime: STALE_TIME.insights,
+    refetchInterval,
     refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData ?? [],
   });
 
   const refetch = useCallback(() => {

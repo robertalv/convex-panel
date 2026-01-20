@@ -30,6 +30,7 @@ import { useLocalSchema } from "./hooks/useLocalSchema";
 import { useRemoteSchemaHistory } from "./hooks/useRemoteSchemaHistory";
 import { useSchemaUpdates } from "./hooks/useSchemaUpdates";
 import { useVisualizerSettings } from "./hooks/useVisualizerSettings";
+import { deleteLegacySnapshots } from "./utils/schema-storage";
 import {
   SchemaTreeSidebar,
   type FilterPreset,
@@ -52,6 +53,7 @@ import {
   generateFullSchemaCode,
   generateSchemaFromTable,
 } from "./utils/code-generator";
+import { parseSchema } from "./utils/schema-parser";
 import { useProjectPathOptional } from "@/contexts/project-path-context";
 import { openSchemaInEditor } from "@/utils/editor";
 
@@ -309,7 +311,25 @@ function SchemaVisualizerContent() {
     schema: localSchemaJson,
     exists: localSchemaExists,
     hasProjectPath,
+    loading: localSchemaLoading,
   } = useLocalSchema({ projectPath });
+
+  // Parse local schema JSON into a ParsedSchema for visualization
+  // This is the LOCAL-FIRST approach: when a local schema is available, use it as the primary view
+  const localParsedSchema = useMemo(() => {
+    if (hasProjectPath && localSchemaExists && localSchemaJson) {
+      return parseSchema(localSchemaJson);
+    }
+    return null;
+  }, [hasProjectPath, localSchemaExists, localSchemaJson]);
+
+  // Determine which schema to use as the active/primary schema
+  // LOCAL-FIRST: Prefer local schema when available, fallback to deployed schema
+  const isUsingLocalSchema = localParsedSchema !== null;
+  const activeSchema = localParsedSchema ?? schema;
+  const isActiveSchemaLoading = isUsingLocalSchema
+    ? localSchemaLoading
+    : isLoading;
 
   // Schema diff functionality
   const {
@@ -318,6 +338,7 @@ function SchemaVisualizerContent() {
     diff,
     hasChanges: hasDiffChanges,
     refreshSnapshots,
+    snapshots: diffSnapshots,
   } = useSchemaDiff({
     deployedSchema: schemaJson,
     parsedSchema: schema,
@@ -331,6 +352,7 @@ function SchemaVisualizerContent() {
   const { currentBranch } = useGitSchemaHistory({
     projectPath: projectPath ?? null,
     autoLoad: true,
+    deploymentId: selectedComponentId ?? undefined,
   });
 
   // GitHub integration (optional - returns null if outside provider)
@@ -350,6 +372,7 @@ function SchemaVisualizerContent() {
     autoLoad: github?.isAuthenticated ?? false,
     // Sync with local git branch so GitHub shows the same branch you're working on
     initialBranch: currentBranch,
+    deploymentId: selectedComponentId ?? undefined,
   });
 
   // Real-time schema updates via SSE
@@ -371,6 +394,30 @@ function SchemaVisualizerContent() {
   // UI state for GitHub modals
   const [showGitHubAuthModal, setShowGitHubAuthModal] = useState(false);
   const [showUpdatesPanel, setShowUpdatesPanel] = useState(false);
+
+  // One-time cleanup of legacy snapshots (without deploymentId)
+  useEffect(() => {
+    const cleanupKey = "convex-panel:schema-visualizer:legacy-cleanup-v1";
+    const hasCleanedUp = localStorage.getItem(cleanupKey);
+
+    if (!hasCleanedUp) {
+      deleteLegacySnapshots()
+        .then((count) => {
+          if (count > 0) {
+            console.log(
+              `[SchemaVisualizer] Cleaned up ${count} legacy snapshots`,
+            );
+          }
+          localStorage.setItem(cleanupKey, "true");
+        })
+        .catch((err) => {
+          console.error(
+            "[SchemaVisualizer] Failed to cleanup legacy snapshots:",
+            err,
+          );
+        });
+    }
+  }, []);
 
   // Track the last component that had a valid schema
   const lastValidComponentRef = useRef<string | null>(selectedComponentId);
@@ -422,9 +469,9 @@ function SchemaVisualizerContent() {
 
   // Get selected table data
   const selectedTableData = useMemo(() => {
-    if (!schema || !selectedTable) return null;
-    return schema.tables.get(selectedTable) || null;
-  }, [schema, selectedTable]);
+    if (!activeSchema || !selectedTable) return null;
+    return activeSchema.tables.get(selectedTable) || null;
+  }, [activeSchema, selectedTable]);
 
   // Memoize settings with search query to prevent infinite re-renders
   const settingsWithSearch = useMemo(
@@ -443,7 +490,7 @@ function SchemaVisualizerContent() {
   // Handle export
   const handleExport = useCallback(
     async (format: ExportFormat) => {
-      if (!schema) return;
+      if (!activeSchema) return;
 
       if (format === "png" || format === "svg") {
         // Export as image
@@ -451,7 +498,7 @@ function SchemaVisualizerContent() {
       } else if (format === "mermaid") {
         // Generate Mermaid diagram
         let mermaid = "erDiagram\n";
-        for (const table of schema.tables.values()) {
+        for (const table of activeSchema.tables.values()) {
           mermaid += `    ${table.name} {\n`;
           for (const field of table.fields) {
             const type = field.type === "id" ? "id" : field.type;
@@ -459,7 +506,7 @@ function SchemaVisualizerContent() {
           }
           mermaid += `    }\n`;
         }
-        for (const rel of schema.relationships) {
+        for (const rel of activeSchema.relationships) {
           mermaid += `    ${rel.from} ||--o{ ${rel.to} : "${rel.field}"\n`;
         }
 
@@ -474,15 +521,15 @@ function SchemaVisualizerContent() {
       } else if (format === "json") {
         // Export as JSON
         const jsonData = {
-          tables: Array.from(schema.tables.values()).map((table) => ({
+          tables: Array.from(activeSchema.tables.values()).map((table) => ({
             name: table.name,
             fields: table.fields,
             indexes: table.indexes,
             isSystem: table.isSystem,
             module: table.module,
           })),
-          relationships: schema.relationships,
-          health: schema.health,
+          relationships: activeSchema.relationships,
+          health: activeSchema.health,
         };
 
         const blob = new Blob([JSON.stringify(jsonData, null, 2)], {
@@ -496,7 +543,7 @@ function SchemaVisualizerContent() {
         URL.revokeObjectURL(url);
       }
     },
-    [schema],
+    [activeSchema],
   );
 
   // Handle reset layout
@@ -534,19 +581,25 @@ function SchemaVisualizerContent() {
   );
 
   // Render loading state (also show loading when we're about to revert to a valid component)
-  if (isLoading || isRevertingToValidComponent) {
+  if (isActiveSchemaLoading || isRevertingToValidComponent) {
     return <LoadingState />;
   }
 
-  // Render error state
-  if (error) {
+  // Render error state (only show error when using deployed schema and no local schema available)
+  if (error && !isUsingLocalSchema) {
     return <EmptyState message={error} />;
   }
 
   // Render empty state
-  if (!schema || schema.tables.size === 0) {
+  if (!activeSchema || activeSchema.tables.size === 0) {
     return (
-      <EmptyState message="No schema found. Define tables in your convex/schema.ts file." />
+      <EmptyState
+        message={
+          isUsingLocalSchema
+            ? "No tables found in your local schema.ts file. Add table definitions to visualize."
+            : "No tables found in your deployment schema. Deploy a schema with tables to visualize."
+        }
+      />
     );
   }
 
@@ -582,7 +635,7 @@ function SchemaVisualizerContent() {
           showHeader={false}
         >
           <SchemaTreeSidebar
-            schema={schema}
+            schema={activeSchema}
             selectedTable={selectedTable}
             onSelectTable={setSelectedTable}
             onNavigateToData={handleNavigateToData}
@@ -608,12 +661,13 @@ function SchemaVisualizerContent() {
           onLayoutChange={handleLayoutChange}
           onExport={handleExport}
           onResetLayout={handleResetLayout}
-          health={schema.health}
+          health={activeSchema.health}
           onHealthPanelToggle={() => setShowHealthPanel(!showHealthPanel)}
           showHealthPanel={showHealthPanel}
           diffMode={diffMode}
           onDiffModeChange={setDiffMode}
           hasDiffChanges={hasDiffChanges}
+          diffSnapshots={diffSnapshots}
           hasLocalSchema={
             hasProjectPath && localSchemaExists && localSchemaJson !== null
           }
@@ -717,7 +771,7 @@ function SchemaVisualizerContent() {
             <ReactFlowProvider>
               <SchemaGraph
                 ref={graphRef}
-                schema={schema}
+                schema={activeSchema}
                 settings={settingsWithSearch}
                 selectedTable={selectedTable}
                 onTableSelect={setSelectedTable}
@@ -741,7 +795,7 @@ function SchemaVisualizerContent() {
       {codePanelOpen && (
         <SchemaCodePanel
           table={selectedTableData}
-          schema={schema}
+          schema={activeSchema}
           diff={diffMode.enabled ? diff : null}
           onClose={() => setCodePanelOpen(false)}
           onOpenInCursor={
@@ -769,7 +823,7 @@ function SchemaVisualizerContent() {
               className="text-sm font-medium"
               style={{ color: "var(--color-text-base)" }}
             >
-              Health Warnings ({schema.health.warnings.length})
+              Health Warnings ({activeSchema.health.warnings.length})
             </span>
             <button
               onClick={() => setShowHealthPanel(false)}
@@ -787,9 +841,9 @@ function SchemaVisualizerContent() {
           </div>
 
           {/* Warnings list */}
-          {schema.health.warnings.length > 0 ? (
+          {activeSchema.health.warnings.length > 0 ? (
             <div className="p-2">
-              {schema.health.warnings.slice(0, 5).map((warning, idx) => (
+              {activeSchema.health.warnings.slice(0, 5).map((warning, idx) => (
                 <div
                   key={idx}
                   className="p-2 mb-1 rounded text-xs"
@@ -819,12 +873,12 @@ function SchemaVisualizerContent() {
                   )}
                 </div>
               ))}
-              {schema.health.warnings.length > 5 && (
+              {activeSchema.health.warnings.length > 5 && (
                 <div
                   className="text-xs text-center py-1"
                   style={{ color: "var(--color-text-muted)" }}
                 >
-                  +{schema.health.warnings.length - 5} more warnings
+                  +{activeSchema.health.warnings.length - 5} more warnings
                 </div>
               )}
             </div>

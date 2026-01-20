@@ -8,6 +8,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useDeployment } from "@/contexts/deployment-context";
 import { useTheme } from "@/contexts/theme-context";
+import { useProjectPathOptional } from "@/contexts/project-path-context";
 import { AlertCircle, X, PanelLeftOpen } from "lucide-react";
 
 // Hooks
@@ -23,6 +24,7 @@ import { DataToolbar } from "./components/DataToolbar";
 import { FilterPanel } from "./components/FilterPanel";
 import { DocumentEditor } from "./components/DocumentEditor";
 import { SchemaSheet } from "./components/SchemaSheet";
+import { FullSchemaSheet } from "./components/FullSchemaSheet";
 import { IndexesSheet } from "./components/IndexesSheet";
 import {
   CustomQuerySheet,
@@ -60,6 +62,7 @@ type SheetType =
   | "add"
   | "edit"
   | "schema"
+  | "fullSchema"
   | "indexes"
   | "customQuery"
   | "metrics"
@@ -78,6 +81,8 @@ function DataViewContent() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { deploymentUrl, authToken, useMockData, adminClient } =
     useDeployment();
+  const projectPathContext = useProjectPathOptional();
+  const projectPath = projectPathContext?.projectPath ?? null;
 
   // View mode state
   const [viewMode, setViewMode] = useState<DataViewMode>(() => {
@@ -684,6 +689,16 @@ function DataViewContent() {
             onClose={() => setSheetState({ type: null })}
           />
         );
+      case "fullSchema":
+        return (
+          <FullSchemaSheet
+            tables={tables}
+            selectedTable={selectedTable}
+            onSelectTable={handleSelectTable}
+            onClose={() => setSheetState({ type: null })}
+            projectPath={projectPath}
+          />
+        );
       case "indexes":
         return (
           <IndexesSheet
@@ -763,12 +778,16 @@ function DataViewContent() {
             selectedComponent={selectedComponentId}
             onComponentSelect={setSelectedComponent}
             components={components}
+            onOpenSchemaSheet={() => setSheetState({ type: "fullSchema" })}
           />
         </ResizableSheet>
       )}
 
       {/* Main content area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ backgroundColor: "var(--color-background-base)" }}>
+      <div
+        className="flex-1 flex flex-col min-w-0 overflow-hidden"
+        style={{ backgroundColor: "var(--color-background-base)" }}
+      >
         {/* Error banner */}
         {(error || displayError) && (
           <div

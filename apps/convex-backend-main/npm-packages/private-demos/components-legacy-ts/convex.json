@@ -1,7 +1,0 @@
-{
-  "$schema": "../../convex/schemas/convex.schema.json",
-  "codegen": {
-    "legacyComponentApi": true,
-    "fileType": "ts"
-  }
-}

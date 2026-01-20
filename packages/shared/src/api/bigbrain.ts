@@ -9,6 +9,7 @@
  */
 
 import type { FetchFn } from "./types";
+import type { PlanType } from "../types/plan";
 
 // Default fetch function - uses native fetch
 const defaultFetch: FetchFn = (input, init) => fetch(input, init);
@@ -69,11 +70,18 @@ export interface UserProfile {
   profilePictureUrl?: string;
 }
 
+export interface TeamMember {
+  id: number;
+  name?: string | null;
+  email: string;
+  role: string;
+}
+
 export interface TeamSubscription {
   plan: {
     id: string;
     name: string;
-    planType: string | null;
+    planType: PlanType | null;
     description?: string;
     status?: string;
   };
@@ -362,6 +370,29 @@ export async function getTeamSubscription(
   } catch {
     // 404 or other errors typically mean free plan
     return null;
+  }
+}
+
+/**
+ * Fetch all members of a team
+ */
+export async function getTeamMembers(
+  accessToken: string,
+  teamId: number,
+  fetchFn: FetchFn = defaultFetch,
+): Promise<TeamMember[]> {
+  try {
+    return await callBigBrainAPI<TeamMember[]>(
+      "/teams/{team_id}/members",
+      {
+        accessToken,
+        pathParams: { team_id: teamId },
+      },
+      fetchFn,
+    );
+  } catch (error) {
+    console.error("[BigBrain] Failed to fetch team members:", error);
+    return [];
   }
 }
 
@@ -748,6 +779,15 @@ export interface DiscordAccount {
   };
 }
 
+export interface Invoice {
+  id: string;
+  status: string;
+  hasFailedPayment: boolean;
+  invoiceDate: string;
+  amountDue: number;
+  currency: string;
+}
+
 // ============================================================================
 // Profile Management Functions
 // ============================================================================
@@ -863,5 +903,35 @@ export async function deleteAccount(
       method: "POST",
     },
     fetchFn,
+  );
+}
+
+/**
+ * Get invoices for a team
+ * Filters invoices to only include those from April 29, 2024 onwards
+ */
+export async function getInvoices(
+  accessToken: string,
+  teamId: number,
+  fetchFn: FetchFn = defaultFetch,
+): Promise<Invoice[]> {
+  const response = await fetchFn(
+    `${BIG_BRAIN_URL}${BIG_BRAIN_DASHBOARD_PATH}/teams/${teamId}/list_invoices`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "Convex-Client": CONVEX_CLIENT_ID,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch invoices: ${response.statusText}`);
+  }
+
+  const data = (await response.json()) as { invoices: Invoice[] };
+  return data.invoices.filter(
+    (invoice) => new Date(invoice.invoiceDate) >= new Date("2024-04-29"),
   );
 }

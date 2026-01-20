@@ -193,7 +193,7 @@ export const EmptyTableState = ({
               style={{
                 pointerEvents: "auto",
                 fontSize: "12px",
-                color: "var(--color-panel-success)",
+                color: "var(--color-accent)",
                 textDecoration: "none",
               }}
             >

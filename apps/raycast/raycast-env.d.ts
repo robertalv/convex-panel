@@ -7,7 +7,12 @@
 
 /* eslint-disable @typescript-eslint/ban-types */
 
-type ExtensionPreferences = {}
+type ExtensionPreferences = {
+  /** Deploy Key - Convex deploy key for direct access (optional). Get from Dashboard → Settings → Deploy Key. Format: instance-name|key */
+  "deployKey"?: string,
+  /** Deployment URL - Your Convex deployment URL (optional). Example: https://polite-condor-874.convex.cloud */
+  "deploymentUrl"?: string
+}
 
 /** Preferences accessible in all the extension's commands */
 declare type Preferences = ExtensionPreferences
@@ -31,6 +36,8 @@ declare namespace Preferences {
   export type SearchDocs = ExtensionPreferences & {}
   /** Preferences accessible in the `components` command */
   export type Components = ExtensionPreferences & {}
+  /** Preferences accessible in the `configure-deploy-key` command */
+  export type ConfigureDeployKey = ExtensionPreferences & {}
 }
 
 declare namespace Arguments {
@@ -52,5 +59,7 @@ declare namespace Arguments {
   export type SearchDocs = {}
   /** Arguments passed to the `components` command */
   export type Components = {}
+  /** Arguments passed to the `configure-deploy-key` command */
+  export type ConfigureDeployKey = {}
 }
 

@@ -1,7 +1,0 @@
-{
-  "functions": {
-    "src/pages/**/*": {
-      "memory": 3008
-    }
-  }
-}

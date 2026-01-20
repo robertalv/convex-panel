@@ -43,41 +43,15 @@ interface SectionProps {
 
 function Section({ title, icon, description, children }: SectionProps) {
   return (
-    <div
-      style={{
-        marginBottom: "32px",
-      }}
-    >
+    <div className="mb-4 rounded-xl border border-border-base bg-surface-raised p-4">
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          marginBottom: "8px",
-        }}
+        className={`flex items-center gap-2 ${description ? "mb-1" : "mb-3"}`}
       >
-        {icon}
-        <h3
-          style={{
-            fontSize: "13px",
-            fontWeight: 600,
-            color: "var(--color-panel-text)",
-            margin: 0,
-          }}
-        >
-          {title}
-        </h3>
+        {icon && <span className="text-brand-base">{icon}</span>}
+        <h3 className="text-sm font-semibold text-text-base">{title}</h3>
       </div>
       {description && (
-        <p
-          style={{
-            fontSize: "12px",
-            color: "var(--color-panel-text-secondary)",
-            marginBottom: "12px",
-          }}
-        >
-          {description}
-        </p>
+        <p className="mb-3 text-xs text-text-muted">{description}</p>
       )}
       {children}
     </div>
@@ -186,8 +160,6 @@ export function DesktopIntegrations() {
   );
 
   // Combine initial repos with search results for the dropdown
-  // When no search is active, show the initial repos list
-  // When searching, show search results
   const repoOptions =
     repoSearchResults.length > 0
       ? repoSearchResults.map((repo) => ({
@@ -201,10 +173,9 @@ export function DesktopIntegrations() {
           sublabel: repo.owner.login,
         }));
 
-  // Handle repo selection - need to find the full repo object
+  // Handle repo selection
   const handleRepoSelect = useCallback(
     (fullName: string) => {
-      // Look in both search results and initial repos
       const repo =
         repoSearchResults.find((r) => r.full_name === fullName) ??
         github?.repos.find((r) => r.full_name === fullName);
@@ -215,132 +186,40 @@ export function DesktopIntegrations() {
     [repoSearchResults, github],
   );
 
-  // Branch options from context (all branches fetched with pagination)
+  // Branch options from context
   const branchOptions = (github?.branches ?? []).map((branch) => ({
     value: branch.name,
     label: branch.name,
   }));
 
   return (
-    <div
-      style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-        backgroundColor: "var(--color-panel-bg)",
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          height: "49px",
-          borderBottom: "1px solid var(--color-panel-border)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 8px",
-          backgroundColor: "var(--color-panel-bg)",
-        }}
-      >
-        <h2
-          style={{
-            fontSize: "14px",
-            fontWeight: 700,
-            color: "var(--color-panel-text)",
-            margin: 0,
-          }}
-        >
-          Integrations
-        </h2>
-      </div>
-
-      {/* Content */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "16px",
-        }}
-      >
-        <div style={{ maxWidth: "600px" }}>
+    <div className="flex flex-1 flex-col overflow-hidden bg-background-base">
+      <div className="flex flex-1 justify-center overflow-y-auto p-4">
+        <div className="w-full max-w-2xl space-y-4">
           {/* Project Directory Section */}
           <Section
             title="Project Directory"
-            icon={
-              <FolderOpen
-                size={16}
-                style={{ color: "var(--color-panel-accent)" }}
-              />
-            }
+            icon={<FolderOpen size={16} />}
             description="Your Convex project directory for terminal commands, automatic schema fixes, and file operations"
           >
             {/* Validation error */}
             {validationError && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "8px 12px",
-                  marginBottom: "12px",
-                  backgroundColor:
-                    "color-mix(in srgb, var(--color-error-base) 10%, transparent)",
-                  border: "1px solid var(--color-error-base)",
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                  color: "var(--color-error-base)",
-                }}
-              >
-                <AlertCircle size={14} style={{ flexShrink: 0 }} />
+              <div className="mb-3 flex items-center gap-2 rounded-lg border border-error-base bg-error-base/10 px-3 py-2 text-xs text-error-base">
+                <AlertCircle size={14} className="shrink-0" />
                 <span>{validationError}</span>
               </div>
             )}
 
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <div
-                style={{
-                  flex: 1,
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--color-panel-border)",
-                  backgroundColor: "var(--color-panel-bg-secondary)",
-                  fontSize: "12px",
-                  color: projectPath
-                    ? "var(--color-panel-text)"
-                    : "var(--color-panel-text-muted)",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {projectPath || "No project selected"}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap rounded-lg border border-border-base bg-surface-base px-3 py-2.5 text-xs text-text-base">
+                {projectPath || (
+                  <span className="text-text-muted">No project selected</span>
+                )}
               </div>
               <button
                 onClick={selectProjectDirectory}
                 disabled={isValidating}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--color-panel-border)",
-                  backgroundColor: "var(--color-panel-bg-secondary)",
-                  color: "var(--color-panel-text)",
-                  fontSize: "12px",
-                  fontWeight: 500,
-                  cursor: isValidating ? "not-allowed" : "pointer",
-                  opacity: isValidating ? 0.6 : 1,
-                  transition: "all 0.2s",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isValidating) {
-                    e.currentTarget.style.backgroundColor =
-                      "var(--color-panel-bg-tertiary)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    "var(--color-panel-bg-secondary)";
-                }}
+                className="shrink-0 rounded-lg border border-border-base bg-surface-base px-4 py-2.5 text-xs font-medium text-text-base transition-all hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isValidating ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -353,33 +232,7 @@ export function DesktopIntegrations() {
                   onClick={clearProjectPath}
                   disabled={isValidating}
                   title="Clear project path"
-                  style={{
-                    padding: "10px",
-                    borderRadius: "8px",
-                    border: "1px solid var(--color-panel-border)",
-                    backgroundColor: "var(--color-panel-bg-secondary)",
-                    color: "var(--color-panel-text-muted)",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    cursor: isValidating ? "not-allowed" : "pointer",
-                    opacity: isValidating ? 0.6 : 1,
-                    transition: "all 0.2s",
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isValidating) {
-                      e.currentTarget.style.backgroundColor =
-                        "var(--color-panel-bg-tertiary)";
-                      e.currentTarget.style.color = "var(--color-error-base)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      "var(--color-panel-bg-secondary)";
-                    e.currentTarget.style.color =
-                      "var(--color-panel-text-muted)";
-                  }}
+                  className="flex shrink-0 items-center rounded-lg border border-border-base bg-surface-base p-2.5 text-text-muted transition-all hover:bg-surface-raised hover:text-error-base disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <X size={14} />
                 </button>
@@ -390,12 +243,10 @@ export function DesktopIntegrations() {
           {/* Editor Preference Section */}
           <Section
             title="Preferred Editor"
-            icon={
-              <Code2 size={16} style={{ color: "var(--color-panel-accent)" }} />
-            }
+            icon={<Code2 size={16} />}
             description="Choose which code editor to open when applying schema fixes. Make sure your editor is installed and available in your PATH."
           >
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <div className="flex flex-wrap gap-2">
               {Object.keys(allEditors).map((editorKey) => {
                 const editor = allEditors[editorKey];
                 const isSelected = preferredEditor === editorKey;
@@ -405,82 +256,27 @@ export function DesktopIntegrations() {
                 return (
                   <div
                     key={editorKey}
-                    style={{
-                      flex: "1 1 calc(50% - 4px)",
-                      minWidth: "200px",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "4px",
-                      position: "relative",
-                    }}
+                    className="flex min-w-[200px] flex-1 flex-col gap-1"
                   >
                     <button
                       onClick={() => handleEditorChange(editorKey)}
-                      style={{
-                        padding: "12px 16px",
-                        borderRadius: "8px",
-                        border: `2px solid ${
-                          isSelected
-                            ? "var(--color-panel-accent)"
-                            : "var(--color-panel-border)"
-                        }`,
-                        backgroundColor: isSelected
-                          ? "color-mix(in srgb, var(--color-panel-accent) 10%, transparent)"
-                          : "var(--color-panel-bg-secondary)",
-                        color: isSelected
-                          ? "var(--color-panel-accent)"
-                          : "var(--color-panel-text)",
-                        fontSize: "12px",
-                        fontWeight: isSelected ? 600 : 500,
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                        textAlign: "center",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "6px",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.backgroundColor =
-                            "var(--color-panel-bg-tertiary)";
-                          e.currentTarget.style.borderColor =
-                            "var(--color-panel-text-muted)";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.backgroundColor =
-                            "var(--color-panel-bg-secondary)";
-                          e.currentTarget.style.borderColor =
-                            "var(--color-panel-border)";
-                        }
-                      }}
+                      className={`flex items-center justify-center gap-1.5 rounded-lg border-2 px-4 py-3 text-xs font-medium transition-all ${
+                        isSelected
+                          ? "border-brand-base bg-brand-base/10 font-semibold text-brand-base"
+                          : "border-border-base bg-surface-base text-text-base hover:border-text-muted hover:bg-surface-raised"
+                      }`}
                     >
                       {editor.label}
                       {isCustom && (
-                        <span
-                          style={{
-                            fontSize: "9px",
-                            padding: "2px 4px",
-                            borderRadius: "4px",
-                            backgroundColor: "var(--color-panel-accent)",
-                            color: "white",
-                          }}
-                        >
+                        <span className="rounded bg-brand-base px-1 py-0.5 text-[9px] text-white">
                           CUSTOM
                         </span>
                       )}
                       {!checkingEditors && isAvailable !== null && (
                         <span
-                          style={{
-                            width: "8px",
-                            height: "8px",
-                            borderRadius: "50%",
-                            backgroundColor: isAvailable
-                              ? "var(--color-success-base)"
-                              : "var(--color-error-base)",
-                          }}
+                          className={`h-2 w-2 rounded-full ${
+                            isAvailable ? "bg-success-base" : "bg-error-base"
+                          }`}
                           title={
                             isAvailable
                               ? "Available in PATH"
@@ -502,26 +298,7 @@ export function DesktopIntegrations() {
                             refreshEditors();
                           }
                         }}
-                        style={{
-                          padding: "4px 8px",
-                          borderRadius: "6px",
-                          border: "1px solid var(--color-error-base)",
-                          backgroundColor: "transparent",
-                          color: "var(--color-error-base)",
-                          fontSize: "10px",
-                          cursor: "pointer",
-                          transition: "all 0.2s",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor =
-                            "var(--color-error-base)";
-                          e.currentTarget.style.color = "white";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "transparent";
-                          e.currentTarget.style.color =
-                            "var(--color-error-base)";
-                        }}
+                        className="rounded-md border border-error-base px-2 py-1 text-[10px] text-error-base transition-all hover:bg-error-base hover:text-white"
                       >
                         Remove
                       </button>
@@ -531,40 +308,26 @@ export function DesktopIntegrations() {
               })}
             </div>
 
-            <div
-              style={{
-                marginTop: "12px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "8px",
-              }}
-            >
-              <p
-                style={{
-                  fontSize: "11px",
-                  color: "var(--color-panel-text-muted)",
-                  margin: 0,
-                }}
-              >
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <p className="m-0 text-[11px] text-text-muted">
                 Selected:{" "}
                 <strong>
                   {allEditors[preferredEditor]?.label || "Unknown"}
                 </strong>{" "}
                 (
-                <code style={{ fontSize: "10px" }}>
+                <code className="text-[10px]">
                   {allEditors[preferredEditor]?.command || "unknown"}
                 </code>
                 )
                 {!checkingEditors &&
                   editorAvailability[preferredEditor] === false && (
-                    <span style={{ color: "var(--color-error-base)" }}>
+                    <span className="text-error-base">
                       {" "}
                       - Not found in PATH
                     </span>
                   )}
               </p>
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div className="flex gap-2">
                 {!checkingEditors &&
                   editorAvailability[preferredEditor] === false &&
                   hasAutomatedInstall(
@@ -574,48 +337,12 @@ export function DesktopIntegrations() {
                       onClick={() => {
                         const editorCommand =
                           allEditors[preferredEditor]?.command || "";
-                        console.log(
-                          "[DesktopIntegrations] Install CLI Tool clicked for:",
-                          editorCommand,
-                        );
-
                         const command = getEditorInstallCommand(editorCommand);
-                        console.log(
-                          "[DesktopIntegrations] Got install command:",
-                          command,
-                        );
-
                         if (command) {
                           executeInTerminal(command);
-                        } else {
-                          console.error(
-                            "[DesktopIntegrations] No install command found for:",
-                            editorCommand,
-                          );
                         }
                       }}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px",
-                        padding: "4px 8px",
-                        borderRadius: "6px",
-                        border: "1px solid var(--color-panel-accent)",
-                        backgroundColor: "var(--color-panel-accent)",
-                        color: "white",
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor =
-                          "color-mix(in srgb, var(--color-panel-accent) 85%, black)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor =
-                          "var(--color-panel-accent)";
-                      }}
+                      className="flex items-center gap-1 rounded-md border border-brand-base bg-brand-base px-2 py-1 text-[11px] font-semibold text-white transition-all hover:opacity-90"
                     >
                       <Terminal size={12} />
                       Install CLI Tool
@@ -623,24 +350,7 @@ export function DesktopIntegrations() {
                   )}
                 <button
                   onClick={() => setShowInstallHelp(!showInstallHelp)}
-                  style={{
-                    padding: "4px 8px",
-                    borderRadius: "6px",
-                    border: "1px solid var(--color-panel-border)",
-                    backgroundColor: "var(--color-panel-bg-secondary)",
-                    color: "var(--color-panel-text-secondary)",
-                    fontSize: "11px",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      "var(--color-panel-bg-tertiary)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      "var(--color-panel-bg-secondary)";
-                  }}
+                  className="rounded-md border border-border-base bg-surface-base px-2 py-1 text-[11px] text-text-muted transition-all hover:bg-surface-raised"
                 >
                   {showInstallHelp ? "Hide" : "Show"} Install Instructions
                 </button>
@@ -649,61 +359,20 @@ export function DesktopIntegrations() {
 
             {/* Installation Instructions */}
             {showInstallHelp && (
-              <div
-                style={{
-                  marginTop: "12px",
-                  padding: "12px",
-                  borderRadius: "8px",
-                  backgroundColor: "var(--color-panel-bg-secondary)",
-                  border: "1px solid var(--color-panel-border)",
-                }}
-              >
-                <h4
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "var(--color-panel-text)",
-                    marginBottom: "8px",
-                  }}
-                >
+              <div className="mt-3 rounded-lg border border-border-base bg-surface-base p-3">
+                <h4 className="mb-2 text-xs font-semibold text-text-base">
                   How to install{" "}
                   {allEditors[preferredEditor]?.label || "this editor"}{" "}
                   command-line tool:
                 </h4>
-                <p
-                  style={{
-                    fontSize: "11px",
-                    color: "var(--color-panel-text-secondary)",
-                    marginBottom: "12px",
-                    lineHeight: "1.5",
-                  }}
-                >
+                <p className="mb-3 text-[11px] leading-relaxed text-text-muted">
                   {getInstallInstructions(preferredEditor)}
                 </p>
-                <div
-                  style={{
-                    padding: "8px",
-                    borderRadius: "6px",
-                    backgroundColor: "var(--color-panel-bg)",
-                    border: "1px solid var(--color-panel-border)",
-                  }}
-                >
-                  <p
-                    style={{
-                      fontSize: "10px",
-                      color: "var(--color-panel-text-muted)",
-                      margin: "0 0 4px 0",
-                    }}
-                  >
+                <div className="rounded-md border border-border-base bg-surface-raised p-2">
+                  <p className="m-0 mb-1 text-[10px] text-text-muted">
                     To verify installation, run in terminal:
                   </p>
-                  <code
-                    style={{
-                      fontSize: "11px",
-                      color: "var(--color-panel-accent)",
-                      fontFamily: "monospace",
-                    }}
-                  >
+                  <code className="font-mono text-[11px] text-brand-base">
                     which {allEditors[preferredEditor]?.command || "command"}
                   </code>
                 </div>
@@ -711,29 +380,10 @@ export function DesktopIntegrations() {
             )}
 
             {/* Add Custom Editor Button */}
-            <div style={{ marginTop: "16px" }}>
+            <div className="mt-4">
               <button
                 onClick={() => setShowAddCustomEditor(!showAddCustomEditor)}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--color-panel-border)",
-                  backgroundColor: "var(--color-panel-bg-secondary)",
-                  color: "var(--color-panel-text)",
-                  fontSize: "12px",
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                  width: "100%",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    "var(--color-panel-bg-tertiary)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    "var(--color-panel-bg-secondary)";
-                }}
+                className="w-full rounded-lg border border-border-base bg-surface-base px-4 py-2 text-xs font-medium text-text-base transition-all hover:bg-surface-raised"
               >
                 {showAddCustomEditor ? "Cancel" : "+ Add Custom Editor"}
               </button>
@@ -741,42 +391,14 @@ export function DesktopIntegrations() {
 
             {/* Add Custom Editor Form */}
             {showAddCustomEditor && (
-              <div
-                style={{
-                  marginTop: "12px",
-                  padding: "16px",
-                  borderRadius: "8px",
-                  backgroundColor: "var(--color-panel-bg-secondary)",
-                  border: "1px solid var(--color-panel-border)",
-                }}
-              >
-                <h4
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "var(--color-panel-text)",
-                    marginBottom: "12px",
-                  }}
-                >
+              <div className="mt-3 rounded-lg border border-border-base bg-surface-base p-4">
+                <h4 className="mb-3 text-xs font-semibold text-text-base">
                   Add Custom Editor
                 </h4>
 
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "12px",
-                  }}
-                >
+                <div className="flex flex-col gap-3">
                   <div>
-                    <label
-                      style={{
-                        fontSize: "11px",
-                        color: "var(--color-panel-text-secondary)",
-                        display: "block",
-                        marginBottom: "4px",
-                      }}
-                    >
+                    <label className="mb-1 block text-[11px] text-text-muted">
                       Editor Name*
                     </label>
                     <input
@@ -789,27 +411,12 @@ export function DesktopIntegrations() {
                         })
                       }
                       placeholder="e.g., Zed"
-                      style={{
-                        width: "100%",
-                        padding: "8px 12px",
-                        borderRadius: "6px",
-                        border: "1px solid var(--color-panel-border)",
-                        backgroundColor: "var(--color-panel-bg)",
-                        color: "var(--color-panel-text)",
-                        fontSize: "12px",
-                      }}
+                      className="w-full rounded-md border border-border-base bg-surface-raised px-3 py-2 text-xs text-text-base"
                     />
                   </div>
 
                   <div>
-                    <label
-                      style={{
-                        fontSize: "11px",
-                        color: "var(--color-panel-text-secondary)",
-                        display: "block",
-                        marginBottom: "4px",
-                      }}
-                    >
+                    <label className="mb-1 block text-[11px] text-text-muted">
                       Command*
                     </label>
                     <input
@@ -822,16 +429,7 @@ export function DesktopIntegrations() {
                         })
                       }
                       placeholder="e.g., zed"
-                      style={{
-                        width: "100%",
-                        padding: "8px 12px",
-                        borderRadius: "6px",
-                        border: "1px solid var(--color-panel-border)",
-                        backgroundColor: "var(--color-panel-bg)",
-                        color: "var(--color-panel-text)",
-                        fontSize: "12px",
-                        fontFamily: "monospace",
-                      }}
+                      className="w-full rounded-md border border-border-base bg-surface-raised px-3 py-2 font-mono text-xs text-text-base"
                     />
                   </div>
 
@@ -857,24 +455,7 @@ export function DesktopIntegrations() {
                     disabled={
                       !customEditorForm.label || !customEditorForm.command
                     }
-                    style={{
-                      padding: "10px 16px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--color-panel-accent)",
-                      backgroundColor: "var(--color-panel-accent)",
-                      color: "white",
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      cursor:
-                        customEditorForm.label && customEditorForm.command
-                          ? "pointer"
-                          : "not-allowed",
-                      opacity:
-                        customEditorForm.label && customEditorForm.command
-                          ? 1
-                          : 0.5,
-                      transition: "all 0.2s",
-                    }}
+                    className="rounded-lg border border-brand-base bg-brand-base px-4 py-2.5 text-xs font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Add Editor
                   </button>
@@ -886,89 +467,28 @@ export function DesktopIntegrations() {
           {/* GitHub Section */}
           <Section
             title="GitHub"
-            icon={
-              <Github
-                size={16}
-                style={{ color: "var(--color-panel-accent)" }}
-              />
-            }
+            icon={<Github size={16} />}
             description="Connect to GitHub to view schema history from your repository"
           >
             {!github?.hasConvexProject ? (
-              <div
-                style={{
-                  padding: "16px",
-                  borderRadius: "12px",
-                  border: "1px solid var(--color-panel-border)",
-                  backgroundColor: "var(--color-panel-bg-secondary)",
-                  fontSize: "12px",
-                  color: "var(--color-panel-text-muted)",
-                }}
-              >
+              <div className="rounded-lg border border-border-base bg-surface-base px-3 py-2.5 text-xs text-text-muted">
                 Select a Convex project to enable GitHub integration
               </div>
             ) : !github?.isAuthenticated ? (
-              <div
-                style={{
-                  padding: "16px",
-                  borderRadius: "12px",
-                  border: "1px solid var(--color-panel-border)",
-                  backgroundColor: "var(--color-panel-bg-secondary)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
+              <div className="rounded-lg border border-border-base bg-surface-base p-3">
+                <div className="flex items-center justify-between">
                   <div>
-                    <div
-                      style={{
-                        fontSize: "13px",
-                        fontWeight: 500,
-                        color: "var(--color-panel-text)",
-                        marginBottom: "4px",
-                      }}
-                    >
+                    <div className="mb-1 text-xs font-medium text-text-base">
                       Not connected
                     </div>
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: "var(--color-panel-text-muted)",
-                      }}
-                    >
+                    <div className="text-xs text-text-muted">
                       Sign in to GitHub to enable schema history
                     </div>
                   </div>
                   <button
                     onClick={github?.startAuth}
                     disabled={github?.isLoading}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      padding: "8px 16px",
-                      borderRadius: "8px",
-                      border: "none",
-                      backgroundColor: "#24292e",
-                      color: "white",
-                      fontSize: "12px",
-                      fontWeight: 500,
-                      cursor: github?.isLoading ? "not-allowed" : "pointer",
-                      opacity: github?.isLoading ? 0.6 : 1,
-                      transition: "all 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!github?.isLoading) {
-                        e.currentTarget.style.backgroundColor = "#1b1f23";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "#24292e";
-                    }}
+                    className="flex items-center gap-1.5 rounded-lg border-none bg-[#24292e] px-4 py-2 text-xs font-medium text-white transition-all hover:bg-[#1b1f23] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {github?.isLoading ? (
                       <Loader2 size={14} className="animate-spin" />
@@ -980,95 +500,19 @@ export function DesktopIntegrations() {
                 </div>
               </div>
             ) : (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "12px",
-                }}
-              >
+              <div className="flex flex-col gap-3">
                 {/* Auth Status */}
-                <div
-                  style={{
-                    padding: "12px 16px",
-                    borderRadius: "8px",
-                    border: "1px solid var(--color-panel-border)",
-                    backgroundColor: "var(--color-panel-bg-secondary)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "8px",
-                        height: "8px",
-                        borderRadius: "50%",
-                        backgroundColor: "#22c55e",
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        color: "var(--color-panel-text)",
-                      }}
-                    >
+                <div className="flex items-center justify-between rounded-lg border border-border-base bg-surface-base px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-success-base" />
+                    <span className="text-xs text-text-base">
                       Connected to GitHub
                       {github.user?.login && ` as ${github.user.login}`}
                     </span>
                   </div>
                   <button
-                    onClick={() => {
-                      const editorCommand =
-                        allEditors[preferredEditor]?.command || "";
-                      console.log(
-                        "[DesktopIntegrations] Install CLI Tool clicked for:",
-                        editorCommand,
-                      );
-
-                      const command = getEditorInstallCommand(editorCommand);
-                      console.log(
-                        "[DesktopIntegrations] Got install command:",
-                        command,
-                      );
-
-                      if (command) {
-                        executeInTerminal(command);
-                      } else {
-                        console.error(
-                          "[DesktopIntegrations] No install command found for:",
-                          editorCommand,
-                        );
-                      }
-                    }}
-                    title="Automatically install CLI tool (may require sudo password)"
-                    style={{
-                      padding: "4px 10px",
-                      borderRadius: "6px",
-                      border: "none",
-                      backgroundColor: "transparent",
-                      color: "var(--color-panel-text-muted)",
-                      fontSize: "11px",
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor =
-                        "var(--color-panel-bg-tertiary)";
-                      e.currentTarget.style.color = "#ef4444";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                      e.currentTarget.style.color =
-                        "var(--color-panel-text-muted)";
-                    }}
+                    onClick={github.logout}
+                    className="rounded-md border-none bg-transparent px-2.5 py-1 text-[11px] text-text-muted transition-all hover:bg-surface-raised hover:text-error-base"
                   >
                     Disconnect
                   </button>
@@ -1076,15 +520,7 @@ export function DesktopIntegrations() {
 
                 {/* Repository Selection */}
                 <div>
-                  <label
-                    style={{
-                      fontSize: "11px",
-                      fontWeight: 500,
-                      color: "var(--color-panel-text-secondary)",
-                      marginBottom: "6px",
-                      display: "block",
-                    }}
-                  >
+                  <label className="mb-1.5 block text-[11px] font-medium text-text-muted">
                     Repository
                   </label>
                   <SearchableSelect
@@ -1103,15 +539,7 @@ export function DesktopIntegrations() {
                 {/* Branch Selection */}
                 {github.selectedRepo && (
                   <div>
-                    <label
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 500,
-                        color: "var(--color-panel-text-secondary)",
-                        marginBottom: "6px",
-                        display: "block",
-                      }}
-                    >
+                    <label className="mb-1.5 block text-[11px] font-medium text-text-muted">
                       Branch
                     </label>
                     <SearchableSelect
@@ -1141,20 +569,7 @@ export function DesktopIntegrations() {
               href="https://docs.convex.dev/production/integrations/"
               target="_blank"
               rel="noopener noreferrer"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                fontSize: "12px",
-                color: "var(--color-panel-accent)",
-                textDecoration: "none",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.textDecoration = "underline";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.textDecoration = "none";
-              }}
+              className="inline-flex items-center gap-1 text-xs text-brand-base no-underline hover:underline"
             >
               Learn about integrations
               <ExternalLink size={12} />

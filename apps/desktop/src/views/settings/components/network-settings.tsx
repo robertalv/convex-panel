@@ -25,23 +25,11 @@ const ENDPOINTS = {
 } as const;
 
 function StatusBadge({ status }: { status: TestStatus }) {
-  const config = {
-    pending: {
-      bg: "var(--color-surface-raised)",
-      text: "var(--color-text-muted)",
-      label: "Pending",
-    },
-    running: {
-      bg: "rgba(var(--color-brand-rgb), 0.1)",
-      text: "var(--color-brand-base)",
-      label: "Testing...",
-    },
-    success: {
-      bg: "rgba(34, 197, 94, 0.1)",
-      text: "#22c55e",
-      label: "Connected",
-    },
-    error: { bg: "rgba(239, 68, 68, 0.1)", text: "#ef4444", label: "Failed" },
+  const styles = {
+    pending: "bg-surface-raised text-text-muted",
+    running: "bg-brand-base/10 text-brand-base",
+    success: "bg-success-base/10 text-success-base",
+    error: "bg-error-base/10 text-error-base",
   }[status];
 
   const Icon = {
@@ -51,22 +39,19 @@ function StatusBadge({ status }: { status: TestStatus }) {
     error: X,
   }[status];
 
+  const label = {
+    pending: "Pending",
+    running: "Testing...",
+    success: "Connected",
+    error: "Failed",
+  }[status];
+
   return (
     <div
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "6px",
-        padding: "4px 10px",
-        borderRadius: "6px",
-        backgroundColor: config.bg,
-        fontSize: "11px",
-        fontWeight: 500,
-        color: config.text,
-      }}
+      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium ${styles}`}
     >
       <Icon size={12} className={status === "running" ? "animate-spin" : ""} />
-      {config.label}
+      {label}
     </div>
   );
 }
@@ -89,127 +74,49 @@ function TestCard({
   onRerun,
 }: TestCardProps) {
   return (
-    <div
-      style={{
-        padding: "16px",
-        borderRadius: "12px",
-        border: "1px solid var(--color-panel-border)",
-        backgroundColor: "var(--color-panel-bg-secondary)",
-        marginBottom: "12px",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "40px",
-              height: "40px",
-              borderRadius: "10px",
-              backgroundColor: "var(--color-panel-bg-tertiary)",
-              color: "var(--color-panel-accent)",
-            }}
-          >
+    <div className="mb-3 rounded-xl border border-border-base bg-surface-raised p-4">
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-overlay text-brand-base">
             {icon}
           </div>
           <div>
-            <h4
-              style={{
-                fontSize: "13px",
-                fontWeight: 600,
-                color: "var(--color-panel-text)",
-                marginBottom: "2px",
-              }}
-            >
+            <h4 className="mb-0.5 text-[13px] font-semibold text-text-base">
               {name}
             </h4>
-            <p
-              style={{
-                fontSize: "11px",
-                color: "var(--color-panel-text-secondary)",
-              }}
-            >
-              {description}
-            </p>
+            <p className="text-[11px] text-text-muted">{description}</p>
           </div>
         </div>
         <StatusBadge status={result.status} />
       </div>
 
       {/* Endpoint URL */}
-      <div
-        style={{
-          marginTop: "12px",
-          padding: "8px 10px",
-          borderRadius: "6px",
-          backgroundColor: "var(--color-panel-bg-tertiary)",
-          fontSize: "10px",
-          fontFamily: "monospace",
-          color: "var(--color-panel-text-muted)",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
+      <div className="mt-3 overflow-hidden text-ellipsis whitespace-nowrap rounded-md bg-surface-overlay px-2.5 py-2 font-mono text-[10px] text-text-muted">
         {endpoint}
       </div>
 
       {/* Result Details */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginTop: "12px",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+      <div className="mt-3 flex items-center justify-between">
+        <div className="flex items-center gap-4">
           {result.latency !== undefined && (
-            <span
-              style={{
-                fontSize: "11px",
-                color: "var(--color-panel-text-muted)",
-              }}
-            >
+            <span className="text-[11px] text-text-muted">
               Latency:{" "}
-              <strong style={{ color: "var(--color-panel-text)" }}>
-                {result.latency}ms
-              </strong>
+              <strong className="text-text-base">{result.latency}ms</strong>
             </span>
           )}
           {result.messagesReceived !== undefined && (
-            <span
-              style={{
-                fontSize: "11px",
-                color: "var(--color-panel-text-muted)",
-              }}
-            >
+            <span className="text-[11px] text-text-muted">
               Messages:{" "}
-              <strong style={{ color: "var(--color-panel-text)" }}>
+              <strong className="text-text-base">
                 {result.messagesReceived}
               </strong>
             </span>
           )}
           {result.error && (
-            <span style={{ fontSize: "11px", color: "#ef4444" }}>
-              {result.error}
-            </span>
+            <span className="text-[11px] text-error-base">{result.error}</span>
           )}
           {result.lastRun && (
-            <span
-              style={{
-                fontSize: "10px",
-                color: "var(--color-panel-text-muted)",
-              }}
-            >
+            <span className="text-[10px] text-text-muted">
               Last: {result.lastRun.toLocaleTimeString()}
             </span>
           )}
@@ -217,33 +124,11 @@ function TestCard({
         <button
           onClick={onRerun}
           disabled={result.status === "running"}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            padding: "6px 12px",
-            borderRadius: "6px",
-            border: "none",
-            backgroundColor: "var(--color-panel-bg-tertiary)",
-            color:
-              result.status === "running"
-                ? "var(--color-panel-text-muted)"
-                : "var(--color-panel-text)",
-            fontSize: "11px",
-            fontWeight: 500,
-            cursor: result.status === "running" ? "not-allowed" : "pointer",
-            opacity: result.status === "running" ? 0.6 : 1,
-            transition: "all 0.2s",
-          }}
-          onMouseEnter={(e) => {
-            if (result.status !== "running") {
-              e.currentTarget.style.backgroundColor = "var(--color-panel-bg)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor =
-              "var(--color-panel-bg-tertiary)";
-          }}
+          className={`flex items-center gap-1.5 rounded-md border-0 bg-surface-overlay px-3 py-1.5 text-[11px] font-medium transition-all ${
+            result.status === "running"
+              ? "cursor-not-allowed text-text-muted opacity-60"
+              : "cursor-pointer text-text-base hover:bg-surface-base"
+          }`}
         >
           <RefreshCw
             size={12}
@@ -261,16 +146,7 @@ export function NetworkSettings() {
 
   if (!networkTests) {
     return (
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "var(--color-panel-text-muted)",
-          fontSize: "13px",
-        }}
-      >
+      <div className="flex flex-1 items-center justify-center text-[13px] text-text-muted">
         Network testing is not available
       </div>
     );
@@ -280,77 +156,43 @@ export function NetworkSettings() {
     networkTests;
 
   const overallStatusConfig = {
-    success: { color: "#22c55e", text: "All network tests passed" },
-    error: { color: "#ef4444", text: "Network connectivity issues detected" },
-    partial: { color: "#f59e0b", text: "Some network tests failed" },
+    success: {
+      color: "bg-success-base text-success-base",
+      text: "All network tests passed",
+    },
+    error: {
+      color: "bg-error-base text-error-base",
+      text: "Network connectivity issues detected",
+    },
+    partial: {
+      color: "bg-warning-base text-warning-base",
+      text: "Some network tests failed",
+    },
     running: {
-      color: "var(--color-brand-base)",
+      color: "bg-brand-base text-brand-base",
       text: "Running network tests...",
     },
     pending: {
-      color: "var(--color-text-muted)",
+      color: "bg-text-muted text-text-muted",
       text: "Network tests pending",
     },
   }[overallStatus];
 
   return (
-    <div
-      style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-        backgroundColor: "var(--color-panel-bg)",
-      }}
-    >
+    <div className="flex flex-1 flex-col overflow-hidden bg-background-base">
       {/* Header */}
-      <div
-        style={{
-          height: "49px",
-          borderBottom: "1px solid var(--color-panel-border)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 16px",
-          backgroundColor: "var(--color-panel-bg)",
-        }}
-      >
-        <h2
-          style={{
-            fontSize: "14px",
-            fontWeight: 700,
-            color: "var(--color-panel-text)",
-            margin: 0,
-          }}
-        >
+      <div className="flex h-[49px] items-center justify-between border-b border-border-base bg-background-base px-4">
+        <h2 className="m-0 text-sm font-bold text-text-base">
           Network / Connectivity
         </h2>
         <button
           onClick={runAllTests}
           disabled={isRunning}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            padding: "8px 14px",
-            borderRadius: "8px",
-            border: "none",
-            backgroundColor: "var(--color-brand-base)",
-            color: "white",
-            fontSize: "12px",
-            fontWeight: 500,
-            cursor: isRunning ? "not-allowed" : "pointer",
-            opacity: isRunning ? 0.7 : 1,
-            transition: "all 0.2s",
-          }}
-          onMouseEnter={(e) => {
-            if (!isRunning) {
-              e.currentTarget.style.opacity = "0.9";
-            }
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = isRunning ? "0.7" : "1";
-          }}
+          className={`flex items-center gap-1.5 rounded-lg border-0 bg-brand-base px-3.5 py-2 text-xs font-medium text-white transition-all ${
+            isRunning
+              ? "cursor-not-allowed opacity-70"
+              : "cursor-pointer hover:opacity-90"
+          }`}
         >
           <RefreshCw size={14} className={isRunning ? "animate-spin" : ""} />
           Run All Tests
@@ -358,52 +200,20 @@ export function NetworkSettings() {
       </div>
 
       {/* Content */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "16px",
-        }}
-      >
-        <div style={{ maxWidth: "700px" }}>
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="max-w-[700px]">
           {/* Overall Status Card */}
           <div
-            style={{
-              padding: "16px",
-              borderRadius: "12px",
-              border: `1px solid ${overallStatusConfig.color}20`,
-              backgroundColor: `${overallStatusConfig.color}08`,
-              marginBottom: "24px",
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-            }}
+            className={`mb-6 flex items-center gap-3 rounded-xl border p-4 ${overallStatusConfig.color.replace("bg-", "border-")}/20 ${overallStatusConfig.color.replace("bg-", "bg-")}/[0.08]`}
           >
             <div
-              style={{
-                width: "12px",
-                height: "12px",
-                borderRadius: "50%",
-                backgroundColor: overallStatusConfig.color,
-              }}
+              className={`h-3 w-3 rounded-full ${overallStatusConfig.color.split(" ")[0]}`}
             />
             <div>
-              <h3
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "var(--color-panel-text)",
-                  marginBottom: "2px",
-                }}
-              >
+              <h3 className="mb-0.5 text-[13px] font-semibold text-text-base">
                 {overallStatusConfig.text}
               </h3>
-              <p
-                style={{
-                  fontSize: "11px",
-                  color: "var(--color-panel-text-muted)",
-                }}
-              >
+              <p className="text-[11px] text-text-muted">
                 Testing connectivity to Convex services using multiple protocols
               </p>
             </div>
@@ -447,25 +257,12 @@ export function NetworkSettings() {
           />
 
           {/* Help Link */}
-          <div style={{ marginTop: "24px" }}>
+          <div className="mt-6">
             <a
               href="https://docs.convex.dev/production/hosting/troubleshooting"
               target="_blank"
               rel="noopener noreferrer"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                fontSize: "12px",
-                color: "var(--color-panel-accent)",
-                textDecoration: "none",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.textDecoration = "underline";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.textDecoration = "none";
-              }}
+              className="inline-flex items-center gap-1.5 text-xs text-brand-base no-underline hover:underline"
             >
               Troubleshooting network issues
               <ExternalLink size={12} />

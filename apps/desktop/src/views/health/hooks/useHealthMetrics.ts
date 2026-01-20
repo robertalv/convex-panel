@@ -11,6 +11,7 @@ import {
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { useDeployment } from "@/contexts/deployment-context";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/query-context";
+import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
 import type { TimeSeriesDataPoint } from "../components/MetricChart";
 
 // Use Tauri's fetch for CORS-free HTTP requests in the desktop app
@@ -151,6 +152,9 @@ function getLatestValue(data: TimeSeriesDataPoint[]): number {
 export function useHealthMetrics(): HealthMetrics {
   const { deploymentUrl, authToken } = useDeployment();
   const queryClient = useQueryClient();
+  
+  // Only refetch when tab is visible
+  const refetchInterval = useVisibilityRefetch(REFETCH_INTERVAL.health);
 
   const enabled = Boolean(deploymentUrl && authToken);
 
@@ -167,8 +171,9 @@ export function useHealthMetrics(): HealthMetrics {
     },
     enabled,
     staleTime: STALE_TIME.health,
-    refetchInterval: REFETCH_INTERVAL.health,
+    refetchInterval,
     refetchOnMount: false,
+    refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData ?? [],
   });
 
@@ -185,8 +190,9 @@ export function useHealthMetrics(): HealthMetrics {
     },
     enabled,
     staleTime: STALE_TIME.health,
-    refetchInterval: REFETCH_INTERVAL.health,
+    refetchInterval,
     refetchOnMount: false,
+    refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData ?? [],
   });
 
@@ -215,8 +221,9 @@ export function useHealthMetrics(): HealthMetrics {
     },
     enabled,
     staleTime: STALE_TIME.health,
-    refetchInterval: REFETCH_INTERVAL.health,
+    refetchInterval,
     refetchOnMount: false,
+    refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData ?? [],
   });
 
@@ -259,8 +266,9 @@ export function useHealthMetrics(): HealthMetrics {
     },
     enabled,
     staleTime: STALE_TIME.health,
-    refetchInterval: REFETCH_INTERVAL.health,
+    refetchInterval,
     refetchOnMount: false,
+    refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData ?? [],
   });
 

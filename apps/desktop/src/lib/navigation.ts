@@ -6,6 +6,8 @@ export interface NavItem {
   path: string;
   icon: IconProps;
   shortcut?: string;
+  /** If true, this nav item is only available in OAuth mode (not deploy key mode) */
+  requiresOAuth?: boolean;
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -14,7 +16,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Health",
     path: "/health",
     icon: { name: "activity" },
-    shortcut: "G then H",
+    shortcut: "⌘1",
   },
   {
     id: "data",
@@ -29,6 +31,7 @@ export const NAV_ITEMS: NavItem[] = [
     path: "/schema",
     icon: { name: "flow" },
     shortcut: "⌘3",
+    requiresOAuth: true, // Not available in deploy key mode
   },
   {
     id: "advisor",
@@ -36,6 +39,7 @@ export const NAV_ITEMS: NavItem[] = [
     path: "/advisor",
     icon: { name: "performance" },
     shortcut: "⌘4",
+    requiresOAuth: true, // Not available in deploy key mode
   },
   {
     id: "functions",
@@ -65,4 +69,23 @@ export const NAV_ITEMS: NavItem[] = [
     icon: { name: "logs" },
     shortcut: "⌘9",
   },
+  {
+    id: "marketplace",
+    label: "Marketplace",
+    path: "/marketplace",
+    icon: { name: "marketplace" },
+    shortcut: "G then M",
+    requiresOAuth: true,
+  },
 ];
+
+/**
+ * Get filtered navigation items based on auth mode
+ * In deploy key mode, items with requiresOAuth=true are hidden
+ */
+export function getFilteredNavItems(isDeployKeyMode: boolean): NavItem[] {
+  if (!isDeployKeyMode) {
+    return NAV_ITEMS;
+  }
+  return NAV_ITEMS.filter((item) => !item.requiresOAuth);
+}

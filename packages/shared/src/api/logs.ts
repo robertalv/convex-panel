@@ -21,6 +21,7 @@ const defaultFetch: FetchFn = (input, init) => fetch(input, init);
  * @param cursor - The cursor to start streaming from
  * @param limit - Optional limit for number of entries
  * @param fetchFn - Optional custom fetch function (for Tauri/CORS-free environments)
+ * @param signal - Optional AbortSignal for cancellation
  * @returns The streamed UDF execution logs
  */
 export async function streamUdfExecution(
@@ -29,6 +30,7 @@ export async function streamUdfExecution(
   cursor: number | string = 0,
   limit?: number,
   fetchFn: FetchFn = defaultFetch,
+  signal?: AbortSignal,
 ): Promise<{ entries: FunctionExecutionJson[]; newCursor: number | string }> {
   const urlObj = new URL(`${deploymentUrl}${ROUTES.STREAM_UDF_EXECUTION}`);
   urlObj.searchParams.set("cursor", String(cursor));
@@ -39,8 +41,18 @@ export async function streamUdfExecution(
 
   const normalizedToken = normalizeToken(authToken);
 
+  // Use provided signal or create internal timeout-based abort
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+  // If external signal is provided, abort our controller when it aborts
+  if (signal) {
+    signal.addEventListener("abort", () => controller.abort());
+    // If already aborted, abort immediately
+    if (signal.aborted) {
+      controller.abort();
+    }
+  }
 
   let response: Response;
   let data: any;
@@ -68,14 +80,18 @@ export async function streamUdfExecution(
   } catch (error: any) {
     clearTimeout(timeoutId);
     if (error.name === "AbortError") {
-      throw new Error("Request timeout: The API took too long to respond");
+      // Re-throw as AbortError so callers can distinguish cancellation from timeout
+      const abortError = new Error("Request aborted");
+      abortError.name = "AbortError";
+      throw abortError;
     }
     throw error;
   }
 
   let entries = (data.entries || []) as FunctionExecutionJson[];
 
-  let newCursor: number | string = cursor;
+  // Use the new cursor from the response, falling back to the provided cursor
+  let newCursor: number | string = data.new_cursor ?? cursor;
 
   return {
     entries,
@@ -92,6 +108,7 @@ export async function streamUdfExecution(
  * @param clientRequestCounter - The client request counter to stream from
  * @param limit - Optional limit for number of entries
  * @param fetchFn - Optional custom fetch function (for Tauri/CORS-free environments)
+ * @param signal - Optional AbortSignal for cancellation
  * @returns The streamed function logs
  */
 export async function streamFunctionLogs(
@@ -102,6 +119,7 @@ export async function streamFunctionLogs(
   clientRequestCounter?: number,
   limit?: number,
   fetchFn: FetchFn = defaultFetch,
+  signal?: AbortSignal,
 ): Promise<{ entries: FunctionExecutionJson[]; newCursor: number | string }> {
   const params = new URLSearchParams({
     cursor: String(cursor),
@@ -120,22 +138,50 @@ export async function streamFunctionLogs(
 
   const normalizedToken = normalizeToken(authToken);
 
-  const response = await fetchFn(url, {
-    headers: {
-      Authorization: normalizedToken,
-      "Content-Type": "application/json",
-      "Convex-Client": "dashboard-1.0.0",
-    },
-  });
+  // Use provided signal or create internal timeout-based abort
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Failed to stream function logs: HTTP ${response.status} - ${text}`,
-    );
+  // If external signal is provided, abort our controller when it aborts
+  if (signal) {
+    signal.addEventListener("abort", () => controller.abort());
+    if (signal.aborted) {
+      controller.abort();
+    }
   }
 
-  const data = await response.json();
+  let response: Response;
+  let data: any;
+
+  try {
+    response = await fetchFn(url, {
+      headers: {
+        Authorization: normalizedToken,
+        "Content-Type": "application/json",
+        "Convex-Client": "dashboard-1.0.0",
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `Failed to stream function logs: HTTP ${response.status} - ${text}`,
+      );
+    }
+
+    data = await response.json();
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === "AbortError") {
+      const abortError = new Error("Request aborted");
+      abortError.name = "AbortError";
+      throw abortError;
+    }
+    throw error;
+  }
 
   let entries = (data.entries || []) as FunctionExecutionJson[];
 
@@ -215,12 +261,31 @@ export function processFunctionLogs(
 
     const rawLogLines = raw.log_lines || raw.logLines;
 
-    const success =
-      raw.error == null &&
-      (raw.success === undefined ||
-        raw.success === null ||
-        raw.success === true ||
-        (typeof raw.success === "object" && raw.success !== null));
+    // Determine success status
+    // For HTTP actions, check the status code in the success object
+    let success = false;
+    if (raw.error != null) {
+      success = false;
+    } else if (typeof raw.success === "object" && raw.success !== null) {
+      // HTTP actions return {status: "200"} or {status: "401"}, etc.
+      const statusCode =
+        typeof raw.success === "object" &&
+        raw.success !== null &&
+        "status" in raw.success
+          ? String((raw.success as any).status)
+          : null;
+      if (statusCode) {
+        // Success if status is 2xx or 3xx
+        const statusNum = parseInt(statusCode, 10);
+        success = !isNaN(statusNum) && statusNum >= 200 && statusNum < 400;
+      }
+    } else if (
+      raw.success === undefined ||
+      raw.success === null ||
+      raw.success === true
+    ) {
+      success = true;
+    }
 
     const functionName =
       typeof identifierRaw === "string" && identifierRaw.includes(":")
@@ -296,6 +361,15 @@ export function processFunctionLogs(
           typeof rawLine === "string" ? rawLine : JSON.stringify(rawLine);
         const lineTimestamp = (rawLine as any)?.timestamp || startedAtMs;
 
+        // Check if this log line is an error based on content
+        // Only highlight log lines that explicitly contain error keywords
+        const lineContainsError =
+          lineStr.toLowerCase().includes("error") ||
+          lineStr.toLowerCase().includes("failure") ||
+          lineStr.includes("ERROR") ||
+          lineStr.includes("FAILURE");
+        const lineIsError = lineContainsError;
+
         allLogs.push({
           ...commonFields,
           kind: "log",
@@ -304,8 +378,8 @@ export function processFunctionLogs(
           startedAt: lineTimestamp,
           completedAt: lineTimestamp,
           durationMs: 0,
-          success: true, // Individual log lines are not failures
-          error: undefined,
+          success: !lineIsError,
+          error: lineIsError ? lineStr : undefined,
           logLines: [lineStr], // Single log line
           usageStats,
         } as FunctionExecutionLog);

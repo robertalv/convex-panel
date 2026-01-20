@@ -1,6 +1,6 @@
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import type { Deployment, Project, Team } from 'convex-panel';
-import { getDeployments, getProfile, getProjects, getTeams, type UserProfile } from '../../api/bigbrain';
+import { getDeployments, getProfile, getProjects, getTeams, type UserProfile } from '@convex-panel/shared/api';
 
 const AUTH_ISSUER = 'https://auth.convex.dev';
 const AUTH_CLIENT_ID = 'HFtA247jp9iNs08NTLIB7JsNPMmRIyfi';

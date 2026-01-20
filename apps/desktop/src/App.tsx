@@ -26,12 +26,18 @@ import {
   startDeviceAuthorization,
 } from "./lib/convex/dashboardCommonAdapter";
 import {
-  clearAccessToken,
-  clearDeployKey,
   loadAccessToken,
   loadDeployKey,
   saveAccessToken,
+  saveDeployKeyAuthConfig,
+  loadDeployKeyAuthConfig,
+  saveAuthMode,
+  loadAuthMode,
+  clearAllAuthData,
+  type DeployKeyAuthConfig,
+  type AuthMode,
 } from "./lib/secureStorage";
+import type { DeployKeyConfig } from "./lib/deployKeyAuth";
 import { HealthView } from "./views/health";
 import { DataView } from "./views/data";
 import FunctionsView from "./views/functions";
@@ -42,6 +48,7 @@ import { SchemaVisualizerView } from "./views/schema-visualizer";
 import { PerformanceAdvisorView } from "./views/performance-advisor";
 import { ProjectSelector } from "./views/project-selector";
 import { SettingsView } from "./views/settings";
+import { MarketplaceView } from "./views/marketplace";
 import { AppShell, CommandPalette } from "./components/layout";
 import {
   WelcomeScreen,
@@ -61,7 +68,7 @@ import {
 } from "./contexts/onboarding-context";
 import { DeploymentNotificationListener } from "./components/deployment-notification-listener";
 import { useApplicationVersion } from "./hooks/useApplicationVersion";
-import { NAV_ITEMS } from "./lib/navigation";
+import { NAV_ITEMS, getFilteredNavItems } from "./lib/navigation";
 import { isTauri } from "./utils/desktop";
 import { STORAGE_KEYS } from "./lib/constants";
 
@@ -110,6 +117,23 @@ function OnboardingSync({
   return null;
 }
 
+/**
+ * Create a synthetic deployment object from deploy key config
+ */
+function createSyntheticDeployment(
+  config: DeployKeyAuthConfig,
+): Deployment {
+  return {
+    id: 0, // Synthetic ID
+    name: config.deploymentName,
+    url: config.deploymentUrl,
+    deploymentType: "prod", // Assume prod for deploy key mode
+    projectId: 0,
+    kind: "cloud",
+    previewIdentifier: null,
+  };
+}
+
 export default function App({ convex: _initialConvex }: AppProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -138,6 +162,11 @@ export default function App({ convex: _initialConvex }: AppProps) {
   const [userCode, setUserCode] = useState<string | null>(null);
   const pollAbortRef = useRef(false);
 
+  // Deploy key auth mode state
+  const [authMode, setAuthModeState] = useState<AuthMode | null>(null);
+  const [deployKeyAuthConfig, setDeployKeyAuthConfig] =
+    useState<DeployKeyAuthConfig | null>(null);
+
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
 
@@ -160,6 +189,14 @@ export default function App({ convex: _initialConvex }: AppProps) {
 
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
+  // Computed values for deploy key mode
+  const isDeployKeyMode = authMode === "deployKey" && deployKeyAuthConfig !== null;
+  
+  // In deploy key mode, use the synthetic deployment
+  const effectiveDeployment = isDeployKeyMode && deployKeyAuthConfig
+    ? createSyntheticDeployment(deployKeyAuthConfig)
+    : selectedDeployment;
+
   // Check for application updates
   useApplicationVersion();
 
@@ -174,9 +211,11 @@ export default function App({ convex: _initialConvex }: AppProps) {
     loadDeployments,
     loadSubscription,
     loadInvoices,
+    teamsLoading,
     deploymentsLoading,
   } = useBigBrain(
-    session?.accessToken ?? null,
+    // Don't call BigBrain in deploy key mode
+    isDeployKeyMode ? null : (session?.accessToken ?? null),
     useCallback((input, init) => {
       if (isTauri()) {
         return import("@tauri-apps/plugin-http").then(({ fetch }) =>
@@ -200,12 +239,34 @@ export default function App({ convex: _initialConvex }: AppProps) {
     [],
   );
 
+  // Load auth state on mount
   useEffect(() => {
     (async () => {
-      const [storedToken, storedDeployKey] = await Promise.all([
-        loadAccessToken(),
-        loadDeployKey(),
-      ]);
+      const [storedToken, storedDeployKey, storedAuthMode, storedDeployKeyConfig] =
+        await Promise.all([
+          loadAccessToken(),
+          loadDeployKey(),
+          loadAuthMode(),
+          loadDeployKeyAuthConfig(),
+        ]);
+
+      // Restore auth mode state
+      if (storedAuthMode) {
+        setAuthModeState(storedAuthMode);
+      }
+      if (storedDeployKeyConfig) {
+        setDeployKeyAuthConfig(storedDeployKeyConfig);
+      }
+
+      // Check if we have a deploy key auth session
+      if (storedAuthMode === "deployKey" && storedDeployKeyConfig) {
+        // Deploy key mode - no need for OAuth session
+        setIsTransitioning(true);
+        setIsRestoring(false);
+        return;
+      }
+
+      // OAuth mode
       const hasSession = Boolean(storedToken || storedDeployKey);
 
       if (storedToken) {
@@ -256,7 +317,10 @@ export default function App({ convex: _initialConvex }: AppProps) {
     else localStorage.removeItem(STORAGE_KEYS.deployment);
   }, [selectedDeployment]);
 
+  // Skip team/project/deployment selection effects in deploy key mode
   useEffect(() => {
+    if (isDeployKeyMode) return;
+    
     if (teams.length > 0 && selectedTeam) {
       const teamExists = teams.some((t) => t.id === selectedTeam.id);
       if (!teamExists) {
@@ -271,16 +335,20 @@ export default function App({ convex: _initialConvex }: AppProps) {
         }
       }
     }
-  }, [teams, selectedTeam]);
+  }, [teams, selectedTeam, isDeployKeyMode]);
 
   useEffect(() => {
+    if (isDeployKeyMode) return;
+    
     if (!selectedTeam && teams.length > 0) {
       setSelectedTeam(teams[0]);
       setIsInitialLoad(false);
     }
-  }, [teams, selectedTeam]);
+  }, [teams, selectedTeam, isDeployKeyMode]);
 
   useEffect(() => {
+    if (isDeployKeyMode) return;
+    
     if (selectedTeam) {
       loadProjects(selectedTeam.id);
       loadSubscription(selectedTeam.id);
@@ -295,9 +363,12 @@ export default function App({ convex: _initialConvex }: AppProps) {
     loadProjects,
     loadSubscription,
     loadInvoices,
+    isDeployKeyMode,
   ]);
 
   useEffect(() => {
+    if (isDeployKeyMode) return;
+    
     if (projects.length > 0 && selectedProject) {
       const projectExists = projects.some(
         (p) =>
@@ -317,10 +388,12 @@ export default function App({ convex: _initialConvex }: AppProps) {
         }
       }
     }
-  }, [deployments, selectedDeployment, selectedProject]);
+  }, [deployments, selectedDeployment, selectedProject, isDeployKeyMode]);
 
   // Handle loading state for deployments
   useEffect(() => {
+    if (isDeployKeyMode) return;
+    
     if (
       selectedProject &&
       deploymentsLoading === true &&
@@ -330,15 +403,19 @@ export default function App({ convex: _initialConvex }: AppProps) {
       // This prevents showing "No results found" during loading
       setIsInitialLoad(true);
     }
-  }, [selectedProject, deploymentsLoading, deployments.length]);
+  }, [selectedProject, deploymentsLoading, deployments.length, isDeployKeyMode]);
 
   useEffect(() => {
+    if (isDeployKeyMode) return;
+    
     if (selectedProject && session?.accessToken) {
       loadDeployments(selectedProject.id);
     }
-  }, [selectedProject?.id, loadDeployments, session?.accessToken]);
+  }, [selectedProject?.id, loadDeployments, session?.accessToken, isDeployKeyMode]);
 
   useEffect(() => {
+    if (isDeployKeyMode) return;
+    
     if (selectedProject) {
       if (deployments.length > 0) {
         // Deployments are loaded - validate and update selection
@@ -370,9 +447,17 @@ export default function App({ convex: _initialConvex }: AppProps) {
       // No project selected - clear deployment
       setSelectedDeployment(null);
     }
-  }, [deployments, selectedDeployment, selectedProject, deploymentsLoading]);
+  }, [deployments, selectedDeployment, selectedProject, deploymentsLoading, isDeployKeyMode]);
+
+  // Get filtered nav items based on auth mode
+  const filteredNavItems = useMemo(
+    () => getFilteredNavItems(isDeployKeyMode),
+    [isDeployKeyMode],
+  );
 
   // Register global hotkeys for palette, settings, and navigation
+  // IMPORTANT: Use NAV_ITEMS (constant length) for hotkeys to maintain consistent hook count
+  // useGlobalHotkeys calls useHotkeys in a loop, so array length must be constant
   const globalHotkeys = useMemo<HotkeyDefinition[]>(
     () => [
       {
@@ -435,7 +520,9 @@ export default function App({ convex: _initialConvex }: AppProps) {
     setSelectedDeployment(null);
     setSelectedProject(null);
     setSelectedTeam(null);
-    await Promise.all([clearAccessToken(), clearDeployKey()]);
+    setAuthModeState(null);
+    setDeployKeyAuthConfig(null);
+    await clearAllAuthData();
   }, []);
 
   const startDeviceAuth = useCallback(async () => {
@@ -467,6 +554,8 @@ export default function App({ convex: _initialConvex }: AppProps) {
       );
       setSession(dashboardSession);
       await saveAccessToken(dashboardSession.accessToken);
+      await saveAuthMode("oauth");
+      setAuthModeState("oauth");
       setUserCode(null);
       setIsTransitioning(true);
     } catch (err) {
@@ -485,10 +574,42 @@ export default function App({ convex: _initialConvex }: AppProps) {
     setAuthError(null);
   }, []);
 
+  // Handle deploy key connection
+  const handleDeployKeyConnect = useCallback(async (config: DeployKeyConfig) => {
+    try {
+      const authConfig: DeployKeyAuthConfig = {
+        deployKey: config.deployKey,
+        deploymentUrl: config.deploymentUrl,
+        deploymentName: config.deploymentName,
+      };
+
+      // Save to storage
+      await saveDeployKeyAuthConfig(authConfig);
+      await saveAuthMode("deployKey");
+
+      // Update state
+      setDeployKeyAuthConfig(authConfig);
+      setAuthModeState("deployKey");
+      setIsTransitioning(true);
+
+      console.log(
+        `[App] Connected via deploy key to ${config.deploymentName}`,
+      );
+    } catch (error) {
+      console.error("[App] Failed to save deploy key config:", error);
+      setAuthError(
+        error instanceof Error ? error.message : "Failed to connect",
+      );
+    }
+  }, []);
+
   const onNavigate = useCallback((path: string) => navigate(path), [navigate]);
 
+  // Check connection status - include deploy key mode
   const isConnected = Boolean(
-    session?.accessToken || (deployUrl && deployKey && manualConnected),
+    isDeployKeyMode ||
+      session?.accessToken ||
+      (deployUrl && deployKey && manualConnected),
   );
 
   const headerUser: User | null = user
@@ -500,104 +621,107 @@ export default function App({ convex: _initialConvex }: AppProps) {
       }
     : null;
 
-  const authToken = session?.accessToken ?? deployKey ?? null;
+  // Auth token for API calls
+  const authToken = isDeployKeyMode && deployKeyAuthConfig
+    ? deployKeyAuthConfig.deployKey
+    : (session?.accessToken ?? deployKey ?? null);
+
+  // Deploy URL for API calls
+  const effectiveDeployUrl = isDeployKeyMode && deployKeyAuthConfig
+    ? deployKeyAuthConfig.deploymentUrl
+    : deployUrl;
+
+  // In deploy key mode, we skip project selection and show app directly
+  const showProjectSelector = !isDeployKeyMode && !selectedProject;
 
   const mainAppContent = isConnected ? (
-    <>
-      <ProjectPathProvider>
-        <OnboardingProvider>
-          <GitHubProviderWithConvexProject
-            teamSlug={selectedTeam?.slug ?? null}
-            projectSlug={selectedProject?.slug ?? null}
-          >
+    <ProjectPathProvider
+      teamSlug={isDeployKeyMode ? null : selectedTeam?.slug}
+      projectSlug={isDeployKeyMode ? null : selectedProject?.slug}
+    >
+      <GitHubProviderWithConvexProject
+        teamSlug={isDeployKeyMode ? null : (selectedTeam?.slug ?? null)}
+        projectSlug={isDeployKeyMode ? null : (selectedProject?.slug ?? null)}
+      >
+          <OnboardingProvider>
             <TerminalProvider>
               <FunctionRunnerProvider>
                 <DeploymentProvider
-                  deployment={selectedDeployment}
+                  deployment={effectiveDeployment}
                   authToken={authToken}
-                  accessToken={session?.accessToken}
-                  deployUrl={deployUrl}
-                  teamId={selectedTeam?.id ?? null}
-                  teamSlug={selectedTeam?.slug ?? null}
-                  projectSlug={selectedProject?.slug ?? null}
+                  accessToken={isDeployKeyMode ? null : session?.accessToken}
+                  deployUrl={effectiveDeployUrl}
+                  teamId={isDeployKeyMode ? null : (selectedTeam?.id ?? null)}
+                  teamSlug={isDeployKeyMode ? null : (selectedTeam?.slug ?? null)}
+                  projectSlug={isDeployKeyMode ? null : (selectedProject?.slug ?? null)}
                   fetchFn={tauriFetch}
                 >
                   <OnboardingSync
-                    deploymentName={selectedDeployment?.name}
-                    teamSlug={selectedTeam?.slug}
-                    projectSlug={selectedProject?.slug}
+                    deploymentName={effectiveDeployment?.name}
+                    teamSlug={isDeployKeyMode ? null : selectedTeam?.slug}
+                    projectSlug={isDeployKeyMode ? null : selectedProject?.slug}
                   />
                   <AppShell
                     theme={theme}
-                    navItems={NAV_ITEMS}
+                    navItems={filteredNavItems}
                     currentPath={location.pathname}
                     onNavigate={onNavigate}
                     onOpenPalette={() => setPaletteOpen(true)}
                     onThemeChange={setTheme}
                     onDisconnect={handleDisconnect}
                     onOpenSettings={() => navigate("/settings")}
-                    onNavigateToProjectSelector={() => {
-                      setSelectedProject(null);
-                      setSelectedDeployment(null);
-                    }}
-                    user={headerUser}
-                    teams={teams}
-                    projects={projects}
-                    deployments={deployments}
-                    selectedTeam={selectedTeam}
-                    selectedProject={selectedProject}
-                    selectedDeployment={selectedDeployment}
-                    subscription={subscription}
-                    invoices={invoices}
-                    onSelectTeam={(team) => {
-                      setSelectedTeam(team);
-                      setSelectedProject(null);
-                      setSelectedDeployment(null);
-                    }}
-                    onSelectProject={(project) => {
-                      setSelectedProject(project);
-                      setSelectedDeployment(null);
-                    }}
-                    onSelectDeployment={setSelectedDeployment}
-                    hideNav={!selectedProject}
-                    deploymentsLoading={deploymentsLoading}
-                  >
-                    {selectedProject ? (
-                      <Routes>
-                        <Route path="/health" element={<HealthView />} />
-                        <Route path="/data" element={<DataView />} />
-                        <Route
-                          path="/schema"
-                          element={<SchemaVisualizerView />}
-                        />
-                        <Route
-                          path="/advisor"
-                          element={<PerformanceAdvisorView />}
-                        />
-                        <Route path="/functions" element={<FunctionsView />} />
-                        <Route path="/files" element={<FilesView />} />
-                        <Route path="/schedules" element={<SchedulesView />} />
-                        <Route path="/logs" element={<LogsView />} />
-                        <Route
-                          path="/settings"
-                          element={
-                            <SettingsView
-                              user={{
-                                name: headerUser?.name || "",
-                                email: headerUser?.email || "",
-                                profilePictureUrl:
-                                  headerUser?.profilePictureUrl,
-                              }}
-                              teamId={selectedTeam?.id}
-                            />
+                    onNavigateToProjectSelector={
+                      isDeployKeyMode
+                        ? undefined
+                        : () => {
+                            setSelectedProject(null);
+                            setSelectedDeployment(null);
                           }
-                        />
-                        <Route
-                          path="*"
-                          element={<Navigate to="/health" replace />}
-                        />
-                      </Routes>
-                    ) : (
+                    }
+                    onRefreshProjects={
+                      isDeployKeyMode
+                        ? undefined
+                        : () => {
+                            if (selectedTeam) {
+                              loadProjects(selectedTeam.id);
+                            }
+                          }
+                    }
+                    user={isDeployKeyMode ? null : headerUser}
+                    teams={isDeployKeyMode ? [] : teams}
+                    projects={isDeployKeyMode ? [] : projects}
+                    deployments={isDeployKeyMode ? [] : deployments}
+                    selectedTeam={isDeployKeyMode ? null : selectedTeam}
+                    selectedProject={isDeployKeyMode ? null : selectedProject}
+                    selectedDeployment={effectiveDeployment}
+                    subscription={isDeployKeyMode ? null : subscription}
+                    invoices={isDeployKeyMode ? [] : invoices}
+                    onSelectTeam={
+                      isDeployKeyMode
+                        ? undefined
+                        : (team) => {
+                            setSelectedTeam(team);
+                            setSelectedProject(null);
+                            setSelectedDeployment(null);
+                          }
+                    }
+                    onSelectProject={
+                      isDeployKeyMode
+                        ? undefined
+                        : (project) => {
+                            setSelectedProject(project);
+                            setSelectedDeployment(null);
+                          }
+                    }
+                    onSelectDeployment={
+                      isDeployKeyMode ? undefined : setSelectedDeployment
+                    }
+                    hideNav={showProjectSelector}
+                    teamsLoading={isDeployKeyMode ? false : teamsLoading}
+                    deploymentsLoading={isDeployKeyMode ? false : deploymentsLoading}
+                    isDeployKeyMode={isDeployKeyMode}
+                  >
+                    {showProjectSelector ? (
                       <ProjectSelector
                         user={headerUser}
                         team={selectedTeam}
@@ -608,6 +732,56 @@ export default function App({ convex: _initialConvex }: AppProps) {
                           setSelectedDeployment(null);
                         }}
                       />
+                    ) : (
+                      <Routes>
+                        <Route path="/health" element={<HealthView />} />
+                        <Route path="/data" element={<DataView />} />
+                        {!isDeployKeyMode && (
+                          <>
+                            <Route
+                              path="/schema"
+                              element={<SchemaVisualizerView />}
+                            />
+                            <Route
+                              path="/advisor"
+                              element={<PerformanceAdvisorView />}
+                            />
+                          </>
+                        )}
+                        <Route path="/functions" element={<FunctionsView />} />
+                        <Route path="/files" element={<FilesView />} />
+                        <Route path="/schedules" element={<SchedulesView />} />
+                        <Route path="/logs" element={<LogsView />} />
+                        {!isDeployKeyMode && (
+                          <Route
+                            path="/marketplace"
+                            element={<MarketplaceView />}
+                          />
+                        )}
+                        <Route
+                          path="/settings"
+                          element={
+                            <SettingsView
+                              user={
+                                isDeployKeyMode
+                                  ? null
+                                  : {
+                                      name: headerUser?.name || "",
+                                      email: headerUser?.email || "",
+                                      profilePictureUrl:
+                                        headerUser?.profilePictureUrl,
+                                    }
+                              }
+                              teamId={isDeployKeyMode ? undefined : selectedTeam?.id}
+                              isDeployKeyMode={isDeployKeyMode}
+                            />
+                          }
+                        />
+                        <Route
+                          path="*"
+                          element={<Navigate to="/health" replace />}
+                        />
+                      </Routes>
                     )}
                   </AppShell>
                   <DeploymentNotificationListener />
@@ -616,7 +790,7 @@ export default function App({ convex: _initialConvex }: AppProps) {
             </TerminalProvider>
             <CommandPalette
               open={paletteOpen}
-              navItems={NAV_ITEMS}
+              navItems={filteredNavItems}
               onSelect={onNavigate}
               onClose={() => setPaletteOpen(false)}
             />
@@ -624,10 +798,9 @@ export default function App({ convex: _initialConvex }: AppProps) {
               isOpen={aboutOpen}
               onClose={() => setAboutOpen(false)}
             />
-          </GitHubProviderWithConvexProject>
-        </OnboardingProvider>
+          </OnboardingProvider>
+        </GitHubProviderWithConvexProject>
       </ProjectPathProvider>
-    </>
   ) : null;
 
   // Set window size to 960x600 with min/max constraints when showing welcome screen
@@ -664,6 +837,7 @@ export default function App({ convex: _initialConvex }: AppProps) {
           onStartDeviceAuth={startDeviceAuth}
           onCancelDeviceAuth={cancelDeviceAuth}
           authError={authError}
+          onDeployKeyConnect={handleDeployKeyConnect}
         />
         <AboutDialog isOpen={aboutOpen} onClose={() => setAboutOpen(false)} />
       </>

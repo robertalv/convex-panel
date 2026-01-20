@@ -30,7 +30,9 @@ export function parseLogLines(logLines: string[]): LogOutput[] {
  * Format: "[LEVEL] message" or just "message"
  */
 function parseLogLine(line: string): LogOutput | null {
-  if (!line || line.trim().length === 0) return null;
+  // Type guard - ensure line is a string
+  if (typeof line !== "string" || !line || line.trim().length === 0)
+    return null;
 
   // Try to extract log level from format: [LEVEL] message
   const levelMatch = line.match(/^\[([A-Z]+)\]\s*(.*)$/);
@@ -65,6 +67,8 @@ export function getPrimaryLogLevel(logLines: string[]): LogLevel | undefined {
   const levels: LogLevel[] = [];
 
   for (const line of logLines) {
+    // Type guard - ensure line is a string
+    if (typeof line !== "string") continue;
     const match = line.match(/^\[([A-Z]+)\]/);
     if (match) {
       levels.push(match[1] as LogLevel);
@@ -91,10 +95,12 @@ export function mergeLogLines(logLines: string[]): LogOutput | null {
   const primaryLevel = getPrimaryLogLevel(logLines);
 
   // Combine all messages, stripping level prefixes
-  const messages = logLines.map((line) => {
-    const match = line.match(/^\[([A-Z]+)\]\s*(.*)$/);
-    return match ? match[2] : line;
-  });
+  const messages = logLines
+    .filter((line) => typeof line === "string") // Type guard
+    .map((line) => {
+      const match = line.match(/^\[([A-Z]+)\]\s*(.*)$/);
+      return match ? match[2] : line;
+    });
 
   return {
     level: primaryLevel,

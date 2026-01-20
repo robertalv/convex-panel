@@ -1,10 +1,22 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import Editor, { type BeforeMount } from "@monaco-editor/react";
-import { PanelLeftOpen, ToggleLeft, ToggleRight } from "lucide-react";
+import Editor, { type BeforeMount, type OnMount } from "@monaco-editor/react";
+import {
+  PanelLeftOpen,
+  ToggleLeft,
+  ToggleRight,
+  Save,
+  ExternalLink,
+} from "lucide-react";
 import { useSearchParams } from "react-router-dom";
+import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { toast } from "sonner";
 import { useDeployment } from "@/contexts/deployment-context";
 import { useTheme } from "@/contexts/theme-context";
+import { useProjectPathOptional } from "@/contexts/project-path-context";
+import { openInEditor } from "@/utils/editor";
 import { useFunctions } from "./hooks/useFunctions";
+import { useLocalSourceCode } from "./hooks/useLocalSourceCode";
 import { useFunctionLogStream } from "./hooks/useFunctionLogStream";
 import { EmptyFunctionsState } from "./components/EmptyFunctionsState";
 import { HealthCard } from "@/components/ui";
@@ -27,7 +39,11 @@ import {
   fetchSourceCode,
   type ModuleFunction,
   type FunctionExecutionLog,
+  type FetchFn,
 } from "@convex-panel/shared/api";
+
+// Use Tauri's fetch for CORS-free requests
+const desktopFetch: FetchFn = (input, init) => tauriFetch(input, init);
 
 type TabType = "statistics" | "code" | "logs";
 
@@ -35,6 +51,8 @@ const FunctionsView: React.FC = () => {
   const { deployment, deploymentUrl, authToken, adminClient, useMockData } =
     useDeployment();
   const { resolvedTheme } = useTheme();
+  const projectPathContext = useProjectPathOptional();
+  const projectPath = projectPathContext?.projectPath ?? null;
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedFunction, setSelectedFunction] =
     useState<ModuleFunction | null>(null);
@@ -93,6 +111,9 @@ const FunctionsView: React.FC = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  // Monaco editor ref for scrolling to function
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+
   // Function runner state
   const [showFunctionRunner, setShowFunctionRunner] = useState(false);
   const [functionRunnerLayout, setFunctionRunnerLayout] =
@@ -100,6 +121,18 @@ const FunctionsView: React.FC = () => {
 
   // Setup Monaco themes before mount
   const handleEditorWillMount: BeforeMount = useCallback((monaco) => {
+    // Disable TypeScript semantic validation to avoid "Cannot find module" errors
+    // since we're viewing standalone files without the full project context
+    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: true,
+      noSyntaxValidation: false, // Keep syntax validation for basic error highlighting
+    });
+
+    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: true,
+      noSyntaxValidation: false,
+    });
+
     monaco.editor.defineTheme("convex-light", {
       base: "vs",
       inherit: true,
@@ -118,6 +151,69 @@ const FunctionsView: React.FC = () => {
       },
     });
   }, []);
+
+  // Handle Monaco editor mount - store ref for scrolling
+  const handleEditorDidMount: OnMount = useCallback((editor) => {
+    editorRef.current = editor;
+  }, []);
+
+  // Find the line number for the selected function in the source code
+  const functionLineNumber = React.useMemo(() => {
+    if (!sourceCode || !selectedFunction?.name) return null;
+
+    const functionName = selectedFunction.name;
+    const lines = sourceCode.split("\n");
+
+    // Look for common function definition patterns:
+    // export const functionName = query(...)
+    // export const functionName = mutation(...)
+    // export const functionName = action(...)
+    // export const functionName = internalQuery(...)
+    // export default functionName
+    // const functionName = ...
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Match: export const/let/var functionName =
+      // or: const/let/var functionName =
+      // or: export default functionName
+      // or: export { functionName }
+      const patterns = [
+        new RegExp(`\\bexport\\s+(const|let|var)\\s+${functionName}\\s*=`),
+        new RegExp(`\\b(const|let|var)\\s+${functionName}\\s*=`),
+        new RegExp(`\\bexport\\s+default\\s+${functionName}\\b`),
+        new RegExp(`\\bexport\\s+\\{[^}]*\\b${functionName}\\b`),
+        new RegExp(`\\bfunction\\s+${functionName}\\s*\\(`),
+        new RegExp(
+          `\\b${functionName}\\s*:\\s*(query|mutation|action|internalQuery|internalMutation|internalAction|httpAction)\\s*\\(`,
+        ),
+      ];
+
+      for (const pattern of patterns) {
+        if (pattern.test(line)) {
+          return i + 1; // Line numbers are 1-indexed
+        }
+      }
+    }
+
+    return null;
+  }, [sourceCode, selectedFunction?.name]);
+
+  // Scroll editor to the function when source code loads or function changes
+  useEffect(() => {
+    if (editorRef.current && functionLineNumber && sourceCode) {
+      // Small delay to ensure editor has rendered the content
+      setTimeout(() => {
+        if (editorRef.current) {
+          editorRef.current.revealLineInCenter(functionLineNumber);
+          // Also set cursor position at the function
+          editorRef.current.setPosition({
+            lineNumber: functionLineNumber,
+            column: 1,
+          });
+        }
+      }, 100);
+    }
+  }, [functionLineNumber, sourceCode]);
 
   // Convert ModuleFunction[] to FunctionItem[] for sidebar
   const sidebarFunctions: FunctionItem[] = groupedFunctions.flatMap((group) =>
@@ -224,6 +320,7 @@ const FunctionsView: React.FC = () => {
           deploymentUrl,
           authToken,
           thirtyMinutesAgo * 1000,
+          desktopFetch,
         ).catch(() => null);
 
         let invData: number[] = Array(30).fill(0);
@@ -264,50 +361,115 @@ const FunctionsView: React.FC = () => {
     return () => clearInterval(interval);
   }, [selectedFunction, deploymentUrl, authToken, useMockData, activeTab]);
 
-  // Fetch source code when code tab is selected
-  useEffect(() => {
-    if (
-      activeTab !== "code" ||
-      !selectedFunction ||
-      !deploymentUrl ||
-      !authToken ||
-      useMockData
-    ) {
-      setSourceCode(null);
-      return;
-    }
+  // Compute module path for source code fetching
+  const modulePath = React.useMemo(() => {
+    if (!selectedFunction) return null;
 
-    let modulePath = selectedFunction.file?.path || "";
+    let path = selectedFunction.file?.path || "";
 
-    if (!modulePath && selectedFunction.identifier) {
+    if (!path && selectedFunction.identifier) {
       const parts = selectedFunction.identifier.split(":");
       if (parts.length >= 2) {
-        modulePath = parts[0];
+        path = parts[0];
       } else {
-        modulePath = selectedFunction.identifier;
+        path = selectedFunction.identifier;
       }
     }
 
-    if (modulePath && !modulePath.includes(".")) {
-      modulePath = `${modulePath}.js`;
+    if (path && !path.includes(".")) {
+      path = `${path}.js`;
     }
 
-    if (!modulePath) {
+    return path || null;
+  }, [selectedFunction]);
+
+  // Try to load source code from local filesystem first
+  const {
+    sourceCode: localSourceCode,
+    loading: localLoading,
+    hasAttempted: localHasAttempted,
+    localPath,
+    refresh: refreshLocalSource,
+  } = useLocalSourceCode({
+    projectPath,
+    modulePath,
+    enabled: activeTab === "code" && !!selectedFunction && !useMockData,
+  });
+
+  // Track whether we're viewing a local (editable) file or API source (read-only)
+  const [isLocalFile, setIsLocalFile] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Track API fetch state to avoid race conditions
+  const apiFetchRef = useRef<{
+    modulePath: string | null;
+    inProgress: boolean;
+  }>({ modulePath: null, inProgress: false });
+
+  // Fetch source code: local first, then API fallback
+  useEffect(() => {
+    if (activeTab !== "code" || !selectedFunction || useMockData) {
       setSourceCode(null);
+      setCodeLoading(false);
+      setIsLocalFile(false);
+      setHasUnsavedChanges(false);
       return;
     }
 
+    // If local source code is still loading or hasn't been attempted yet, wait
+    if (localLoading || !localHasAttempted) {
+      setCodeLoading(true);
+      return;
+    }
+
+    // If we have local source code, use it (editable)
+    if (localSourceCode) {
+      setSourceCode(localSourceCode);
+      setCodeLoading(false);
+      setIsLocalFile(true);
+      setHasUnsavedChanges(false);
+      apiFetchRef.current = { modulePath: null, inProgress: false };
+      return;
+    }
+
+    // No local source code - try API fallback (read-only)
+    if (!modulePath || !deploymentUrl || !authToken) {
+      setSourceCode(null);
+      setCodeLoading(false);
+      setIsLocalFile(false);
+      return;
+    }
+
+    // Avoid duplicate API fetches for the same module
+    if (
+      apiFetchRef.current.modulePath === modulePath &&
+      apiFetchRef.current.inProgress
+    ) {
+      return;
+    }
+
+    apiFetchRef.current = { modulePath, inProgress: true };
     setCodeLoading(true);
+    setIsLocalFile(false);
+
     // Pass the actual component ID (UUID) for fetching source code
     fetchSourceCode(deploymentUrl, authToken, modulePath, selectedComponentId)
       .then((code: string) => {
-        setSourceCode(code);
+        if (apiFetchRef.current.modulePath === modulePath) {
+          setSourceCode(code);
+        }
       })
       .catch(() => {
-        setSourceCode(null);
+        if (apiFetchRef.current.modulePath === modulePath) {
+          setSourceCode(null);
+        }
       })
       .finally(() => {
-        setCodeLoading(false);
+        if (apiFetchRef.current.modulePath === modulePath) {
+          apiFetchRef.current.inProgress = false;
+          setCodeLoading(false);
+        }
       });
   }, [
     activeTab,
@@ -316,7 +478,72 @@ const FunctionsView: React.FC = () => {
     authToken,
     useMockData,
     selectedComponentId,
+    modulePath,
+    localSourceCode,
+    localLoading,
+    localHasAttempted,
   ]);
+
+  // Handle editor content changes (only for local files)
+  const handleEditorChange = useCallback(
+    (value: string | undefined) => {
+      if (isLocalFile && value !== undefined) {
+        setSourceCode(value);
+        setHasUnsavedChanges(value !== localSourceCode);
+      }
+    },
+    [isLocalFile, localSourceCode],
+  );
+
+  // Save file to disk
+  const handleSaveFile = useCallback(async () => {
+    if (!localPath || !sourceCode || !isLocalFile) return;
+
+    setIsSaving(true);
+    try {
+      await writeTextFile(localPath, sourceCode);
+      setHasUnsavedChanges(false);
+      toast.success("File saved");
+      // Refresh the local source to update the reference
+      refreshLocalSource();
+    } catch (error) {
+      console.error("Failed to save file:", error);
+      toast.error("Failed to save file");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [localPath, sourceCode, isLocalFile, refreshLocalSource]);
+
+  // Open file in external code editor
+  const handleOpenInEditor = useCallback(async () => {
+    if (!localPath) return;
+
+    try {
+      // Pass the function line number so the editor opens at the right location
+      await openInEditor(localPath, functionLineNumber ?? undefined);
+    } catch (error) {
+      console.error("Failed to open in editor:", error);
+      toast.error("Could not open editor", {
+        description:
+          "Make sure your preferred editor is installed and available in PATH. Check Settings to configure.",
+      });
+    }
+  }, [localPath, functionLineNumber]);
+
+  // Handle keyboard shortcuts for save (Cmd+S / Ctrl+S)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        if (isLocalFile && hasUnsavedChanges) {
+          handleSaveFile();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isLocalFile, hasUnsavedChanges, handleSaveFile]);
 
   // Logs streaming
   const isLogsTabActive = activeTab === "logs";
@@ -731,6 +958,111 @@ const FunctionsView: React.FC = () => {
                       backgroundColor: "var(--color-background-base)",
                     }}
                   >
+                    {/* Status bar for local files */}
+                    {isLocalFile && sourceCode && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "6px 12px",
+                          borderBottom: "1px solid var(--color-border-muted)",
+                          backgroundColor: "var(--color-background-secondary)",
+                          fontSize: "12px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            color: "var(--color-text-muted)",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontFamily: "monospace",
+                              fontSize: "11px",
+                            }}
+                          >
+                            {localPath}
+                          </span>
+                          {hasUnsavedChanges && (
+                            <span
+                              style={{
+                                color: "var(--color-warning)",
+                                fontWeight: 500,
+                              }}
+                            >
+                              (unsaved)
+                            </span>
+                          )}
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                          }}
+                        >
+                          <button
+                            onClick={handleOpenInEditor}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              padding: "4px 8px",
+                              fontSize: "11px",
+                              fontWeight: 500,
+                              color: "var(--color-text-secondary)",
+                              backgroundColor: "transparent",
+                              border: "1px solid var(--color-border-muted)",
+                              borderRadius: "4px",
+                              cursor: "pointer",
+                            }}
+                            title="Open in external editor"
+                          >
+                            <ExternalLink size={12} />
+                            Open in Editor
+                          </button>
+                          <button
+                            onClick={handleSaveFile}
+                            disabled={!hasUnsavedChanges || isSaving}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              padding: "4px 8px",
+                              fontSize: "11px",
+                              fontWeight: 500,
+                              color: hasUnsavedChanges
+                                ? "var(--color-text-primary)"
+                                : "var(--color-text-muted)",
+                              backgroundColor: hasUnsavedChanges
+                                ? "var(--color-background-tertiary)"
+                                : "transparent",
+                              border: "1px solid var(--color-border-muted)",
+                              borderRadius: "4px",
+                              cursor: hasUnsavedChanges ? "pointer" : "default",
+                              opacity: hasUnsavedChanges ? 1 : 0.5,
+                            }}
+                          >
+                            <Save size={12} />
+                            {isSaving ? "Saving..." : "Save"}
+                            <span
+                              style={{
+                                opacity: 0.6,
+                                marginLeft: "4px",
+                              }}
+                            >
+                              {navigator.platform.includes("Mac")
+                                ? "Cmd+S"
+                                : "Ctrl+S"}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     <div
                       style={{
                         flex: 1,
@@ -773,14 +1105,16 @@ const FunctionsView: React.FC = () => {
                               height="100%"
                               defaultLanguage="typescript"
                               value={sourceCode}
+                              onChange={handleEditorChange}
                               theme={
                                 resolvedTheme === "dark"
                                   ? "convex-dark"
                                   : "convex-light"
                               }
                               beforeMount={handleEditorWillMount}
+                              onMount={handleEditorDidMount}
                               options={{
-                                readOnly: true,
+                                readOnly: !isLocalFile,
                                 minimap: { enabled: false },
                                 scrollBeyondLastLine: false,
                                 fontSize: 13,
@@ -792,7 +1126,7 @@ const FunctionsView: React.FC = () => {
                                 },
                                 wordWrap: "on",
                                 tabSize: 2,
-                                domReadOnly: true,
+                                domReadOnly: !isLocalFile,
                                 contextmenu: true,
                                 glyphMargin: false,
                                 folding: true,
@@ -804,15 +1138,40 @@ const FunctionsView: React.FC = () => {
                             style={{
                               height: "100%",
                               display: "flex",
+                              flexDirection: "column",
                               alignItems: "center",
                               justifyContent: "center",
                               color: "var(--color-text-muted)",
                               fontSize: "14px",
                               padding: "32px",
                               textAlign: "center",
+                              gap: "8px",
                             }}
                           >
-                            Source code not available
+                            <svg
+                              width="28"
+                              height="28"
+                              viewBox="0 0 15 15"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M14.7649 6.07596C14.9991 6.22231 15.0703 6.53079 14.9239 6.76495C14.4849 7.46743 13.9632 8.10645 13.3702 8.66305L14.5712 9.86406C14.7664 10.0593 14.7664 10.3759 14.5712 10.5712C14.3759 10.7664 14.0593 10.7664 13.8641 10.5712L12.6011 9.30817C11.805 9.90283 10.9089 10.3621 9.93375 10.651L10.383 12.3277C10.4544 12.5944 10.2961 12.8685 10.0294 12.94C9.76267 13.0115 9.4885 12.8532 9.41704 12.5865L8.95917 10.8775C8.48743 10.958 8.00036 11.0001 7.50001 11.0001C6.99965 11.0001 6.51257 10.958 6.04082 10.8775L5.58299 12.5864C5.51153 12.8532 5.23737 13.0115 4.97064 12.94C4.7039 12.8686 4.5765 12.5765 4.59699 12.3277L5.04625 10.6509C4.07103 10.362 3.17493 9.90282 2.37885 9.30815L1.11588 10.5712C0.920618 10.7664 0.604034 10.7664 0.408772 10.5712C0.21351 10.3759 0.21351 10.0593 0.408772 9.86406L1.60977 8.66303C1.01681 8.10643 0.495135 7.46742 0.0561054 6.76495C-0.0902503 6.53079 -0.0190703 6.22231 0.215094 6.07596C0.449259 5.92962 0.757736 6.0008 0.904082 6.23496C1.41259 7.04378 2.03243 7.76316 2.74426 8.37186C4.10605 9.51919 5.75006 10.0001 7.50001 10.0001C9.24996 10.0001 10.894 9.51919 12.2558 8.37186C12.9676 7.76316 13.5874 7.04378 14.0959 6.23496C14.2423 6.0008 14.5507 5.92962 14.7649 6.07596Z"
+                                fill="currentColor"
+                                fillRule="evenodd"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                            <p>We're unable to display your source code.</p>
+                            <p
+                              style={{
+                                fontSize: "12px",
+                                opacity: 0.7,
+                              }}
+                            >
+                              Source maps may not be included in this
+                              deployment.
+                            </p>
                           </div>
                         )}
                       </div>

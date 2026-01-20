@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 
-const STORAGE_KEY = "convex-panel-project-path";
+const STORAGE_KEY_PREFIX = "convex-panel-project-path";
 
 interface ProjectPathContextValue {
   projectPath: string | null;
@@ -34,6 +34,8 @@ export function useProjectPathOptional() {
 
 interface ProjectPathProviderProps {
   children: ReactNode;
+  teamSlug?: string | null;
+  projectSlug?: string | null;
 }
 
 /**
@@ -67,25 +69,74 @@ async function validateConvexProject(
   }
 }
 
-export function ProjectPathProvider({ children }: ProjectPathProviderProps) {
-  const [projectPath, setProjectPathState] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved || null;
+export function ProjectPathProvider({
+  children,
+  teamSlug,
+  projectSlug,
+}: ProjectPathProviderProps) {
+  // Create a project-scoped storage key
+  const storageKey =
+    teamSlug && projectSlug
+      ? `${STORAGE_KEY_PREFIX}:${teamSlug}/${projectSlug}`
+      : null;
+
+  console.log("[ProjectPathProvider] Props:", {
+    teamSlug,
+    projectSlug,
+    storageKey,
   });
+
+  const [projectPath, setProjectPathState] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  // Load the path from storage when storage key changes (project changes)
   useEffect(() => {
-    if (projectPath) {
-      localStorage.setItem(STORAGE_KEY, projectPath);
+    console.log("[ProjectPathProvider] Loading from storage, key:", storageKey);
+    if (storageKey) {
+      const saved = localStorage.getItem(storageKey);
+      console.log("[ProjectPathProvider] Loaded path:", saved);
+      setProjectPathState(saved || null);
     } else {
-      localStorage.removeItem(STORAGE_KEY);
+      console.log("[ProjectPathProvider] No storage key, clearing path");
+      setProjectPathState(null);
     }
-  }, [projectPath]);
+    setIsInitialized(true);
+  }, [storageKey]);
+
+  // Save path to storage when it changes
+  useEffect(() => {
+    if (!isInitialized) {
+      return;
+    }
+
+    console.log(
+      "[ProjectPathProvider] Save effect - storageKey:",
+      storageKey,
+      "projectPath:",
+      projectPath,
+    );
+    if (!storageKey) {
+      console.log("[ProjectPathProvider] No storage key, skipping save");
+      return;
+    }
+
+    if (projectPath) {
+      console.log(
+        "[ProjectPathProvider] Saving path to localStorage:",
+        projectPath,
+      );
+      localStorage.setItem(storageKey, projectPath);
+    } else {
+      console.log("[ProjectPathProvider] Removing path from localStorage");
+      localStorage.removeItem(storageKey);
+    }
+  }, [projectPath, storageKey, isInitialized]);
 
   const setProjectPath = useCallback(async (path: string | null) => {
+    console.log("[ProjectPathProvider] setProjectPath called with:", path);
     if (!path) {
       setProjectPathState(null);
       setValidationError(null);
@@ -96,13 +147,19 @@ export function ProjectPathProvider({ children }: ProjectPathProviderProps) {
     setValidationError(null);
 
     const validation = await validateConvexProject(path);
+    console.log("[ProjectPathProvider] Validation result:", validation);
 
     setIsValidating(false);
 
     if (validation.valid) {
+      console.log(
+        "[ProjectPathProvider] Validation passed, setting path:",
+        path,
+      );
       setProjectPathState(path);
       setValidationError(null);
     } else {
+      console.log("[ProjectPathProvider] Validation failed:", validation.error);
       setValidationError(validation.error || "Invalid project directory");
     }
   }, []);

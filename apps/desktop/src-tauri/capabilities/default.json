@@ -32,7 +32,7 @@
       "deny": []
     },
     {
-      "identifier": "shell:allow-spawn",
+      "identifier": "shell:allow-execute",
       "allow": [
         {
           "name": "sh",
@@ -75,6 +75,11 @@
           "args": true
         },
         {
+          "name": "bun",
+          "cmd": "bun",
+          "args": true
+        },
+        {
           "name": "git",
           "cmd": "git",
           "args": true
@@ -91,19 +96,10 @@
         }
       ]
     },
+    "shell:allow-spawn",
     "shell:allow-stdin-write",
     "shell:allow-kill",
     "shell:allow-open",
-    {
-      "identifier": "shell:allow-execute",
-      "allow": [
-        {
-          "name": "git",
-          "cmd": "git",
-          "args": true
-        }
-      ]
-    },
     "dialog:default",
     "dialog:allow-open",
     "fs:default",

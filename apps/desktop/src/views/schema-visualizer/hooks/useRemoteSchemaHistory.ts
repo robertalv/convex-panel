@@ -72,6 +72,8 @@ export interface UseRemoteSchemaHistoryOptions {
   schemaPath?: string;
   /** Initial branch to use (e.g., from local git) - syncs with local working branch */
   initialBranch?: string | null;
+  /** Deployment ID for scoping snapshots to specific deployment */
+  deploymentId?: string;
 }
 
 export interface UseRemoteSchemaHistoryReturn {
@@ -116,6 +118,7 @@ export function useRemoteSchemaHistory({
   autoLoad = true,
   schemaPath,
   initialBranch,
+  deploymentId,
 }: UseRemoteSchemaHistoryOptions = {}): UseRemoteSchemaHistoryReturn {
   // Use optional hook to gracefully handle missing provider
   const github = useGitHubOptional();
@@ -367,10 +370,10 @@ export function useRemoteSchemaHistory({
           throw new Error("Could not parse schema content");
         }
 
-        // Check for existing snapshot
+        // Check for existing snapshot with this commit hash and deploymentId
         const existingSnapshots = await getAllSnapshots("github");
         const existing = existingSnapshots.find(
-          (s) => s.commitHash === commit.sha,
+          (s) => s.commitHash === commit.sha && s.deploymentId === deploymentId,
         );
         if (existing) {
           console.log(
@@ -386,6 +389,7 @@ export function useRemoteSchemaHistory({
           source: "github",
           commitHash: commit.sha,
           commitMessage: commit.message,
+          deploymentId,
         });
 
         await saveSnapshot(snapshot);

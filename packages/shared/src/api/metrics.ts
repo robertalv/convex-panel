@@ -270,27 +270,46 @@ export async function fetchUdfExecutionStats(
 ): Promise<StreamUdfExecutionResponse> {
   const url = `${deploymentUrl}${ROUTES.STREAM_UDF_EXECUTION}?cursor=${cursor}`;
 
-  const response = await fetchFn(url, {
-    headers: {
-      Authorization: normalizeToken(authToken),
-      "Content-Type": "application/json",
-      "Convex-Client": "dashboard-1.0.0",
-    },
-  });
+  // Add timeout to prevent indefinite hanging (stream endpoint can block)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-  if (!response.ok) {
-    const responseText = await response.text();
-    throw new Error(
-      `Failed to fetch UDF execution stats: HTTP ${response.status} - ${responseText}`,
-    );
+  try {
+    const response = await fetchFn(url, {
+      headers: {
+        Authorization: normalizeToken(authToken),
+        "Content-Type": "application/json",
+        "Convex-Client": "dashboard-1.0.0",
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const responseText = await response.text();
+      throw new Error(
+        `Failed to fetch UDF execution stats: HTTP ${response.status} - ${responseText}`,
+      );
+    }
+
+    const data = await response.json();
+
+    return {
+      entries: data.entries || [],
+      new_cursor: data.new_cursor || cursor,
+    };
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === "AbortError") {
+      // Return empty response on timeout instead of hanging indefinitely
+      console.warn(
+        "[fetchUdfExecutionStats] Request timed out, returning empty response",
+      );
+      return { entries: [], new_cursor: cursor };
+    }
+    throw error;
   }
-
-  const data = await response.json();
-
-  return {
-    entries: data.entries || [],
-    new_cursor: data.new_cursor || cursor,
-  };
 }
 
 /**

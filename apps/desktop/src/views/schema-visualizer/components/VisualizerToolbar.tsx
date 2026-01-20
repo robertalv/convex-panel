@@ -40,6 +40,13 @@ interface VisualizerToolbarProps {
   diffMode?: DiffModeSettings;
   onDiffModeChange?: (settings: Partial<DiffModeSettings>) => void;
   hasDiffChanges?: boolean;
+  // Diff snapshots for dropdown (filtered by deployment)
+  diffSnapshots?: Array<{
+    id: string;
+    label: string;
+    timestamp: number;
+    source: "deployed" | "local" | "git" | "github";
+  }>;
   // Local schema props
   hasLocalSchema?: boolean;
   // GitHub integration props (remote)
@@ -181,6 +188,7 @@ export function VisualizerToolbar({
   diffMode,
   onDiffModeChange,
   hasDiffChanges = false,
+  diffSnapshots = [],
   // Local schema
   hasLocalSchema = false,
   // GitHub integration (remote)
@@ -188,12 +196,12 @@ export function VisualizerToolbar({
   gitHubRepo = null,
   gitHubRepos = [],
   gitHubReposLoading = false,
-  remoteCommits = [],
+  remoteCommits: _remoteCommits = [],
   remoteBranches = [],
   remoteBranchesLoading = false,
   remoteCurrentBranch = null,
   onRemoteBranchChange,
-  onSelectRemoteCommitForDiff,
+  onSelectRemoteCommitForDiff: _onSelectRemoteCommitForDiff,
   onConnectGitHub,
   onRepoChange,
   onRepoSearch,
@@ -274,7 +282,6 @@ export function VisualizerToolbar({
 
   return (
     <Toolbar
-      style={{ padding: "0 8px" }}
       left={
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           {/* Layout selector */}
@@ -358,38 +365,37 @@ export function VisualizerToolbar({
                   )}
                 </ToggleButton>
 
-                {diffMode.enabled && remoteCommits.length > 0 && (
+                {diffMode.enabled && (
                   <>
+                    {/* From snapshot selector - Local or GitHub commits */}
                     <SearchableSelect
                       value={diffMode.fromSnapshotId || ""}
                       options={[
-                        // GitHub commits (if connected and repo selected)
-                        ...(isGitHubConnected &&
-                        gitHubRepo &&
-                        remoteCommits.length > 0
-                          ? remoteCommits.map((c) => ({
-                              value: `github:${c.sha}`,
-                              label: `${c.shortSha}: ${c.message.substring(0, 40)}${c.message.length > 40 ? "..." : ""}`,
-                              sublabel: `${c.author} - ${formatTimestamp(c.timestamp)}`,
-                            }))
+                        // Local schema option
+                        ...(hasLocalSchema
+                          ? [
+                              {
+                                value: "__local__",
+                                label: "Local (schema.ts)",
+                              },
+                            ]
                           : []),
+                        // GitHub/git commits
+                        ...diffSnapshots
+                          .filter(
+                            (s) => s.source === "github" || s.source === "git",
+                          )
+                          .map((s) => ({
+                            value: s.id,
+                            label: s.label,
+                            sublabel: formatTimestamp(s.timestamp),
+                          })),
                       ]}
                       onChange={(value) => {
-                        // Handle GitHub commit selection
-                        if (value?.startsWith("github:")) {
-                          const sha = value.replace("github:", "");
-                          const commit = remoteCommits.find(
-                            (c) => c.sha === sha,
-                          );
-                          if (commit && onSelectRemoteCommitForDiff) {
-                            onSelectRemoteCommitForDiff(commit, "from");
-                          }
-                        } else {
-                          onDiffModeChange?.({ fromSnapshotId: value || null });
-                        }
+                        onDiffModeChange?.({ fromSnapshotId: value || null });
                       }}
-                      placeholder="From..."
-                      searchPlaceholder="Search commits..."
+                      placeholder="Select source..."
+                      searchPlaceholder="Search..."
                       sublabelAsText={true}
                     />
 
@@ -398,6 +404,7 @@ export function VisualizerToolbar({
                       style={{ color: "var(--color-text-muted)" }}
                     />
 
+                    {/* To snapshot selector - Current, Local, or GitHub commits */}
                     <SearchableSelect
                       value={diffMode.toSnapshotId || "__current__"}
                       options={[
@@ -414,34 +421,23 @@ export function VisualizerToolbar({
                               },
                             ]
                           : []),
-                        // GitHub commits (if connected and repo selected)
-                        ...(isGitHubConnected &&
-                        gitHubRepo &&
-                        remoteCommits.length > 0
-                          ? remoteCommits.map((c) => ({
-                              value: `github:${c.sha}`,
-                              label: `${c.shortSha}: ${c.message.substring(0, 40)}${c.message.length > 40 ? "..." : ""}`,
-                              sublabel: `${c.author} - ${formatTimestamp(c.timestamp)}`,
-                            }))
-                          : []),
+                        // Only include GitHub/git commits (not local snapshots which duplicate the built-in option)
+                        ...diffSnapshots
+                          .filter(
+                            (s) => s.source === "github" || s.source === "git",
+                          )
+                          .map((s) => ({
+                            value: s.id,
+                            label: s.label,
+                            sublabel: formatTimestamp(s.timestamp),
+                          })),
                       ]}
                       onChange={(value) => {
-                        // Handle GitHub commit selection
-                        if (value?.startsWith("github:")) {
-                          const sha = value.replace("github:", "");
-                          const commit = remoteCommits.find(
-                            (c) => c.sha === sha,
-                          );
-                          if (commit && onSelectRemoteCommitForDiff) {
-                            onSelectRemoteCommitForDiff(commit, "to");
-                          }
-                        } else {
-                          // Keep __current__ as the value, but internally treat it as null for the diff logic
-                          onDiffModeChange?.({
-                            toSnapshotId:
-                              value === "__current__" ? null : value || null,
-                          });
-                        }
+                        // Keep __current__ as the value, but internally treat it as null for the diff logic
+                        onDiffModeChange?.({
+                          toSnapshotId:
+                            value === "__current__" ? null : value || null,
+                        });
                       }}
                       placeholder="To..."
                       searchPlaceholder="Search commits..."
@@ -459,7 +455,6 @@ export function VisualizerToolbar({
                         onDiffModeChange?.({ viewMode: value as DiffViewMode })
                       }
                       placeholder="View..."
-                      searchPlaceholder="View mode..."
                     />
                   </>
                 )}

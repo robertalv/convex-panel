@@ -78,7 +78,9 @@ export function CronsFileSheet({
         if (code) {
           setSourceCode(code);
         } else {
-          setError("Source code not available");
+          setError(
+            "Unable to display source code. Source maps may not be included in this deployment.",
+          );
         }
       } catch (err: any) {
         console.error("Failed to fetch crons source code:", err);

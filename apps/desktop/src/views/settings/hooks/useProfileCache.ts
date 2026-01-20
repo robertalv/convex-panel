@@ -3,7 +3,7 @@ import type {
   ProfileEmail,
   Identity,
   DiscordAccount,
-} from "../../../api/bigbrain";
+} from "@convex-panel/shared/api";
 
 // Cache entry structure
 interface CacheEntry<T> {

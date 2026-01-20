@@ -3,13 +3,22 @@ import { cn } from "@/lib/utils";
 import { ConvexLogo } from "@/components/svg/convex-logo";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { UserMenu } from "./user-menu";
-import type { Team, Project, Deployment, User, ThemeType } from "@/types/desktop";
-import type { TeamSubscription } from "@/api/bigbrain";
+import type {
+  Team,
+  Project,
+  Deployment,
+  User,
+  ThemeType,
+} from "@/types/desktop";
+import type { TeamSubscription } from "@convex-panel/shared/api";
 import { useIsFullscreen } from "../../hooks/useIsFullscreen";
 import { TerminalButton } from "../terminal-button";
 import { FunctionIcon } from "@/components/svg/function-icon";
 import { IconButton } from "@/components/ui/button";
-import { useFunctionRunnerActions, useFunctionRunnerState } from "../../contexts/function-runner-context";
+import {
+  useFunctionRunnerActions,
+  useFunctionRunnerState,
+} from "../../contexts/function-runner-context";
 
 interface TopBarProps {
   user: User | null;
@@ -20,16 +29,18 @@ interface TopBarProps {
   selectedProject: Project | null;
   selectedDeployment: Deployment | null;
   subscription: TeamSubscription | null;
-  onSelectTeam: (team: Team) => void;
-  onSelectProject: (project: Project) => void;
-  onSelectDeployment: (deployment: Deployment) => void;
+  onSelectTeam?: (team: Team) => void;
+  onSelectProject?: (project: Project) => void;
+  onSelectDeployment?: (deployment: Deployment) => void;
   onOpenPalette: () => void;
   onThemeChange: (theme: ThemeType) => void;
   onDisconnect: () => void;
   onOpenSettings?: () => void;
   onNavigateToProjectSelector?: () => void;
+  onRefreshProjects?: () => void;
   theme: ThemeType;
   className?: string;
+  teamsLoading?: boolean;
   deploymentsLoading?: boolean;
 }
 
@@ -50,8 +61,10 @@ export function TopBar({
   onDisconnect,
   onOpenSettings,
   onNavigateToProjectSelector,
+  onRefreshProjects,
   theme,
   className,
+  teamsLoading = false,
   deploymentsLoading = false,
 }: TopBarProps) {
   const isFullscreen = useIsFullscreen();
@@ -88,15 +101,17 @@ export function TopBar({
   const handleTeamChange = React.useCallback(
     (value: string) => {
       const team = teams.find((t) => String(t.id) === value);
-      if (team) onSelectTeam(team);
+      if (team && team.id !== selectedTeam?.id) {
+        onSelectTeam?.(team);
+      }
     },
-    [teams, onSelectTeam],
+    [teams, onSelectTeam, selectedTeam],
   );
 
   const handleProjectChange = React.useCallback(
     (value: string) => {
       const project = projects.find((p) => String(p.id) === value);
-      if (project) onSelectProject(project);
+      if (project) onSelectProject?.(project);
     },
     [projects, onSelectProject],
   );
@@ -104,7 +119,7 @@ export function TopBar({
   const handleDeploymentChange = React.useCallback(
     (value: string) => {
       const deployment = deployments.find((d) => String(d.id) === value);
-      if (deployment) onSelectDeployment(deployment);
+      if (deployment) onSelectDeployment?.(deployment);
     },
     [deployments, onSelectDeployment],
   );
@@ -146,6 +161,7 @@ export function TopBar({
           searchPlaceholder="Search teams..."
           selectedTeam={selectedTeam ?? undefined}
           subscription={subscription}
+          loading={teamsLoading}
         />
 
         <span className="text-text-disabled text-sm">/</span>
@@ -156,6 +172,7 @@ export function TopBar({
           onChange={handleProjectChange}
           placeholder="Project"
           searchPlaceholder="Search projects..."
+          onOpen={onRefreshProjects}
         />
 
         <span className="text-text-disabled text-sm">/</span>

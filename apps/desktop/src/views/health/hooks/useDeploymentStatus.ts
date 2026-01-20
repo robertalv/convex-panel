@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { useDeployment } from "@/contexts/deployment-context";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/query-context";
+import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
 import {
   callConvexQuery,
   SYSTEM_QUERIES,
@@ -62,6 +63,9 @@ export const deploymentStatusKeys = {
 export function useDeploymentStatus(): DeploymentStatus {
   const { deploymentUrl, authToken } = useDeployment();
   const queryClient = useQueryClient();
+  
+  // Only refetch when tab is visible
+  const refetchInterval = useVisibilityRefetch(REFETCH_INTERVAL.health);
 
   const enabled = Boolean(deploymentUrl && authToken);
 
@@ -81,8 +85,9 @@ export function useDeploymentStatus(): DeploymentStatus {
     },
     enabled,
     staleTime: STALE_TIME.health,
-    refetchInterval: REFETCH_INTERVAL.health,
+    refetchInterval,
     refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   // Version query
@@ -123,8 +128,9 @@ export function useDeploymentStatus(): DeploymentStatus {
     },
     enabled,
     staleTime: STALE_TIME.health,
-    refetchInterval: REFETCH_INTERVAL.health,
+    refetchInterval,
     refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   const version = versionQuery.data ?? null;

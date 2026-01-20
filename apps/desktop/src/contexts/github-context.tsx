@@ -459,6 +459,7 @@ export function GitHubProvider({
       try {
         const results = await searchUserRepos(currentToken, query, {
           signal: searchAbortController.current.signal,
+          username: user?.login, // Pass username for better search results
         });
 
         // Only update if this search wasn't cancelled
@@ -486,7 +487,7 @@ export function GitHubProvider({
         }
       }
     },
-    [searchedRepos],
+    [searchedRepos, user?.login],
   );
 
   // Fetch all branches for a repository (with pagination)

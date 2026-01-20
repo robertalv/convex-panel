@@ -60,7 +60,9 @@ import {
   PaintBoardIcon,
   SquareIcon,
   CheckmarkSquare02Icon,
-  MoreVerticalIcon
+  MoreVerticalIcon,
+  ShopSignIcon,
+  Store01Icon
 } from "@hugeicons/core-free-icons";
 
 const ICON_MAP: Record<string, IconSvgElement> = {
@@ -141,6 +143,8 @@ const ICON_MAP: Record<string, IconSvgElement> = {
   palette: PaintBoardIcon,
   square: SquareIcon,
   "square-check": CheckmarkSquare02Icon,
+  store: ShopSignIcon,
+  marketplace: Store01Icon,
 };
 
 export interface IconProps {
