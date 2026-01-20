@@ -1,0 +1,86 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Convex Panel",
+  "version": "0.1.0",
+  "identifier": "dev.convexpanel.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      }
+    },
+    "windows": [
+      {
+        "title": "",
+        "label": "main",
+        "width": 960,
+        "height": 600,
+        "minWidth": 960,
+        "minHeight": 600,
+        "maxWidth": 960,
+        "maxHeight": 600,
+        "resizable": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "center": true,
+        "devtools": true
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "Debug and monitor Convex applications",
+    "longDescription": "Convex Panel is a powerful debugging and monitoring tool for Convex applications. View logs, inspect data, run functions, and monitor performance in real-time.",
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "exceptionDomain": null,
+      "entitlements": "entitlements.plist",
+      "dmg": {
+        "background": "dmg-background.png",
+        "windowSize": {
+          "width": 705,
+          "height": 393
+        },
+        "appPosition": {
+          "x": 220,
+          "y": 196
+        },
+        "applicationFolderPosition": {
+          "x": 485,
+          "y": 196
+        }
+      }
+    },
+    "windows": {
+      "wix": null
+    },
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
+  }
+}

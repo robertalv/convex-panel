@@ -45,7 +45,7 @@ export function IntroContent() {
           <Terminal className="w-6 h-6 text-purple-500 mb-3" />
           <h4 className="font-medium text-content-primary mb-1">Zero Configuration</h4>
           <p className="text-sm text-content-tertiary">
-            Drop it into your app and it automatically detects your Convex client. Works with React, Next.js, Vue, and Svelte.
+            Drop it into your app and it automatically detects your Convex client. Works with React, Next.js and TanStack Start.
           </p>
         </div>
       </div>

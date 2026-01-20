@@ -165,52 +165,6 @@ export function Providers({ children }) {
                       language="typescript"
                     />
                   </div>
-
-                  <div>
-                    <h5 className="font-semibold text-content-primary mb-2">Vue</h5>
-                    <CodeBlock
-                      code={`<!-- App.vue -->
-<script setup lang="ts">
-import ConvexPanel from 'convex-panel/vue'
-
-const convexUrl = import.meta.env.VITE_CONVEX_URL || ''
-</script>
-
-<template>
-  <main>
-    <!-- Your app content -->
-  </main>
-  <ConvexPanel
-    v-if="convexUrl"
-    :convex-url="convexUrl"
-  />
-</template>`}
-                      title="Vue Setup"
-                      language="vue"
-                    />
-                  </div>
-
-                  <div>
-                    <h5 className="font-semibold text-content-primary mb-2">Svelte</h5>
-                    <CodeBlock
-                      code={`<!-- App.svelte -->
-<script lang="ts">
-import ConvexPanel from 'convex-panel/svelte'
-
-const convexUrl = import.meta.env.VITE_CONVEX_URL || ''
-</script>
-
-<main>
-  <!-- Your app content -->
-</main>
-
-{#if convexUrl}
-  <ConvexPanel {convexUrl} />
-{/if}`}
-                      title="Svelte Setup"
-                      language="svelte"
-                    />
-                  </div>
                 </div>
               </div>
             </div>

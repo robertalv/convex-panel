@@ -4,7 +4,7 @@
  * DO NOT EDIT MANUALLY - run 'npm run build:styles-ts' to regenerate.
  */
 
-export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tailwindcss.com */
+export const panelStyles = `/*! tailwindcss v4.1.18 | MIT License | https://tailwindcss.com */
 @layer properties;
 .collapse {
   visibility: collapse;
@@ -63,8 +63,14 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
 .table {
   display: table;
 }
+.h-full {
+  height: 100%;
+}
 .w-full {
   width: 100%;
+}
+.flex-1 {
+  flex: 1;
 }
 .flex-shrink {
   flex-shrink: 1;
@@ -72,14 +78,23 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
 .shrink {
   flex-shrink: 1;
 }
+.shrink-0 {
+  flex-shrink: 0;
+}
 .border-collapse {
   border-collapse: collapse;
 }
 .transform {
   transform: var(--tw-rotate-x,) var(--tw-rotate-y,) var(--tw-rotate-z,) var(--tw-skew-x,) var(--tw-skew-y,);
 }
+.cursor-pointer {
+  cursor: pointer;
+}
 .resize {
   resize: both;
+}
+.flex-col {
+  flex-direction: column;
 }
 .flex-wrap {
   flex-wrap: wrap;
@@ -87,12 +102,30 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
 .items-center {
   align-items: center;
 }
+.justify-between {
+  justify-content: space-between;
+}
 .justify-center {
   justify-content: center;
+}
+.justify-end {
+  justify-content: flex-end;
+}
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.overflow-y-auto {
+  overflow-y: auto;
 }
 .border {
   border-style: var(--tw-border-style);
   border-width: 1px;
+}
+.border-none {
+  --tw-border-style: none;
+  border-style: none;
 }
 .text-center {
   text-align: center;
@@ -132,15 +165,21 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   transition-timing-function: var(--tw-ease, ease);
   transition-duration: var(--tw-duration, 0s);
 }
+.transition-opacity {
+  transition-property: opacity;
+  transition-timing-function: var(--tw-ease, ease);
+  transition-duration: var(--tw-duration, 0s);
+}
 .cp-skeleton {
   background-color: var(--color-panel-border);
   border-radius: 4px;
   animation: cp-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 .cp-skeleton--shimmer {
-  background: linear-gradient(90deg, 
-    var(--color-panel-bg-secondary) 25%, 
-    var(--color-panel-bg-tertiary) 50%, 
+  background: linear-gradient(
+    90deg,
+    var(--color-panel-bg-secondary) 25%,
+    var(--color-panel-bg-tertiary) 50%,
     var(--color-panel-bg-secondary) 75%
   );
   background-size: 200% 100%;
@@ -156,7 +195,8 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   }
 }
 @keyframes cp-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -164,7 +204,8 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   }
 }
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -248,11 +289,11 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   --color-panel-highlight-border: var(--color-panel-success);
   --color-panel-accent: rgb(99, 168, 248);
   --color-panel-accent-hover: rgb(143, 190, 255);
-  --color-panel-success: var(--green-200);
-  --color-panel-warning: var(--yellow-200);
-  --color-panel-error: var(--red-200);
-  --color-panel-info: var(--info);
-  --color-panel-httpaction: var(--purple-500);
+  --color-panel-success: rgb(134, 239, 172);
+  --color-panel-warning: rgb(252, 211, 77);
+  --color-panel-error: rgb(252, 165, 165);
+  --color-panel-info: rgb(7, 191, 232);
+  --color-panel-httpaction: rgb(168, 85, 247);
   --color-background-error: #6b211f;
   --color-background-errorSecondary: #a81515;
   --color-content-error: #ffcac1;
@@ -265,7 +306,7 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   --color-panel-scrollbar: rgb(107, 107, 107);
   --color-panel-scrollbar-hover: rgb(147, 147, 147);
   --cp-data-header-bg: var(--color-panel-bg-secondary);
-  --cp-data-header-text: var(--color-panel-text-muted);
+  --cp-data-header-text: var(--color-panel-text);
   --cp-data-header-border: var(--color-panel-border);
   --cp-data-row-border: var(--color-panel-border);
   --cp-data-row-hover-bg: rgba(255, 255, 255, 0.04);
@@ -324,7 +365,8 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     background-color: var(--color-panel-bg);
     color: var(--color-panel-text);
     font-size: var(--font-size-panel-base);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+      Arial, sans-serif;
   }
   .cp-btn {
     padding: var(--spacing-panel-2) var(--spacing-panel-3);
@@ -332,7 +374,8 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     font-size: var(--font-size-panel-base);
     font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
+    transition: background-color 0.15s ease,
+      border-color 0.15s ease;
     color: var(--color-panel-text);
   }
   .cp-btn-primary {
@@ -396,21 +439,33 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   .cp-badge-success {
     background-color: var(--color-panel-success);
     @supports (color: color-mix(in lab, red, red)) {
-      background-color: color-mix(in srgb, var(--color-panel-success) 20%, transparent);
+      background-color: color-mix(
+      in srgb,
+      var(--color-panel-success) 20%,
+      transparent
+    );
     }
     color: var(--color-panel-success);
   }
   .cp-badge-warning {
     background-color: var(--color-panel-warning);
     @supports (color: color-mix(in lab, red, red)) {
-      background-color: color-mix(in srgb, var(--color-panel-warning) 20%, transparent);
+      background-color: color-mix(
+      in srgb,
+      var(--color-panel-warning) 20%,
+      transparent
+    );
     }
     color: var(--color-panel-warning);
   }
   .cp-badge-error {
     background-color: var(--color-panel-error);
     @supports (color: color-mix(in lab, red, red)) {
-      background-color: color-mix(in srgb, var(--color-panel-error) 20%, transparent);
+      background-color: color-mix(
+      in srgb,
+      var(--color-panel-error) 20%,
+      transparent
+    );
     }
     color: var(--color-panel-error);
   }
@@ -423,7 +478,11 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     padding: 2px 6px;
     background-color: var(--color-panel-info);
     @supports (color: color-mix(in lab, red, red)) {
-      background-color: color-mix(in srgb, var(--color-panel-info) 20%, transparent);
+      background-color: color-mix(
+      in srgb,
+      var(--color-panel-info) 20%,
+      transparent
+    );
     }
     color: var(--color-panel-info);
   }
@@ -436,7 +495,11 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     padding: 2px 6px;
     background-color: var(--color-panel-success);
     @supports (color: color-mix(in lab, red, red)) {
-      background-color: color-mix(in srgb, var(--color-panel-success) 20%, transparent);
+      background-color: color-mix(
+      in srgb,
+      var(--color-panel-success) 20%,
+      transparent
+    );
     }
     color: var(--color-panel-success);
   }
@@ -449,7 +512,11 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     padding: 2px 6px;
     background-color: var(--color-panel-warning);
     @supports (color: color-mix(in lab, red, red)) {
-      background-color: color-mix(in srgb, var(--color-panel-warning) 20%, transparent);
+      background-color: color-mix(
+      in srgb,
+      var(--color-panel-warning) 20%,
+      transparent
+    );
     }
     color: var(--color-panel-warning);
   }
@@ -462,7 +529,11 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     padding: 2px 6px;
     background-color: var(--color-panel-httpaction);
     @supports (color: color-mix(in lab, red, red)) {
-      background-color: color-mix(in srgb, var(--color-panel-httpaction) 20%, transparent);
+      background-color: color-mix(
+      in srgb,
+      var(--color-panel-httpaction) 20%,
+      transparent
+    );
     }
     color: var(--color-panel-httpaction);
   }
@@ -502,7 +573,7 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     table-layout: fixed;
     color: var(--color-panel-text);
     font-size: 12px;
-    font-family: 'Inter Variable', var(--font-display);
+    font-family: "Inter Variable", var(--font-display);
   }
   .cp-data-table__head {
     position: sticky;
@@ -560,13 +631,16 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     width: 2px;
     height: 70%;
     border-radius: 999px;
-    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+    transition: background-color 0.15s ease,
+      box-shadow 0.15s ease;
   }
   .cp-data-table__resize-indicator.is-active {
     background-color: var(--cp-data-resize-indicator);
-    box-shadow: 0 0 8px var(--cp-data-resize-indicator);
+    box-shadow: 0 0 8px
+      var(--cp-data-resize-indicator);
     @supports (color: color-mix(in lab, red, red)) {
-      box-shadow: 0 0 8px color-mix(in srgb, var(--cp-data-resize-indicator) 70%, transparent);
+      box-shadow: 0 0 8px
+      color-mix(in srgb, var(--cp-data-resize-indicator) 70%, transparent);
     }
   }
   .cp-data-table__drag-target {
@@ -576,15 +650,18 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     width: 3px;
     border-radius: 999px;
     background: var(--cp-data-highlight-border);
-    box-shadow: 0 0 12px var(--cp-data-highlight-border);
+    box-shadow: 0 0 12px
+      var(--cp-data-highlight-border);
     @supports (color: color-mix(in lab, red, red)) {
-      box-shadow: 0 0 12px color-mix(in srgb, var(--cp-data-highlight-border) 70%, transparent);
+      box-shadow: 0 0 12px
+      color-mix(in srgb, var(--cp-data-highlight-border) 70%, transparent);
     }
     pointer-events: none;
   }
   .cp-data-table__row {
     border-bottom: 1px solid var(--cp-data-row-border);
-    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    transition: background-color 0.3s ease,
+      box-shadow 0.3s ease;
   }
   .cp-data-table__row:hover {
     background-color: var(--cp-data-row-hover-bg);
@@ -595,7 +672,8 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   .cp-data-table__row--new {
     background-color: var(--cp-data-highlight-bg);
     box-shadow: 0 0 0 1px var(--cp-data-highlight-border);
-    animation: highlight 1s ease, highlightBorder 1s ease;
+    animation: highlight 1s ease,
+      highlightBorder 1s ease;
   }
   .cp-data-table__selection-cell {
     padding: 0;
@@ -671,13 +749,13 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     border-right: 1px solid var(--cp-data-row-border);
   }
   .cp-bottom-sheet,
-.cp-bottom-sheet div,
-.cp-bottom-sheet section,
-.cp-bottom-sheet article,
-.cp-bottom-sheet aside,
-.cp-bottom-sheet main,
-.cp-bottom-sheet ul,
-.cp-bottom-sheet ol {
+  .cp-bottom-sheet div,
+  .cp-bottom-sheet section,
+  .cp-bottom-sheet article,
+  .cp-bottom-sheet aside,
+  .cp-bottom-sheet main,
+  .cp-bottom-sheet ul,
+  .cp-bottom-sheet ol {
     scrollbar-width: thin;
     scrollbar-color: var(--color-panel-scrollbar) var(--color-panel-bg);
   }
@@ -718,8 +796,8 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     background-color: var(--color-panel-scrollbar-hover);
   }
   .cp-theme-dark [data-sonner-toaster],
-.cp-theme-light [data-sonner-toaster],
-.cp-bottom-sheet [data-sonner-toaster] {
+  .cp-theme-light [data-sonner-toaster],
+  .cp-bottom-sheet [data-sonner-toaster] {
     --normal-bg: var(--color-panel-bg-tertiary);
     --normal-border: var(--color-panel-border);
     --normal-text: var(--color-panel-text);
@@ -737,8 +815,8 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     --info-text: var(--color-panel-text);
   }
   .cp-theme-dark [data-sonner-toast],
-.cp-theme-light [data-sonner-toast],
-.cp-bottom-sheet [data-sonner-toast] {
+  .cp-theme-light [data-sonner-toast],
+  .cp-bottom-sheet [data-sonner-toast] {
     background-color: var(--normal-bg) !important;
     border: 1px solid var(--normal-border) !important;
     color: var(--normal-text) !important;
@@ -746,29 +824,29 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     border-radius: 8px !important;
   }
   .cp-theme-dark [data-sonner-toast][data-type="success"],
-.cp-theme-light [data-sonner-toast][data-type="success"],
-.cp-bottom-sheet [data-sonner-toast][data-type="success"] {
+  .cp-theme-light [data-sonner-toast][data-type="success"],
+  .cp-bottom-sheet [data-sonner-toast][data-type="success"] {
     background-color: var(--success-bg) !important;
     border-color: var(--success-border) !important;
     color: var(--success-text) !important;
   }
   .cp-theme-dark [data-sonner-toast][data-type="error"],
-.cp-theme-light [data-sonner-toast][data-type="error"],
-.cp-bottom-sheet [data-sonner-toast][data-type="error"] {
+  .cp-theme-light [data-sonner-toast][data-type="error"],
+  .cp-bottom-sheet [data-sonner-toast][data-type="error"] {
     background-color: var(--error-bg) !important;
     border-color: var(--error-border) !important;
     color: var(--error-text) !important;
   }
   .cp-theme-dark [data-sonner-toast][data-type="warning"],
-.cp-theme-light [data-sonner-toast][data-type="warning"],
-.cp-bottom-sheet [data-sonner-toast][data-type="warning"] {
+  .cp-theme-light [data-sonner-toast][data-type="warning"],
+  .cp-bottom-sheet [data-sonner-toast][data-type="warning"] {
     background-color: var(--warning-bg) !important;
     border-color: var(--warning-border) !important;
     color: var(--warning-text) !important;
   }
   .cp-theme-dark [data-sonner-toast][data-type="info"],
-.cp-theme-light [data-sonner-toast][data-type="info"],
-.cp-bottom-sheet [data-sonner-toast][data-type="info"] {
+  .cp-theme-light [data-sonner-toast][data-type="info"],
+  .cp-bottom-sheet [data-sonner-toast][data-type="info"] {
     background-color: var(--info-bg) !important;
     border-color: var(--info-border) !important;
     color: var(--info-text) !important;
@@ -776,7 +854,12 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   .cp-bottom-sheet {
     contain: style layout paint size;
     isolation: isolate;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      sans-serif;
     font-size: 14px;
     line-height: 1.5;
     color: var(--color-panel-text);
@@ -815,6 +898,37 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     padding: 0 8px;
     background-color: var(--color-panel-bg-secondary);
     flex-shrink: 0;
+  }
+  .cp-fullscreen .cp-header {
+    padding-left: 80px;
+    -webkit-app-region: drag;
+  }
+  .cp-fullscreen .cp-header button,
+  .cp-fullscreen .cp-header input,
+  .cp-fullscreen .cp-header select,
+  .cp-fullscreen .cp-header a {
+    -webkit-app-region: no-drag;
+  }
+  .cp-header-custom {
+    min-height: 52px;
+    display: flex;
+    align-items: stretch;
+    background-color: var(--color-panel-bg);
+    flex-shrink: 0;
+  }
+  .cp-fullscreen .cp-header-custom {
+    -webkit-app-region: drag;
+  }
+  .cp-fullscreen .cp-header-custom button,
+  .cp-fullscreen .cp-header-custom input,
+  .cp-fullscreen .cp-header-custom select,
+  .cp-fullscreen .cp-header-custom a,
+  .cp-fullscreen .cp-header-custom .cp-no-drag {
+    -webkit-app-region: no-drag;
+  }
+  .cp-fullscreen {
+    border-top: none;
+    border-radius: 0;
   }
   .cp-header-section {
     display: flex;
@@ -950,9 +1064,11 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     font-size: 12px;
     font-weight: 600;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 8px var(--color-panel-accent);
+    box-shadow: 0 2px 8px
+      var(--color-panel-accent);
     @supports (color: color-mix(in lab, red, red)) {
-      box-shadow: 0 2px 8px color-mix(in srgb, var(--color-panel-accent) 20%, transparent);
+      box-shadow: 0 2px 8px
+      color-mix(in srgb, var(--color-panel-accent) 20%, transparent);
     }
   }
   .cp-run-function-btn:hover {
@@ -971,9 +1087,11 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     font-size: 12px;
     font-weight: 600;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 8px var(--color-panel-accent);
+    box-shadow: 0 2px 8px
+      var(--color-panel-accent);
     @supports (color: color-mix(in lab, red, red)) {
-      box-shadow: 0 2px 8px color-mix(in srgb, var(--color-panel-accent) 20%, transparent);
+      box-shadow: 0 2px 8px
+      color-mix(in srgb, var(--color-panel-accent) 20%, transparent);
     }
   }
   .cp-btn:hover {
@@ -992,9 +1110,11 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     font-size: 12px;
     font-weight: 600;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 8px var(--color-panel-accent);
+    box-shadow: 0 2px 8px
+      var(--color-panel-accent);
     @supports (color: color-mix(in lab, red, red)) {
-      box-shadow: 0 2px 8px color-mix(in srgb, var(--color-panel-accent) 20%, transparent);
+      box-shadow: 0 2px 8px
+      color-mix(in srgb, var(--color-panel-accent) 20%, transparent);
     }
   }
   .cp-upgrade-btn:hover {
@@ -1025,7 +1145,8 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     background: transparent;
     color: var(--color-panel-text-secondary);
     cursor: pointer;
-    transition: color 0.15s ease, background-color 0.15s ease;
+    transition: color 0.15s ease,
+      background-color 0.15s ease;
   }
   .cp-theme-toggle-btn:hover {
     color: var(--color-panel-text);
@@ -1049,7 +1170,7 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     background-color: var(--color-panel-accent-hover);
   }
   .cp-resize-handle {
-    height: 2px;
+    height: 4px;
     cursor: ns-resize;
     background-color: transparent;
     position: absolute;
@@ -1057,19 +1178,10 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     left: 0;
     right: 0;
     z-index: 10;
-    transition: background 0.15s ease;
+    transition: background-color 0.2s ease;
   }
   .cp-resize-handle:hover {
-    background: radial-gradient(ellipse at center, var(--color-panel-accent) 0%, transparent 70%);
-    @supports (color: color-mix(in lab, red, red)) {
-      background: radial-gradient(ellipse at center, color-mix(in srgb, var(--color-panel-accent) 50%, transparent) 0%, transparent 70%);
-    }
-    @supports (color: color-mix(in lab, red, red)) {
-      background: radial-gradient(ellipse at center, var(--color-panel-accent) 0%, transparent 70%);
-      @supports (color: color-mix(in lab, red, red)) {
-        background: radial-gradient(ellipse at center, color-mix(in srgb, var(--color-panel-accent) 50%, transparent) 0%, transparent 70%);
-      }
-    }
+    background-color: var(--color-panel-accent, #6366f1);
   }
   .cp-sidebar {
     width: 48px;
@@ -1365,7 +1477,9 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     transition: all 0.15s ease;
   }
   .cp-transition-colors {
-    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    transition: background-color 0.15s ease,
+      color 0.15s ease,
+      border-color 0.15s ease;
   }
 }
 .cp-search-wrapper {
@@ -1395,7 +1509,8 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   color: var(--color-panel-text);
   outline: none;
   box-sizing: border-box;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  transition: border-color 0.2s ease,
+    background-color 0.2s ease;
 }
 .cp-search-input:focus {
   border-color: var(--color-panel-accent);
@@ -1604,16 +1719,143 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   background-color: var(--color-panel-border);
 }
 .cp-health-container {
-  padding: 16px;
-  height: 100%;
+  padding: 10px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   background-color: var(--color-panel-bg);
 }
+.cp-health-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-panel-border);
+}
+.cp-health-time-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background-color: var(--color-panel-bg-secondary);
+  border-radius: 10px;
+  color: var(--color-panel-text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.cp-health-time-selector:hover {
+  background-color: var(--color-panel-bg-hover);
+  border-color: var(--color-panel-border-hover);
+}
+.cp-health-refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background-color: var(--color-panel-bg-secondary);
+  border: 1px solid var(--color-panel-border);
+  border-radius: 6px;
+  color: var(--color-panel-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.cp-health-refresh-btn:hover {
+  background-color: var(--color-panel-bg-hover);
+  color: var(--color-panel-text);
+}
+.cp-health-section {
+  margin-bottom: 16px;
+}
+.cp-health-section:last-child {
+  margin-bottom: 0;
+}
 .cp-health-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 16px;
+}
+.cp-health-grid--large {
+  grid-template-columns: repeat(2, 1fr);
+}
+.cp-health-grid--status {
+  grid-template-columns: repeat(3, 1fr);
+}
+.cp-health-grid--medium {
+  grid-template-columns: repeat(2, 1fr);
+}
+.cp-health-grid--full {
+  grid-template-columns: 1fr;
+}
+.cp-health-grid--ai {
+  grid-template-columns: repeat(3, 1fr);
+}
+@media (min-width: 1800px) {
+  .cp-health-container {
+    padding: 24px;
+  }
+  .cp-health-grid {
+    gap: 20px;
+  }
+}
+@media (min-width: 1400px) and (max-width: 1799px) {
+  .cp-health-grid--status {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 1399px) {
+  .cp-health-grid--status {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .cp-health-grid--ai {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 1024px) {
+  .cp-health-container {
+    padding: 16px;
+  }
+  .cp-health-grid {
+    gap: 12px;
+  }
+  .cp-health-grid--large {
+    grid-template-columns: 1fr;
+  }
+  .cp-health-grid--status {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .cp-health-grid--medium {
+    grid-template-columns: 1fr;
+  }
+  .cp-health-grid--ai {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 768px) {
+  .cp-health-container {
+    padding: 12px;
+  }
+  .cp-health-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .cp-health-grid--status {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 540px) {
+  .cp-health-container {
+    padding: 8px;
+  }
+  .cp-health-grid {
+    gap: 8px;
+  }
+  .cp-health-section {
+    margin-bottom: 8px;
+  }
 }
 .cp-health-disabled {
   opacity: 0.5;
@@ -1634,6 +1876,7 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
 }
 .cp-data-container {
   display: flex;
+  width: 100%;
   height: 100%;
   overflow: hidden;
 }
@@ -1937,13 +2180,13 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   flex-direction: column;
 }
 .cp-card-header {
-  padding-left: 12px;
-  padding-right: 12px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--color-panel-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   cursor: default;
+  min-height: 32px;
 }
 .cp-card-title {
   font-size: 10px;
@@ -1963,6 +2206,21 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   position: relative;
   display: flex;
   flex-direction: column;
+}
+@media (max-width: 540px) {
+  .cp-card-header {
+    padding: 6px 10px;
+    min-height: 28px;
+  }
+  .cp-card-title {
+    font-size: 9px;
+  }
+  .cp-card-content {
+    padding: 10px;
+  }
+  .cp-card-actions {
+    gap: 4px;
+  }
 }
 .cp-auth-container {
   display: flex;
@@ -2275,7 +2533,10 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
   position: absolute;
   left: 0;
   right: 0;
-  background-color: var(--color-panel-active-code, rgba(255, 255, 255, 0.08)) !important;
+  background-color: var(
+    --color-panel-active-code,
+    rgba(255, 255, 255, 0.08)
+  ) !important;
   opacity: 0.3;
 }
 .ace_gutter {
@@ -2288,7 +2549,8 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
 .ace_gutter-active-line .ace_gutter-cell {
   background-color: var(--color-panel-active-code) !important;
 }
-.ace_folding-enabled > .ace_gutter-cell, .ace_folding-enabled > .ace_gutter-cell_svg-icons {
+.ace_folding-enabled > .ace_gutter-cell,
+.ace_folding-enabled > .ace_gutter-cell_svg-icons {
   color: var(--color-panel-editorLineNumber-foreground) !important;
 }
 .ace_content {
@@ -2312,6 +2574,182 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
 .ace-tm .ace_marker-layer .ace_selected-word {
   background-color: var(--color-panel-active-code) !important;
   border: none !important;
+}
+.cp-terminal-panel {
+  display: flex;
+  flex-direction: column;
+  background-color: #1a1a1a;
+  border-top: 1px solid var(--color-panel-border);
+  position: relative;
+  min-height: 150px;
+  flex-shrink: 0;
+}
+.cp-terminal-resize-handle {
+  height: 4px;
+  cursor: ns-resize;
+  background-color: transparent;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  transition: background-color 0.2s ease;
+}
+.cp-terminal-resize-handle:hover {
+  background-color: var(--color-panel-accent, #6366f1);
+}
+.cp-terminal-header {
+  height: 36px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background-color: #252525;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+.cp-terminal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e5e5e5;
+  font-size: 12px;
+  font-weight: 500;
+}
+.cp-terminal-header-center {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cp-terminal-header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cp-terminal-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #e5e5e5;
+}
+.cp-terminal-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+.cp-terminal-badge--connected {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.cp-terminal-badge--limited {
+  background-color: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+.cp-terminal-badge--disconnected {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.cp-terminal-quick-commands {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cp-terminal-quick-btn {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #a3a3a3;
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.cp-terminal-quick-btn:hover {
+  color: #e5e5e5;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.cp-terminal-icon-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: none;
+  background-color: transparent;
+  color: #737373;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.cp-terminal-icon-btn:hover {
+  color: #e5e5e5;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.cp-terminal-content {
+  flex: 1;
+  overflow: hidden;
+  padding: 8px;
+  background-color: #1a1a1a;
+}
+.cp-terminal-content .xterm {
+  padding: 0;
+}
+.cp-terminal-content .xterm-viewport {
+  background-color: #1a1a1a !important;
+}
+.cp-terminal-content .xterm-screen {
+  padding: 4px;
+}
+.cp-terminal-toggle-wrapper {
+  position: absolute;
+  bottom: 16px;
+  right: 80px;
+  z-index: 10;
+}
+.cp-terminal-toggle-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background-color: var(--color-panel-bg-tertiary);
+  border: 1px solid var(--color-panel-border);
+  color: var(--color-panel-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px var(--color-panel-shadow);
+  opacity: 0.9;
+}
+.cp-terminal-toggle-btn:hover {
+  background-color: var(--color-panel-active);
+  opacity: 1;
+  transform: scale(1.05);
+  color: var(--color-panel-accent);
+  border-color: var(--color-panel-accent);
+}
+.cp-terminal-shortcut {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--color-panel-text-muted);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.cp-terminal-toggle-btn:hover + .cp-terminal-shortcut,
+.cp-terminal-toggle-wrapper:hover .cp-terminal-shortcut {
+  opacity: 1;
 }
 @property --tw-rotate-x {
   syntax: "*";
@@ -2422,5 +2860,6 @@ export const panelStyles = `/*! tailwindcss v4.1.17 | MIT License | https://tail
     }
   }
 }
+
 /*# sourceMappingURL=index.css.map */`;
 

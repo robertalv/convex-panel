@@ -1,0 +1,337 @@
+/**
+ * UnifiedDiffView Styles
+ * Matches OpenCode's session-review component styling patterns
+ */
+
+[data-component="unified-diff-view"] {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background-color: var(--color-background-base);
+
+  /* Header - 32px height matching session-review */
+  [data-slot="diff-header"] {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background-color: var(--color-surface-raised);
+    height: 47px;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--color-border-base);
+  }
+
+  [data-slot="diff-title"] {
+    font-family: var(--font-sans);
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--color-text-base);
+  }
+
+  [data-slot="diff-actions"] {
+    display: flex;
+    align-items: center;
+    column-gap: 16px;
+    padding-right: 1px;
+  }
+
+  /* Container for accordion content */
+  [data-slot="diff-container"] {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Accordion item wrapper */
+  [data-slot="diff-accordion-item"] {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    border-bottom: 1px solid var(--color-border-base);
+    overflow: hidden;
+  }
+
+  /* File trigger button */
+  [data-slot="diff-trigger"] {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    background-color: var(--color-surface-raised);
+    border: none;
+    cursor: pointer;
+    padding: 8px 12px;
+    transition: background-color 0.15s ease;
+    flex-shrink: 0;
+
+    &:hover {
+      background-color: var(--color-surface-overlay);
+    }
+  }
+
+  [data-slot="diff-trigger-content"] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 20px;
+  }
+
+  [data-slot="diff-file-info"] {
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  [data-slot="diff-file-icon"] {
+    flex-shrink: 0;
+    color: var(--color-text-subtle);
+  }
+
+  [data-slot="diff-file-name-container"] {
+    display: flex;
+    flex-grow: 1;
+    min-width: 0;
+  }
+
+  [data-slot="diff-directory"] {
+    color: var(--color-text-muted);
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    direction: rtl;
+    text-align: left;
+    font-size: var(--font-size-sm);
+  }
+
+  [data-slot="diff-filename"] {
+    color: var(--color-text-base);
+    flex-shrink: 0;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+  }
+
+  [data-slot="diff-trigger-actions"] {
+    flex-shrink: 0;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  [data-slot="diff-chevron"] {
+    color: var(--color-text-subtle);
+    transition: transform 0.15s ease;
+  }
+
+  [data-slot="diff-accordion-item"][data-expanded] [data-slot="diff-chevron"] {
+    transform: rotate(180deg);
+  }
+
+  /* Accordion content area */
+  [data-slot="diff-content"] {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    background-color: var(--color-background-base);
+    border-top: 1px solid var(--color-border-base);
+    overflow: hidden;
+  }
+
+  [data-slot="diff-accordion-item"][data-expanded] [data-slot="diff-content"] {
+    display: flex;
+  }
+
+  /* Empty state */
+  [data-slot="diff-empty"] {
+    padding: 32px 16px;
+    text-align: center;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+  }
+
+  /* Version labels footer */
+  [data-slot="diff-footer"] {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: var(--font-size-xs);
+    background-color: var(--color-surface-base);
+    border-top: 1px solid var(--color-border-base);
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+  }
+
+  [data-slot="diff-footer-label"] {
+    color: var(--color-text-base);
+  }
+
+  /* Diff editor container - full height, constrains child */
+  [data-slot="diff-editor-container"] {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* Ensure PierreDiff respects container height and handles scrolling */
+[data-slot="diff-editor-container"] [data-component="pierre-diff"] {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  height: 100%;
+}
+
+/* DiffChanges Component - using OpenCode's mint/ember diff colors */
+[data-component="diff-changes"] {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+
+  [data-slot="diff-changes-additions"] {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    font-weight: 400;
+    line-height: 1.5;
+    text-align: right;
+    color: var(--color-diff-add-text);
+  }
+
+  [data-slot="diff-changes-deletions"] {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    font-weight: 400;
+    line-height: 1.5;
+    text-align: right;
+    color: var(--color-diff-delete-text);
+  }
+}
+
+/* RadioGroup-style Toggle */
+[data-component="diff-style-toggle"] {
+  display: flex;
+  flex-direction: column;
+
+  [data-slot="toggle-wrapper"] {
+    all: unset;
+    background-color: var(--color-surface-base);
+    border-radius: var(--radius-md);
+    box-shadow: inset 0 0 0 1px var(--color-border-base);
+    margin: 0;
+    padding: 0;
+    position: relative;
+    width: fit-content;
+  }
+
+  [data-slot="toggle-items"] {
+    display: inline-flex;
+    list-style: none;
+    flex-direction: row;
+  }
+
+  [data-slot="toggle-item"] {
+    position: relative;
+  }
+
+  /* Separator between items */
+  [data-slot="toggle-item"]:not(:first-of-type)::before {
+    background: var(--color-border-muted);
+    border-radius: 1px;
+    content: "";
+    position: absolute;
+    inset: 6px 0;
+    width: 1px;
+    transform: translateX(-0.5px);
+    transition: opacity 0.15s ease;
+  }
+
+  /* Hide separator when item or previous item is selected */
+  [data-slot="toggle-item"][data-selected]::before,
+  [data-slot="toggle-item"][data-selected] + [data-slot="toggle-item"]::before {
+    opacity: 0;
+  }
+
+  [data-slot="toggle-button"] {
+    color: var(--color-text-subtle);
+    font-family: var(--font-sans);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    line-height: 1;
+    padding: 4px 10px;
+    place-content: center;
+    position: relative;
+    transition:
+      color 0.15s ease,
+      background-color 0.15s ease;
+    user-select: none;
+    border: none;
+    background: transparent;
+  }
+
+  [data-slot="toggle-item"][data-selected] [data-slot="toggle-button"] {
+    color: var(--color-text-base);
+    background-color: var(--color-surface-raised);
+    box-shadow: inset 0 0 0 1px var(--color-border-base);
+  }
+
+  [data-slot="toggle-button"]:hover:not(
+      [data-slot="toggle-item"][data-selected] [data-slot="toggle-button"]
+    ) {
+    color: var(--color-text-muted);
+  }
+}
+
+/* Collapse button styling */
+[data-component="unified-diff-view"] [data-slot="collapse-button"] {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background-color: var(--color-surface-base);
+  border: 1px solid var(--color-border-base);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background-color: var(--color-surface-raised);
+    color: var(--color-text-base);
+  }
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* Monaco Diff Editor - minimal styling, let Monaco themes control diff colors */
+[data-component="unified-diff-view"] {
+  .monaco-editor .line-numbers,
+  .monaco-diff-editor .line-numbers {
+    color: var(--color-text-subtle) !important;
+  }
+}

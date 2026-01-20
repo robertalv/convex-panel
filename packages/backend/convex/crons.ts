@@ -28,4 +28,37 @@ crons.interval(
   internal.crons.cleanupFilterHistory,
 );
 
+// AI Analysis cron jobs
+// Note: These are commented out until we implement log fetching from the Convex API
+// Uncomment and implement log fetching when ready to enable automatic analysis
+
+// Hourly error analysis
+// TODO: Implement log fetching and uncomment when ready
+// crons.hourly(
+//   "ai-analyze-recent-errors",
+//   {
+//     hourUTC: 0, // Run at the top of every hour
+//     timezone: "UTC",
+//   },
+//   internal.aiAnalysis.jobs.analyzeRecentErrors,
+//   {
+//     errors: [], // This would be populated by fetching from logs API
+//   }
+// );
+
+// Daily log summarization
+// TODO: Implement log fetching and uncomment when ready
+// crons.daily(
+//   "ai-summarize-recent-logs",
+//   {
+//     hourUTC: 0,
+//     minuteUTC: 0,
+//     timezone: "UTC",
+//   },
+//   internal.aiAnalysis.jobs.summarizeRecentLogs,
+//   {
+//     logs: [], // This would be populated by fetching from logs API
+//   }
+// );
+
 export default crons;

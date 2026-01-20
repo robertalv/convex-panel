@@ -137,18 +137,21 @@ export const ConvexPanelShadow = (props: ConvexPanelProps) => {
     }
   }); // Run on every render to update props
 
+  // Determine if we should use fullscreen mode
+  const isFullscreen = props.fullscreen ?? false;
+
   return (
     <div
       ref={shadowHostRef}
       style={{
         position: 'fixed',
-        bottom: 0,
+        top: isFullscreen ? 0 : undefined,
+        bottom: isFullscreen ? 0 : 0,
         left: 0,
         right: 0,
         zIndex: 99999,
-        // Let clicks pass through the host by default; actual panel/backdrop inside
-        // the shadow root uses pointer-events:auto so it still captures interactions.
-        pointerEvents: 'none',
+        // In fullscreen mode, allow pointer events; otherwise let them pass through
+        pointerEvents: isFullscreen ? 'auto' : 'none',
         width: '100%',
         height: '100%',
         contain: 'layout style paint',

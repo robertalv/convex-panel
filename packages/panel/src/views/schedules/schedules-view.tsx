@@ -20,7 +20,6 @@ import { MultiSelectFunctionSelector } from '../../components/function-runner/mu
 import { useComponents } from '../../hooks/useComponents';
 import { useCronJobs } from '../../hooks/useCronJobs';
 import { usePaginatedScheduledJobs } from '../../hooks/usePaginatedScheduledJobs';
-// import { logsViewStyles } from '../../styles/panelStyles';
 import { formatCronSchedule, formatRelativeTime } from '../../utils/cronFormatters';
 import { discoverFunctions } from '../../utils/api/functionDiscovery';
 import type { ModuleFunction } from '../../utils/api/functionDiscovery';
@@ -39,26 +38,13 @@ import { ConfirmDialog } from '../../components/shared/confirm-dialog';
 import { cancelScheduledJob, cancelAllScheduledJobs } from '../../utils/api/scheduledJobs';
 import { getAdminClientInfo } from '../../utils/adminClient';
 import { fetchSourceCode } from '../../utils/api/functions';
+import { formatTimestamp } from '../../utils/cronFormatters';
+import { normalizeIdentifier } from '../../utils';
 
 export interface SchedulesViewProps {
   adminClient?: any;
   useMockData?: boolean;
 }
-
-const formatTimestamp = (timestamp: number | bigint): string => {
-  try {
-    // Handle BigInt (nanoseconds) by converting to milliseconds
-    const ms = typeof timestamp === 'bigint'
-      ? Number(timestamp) / 1000000
-      : timestamp;
-
-    const date = new Date(ms);
-    return date.toLocaleString();
-  } catch (e) {
-    console.error('Error formatting timestamp:', e);
-    return '-';
-  }
-};
 
 export const SchedulesView: React.FC<SchedulesViewProps> = ({
   adminClient,
@@ -175,7 +161,6 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
     };
   }, []);
 
-  // Fetch crons.js source code when showCronsFile is true
   useEffect(() => {
     if (!showCronsFile || !adminClient || useMockData) {
       return;
@@ -229,15 +214,13 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
               selectedComponents={selectedComponents}
               onSelect={(components) => {
                 setSelectedComponents(components);
-                setSelectedFunctions([]); // Reset functions when component changes
-                // Also update the single component selector for compatibility
+                setSelectedFunctions([]);
                 const componentsArray = components === 'all' ? uniqueComponentList : (components as string[]);
                 if (componentsArray.length === 1) {
                   setSelectedComponent(componentsArray[0]);
                 } else if (componentsArray.length === 0) {
                   setSelectedComponent(null);
                 } else {
-                  // Multiple selected - keep the first one for function selector
                   setSelectedComponent(componentsArray[0]);
                 }
               }}
@@ -869,8 +852,6 @@ const CronsJobsFunctionView = ({ adminClient, selectedComponentId, selectedTab, 
       return filtered;
     }
     
-    const normalizeIdentifier = (id: string) => id.replace(/\.js:/g, ':').replace(/\.js$/g, '');
-    
     const selectedIdentifiers = new Set(
       validFunctions
         .map((fn) => normalizeIdentifier(fn.identifier))
@@ -904,7 +885,6 @@ const CronsJobsFunctionView = ({ adminClient, selectedComponentId, selectedTab, 
       const job = data.jobs[index];
       if (!job) return <div style={style}></div>;
 
-      const normalizeIdentifier = (id: string) => id.replace(/\.js:/g, ':').replace(/\.js$/g, '');
       const jobUdfPath = job.cronSpec?.udfPath || '';
       const normalizedJobPath = normalizeIdentifier(jobUdfPath);
       

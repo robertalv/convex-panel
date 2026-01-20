@@ -13,12 +13,15 @@
   ],
   "license": "ISC",
   "dependencies": {
+    "@convex-dev/agent": "^0.3.2",
     "@convex-dev/crons": "^0.2.0",
+    "@convex-dev/persistent-text-streaming": "^0.3.0",
+    "@convex-dev/rag": "^0.6.1",
+    "@convex-panel/component": "workspace:*",
     "@devwithbobby/loops": "^0.1.17",
     "@erquhart/convex-oss-stats": "^0.8.2",
     "convex": "^1.29.3",
     "convex-helpers": "^0.1.106",
-    "@convex-panel/component": "workspace:*",
     "typescript": "^5.9.3"
   }
 }

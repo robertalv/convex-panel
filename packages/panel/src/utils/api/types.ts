@@ -10,14 +10,53 @@ export interface TimeseriesBucket {
 }
 
 /**
- * Insight type definition based on Convex dashboard
+ * Insight type definitions based on Convex dashboard
  */
-export interface Insight {
-  kind: 'bytesReadLimit' | 'bytesReadThreshold' | 'documentsReadLimit' | 'documentsReadThreshold' | 'occFailedPermanently' | 'occRetried';
-  functionId: string;
-  componentPath?: string | null;
-  [key: string]: any; // Allow additional properties
-}
+export type HourlyCount = {
+  hour: string;
+  count: number;
+};
+
+export type OccRecentEvent = {
+  timestamp: string;
+  id: string;
+  request_id: string;
+  occ_document_id?: string;
+  occ_write_source?: string;
+  occ_retry_count: number;
+};
+
+export type BytesReadRecentEvent = {
+  timestamp: string;
+  id: string;
+  request_id: string;
+  calls: { table_name: string; bytes_read: number; documents_read: number }[];
+  success: boolean;
+};
+
+export type Insight = { functionId: string; componentPath: string | null } & (
+  | {
+      kind: 'occRetried' | 'occFailedPermanently';
+      details: {
+        occCalls: number;
+        occTableName?: string;
+        hourlyCounts: HourlyCount[];
+        recentEvents: OccRecentEvent[];
+      };
+    }
+  | {
+      kind:
+        | 'bytesReadLimit'
+        | 'bytesReadThreshold'
+        | 'documentsReadLimit'
+        | 'documentsReadThreshold';
+      details: {
+        count: number;
+        hourlyCounts: HourlyCount[];
+        recentEvents: BytesReadRecentEvent[];
+      };
+    }
+);
 
 export interface EnvironmentVariable {
   name: string;
@@ -53,7 +92,6 @@ export interface DeploymentInfo {
 export interface DeployKey {
   id: string;
   name?: string;
-  createdAt?: number;
   expiresAt?: number;
   [key: string]: any;
 }

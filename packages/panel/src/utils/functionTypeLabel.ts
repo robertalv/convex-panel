@@ -1,4 +1,4 @@
-import { UdfType } from '../types';
+import { UdfType } from "../types";
 
 export const functionTypeLabel = (udfType: UdfType) => {
   let text = "";
@@ -12,11 +12,11 @@ export const functionTypeLabel = (udfType: UdfType) => {
     case "action":
       text = "Action";
       break;
-    case "httpaction":
+    case "httpAction":
       text = "HTTP";
       break;
     default:
       text = "Function";
   }
   return text;
-}; 
+};

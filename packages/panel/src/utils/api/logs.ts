@@ -3,7 +3,7 @@
  * Handles all log-related API operations including streaming and processing
  */
 
-import { ROUTES } from '../../utils/constants';
+import { ROUTES } from "../../utils/constants";
 import type {
   LogEntry,
   FunctionExecutionJson,
@@ -11,9 +11,13 @@ import type {
   ModuleFunction,
   FetchLogsOptions,
   FetchLogsResponse,
-} from '../../types';
-import { mockFetchLogsFromApi } from '../mockData';
-import { normalizeToken } from './helpers';
+  FetchFn,
+} from "../../types";
+import { mockFetchLogsFromApi } from "../mockData";
+import { normalizeToken } from "./helpers";
+
+// Default fetch function - uses native fetch
+const defaultFetch: FetchFn = (input, init) => fetch(input, init);
 
 /**
  * Fetch logs from the Convex API
@@ -27,11 +31,13 @@ export async function fetchLogsFromApi({
   signal,
   functionId,
   limit,
-  useMockData = false
-}: FetchLogsOptions & { 
+  useMockData = false,
+  fetchFn = defaultFetch,
+}: FetchLogsOptions & {
   useMockData?: boolean;
   functionId?: string;
   limit?: number;
+  fetchFn?: FetchFn;
 }): Promise<FetchLogsResponse> {
   if (useMockData) {
     return mockFetchLogsFromApi(cursor);
@@ -39,86 +45,96 @@ export async function fetchLogsFromApi({
 
   const urlObj = new URL(convexUrl);
   const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
-  
+
   const url = new URL(`${baseUrl}${ROUTES.STREAM_FUNCTION_LOGS_API}`);
-  const cursorValue = (cursor === 'now' || cursor === '' || !cursor) ? '0' : String(cursor);
-  url.searchParams.set('cursor', cursorValue);
+  const cursorValue =
+    cursor === "now" || cursor === "" || !cursor ? "0" : String(cursor);
+  url.searchParams.set("cursor", cursorValue);
   if (functionId) {
-    url.searchParams.set('function', functionId);
+    url.searchParams.set("function", functionId);
   }
   if (limit) {
-    url.searchParams.set('limit', String(limit));
+    url.searchParams.set("limit", String(limit));
   }
-  
+
   const normalizedToken = normalizeToken(accessToken);
-  
-  const response = await fetch(url.toString(), {
-    method: 'GET',
+
+  const response = await fetchFn(url.toString(), {
+    method: "GET",
     headers: {
-      'Authorization': normalizedToken,
-      'Content-Type': 'application/json',
-      'Convex-Client': 'dashboard-0.0.0',
+      Authorization: normalizedToken,
+      "Content-Type": "application/json",
+      "Convex-Client": "dashboard-0.0.0",
     },
     signal,
   });
-  
+
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Failed to fetch logs: HTTP ${response.status} - ${errorText}`);
+    throw new Error(
+      `Failed to fetch logs: HTTP ${response.status} - ${errorText}`,
+    );
   }
-  
+
   const data = await response.json();
-  
+
   const formattedLogs: LogEntry[] = (data.entries || []).map((entry: any) => {
-    const timestamp = entry.timestamp 
-      ? (entry.timestamp > 1e12 ? entry.timestamp : entry.timestamp * 1000)
+    const timestamp = entry.timestamp
+      ? entry.timestamp > 1e12
+        ? entry.timestamp
+        : entry.timestamp * 1000
       : Date.now();
-    
+
     const udfType = entry.udfType || entry.udf_type || entry.type;
     const identifier = entry.identifier || entry.udf_path || entry.function;
     const requestId = entry.requestId || entry.request_id || entry.execution_id;
-    
-    const executionTime = entry.executionTime 
-      ? (entry.executionTime < 1000 ? entry.executionTime * 1000 : entry.executionTime)
-      : (entry.execution_time_ms || entry.executionTimeMs);
-    
+
+    const executionTime = entry.executionTime
+      ? entry.executionTime < 1000
+        ? entry.executionTime * 1000
+        : entry.executionTime
+      : entry.execution_time_ms || entry.executionTimeMs;
+
     const success = entry.success;
     let status: string | undefined;
-    
+
     if (entry.status) {
       status = entry.status;
     } else if (success === null || success === undefined) {
       status = undefined;
-    } else if (typeof success === 'object' && success !== null) {
-      status = 'success';
+    } else if (typeof success === "object" && success !== null) {
+      status = "success";
     } else if (success === true) {
-      status = 'success';
+      status = "success";
     } else {
-      status = 'error';
+      status = "error";
     }
-    
+
     return {
       timestamp,
-      topic: entry.topic || 'console',
-      function: identifier ? {
-        type: udfType,
-        path: identifier,
-        cached: entry.cachedResult || entry.cached || false,
-        request_id: requestId
-      } : undefined,
-      log_level: entry.level || entry.log_level || 'INFO',
-      message: entry.message || entry.logLines?.join('\n') || JSON.stringify(entry),
+      topic: entry.topic || "console",
+      function: identifier
+        ? {
+            type: udfType,
+            path: identifier,
+            cached: entry.cachedResult || entry.cached || false,
+            request_id: requestId,
+          }
+        : undefined,
+      log_level: entry.level || entry.log_level || "INFO",
+      message:
+        entry.message || entry.logLines?.join("\n") || JSON.stringify(entry),
       execution_time_ms: executionTime,
       status,
       error_message: entry.error || entry.error_message,
-      raw: entry
+      raw: entry,
     };
   });
 
   return {
     logs: formattedLogs,
     newCursor: data.newCursor || data.new_cursor,
-    hostname: urlObj.hostname
+    hostname: urlObj.hostname,
   };
 }
 
@@ -127,6 +143,8 @@ export async function fetchLogsFromApi({
  * @param deploymentUrl - The URL of the Convex deployment
  * @param authToken - The authentication token
  * @param cursor - The cursor to start streaming from
+ * @param limit - Optional limit for number of entries
+ * @param fetchFn - Optional custom fetch function (for Tauri/CORS-free environments)
  * @returns The streamed UDF execution logs
  */
 export async function streamUdfExecution(
@@ -134,11 +152,12 @@ export async function streamUdfExecution(
   authToken: string,
   cursor: number | string = 0,
   limit?: number,
+  fetchFn: FetchFn = defaultFetch,
 ): Promise<{ entries: FunctionExecutionJson[]; newCursor: number | string }> {
   const urlObj = new URL(`${deploymentUrl}${ROUTES.STREAM_UDF_EXECUTION}`);
-  urlObj.searchParams.set('cursor', String(cursor));
+  urlObj.searchParams.set("cursor", String(cursor));
   if (limit) {
-    urlObj.searchParams.set('limit', String(limit));
+    urlObj.searchParams.set("limit", String(limit));
   }
   const url = urlObj.toString();
 
@@ -149,36 +168,39 @@ export async function streamUdfExecution(
 
   let response: Response;
   let data: any;
-  
+
   try {
-    response = await fetch(url, {
+    response = await fetchFn(url, {
       headers: {
         Authorization: normalizedToken,
-        'Content-Type': 'application/json',
-        'Convex-Client': 'dashboard-1.0.0',
+        "Content-Type": "application/json",
+        "Convex-Client": "dashboard-1.0.0",
       },
       signal: controller.signal,
     });
-    
+
     clearTimeout(timeoutId);
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`Failed to stream UDF executions: HTTP ${response.status} - ${text}`);
+      throw new Error(
+        `Failed to stream UDF executions: HTTP ${response.status} - ${text}`,
+      );
     }
 
     data = await response.json();
   } catch (error: any) {
     clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new Error('Request timeout: The API took too long to respond');
+    if (error.name === "AbortError") {
+      throw new Error("Request timeout: The API took too long to respond");
     }
     throw error;
   }
 
   let entries = (data.entries || []) as FunctionExecutionJson[];
 
-  let newCursor: number | string = cursor;
+  // Use the new cursor from the response, falling back to the provided cursor
+  let newCursor: number | string = data.new_cursor ?? cursor;
 
   return {
     entries,
@@ -193,6 +215,8 @@ export async function streamUdfExecution(
  * @param cursor - The cursor to start streaming from
  * @param sessionId - The session ID to stream from
  * @param clientRequestCounter - The client request counter to stream from
+ * @param limit - Optional limit for number of entries
+ * @param fetchFn - Optional custom fetch function (for Tauri/CORS-free environments)
  * @returns The streamed function logs
  */
 export async function streamFunctionLogs(
@@ -202,35 +226,38 @@ export async function streamFunctionLogs(
   sessionId?: string,
   clientRequestCounter?: number,
   limit?: number,
+  fetchFn: FetchFn = defaultFetch,
 ): Promise<{ entries: FunctionExecutionJson[]; newCursor: number | string }> {
   const params = new URLSearchParams({
     cursor: String(cursor),
   });
 
   if (sessionId && clientRequestCounter !== undefined) {
-    params.set('session_id', sessionId);
-    params.set('client_request_counter', String(clientRequestCounter));
+    params.set("session_id", sessionId);
+    params.set("client_request_counter", String(clientRequestCounter));
   }
-  
+
   if (limit) {
-    params.set('limit', String(limit));
+    params.set("limit", String(limit));
   }
 
   const url = `${deploymentUrl}${ROUTES.STREAM_FUNCTION_LOGS}?${params.toString()}`;
 
   const normalizedToken = normalizeToken(authToken);
 
-  const response = await fetch(url, {
+  const response = await fetchFn(url, {
     headers: {
       Authorization: normalizedToken,
-      'Content-Type': 'application/json',
-      'Convex-Client': 'dashboard-1.0.0',
+      "Content-Type": "application/json",
+      "Convex-Client": "dashboard-1.0.0",
     },
   });
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Failed to stream function logs: HTTP ${response.status} - ${text}`);
+    throw new Error(
+      `Failed to stream function logs: HTTP ${response.status} - ${text}`,
+    );
   }
 
   const data = await response.json();
@@ -258,14 +285,13 @@ export function processFunctionLogs(
   const targetIdentifier = selectedFunction?.identifier;
 
   const normalizeIdentifier = (id: string | undefined | null) =>
-    (id || '').replace(/\.js:/g, ':').replace(/\.js$/g, '');
+    (id || "").replace(/\.js:/g, ":").replace(/\.js$/g, "");
 
   const matchesSelected = (entry: FunctionExecutionJson) => {
     if (!selectedFunction) return true;
 
     const raw: any = entry as any;
-    const entryPath: string | undefined =
-      raw.udf_path || raw.identifier;
+    const entryPath: string | undefined = raw.udf_path || raw.identifier;
 
     const normalizedEntryId = normalizeIdentifier(entryPath);
     const normalizedTargetId = normalizeIdentifier(targetIdentifier);
@@ -278,114 +304,127 @@ export function processFunctionLogs(
   };
 
   const matchingEntries = entries.filter(matchesSelected);
-  const effectiveEntries =
-    selectedFunction ? matchingEntries : entries;
+  const effectiveEntries = selectedFunction ? matchingEntries : entries;
 
-  return effectiveEntries
-    .map((entry) => {
-      const raw: any = entry as any;
+  return effectiveEntries.map((entry) => {
+    const raw: any = entry as any;
 
-      const udfTypeRaw = (raw.udf_type || raw.udfType || 'query') as string;
-      const componentPath = raw.component_path || raw.componentPath;
+    const udfTypeRaw = (raw.udf_type || raw.udfType || "query") as string;
+    const componentPath = raw.component_path || raw.componentPath;
 
-      const identifierRaw =
-        raw.identifier ||
-        raw.udf_path ||
-        (componentPath ? `${componentPath}:${raw.identifier}` : '');
+    const identifierRaw =
+      raw.identifier ||
+      raw.udf_path ||
+      (componentPath ? `${componentPath}:${raw.identifier}` : "");
 
-      const timestampSec = raw.timestamp ?? raw.execution_timestamp ?? 0;
-      const startedAtMs =
-        timestampSec > 1e12 ? timestampSec : timestampSec * 1000;
+    const timestampSec = raw.timestamp ?? raw.execution_timestamp ?? 0;
+    const startedAtMs =
+      timestampSec > 1e12 ? timestampSec : timestampSec * 1000;
 
-      let executionTimeSeconds = 0;
-      if (raw.executionTime != null) {
-        executionTimeSeconds = raw.executionTime;
-      } else if (raw.execution_time != null) {
-        executionTimeSeconds = raw.execution_time;
-      } else if (raw.executionTimeMs != null) {
-        executionTimeSeconds = raw.executionTimeMs / 1000;
-      } else if (raw.execution_time_ms != null) {
-        executionTimeSeconds = raw.execution_time_ms / 1000;
-      }
-      const durationMs = executionTimeSeconds * 1000;
-      const completedAtMs = startedAtMs + durationMs;
+    let executionTimeSeconds = 0;
+    if (raw.executionTime != null) {
+      executionTimeSeconds = raw.executionTime;
+    } else if (raw.execution_time != null) {
+      executionTimeSeconds = raw.execution_time;
+    } else if (raw.executionTimeMs != null) {
+      executionTimeSeconds = raw.executionTimeMs / 1000;
+    } else if (raw.execution_time_ms != null) {
+      executionTimeSeconds = raw.execution_time_ms / 1000;
+    }
+    const durationMs = executionTimeSeconds * 1000;
+    const completedAtMs = startedAtMs + durationMs;
 
-      const rawLogLines = raw.log_lines || raw.logLines;
-      
-      const logLines = rawLogLines && Array.isArray(rawLogLines) && rawLogLines.length > 0
+    const rawLogLines = raw.log_lines || raw.logLines;
+
+    const logLines =
+      rawLogLines && Array.isArray(rawLogLines) && rawLogLines.length > 0
         ? rawLogLines.map((line: any) =>
-            typeof line === 'string' ? line : JSON.stringify(line),
+            typeof line === "string" ? line : JSON.stringify(line),
           )
         : [];
-      
-      const success =
-        raw.error == null &&
-        (raw.success === undefined ||
-          raw.success === null ||
-          raw.success === true ||
-          (typeof raw.success === 'object' && raw.success !== null));
 
-      const functionName =
-        typeof identifierRaw === 'string' && identifierRaw.includes(':')
-          ? identifierRaw.split(':').slice(-1)[0]
-          : identifierRaw;
+    const success =
+      raw.error == null &&
+      (raw.success === undefined ||
+        raw.success === null ||
+        raw.success === true ||
+        (typeof raw.success === "object" && raw.success !== null));
 
-      const functionIdentifier =
-        componentPath && identifierRaw
-          ? `${componentPath}:${identifierRaw}`
-          : identifierRaw;
+    const functionName =
+      typeof identifierRaw === "string" && identifierRaw.includes(":")
+        ? identifierRaw.split(":").slice(-1)[0]
+        : identifierRaw;
 
-      return {
-        id: raw.execution_id || raw.executionId || `${identifierRaw}-${startedAtMs}`,
-        functionIdentifier,
-        functionName,
-        udfType: (udfTypeRaw.toLowerCase() || 'query') as any,
-        componentPath,
-        timestamp: startedAtMs,
-        startedAt: startedAtMs,
-        completedAt: completedAtMs,
-        durationMs,
-        success,
-        error: raw.error || raw.error_message,
-        logLines,
-        usageStats: (() => {
-          const stats = raw.usage_stats || raw.usageStats;
-          if (stats) {
-            return {
-              database_read_bytes: stats.database_read_bytes ?? stats.databaseReadBytes ?? 0,
-              database_write_bytes: stats.database_write_bytes ?? stats.databaseWriteBytes ?? 0,
-              database_read_documents: stats.database_read_documents ?? stats.databaseReadDocuments ?? 0,
-              storage_read_bytes: stats.storage_read_bytes ?? stats.storageReadBytes ?? 0,
-              storage_write_bytes: stats.storage_write_bytes ?? stats.storageWriteBytes ?? 0,
-              vector_index_read_bytes: stats.vector_index_read_bytes ?? stats.vectorIndexReadBytes ?? 0,
-              vector_index_write_bytes: stats.vector_index_write_bytes ?? stats.vectorIndexWriteBytes ?? 0,
-              memory_used_mb: stats.memory_used_mb ?? stats.memoryUsedMb ?? 0,
-            };
-          }
+    const functionIdentifier =
+      componentPath && identifierRaw
+        ? `${componentPath}:${identifierRaw}`
+        : identifierRaw;
+
+    return {
+      id:
+        raw.execution_id ||
+        raw.executionId ||
+        `${identifierRaw}-${startedAtMs}`,
+      functionIdentifier,
+      functionName,
+      udfType: (udfTypeRaw.toLowerCase() || "query") as any,
+      componentPath,
+      timestamp: startedAtMs,
+      startedAt: startedAtMs,
+      completedAt: completedAtMs,
+      durationMs,
+      success,
+      error: raw.error || raw.error_message,
+      logLines,
+      usageStats: (() => {
+        const stats = raw.usage_stats || raw.usageStats;
+        if (stats) {
           return {
-            database_read_bytes: 0,
-            database_write_bytes: 0,
-            database_read_documents: 0,
-            storage_read_bytes: 0,
-            storage_write_bytes: 0,
-            vector_index_read_bytes: 0,
-            vector_index_write_bytes: 0,
-            memory_used_mb: 0,
+            database_read_bytes:
+              stats.database_read_bytes ?? stats.databaseReadBytes ?? 0,
+            database_write_bytes:
+              stats.database_write_bytes ?? stats.databaseWriteBytes ?? 0,
+            database_read_documents:
+              stats.database_read_documents ?? stats.databaseReadDocuments ?? 0,
+            storage_read_bytes:
+              stats.storage_read_bytes ?? stats.storageReadBytes ?? 0,
+            storage_write_bytes:
+              stats.storage_write_bytes ?? stats.storageWriteBytes ?? 0,
+            vector_index_read_bytes:
+              stats.vector_index_read_bytes ?? stats.vectorIndexReadBytes ?? 0,
+            vector_index_write_bytes:
+              stats.vector_index_write_bytes ??
+              stats.vectorIndexWriteBytes ??
+              0,
+            memory_used_mb: stats.memory_used_mb ?? stats.memoryUsedMb ?? 0,
           };
-        })(),
-        requestId: raw.request_id || raw.requestId || '',
-        executionId: raw.execution_id || raw.executionId || '',
-        caller: raw.caller,
-        environment: raw.environment === 'isolate' ? 'Convex' : (raw.environment || 'Convex'),
-        identityType: (() => {
-          const identity = raw.identity_type || raw.identityType || '';
-          if (!identity) return '';
-          return identity.charAt(0).toUpperCase() + identity.slice(1).toLowerCase();
-        })(),
-        returnBytes: raw.return_bytes || raw.returnBytes,
-        cachedResult: raw.cached_result || raw.cachedResult || false,
-        raw: raw,
-      } as FunctionExecutionLog;
-    });
-  }
-
+        }
+        return {
+          database_read_bytes: 0,
+          database_write_bytes: 0,
+          database_read_documents: 0,
+          storage_read_bytes: 0,
+          storage_write_bytes: 0,
+          vector_index_read_bytes: 0,
+          vector_index_write_bytes: 0,
+          memory_used_mb: 0,
+        };
+      })(),
+      requestId: raw.request_id || raw.requestId || "",
+      executionId: raw.execution_id || raw.executionId || "",
+      caller: raw.caller,
+      environment:
+        raw.environment === "isolate" ? "Convex" : raw.environment || "Convex",
+      identityType: (() => {
+        const identity = raw.identity_type || raw.identityType || "";
+        if (!identity) return "";
+        return (
+          identity.charAt(0).toUpperCase() + identity.slice(1).toLowerCase()
+        );
+      })(),
+      returnBytes: raw.return_bytes || raw.returnBytes,
+      cachedResult: raw.cached_result || raw.cachedResult || false,
+      raw: raw,
+    } as FunctionExecutionLog;
+  });
+}

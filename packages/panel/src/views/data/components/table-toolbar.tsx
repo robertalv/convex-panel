@@ -1,14 +1,18 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Filter, Plus, MoreVertical, EyeOff, Trash2, Edit2, X, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Filter, Plus, MoreVertical, EyeOff, Trash2, Edit2, X, ArrowUpDown, ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { FilterExpression, SortConfig } from '../../../types';
+import type { TableSchema } from '../../../types/tables';
 import { operatorOptions } from '../../../utils/constants';
 import { TooltipAction } from '../../../components/shared/tooltip-action';
 import { TableMenuDropdown } from './table-menu-dropdown';
+import { NaturalLanguageQuery } from './natural-language-query';
 
 export interface TableToolbarProps {
   documentCount: number;
   onFilterToggle: () => void;
   isFilterOpen: boolean;
+  onToggleSidebar?: () => void;
+  sidebarCollapsed?: boolean;
   onAddDocument?: () => void;
   onColumnVisibilityToggle?: () => void;
   hiddenFieldsCount?: number;
@@ -26,12 +30,20 @@ export interface TableToolbarProps {
   onMetrics?: () => void;
   onClearTable?: () => void;
   onDeleteTable?: () => void;
+  tableName?: string;
+  tableSchema?: TableSchema;
+  availableFields?: string[];
+  adminClient?: any;
+  onNaturalLanguageQuery?: (filters: FilterExpression, sortConfig: SortConfig | null, limit: number | null) => void;
+  onNaturalLanguageQueryError?: (error: string) => void;
 }
 
 export const TableToolbar: React.FC<TableToolbarProps> = ({
   documentCount,
   onFilterToggle,
   isFilterOpen,
+  onToggleSidebar,
+  sidebarCollapsed = false,
   onAddDocument,
   onColumnVisibilityToggle,
   hiddenFieldsCount = 0,
@@ -49,6 +61,12 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
   onMetrics,
   onClearTable,
   onDeleteTable,
+  tableName,
+  tableSchema,
+  availableFields = [],
+  adminClient,
+  onNaturalLanguageQuery,
+  onNaturalLanguageQueryError,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
@@ -182,7 +200,54 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
         padding: '0 8px',
         backgroundColor: 'var(--color-panel-bg)',
       }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 auto', minWidth: 0, overflow: 'hidden' }}>
+        {onToggleSidebar && (
+          <>
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '28px',
+                height: '28px',
+                padding: 0,
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                color: 'var(--color-panel-text-muted)',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'var(--color-panel-text)';
+                e.currentTarget.style.backgroundColor = 'var(--color-panel-bg-tertiary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--color-panel-text-muted)';
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+              title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+            </button>
+            <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--color-panel-border)' }}></div>
+          </>
+        )}
+        {tableName && tableSchema && adminClient && onNaturalLanguageQuery && (
+          <>
+            <NaturalLanguageQuery
+              tableName={tableName}
+              tableSchema={tableSchema}
+              availableFields={availableFields}
+              adminClient={adminClient}
+              onApply={onNaturalLanguageQuery}
+              onError={onNaturalLanguageQueryError}
+            />
+            <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--color-panel-border)' }}></div>
+          </>
+        )}
         <div
           onClick={onFilterToggle}
           style={{
@@ -218,12 +283,10 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
           {documentCount} {documentCount === 1 ? 'document' : 'documents'}
         </div>
 
-        {/* Active Filters & Sort */}
         {hasActiveFilters && (
           <>
             <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--color-panel-border)', margin: '0 4px' }}></div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0', position: 'relative' }}>
-              {/* Left Arrow with Fade */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0', position: 'relative', flex: '1 1 auto', minWidth: 0 }}>
               {shouldScroll && canScrollLeft && (
                 <>
                   <div
@@ -278,9 +341,11 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
                   display: 'flex', 
                   alignItems: 'center', 
                   gap: '6px', 
-                  flexWrap: shouldScroll ? 'nowrap' : 'wrap', 
-                  maxWidth: shouldScroll ? (canScrollLeft && canScrollRight ? '352px' : canScrollLeft || canScrollRight ? '376px' : '400px') : '400px',
-                  overflowX: shouldScroll ? 'auto' : 'hidden',
+                  flexWrap: 'nowrap', 
+                  flex: '1 1 auto',
+                  minWidth: 0,
+                  maxWidth: shouldScroll ? (canScrollLeft && canScrollRight ? '352px' : canScrollLeft || canScrollRight ? '376px' : '400px') : 'none',
+                  overflowX: shouldScroll ? 'auto' : 'visible',
                   overflowY: 'hidden',
                   WebkitOverflowScrolling: 'touch',
                   scrollbarWidth: 'none',
@@ -288,7 +353,7 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
                   scrollBehavior: 'smooth',
                 }}
               >
-              {/* Sort Badge */}
+
               {sortConfig && (
                 <div
                   style={{
@@ -347,7 +412,6 @@ export const TableToolbar: React.FC<TableToolbarProps> = ({
                 </div>
               )}
 
-              {/* Filter Badges */}
               {activeFilters.map((filter, index) => {
                 const filterIndex = filters?.clauses?.findIndex((f) => 
                   f.field === filter.field && f.op === filter.op && 

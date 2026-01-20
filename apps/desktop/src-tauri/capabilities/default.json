@@ -1,0 +1,128 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:event:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://auth.convex.dev/**"
+        },
+        {
+          "url": "https://api.convex.dev/**"
+        },
+        {
+          "url": "https://bigbrain.convex.dev/**"
+        },
+        {
+          "url": "https://dashboard.convex.dev/**"
+        },
+        {
+          "url": "https://*.convex.cloud/**"
+        }
+      ],
+      "deny": []
+    },
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "sh",
+          "cmd": "sh",
+          "args": true
+        },
+        {
+          "name": "bash",
+          "cmd": "bash",
+          "args": true
+        },
+        {
+          "name": "zsh",
+          "cmd": "zsh",
+          "args": true
+        },
+        {
+          "name": "node",
+          "cmd": "node",
+          "args": true
+        },
+        {
+          "name": "npm",
+          "cmd": "npm",
+          "args": true
+        },
+        {
+          "name": "npx",
+          "cmd": "npx",
+          "args": true
+        },
+        {
+          "name": "pnpm",
+          "cmd": "pnpm",
+          "args": true
+        },
+        {
+          "name": "yarn",
+          "cmd": "yarn",
+          "args": true
+        },
+        {
+          "name": "bun",
+          "cmd": "bun",
+          "args": true
+        },
+        {
+          "name": "git",
+          "cmd": "git",
+          "args": true
+        },
+        {
+          "name": "cursor",
+          "cmd": "cursor",
+          "args": true
+        },
+        {
+          "name": "code",
+          "cmd": "code",
+          "args": true
+        }
+      ]
+    },
+    "shell:allow-spawn",
+    "shell:allow-stdin-write",
+    "shell:allow-kill",
+    "shell:allow-open",
+    "dialog:default",
+    "dialog:allow-open",
+    "fs:default",
+    "fs:allow-read",
+    "fs:allow-exists",
+    "fs:allow-watch",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        {
+          "path": "$HOME/**"
+        }
+      ]
+    },
+    "notification:default",
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission",
+    "notification:allow-show",
+    "notification:allow-create-channel",
+    "notification:allow-delete-channel",
+    "notification:allow-list-channels",
+    "notification:allow-permission-state"
+  ]
+}

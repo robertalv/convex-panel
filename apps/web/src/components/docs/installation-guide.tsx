@@ -83,8 +83,6 @@ export function InstallationGuide() {
                 code={activeFramework.setup} 
                 title={activeFramework.filename} 
                 language={
-                  activeFramework.filename.endsWith('.vue') ? 'vue' :
-                  activeFramework.filename.endsWith('.svelte') ? 'svelte' :
                   activeFramework.filename.endsWith('.tsx') || activeFramework.filename.includes('tsx') ? 'tsx' :
                   'typescript'
                 }

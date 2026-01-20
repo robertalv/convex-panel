@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -8,31 +8,93 @@ import {
   Sparkles,
   ExternalLink,
   BookOpen,
-} from 'lucide-react';
-import { ConvexLogo } from './icons';
-import { AskAI } from './ask-ai';
-import { setStorageItem } from '../utils/storage';
-import { STORAGE_KEYS } from '../utils/constants';
-import { DeploymentDisplay } from './shared/deployment-display';
-import { ProjectSelector } from './shared/project-selector';
-import { GlobalFunctionTester } from './function-runner/global-function-tester';
-import { GlobalSheet } from './shared/global-sheet';
-import { Sidebar } from './sidebar';
-import { useActiveTab } from '../hooks/useActiveTab';
-import { useIsGlobalRunnerShown, useShowGlobalRunner } from '../lib/functionRunner';
-import { useFunctionRunnerShortcuts } from '../hooks/useFunctionRunnerShortcuts';
-import { useGlobalLocalStorage } from '../hooks/useGlobalLocalStorage';
-import type { TabId } from '../types/tabs';
-import type { Team, Project, EnvType } from '../types';
-import { useThemeSafe } from '../hooks/useTheme';
-import { useHasSubscription } from '../hooks/useTeamOrbSubscription';
-import { SupportPopup } from './support-popup';
-import { SetupInstructions } from './setup-instructions';
-import { UserMenu } from './user-menu';
-import { fetchDeploymentMetadata } from '../utils/api/deployments';
-import { extractDeploymentName, extractProjectName } from '../utils/api/utils';
-import { fetchProjectInfo } from '../utils/api/teams';
-import { useIsDeploymentPaused } from '../hooks/usePaginatedScheduledJobs';
+  MessageCircle,
+} from "lucide-react";
+import { ConvexLogo } from "./icons";
+import { AskAI } from "./ask-ai";
+import { setStorageItem } from "../utils/storage";
+import { STORAGE_KEYS } from "../utils/constants";
+import { DeploymentDisplay } from "./shared/deployment-display";
+import { ProjectSelector } from "./shared/project-selector";
+import { GlobalFunctionTester } from "./function-runner/global-function-tester";
+import { GlobalSheet } from "./shared/global-sheet";
+import { Sidebar } from "./sidebar";
+import { useActiveTab } from "../hooks/useActiveTab";
+import {
+  useIsGlobalRunnerShown,
+  useShowGlobalRunner,
+} from "../lib/functionRunner";
+import { useFunctionRunnerShortcuts } from "../hooks/useFunctionRunnerShortcuts";
+import { useGlobalLocalStorage } from "../hooks/useGlobalLocalStorage";
+import type { TabId } from "../types/tabs";
+import type { Team, Project, EnvType } from "../types";
+import { useThemeSafe } from "../hooks/useTheme";
+import { useHasSubscription } from "../hooks/useTeamOrbSubscription";
+import { SupportPopup } from "./support-popup";
+import { SetupInstructions } from "./setup-instructions";
+import { fetchDeploymentMetadata } from "../utils/api/deployments";
+import { extractDeploymentName, extractProjectName } from "../utils/api/utils";
+import { fetchProjectInfo } from "../utils/api/teams";
+import { useIsDeploymentPaused } from "../hooks/usePaginatedScheduledJobs";
+import { ChatbotSheet } from "./chatbot-sheet";
+import { useDataViewState } from "../contexts/data-view-context";
+
+// Wrapper component that subscribes to DataViewContext for chatbot
+// This isolates the context subscription from BottomSheet to prevent re-renders
+interface ChatbotSheetWrapperProps {
+  isOpen: boolean;
+  onClose: () => void;
+  adminClient?: any;
+  accessToken?: string;
+  deploymentUrl?: string;
+  onTabChange?: (tab: TabId) => void;
+  container: HTMLElement | null;
+  activeTab?: TabId;
+}
+
+const ChatbotSheetWrapper: React.FC<ChatbotSheetWrapperProps> = React.memo(
+  ({
+    isOpen,
+    onClose,
+    adminClient,
+    accessToken,
+    deploymentUrl,
+    onTabChange,
+    container,
+    activeTab,
+  }) => {
+    const dataViewState = useDataViewState();
+
+    const currentTable = useMemo(() => {
+      return activeTab === "data" ? dataViewState.selectedTable : null;
+    }, [activeTab, dataViewState.selectedTable]);
+
+    const availableFields = useMemo(() => {
+      return activeTab === "data" ? dataViewState.availableFields : [];
+    }, [activeTab, dataViewState.availableFields]);
+
+    const isInDataView = activeTab === "data";
+
+    if (!deploymentUrl || !accessToken) {
+      return null;
+    }
+
+    return (
+      <ChatbotSheet
+        isOpen={isOpen}
+        onClose={onClose}
+        adminClient={adminClient}
+        accessToken={accessToken}
+        convexUrl={deploymentUrl}
+        onTabChange={onTabChange}
+        container={container}
+        currentTable={currentTable}
+        availableFields={availableFields}
+        isInDataView={isInDataView}
+      />
+    );
+  },
+);
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -54,13 +116,51 @@ interface BottomSheetProps {
   projectSlug?: string;
   team?: Team;
   project?: Project;
+  /** When true, the panel fills the entire viewport. Useful for desktop apps. */
+  fullscreen?: boolean;
+  headerVisible?: boolean;
+  customHeader?: React.ReactNode;
 }
 
-const PANEL_HEIGHT_STORAGE_KEY = 'convex-panel-bottom-sheet-height';
+// Floating button for function runner
+interface FloatingButtonsProps {
+  isAuthenticated?: boolean;
+  isRunnerShown: boolean;
+  showGlobalRunner: (
+    selected: null,
+    autoRun?: boolean,
+    vertical?: boolean,
+  ) => void;
+}
+
+const FloatingButtons: React.FC<FloatingButtonsProps> = React.memo(
+  ({ isAuthenticated, isRunnerShown, showGlobalRunner }) => {
+    // Don't show if not authenticated
+    if (!isAuthenticated) return null;
+
+    // Don't show if runner is open
+    if (isRunnerShown) return null;
+
+    return (
+      <div className="cp-floating-btn-wrapper">
+        <button
+          type="button"
+          onClick={() => showGlobalRunner(null)}
+          className="cp-floating-btn"
+          title="Run functions (Ctrl+`)"
+        >
+          fn
+        </button>
+      </div>
+    );
+  },
+);
+
+const PANEL_HEIGHT_STORAGE_KEY = "convex-panel-bottom-sheet-height";
 const PANEL_MIN_HEIGHT = 40;
 const PANEL_COLLAPSED_HEIGHT = `${PANEL_MIN_HEIGHT}px`;
 const PANEL_MAX_HEIGHT_RATIO = 0.9;
-const PANEL_DEFAULT_HEIGHT = '60vh';
+const PANEL_DEFAULT_HEIGHT = "60vh";
 
 export const BottomSheet: React.FC<BottomSheetProps> = ({
   isOpen,
@@ -68,54 +168,64 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   children,
   projectName: providedProjectName,
   deploymentUrl,
-  environment: providedEnvironment = 'development',
+  environment: providedEnvironment = "development",
   isAuthenticated,
   onConnect,
-  onLogout,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onLogout: _onLogout,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   oauthConfig: _oauthConfig,
   activeTab: externalActiveTab,
   onTabChange,
   adminClient,
   accessToken,
-  isOAuthToken = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  isOAuthToken: _isOAuthToken,
   teamSlug,
   projectSlug,
   team,
   project,
+  fullscreen = false,
+  headerVisible = true,
+  customHeader,
 }) => {
   const [internalActiveTab, setInternalActiveTab] = useActiveTab();
   const activeTab = externalActiveTab ?? internalActiveTab;
   const [isResizing, setIsResizing] = useState(false);
   const [isSupportPopupOpen, setIsSupportPopupOpen] = useState(false);
   const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
+  const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [customHeight, setCustomHeight] = useState<number | null>(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       const saved = localStorage.getItem(PANEL_HEIGHT_STORAGE_KEY);
       return saved ? parseInt(saved, 10) : null;
     }
     return null;
   });
-  const [sheetContainer, setSheetContainer] = useState<HTMLElement | null>(null);
-  
-  // Calculate isPanelExpanded early so it can be used in the callback ref
-  // Allow expansion even when not authenticated so users can see instructions
+  const [sheetContainer, setSheetContainer] = useState<HTMLElement | null>(
+    null,
+  );
+
   const isPanelExpanded = Boolean(isOpen);
-  
-  // Callback ref to track the main content container
-  const mainContentRef = useCallback((node: HTMLDivElement | null) => {
-    if (node && isPanelExpanded) {
-      setSheetContainer(node);
-    } else {
-      setSheetContainer(null);
-    }
-  }, [isPanelExpanded]);
-  
+
+  const mainContentRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (node && isPanelExpanded) {
+        setSheetContainer(node);
+      } else {
+        setSheetContainer(null);
+      }
+    },
+    [isPanelExpanded],
+  );
+
+  useEffect(() => {}, [sheetContainer]);
+
   const [deploymentMetadata, setDeploymentMetadata] = useState<{
     deploymentName?: string;
     projectName?: string;
-    deploymentType?: 'dev' | 'prod' | 'preview';
-    kind?: 'cloud' | 'local';
+    deploymentType?: "dev" | "prod" | "preview";
+    kind?: "cloud" | "local";
   } | null>(null);
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
 
@@ -134,13 +244,13 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   } | null>(null);
   const [isLoadingProjectInfo, setIsLoadingProjectInfo] = useState(false);
 
-  console.log('deploymentUrl', deploymentUrl);
-  console.log('adminClient', adminClient);
-  console.log('accessToken', accessToken);
-
-  // Check if deployment is paused using the hook
   const isDeploymentPaused = useIsDeploymentPaused(adminClient);
-  const deploymentState = isDeploymentPaused === true ? 'paused' : isDeploymentPaused === false ? 'running' : null;
+  const deploymentState =
+    isDeploymentPaused === true
+      ? "paused"
+      : isDeploymentPaused === false
+        ? "running"
+        : null;
 
   useEffect(() => {
     if (!isAuthenticated || !deploymentUrl) {
@@ -152,14 +262,18 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     const fetchMetadata = async () => {
       setIsLoadingMetadata(true);
       try {
-        const metadata = await fetchDeploymentMetadata(adminClient, deploymentUrl, accessToken);
+        const metadata = await fetchDeploymentMetadata(
+          adminClient,
+          deploymentUrl,
+          accessToken,
+        );
         setDeploymentMetadata(metadata);
       } catch (error) {
         setDeploymentMetadata({
           deploymentName: extractDeploymentName(deploymentUrl),
           projectName: extractProjectName(deploymentUrl),
-          deploymentType: 'dev',
-          kind: 'cloud',
+          deploymentType: "dev",
+          kind: "cloud",
         });
       } finally {
         setIsLoadingMetadata(false);
@@ -179,7 +293,13 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     const fetchInfo = async () => {
       setIsLoadingProjectInfo(true);
       try {
-        const info = await fetchProjectInfo(adminClient, deploymentUrl, accessToken, teamSlug, projectSlug);
+        const info = await fetchProjectInfo(
+          adminClient,
+          deploymentUrl,
+          accessToken,
+          teamSlug,
+          projectSlug,
+        );
         setProjectInfo(info);
       } catch (error) {
         if (team || project) {
@@ -193,7 +313,16 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     };
 
     fetchInfo();
-  }, [isAuthenticated, deploymentUrl, adminClient, accessToken, teamSlug, projectSlug, team, project]);
+  }, [
+    isAuthenticated,
+    deploymentUrl,
+    adminClient,
+    accessToken,
+    teamSlug,
+    projectSlug,
+    team,
+    project,
+  ]);
 
   // useEffect(() => {
   //   if (!isAuthenticated || !deploymentUrl || !adminClient) {
@@ -204,9 +333,9 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   //   // Check if dependencies actually changed
   //   const currentDeps = { deploymentUrl, accessToken: accessToken?.substring(0, 20) };
   //   const prevDeps = prevDepsRef.current;
-  //   const depsChanged = prevDeps.deploymentUrl !== currentDeps.deploymentUrl || 
+  //   const depsChanged = prevDeps.deploymentUrl !== currentDeps.deploymentUrl ||
   //                       prevDeps.accessToken !== currentDeps.accessToken;
-    
+
   //   // Update ref with current deps
   //   prevDepsRef.current = currentDeps;
 
@@ -215,7 +344,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
   //   const fetchDeploymentState = async () => {
   //     if (!isMounted || deploymentStateFetchRef.current.isFetching) return;
-      
+
   //     // Throttle: don't fetch if we fetched less than 1 second ago (unless forced)
   //     const now = Date.now();
   //     const timeSinceLastFetch = now - deploymentStateFetchRef.current.lastFetch;
@@ -243,12 +372,12 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   //       }
 
   //       const state = await getConvexDeploymentState(finalDeploymentUrl, finalAdminKey);
-        
+
   //       if (!isMounted) {
   //         deploymentStateFetchRef.current.isFetching = false;
   //         return;
   //       }
-        
+
   //       setDeploymentState(state.state);
   //       deploymentStateFetchRef.current.isFetching = false;
   //     } catch (error) {
@@ -284,20 +413,20 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   //   if (depsChanged || deploymentStateFetchRef.current.lastFetch === 0) {
   //     fetchDeploymentState();
   //   }
-    
+
   //   // Check for immediate state changes
   //   checkForStateChange();
-    
+
   //   // Listen for custom events
   //   window.addEventListener('deploymentStateChanged', handleDeploymentStateChange);
-    
+
   //   // Poll every 5 seconds (reduced from 2 seconds to reduce load)
   //   intervalId = setInterval(() => {
   //     if (!isMounted) return;
   //     checkForStateChange();
   //     fetchDeploymentState();
   //   }, 5000);
-    
+
   //   return () => {
   //     isMounted = false;
   //     deploymentStateFetchRef.current.isFetching = false;
@@ -310,52 +439,69 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
   const handleSettingsClick = () => {
     if (onTabChange) {
-      onTabChange('settings');
+      onTabChange("settings");
     } else {
-      setInternalActiveTab('settings');
+      setInternalActiveTab("settings");
     }
-    setStorageItem(STORAGE_KEYS.SETTINGS_SECTION, 'pause-deployment');
+    setStorageItem(STORAGE_KEYS.SETTINGS_SECTION, "pause-deployment");
   };
 
   const projectName = useMemo(() => {
-    return deploymentMetadata?.projectName || providedProjectName || extractProjectName(deploymentUrl) || 'convex-panel';
+    return (
+      deploymentMetadata?.projectName ||
+      providedProjectName ||
+      extractProjectName(deploymentUrl) ||
+      "convex-panel"
+    );
   }, [deploymentMetadata?.projectName, providedProjectName, deploymentUrl]);
-  
+
   const deploymentName = useMemo(() => {
-    return deploymentMetadata?.deploymentName || extractDeploymentName(deploymentUrl) || 'convex-panel';
+    return (
+      deploymentMetadata?.deploymentName ||
+      extractDeploymentName(deploymentUrl) ||
+      "convex-panel"
+    );
   }, [deploymentMetadata?.deploymentName, deploymentUrl]);
-  
-  const deploymentType = deploymentMetadata?.deploymentType || providedEnvironment || 'development';
-  const environment = deploymentType === 'prod' ? 'production' : deploymentType === 'preview' ? 'preview' : 'development';
+
+  const deploymentType =
+    deploymentMetadata?.deploymentType || providedEnvironment || "development";
+  const environment =
+    deploymentType === "prod"
+      ? "production"
+      : deploymentType === "preview"
+        ? "preview"
+        : "development";
 
   const projectWithName = useMemo(() => {
     const baseProject = projectInfo?.project || project;
     if (baseProject) {
-      const hasValidName = baseProject.name && typeof baseProject.name === 'string' && baseProject.name.trim().length > 0;
+      const hasValidName =
+        baseProject.name &&
+        typeof baseProject.name === "string" &&
+        baseProject.name.trim().length > 0;
       const finalName = hasValidName ? baseProject.name : projectName;
       return {
         ...baseProject,
         name: finalName,
       };
     }
-    if (projectName && projectName !== 'convex-panel') {
+    if (projectName && projectName !== "convex-panel") {
       return {
-        id: deploymentName || '',
+        id: deploymentName || "",
         name: projectName,
         slug: projectName,
-        teamId: projectInfo?.team?.id || team?.id || '',
+        teamId: projectInfo?.team?.id || team?.id || "",
       };
     }
     return undefined;
   }, [projectInfo, project, projectName, deploymentName, team]);
-  
+
   const handleTabChange = (tab: TabId) => {
     setInternalActiveTab(tab);
     onTabChange?.(tab);
   };
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    // Allow resizing even when not authenticated
     e.preventDefault();
     setIsResizing(true);
   }, []);
@@ -377,41 +523,48 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       setIsResizing(false);
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
     };
   }, [isResizing]);
 
   const isRunnerShown = useIsGlobalRunnerShown();
   const showGlobalRunner = useShowGlobalRunner();
-  const [isGlobalRunnerVertical, setIsGlobalRunnerVertical] = useGlobalLocalStorage('functionRunnerOrientation', false);
+  const [isGlobalRunnerVertical, setIsGlobalRunnerVertical] =
+    useGlobalLocalStorage("functionRunnerOrientation", false);
   const [isRunnerExpanded, setIsRunnerExpanded] = useState(false);
-  
+
   useFunctionRunnerShortcuts();
 
   const getHeight = () => {
+    // In fullscreen mode, always use 100vh
+    if (fullscreen) return "100vh";
     const minHeight = PANEL_COLLAPSED_HEIGHT;
-    // Allow expansion even when not authenticated so users can see instructions
     if (!isOpen) return minHeight;
     if (customHeight !== null) return `${customHeight}px`;
     return PANEL_DEFAULT_HEIGHT;
   };
 
   const height = getHeight();
-  const finalHeight = height === '0px' || !height ? PANEL_COLLAPSED_HEIGHT : height;
+  const finalHeight = fullscreen
+    ? "100vh"
+    : height === "0px" || !height
+      ? PANEL_COLLAPSED_HEIGHT
+      : height;
 
-  const isProjectSelectorLoading = isAuthenticated && (isLoadingMetadata || isLoadingProjectInfo);
+  const isProjectSelectorLoading =
+    isAuthenticated && (isLoadingMetadata || isLoadingProjectInfo);
 
   const headerLeftContent = isAuthenticated ? (
     <>
       <div className="cp-flex cp-items-center cp-gap-2">
         <ConvexLogo width={30} height={30} />
-        <ProjectSelector 
-          team={projectInfo?.team || team} 
+        <ProjectSelector
+          team={projectInfo?.team || team}
           project={projectWithName}
           loading={isProjectSelectorLoading}
         />
@@ -419,7 +572,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       <DeploymentDisplay
         environment={environment}
         deploymentName={deploymentName}
-        kind={deploymentMetadata?.kind || 'cloud'}
+        kind={deploymentMetadata?.kind || "cloud"}
         teamSlug={teamSlug}
         projectSlug={projectSlug}
         loading={isLoadingMetadata}
@@ -446,17 +599,22 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
   const { theme, toggleTheme } = useThemeSafe();
 
-  // Get team ID for subscription check
   const teamId = projectInfo?.team?.id || team?.id;
-  // Convert string team ID to number if needed, or pass as-is if already a number
-  const teamIdNumber = teamId ? (typeof teamId === 'string' ? parseInt(teamId, 10) : teamId) : undefined;
+  const teamIdNumber = teamId
+    ? typeof teamId === "string"
+      ? parseInt(teamId, 10)
+      : teamId
+    : undefined;
   const hasSubscription = useHasSubscription(teamIdNumber);
-  
-  // Show upgrade button if authenticated, not loading, and no subscription
+
   const showUpgradeButton = isAuthenticated && hasSubscription === false;
 
   const handleUpgradeClick = () => {
-    window.open('https://convex.dev/referral/IDYLCO2615', '_blank', 'noopener,noreferrer');
+    window.open(
+      "https://convex.dev/referral/IDYLCO2615",
+      "_blank",
+      "noopener,noreferrer",
+    );
   };
 
   const headerRightContent = (
@@ -494,78 +652,140 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       >
         <HelpCircle size={14} /> Support
       </button>
+      {isAuthenticated && (
+        <button
+          type="button"
+          className="cp-support-btn"
+          onClick={() => setIsChatbotOpen(true)}
+          title="AI Assistant"
+        >
+          <MessageCircle size={14} />
+          Assistant
+        </button>
+      )}
       <button
         type="button"
         onClick={toggleTheme}
         className="cp-theme-toggle-btn"
-        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        title={
+          theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+        }
       >
-        {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+        {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
       </button>
-      {isAuthenticated && isOAuthToken && (
+      {/* TODO: Add user menu back in later, will have configuration
+        for menu bar, floating button, etc.
+      */}
+      {/* {isAuthenticated && isOAuthToken && (
         <UserMenu
           accessToken={accessToken}
           teamSlug={teamSlug}
           projectSlug={projectSlug}
           onLogout={onLogout}
         />
-      )}
-      
-      {isAuthenticated && (
+      )} */}
+
+      {/* Hide collapse button in fullscreen mode - not needed */}
+      {isAuthenticated && !fullscreen && (
         <>
-        <div className="cp-separator" />
-        <button type="button" onClick={onClose} className="cp-icon-btn cp-theme-toggle-btn">
-          {isOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-        </button>
+          <div className="cp-separator" />
+          <button
+            type="button"
+            onClick={onClose}
+            className="cp-icon-btn cp-theme-toggle-btn"
+          >
+            {isOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          </button>
         </>
-)}
+      )}
     </>
   );
 
-  // Always render the BottomSheet - it should always be visible
+  const handleChatbotClose = useCallback(() => setIsChatbotOpen(false), []);
+
   return (
     <div
-      className={`cp-bottom-sheet cp-theme-${theme}`}
+      className={`cp-bottom-sheet cp-theme-${theme}${fullscreen ? " cp-fullscreen" : ""}`}
       style={{
         height: finalHeight,
-        minHeight: PANEL_COLLAPSED_HEIGHT,
-        transition: isResizing ? 'none' : 'height 0.3s ease',
-        userSelect: isResizing ? 'none' : 'auto',
-        position: 'fixed',
+        minHeight: fullscreen ? "100vh" : PANEL_COLLAPSED_HEIGHT,
+        transition: isResizing ? "none" : "height 0.3s ease",
+        userSelect: isResizing ? "none" : "auto",
+        position: "fixed",
+        top: fullscreen ? 0 : undefined,
         bottom: 0,
         left: 0,
         right: 0,
         zIndex: 99998,
-        display: 'flex',
-        flexDirection: 'column',
-        visibility: 'visible',
+        display: "flex",
+        flexDirection: "column",
+        visibility: "visible",
         opacity: 1,
+        pointerEvents: "auto",
       }}
     >
-      {isPanelExpanded && (
-        <div onMouseDown={handleResizeStart} className="cp-resize-handle" />
+      {/* Resize handle - hidden in fullscreen mode */}
+      {isPanelExpanded && !fullscreen && (
+        <div
+          onMouseDown={handleResizeStart}
+          className="cp-resize-handle"
+          style={{
+            backgroundColor: isResizing
+              ? "var(--color-panel-accent, #6366f1)"
+              : "transparent",
+          }}
+          onMouseEnter={(e) => {
+            if (!isResizing) {
+              e.currentTarget.style.backgroundColor =
+                "var(--color-panel-accent, #6366f1)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isResizing) {
+              e.currentTarget.style.backgroundColor = "transparent";
+            }
+          }}
+        />
       )}
-      <div className="cp-header" style={{ borderBottom: isOpen ? undefined : 'none' }}>
-        <div className="cp-header-section cp-header-section--left">{headerLeftContent}</div>
-        <div className="cp-header-section cp-header-section--right">{headerRightContent}</div>
-      </div>
-
+      {headerVisible &&
+        (customHeader ? (
+          <div
+            className="cp-header-custom"
+            style={{
+              borderBottom: isOpen ? "1px solid var(--border)" : "none",
+            }}
+          >
+            {customHeader}
+          </div>
+        ) : (
+          <div
+            className="cp-header"
+            style={{ borderBottom: isOpen ? undefined : "none" }}
+          >
+            <div className="cp-header-section cp-header-section--left">
+              {headerLeftContent}
+            </div>
+            <div className="cp-header-section cp-header-section--right">
+              {headerRightContent}
+            </div>
+          </div>
+        ))}
       {isPanelExpanded && (
         <>
           <div className="cp-flex cp-flex-1 cp-overflow-hidden">
             <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
 
-            <div 
-              className="cp-main-content" 
-              ref={mainContentRef} 
-              style={{ 
-                display: 'flex',
-                flexDirection: !isGlobalRunnerVertical ? 'column' : 'row',
+            <div
+              className="cp-main-content"
+              ref={mainContentRef}
+              style={{
+                display: "flex",
+                flexDirection: !isGlobalRunnerVertical ? "column" : "row",
                 flex: 1,
-                overflow: 'hidden',
+                overflow: "hidden",
                 minHeight: 0,
-                width: '100%',
-                position: 'relative',
+                width: "100%",
+                position: "relative",
               }}
             >
               {/* Main content area - hidden when runner is expanded */}
@@ -574,47 +794,53 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
                   height: isRunnerExpanded && isRunnerShown ? 0 : undefined,
                   width: isRunnerExpanded && isRunnerShown ? 0 : undefined,
                   flex: isRunnerExpanded && isRunnerShown ? 0 : 1,
-                  overflow: isRunnerExpanded && isRunnerShown ? 'hidden' : 'auto',
+                  overflow:
+                    isRunnerExpanded && isRunnerShown ? "hidden" : "auto",
                   minHeight: 0,
                   minWidth: 0,
-                  position: 'relative',
+                  position: "relative",
+                  display: "flex",
+                  flexDirection: "column",
                 }}
               >
                 {/* Deployment Paused Banner */}
-                {isAuthenticated && deploymentState === 'paused' && (
+                {isAuthenticated && deploymentState === "paused" && (
                   <div
                     style={{
-                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                      border: '1px solid rgba(239, 68, 68, 0.2)',
-                      color: '#f87171',
-                      padding: '12px 24px',
-                      textAlign: 'center',
-                      fontSize: '14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '4px',
+                      backgroundColor: "rgba(239, 68, 68, 0.1)",
+                      border: "1px solid rgba(239, 68, 68, 0.2)",
+                      color: "#f87171",
+                      padding: "12px 24px",
+                      textAlign: "center",
+                      fontSize: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "4px",
                     }}
                   >
-                    <span>This deployment is paused. Resume your deployment on the </span>
+                    <span>
+                      This deployment is paused. Resume your deployment on
+                      the{" "}
+                    </span>
                     <button
                       type="button"
                       onClick={handleSettingsClick}
                       style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#60a5fa',
-                        textDecoration: 'underline',
-                        cursor: 'pointer',
+                        background: "none",
+                        border: "none",
+                        color: "#60a5fa",
+                        textDecoration: "underline",
+                        cursor: "pointer",
                         padding: 0,
-                        fontSize: '14px',
+                        fontSize: "14px",
                         fontWeight: 500,
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.color = '#93c5fd';
+                        e.currentTarget.style.color = "#93c5fd";
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.color = '#60a5fa';
+                        e.currentTarget.style.color = "#60a5fa";
                       }}
                     >
                       settings
@@ -642,18 +868,12 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
             </div>
           </div>
 
-          {!isRunnerShown && isAuthenticated && (
-            <div className="cp-floating-btn-wrapper">
-              <button
-                type="button"
-                onClick={() => showGlobalRunner(null)}
-                className="cp-floating-btn"
-                title="Run functions (Ctrl+`)"
-              >
-                fn
-              </button>
-            </div>
-          )}
+          {/* Floating button for function runner */}
+          <FloatingButtons
+            isAuthenticated={isAuthenticated}
+            isRunnerShown={isRunnerShown}
+            showGlobalRunner={showGlobalRunner}
+          />
         </>
       )}
 
@@ -673,7 +893,20 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         projectSlug={projectSlug}
         accessToken={accessToken}
       />
+
+      {/* Chatbot Sheet - wrapped to isolate DataViewContext subscription */}
+      {isAuthenticated && (
+        <ChatbotSheetWrapper
+          isOpen={isChatbotOpen}
+          onClose={handleChatbotClose}
+          adminClient={adminClient}
+          accessToken={accessToken}
+          deploymentUrl={deploymentUrl}
+          onTabChange={onTabChange}
+          container={sheetContainer}
+          activeTab={activeTab}
+        />
+      )}
     </div>
   );
 };
-

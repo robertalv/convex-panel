@@ -1,7 +1,7 @@
-import React from 'react';
-import { Checkbox } from '../../../../components/shared/checkbox';
-import { TableColumnHeader } from './table-column-header';
-import type { ColumnMeta } from './data-table-utils';
+import React from "react";
+import { Checkbox } from "../../../../components/shared/checkbox";
+import { TableColumnHeader } from "./table-column-header";
+import type { ColumnMeta } from "./data-table-utils";
 
 export interface TableHeaderProps {
   columns: string[];
@@ -10,7 +10,7 @@ export interface TableHeaderProps {
   dragState: {
     dragging?: string;
     over?: string;
-    position?: 'left' | 'right';
+    position?: "left" | "right";
   } | null;
   hoveredHeader: string | null;
   resizingHover: string | null;
@@ -18,18 +18,27 @@ export interface TableHeaderProps {
   isIndeterminate: boolean;
   trailingSpacerWidth: number;
   onSelectAll: () => void;
-  onColumnDragOver: (column: string, event: React.DragEvent<HTMLTableHeaderCellElement>) => void;
+  onColumnDragOver: (
+    column: string,
+    event: React.DragEvent<HTMLTableHeaderCellElement>,
+  ) => void;
   onColumnDrop: (column: string) => void;
   onColumnDragEnd: () => void;
   onColumnMouseEnter: (column: string) => void;
   onColumnMouseLeave: (column: string) => void;
-  onColumnDragStart: (column: string, event: React.DragEvent<HTMLDivElement>) => void;
-  onColumnResizeStart: (column: string, event: React.PointerEvent<HTMLDivElement>) => void;
+  onColumnDragStart: (
+    column: string,
+    event: React.DragEvent<HTMLDivElement>,
+  ) => void;
+  onColumnResizeStart: (
+    column: string,
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => void;
   onColumnResizeHoverEnter: (column: string) => void;
   onColumnResizeHoverLeave: (column: string) => void;
 }
 
-export const TableHeader: React.FC<TableHeaderProps> = ({
+const TableHeaderComponent: React.FC<TableHeaderProps> = ({
   columns,
   getColumnWidth,
   columnMeta,
@@ -51,13 +60,13 @@ export const TableHeader: React.FC<TableHeaderProps> = ({
   onColumnResizeHoverLeave,
 }) => {
   return (
-    <thead style={{ position: 'sticky', top: 0, zIndex: 15 }}>
+    <thead style={{ position: "sticky", top: 0, zIndex: 15 }}>
       <tr
         style={{
-          borderBottom: '1px solid var(--color-panel-border)',
-          fontSize: '12px',
-          color: 'var(--color-panel-text-secondary)',
-          backgroundColor: 'var(--color-panel-bg)',
+          borderBottom: "1px solid var(--color-panel-border)",
+          fontSize: "12px",
+          color: "var(--color-panel-text-secondary)",
+          backgroundColor: "var(--color-panel-bg)",
         }}
       >
         <th
@@ -66,10 +75,10 @@ export const TableHeader: React.FC<TableHeaderProps> = ({
             minWidth: 40,
             maxWidth: 40,
             padding: 0,
-            textAlign: 'center',
-            position: 'sticky',
+            textAlign: "center",
+            position: "sticky",
             left: 0,
-            backgroundColor: 'var(--color-panel-bg)',
+            backgroundColor: "var(--color-panel-bg)",
             zIndex: 20,
           }}
         >
@@ -77,10 +86,10 @@ export const TableHeader: React.FC<TableHeaderProps> = ({
             style={{
               width: 40,
               height: 40,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRight: '1px solid var(--color-panel-border)',
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRight: "1px solid var(--color-panel-border)",
             }}
           >
             <Checkbox
@@ -121,9 +130,9 @@ export const TableHeader: React.FC<TableHeaderProps> = ({
         })}
         <th
           style={{
-            padding: '8px',
+            padding: "8px",
             width: trailingSpacerWidth,
-            borderRight: '1px solid var(--color-panel-border)',
+            borderRight: "1px solid var(--color-panel-border)",
           }}
         ></th>
       </tr>
@@ -131,3 +140,6 @@ export const TableHeader: React.FC<TableHeaderProps> = ({
   );
 };
 
+// Memoize TableHeader to prevent re-renders when parent re-renders
+// but header props haven't changed
+export const TableHeader = React.memo(TableHeaderComponent);

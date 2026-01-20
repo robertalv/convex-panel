@@ -3,8 +3,8 @@
  * Handles fetching function specifications, source code, and components
  */
 
-import { ROUTES, SYSTEM_QUERIES } from '../../utils/constants';
-import { normalizeToken } from './helpers';
+import { ROUTES, SYSTEM_QUERIES } from "../../utils/constants";
+import { normalizeToken } from "./helpers";
 
 /**
  * Fetch the API spec for all functions in the Convex deployment
@@ -16,14 +16,14 @@ import { normalizeToken } from './helpers';
 export async function fetchFunctionSpec(
   adminClient: any,
   useMockData = false,
-  componentId?: string | null
+  componentId?: string | null,
 ): Promise<any[]> {
   if (useMockData) {
     return []; // TODO: Add mock data implementation
   }
 
   if (!adminClient) {
-    throw new Error('Admin client not available');
+    throw new Error("Admin client not available");
   }
 
   try {
@@ -33,8 +33,11 @@ export async function fetchFunctionSpec(
     if (componentId !== undefined && componentId !== null) {
       args.componentId = componentId;
     }
-    
-    const results = await adminClient.query(SYSTEM_QUERIES.FUNCTION_API_SPEC, args) as any[];
+
+    const results = (await adminClient.query(
+      SYSTEM_QUERIES.FUNCTION_API_SPEC,
+      args,
+    )) as any[];
 
     if (!Array.isArray(results)) {
       return [];
@@ -55,18 +58,21 @@ export async function fetchFunctionSpec(
  */
 export async function fetchComponents(
   adminClient: any,
-  useMockData = false
+  useMockData = false,
 ): Promise<any[]> {
   if (useMockData) {
     return []; // TODO: Add mock data implementation
   }
 
   if (!adminClient) {
-    throw new Error('Admin client not available');
+    throw new Error("Admin client not available");
   }
 
   try {
-    const results = await adminClient.query(SYSTEM_QUERIES.LIST_COMPONENTS, {}) as any[];
+    const results = (await adminClient.query(
+      SYSTEM_QUERIES.LIST_COMPONENTS,
+      {},
+    )) as any[];
 
     if (!Array.isArray(results)) {
       return [];
@@ -91,55 +97,31 @@ export const fetchSourceCode = async (
   deploymentUrl: string,
   authToken: string,
   modulePath: string,
-  componentId?: string | null
+  componentId?: string | null,
 ) => {
   const params = new URLSearchParams({ path: modulePath });
-  
+
   if (componentId) {
-    params.append('component', componentId);
+    params.append("component", componentId);
   }
-  
+
   const normalizedToken = normalizeToken(authToken);
   const url = `${deploymentUrl}${ROUTES.GET_SOURCE_CODE}?${params}`;
 
   const response = await fetch(url, {
     headers: {
-      'Authorization': normalizedToken,
-      'Content-Type': 'application/json',
-      'Convex-Client': 'dashboard-0.0.0',
-    }
+      Authorization: normalizedToken,
+      "Convex-Client": "dashboard-0.0.0",
+    },
   });
 
   if (!response.ok) {
     const responseText = await response.text();
-    throw new Error(`Failed to fetch source code: HTTP ${response.status} - ${responseText}`);
+    throw new Error(
+      `Failed to fetch source code: HTTP ${response.status} - ${responseText}`,
+    );
   }
 
-  const text = await response.text();
-  
-  if (text === 'null' || text.trim() === '') {
-    return null;
-  }
-  
-  try {
-    const json = JSON.parse(text);
-    
-    if (json === null || json === undefined) {
-      return null;
-    }
-    if (typeof json === 'object' && 'code' in json) {
-      return json.code || null;
-    }
-    if (typeof json === 'object' && 'source' in json) {
-      return json.source || null;
-    }
-    if (typeof json === 'string') {
-      return json;
-    }
-  } catch (parseError) {
-    // Not JSON, return as text
-  }
-  
-  return text;
+  // The API returns JSON - either null or a string
+  return await response.json();
 };
-

@@ -1,0 +1,112 @@
+/* Base container styling */
+[data-component="code-diff-viewer"] {
+  content-visibility: auto;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Diff content wrapper */
+[data-component="code-diff-viewer"] [data-diff-content] {
+  flex: 1;
+  overflow: auto;
+  background-color: var(--color-background-base);
+}
+
+/* Override diffs component base styles for integration */
+[data-component="code-diff-viewer"] [data-diffs] {
+  border-radius: inherit;
+  font-family: var(--diffs-font-family);
+  font-size: var(--diffs-font-size);
+  line-height: var(--diffs-line-height);
+  background-color: var(--color-background-base) !important;
+}
+
+/* Ensure all parts use the background */
+[data-component="code-diff-viewer"] [data-diffs] > * {
+  background-color: var(--color-background-base) !important;
+}
+
+/* Line styling */
+[data-component="code-diff-viewer"] [data-line] {
+  background-color: var(--color-background-base) !important;
+}
+
+/* Line number styling */
+[data-component="code-diff-viewer"] [data-line-number] {
+  user-select: none;
+  background-color: var(--color-background-base) !important;
+}
+
+/* Code content styling */
+[data-component="code-diff-viewer"] [data-code] {
+  tab-size: var(--diffs-tab-size, 2);
+  overflow-x: auto !important;
+  background-color: var(--color-background-base) !important;
+}
+
+/* Separator wrapper styling */
+[data-component="code-diff-viewer"] [data-separator-wrapper] {
+  margin: 0 !important;
+  border-radius: 0 !important;
+  background-color: var(--color-surface-raised) !important;
+}
+
+/* Expand button styling */
+[data-component="code-diff-viewer"] [data-expand-button] {
+  width: 6.5ch !important;
+  height: 24px !important;
+  justify-content: end !important;
+  padding-left: 3ch !important;
+  padding-inline: 1ch !important;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: var(--color-text-subtle, #8f8780);
+  transition: color 0.15s ease;
+}
+
+[data-component="code-diff-viewer"] [data-expand-button]:hover {
+  color: var(--color-text-base, #fff);
+}
+
+/* Multi-button separator styling */
+[data-component="code-diff-viewer"] [data-separator-multi-button] {
+  grid-template-rows: 10px 10px !important;
+}
+
+[data-component="code-diff-viewer"]
+  [data-separator-multi-button]
+  [data-expand-button] {
+  height: 12px !important;
+}
+
+/* Separator content styling */
+[data-component="code-diff-viewer"] [data-separator-content] {
+  height: 24px !important;
+  background-color: var(--color-surface-raised) !important;
+}
+
+/* Scrollbar styling for diff content */
+[data-component="code-diff-viewer"] [data-diff-content]::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+[data-component="code-diff-viewer"]
+  [data-diff-content]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+[data-component="code-diff-viewer"]
+  [data-diff-content]::-webkit-scrollbar-thumb {
+  background: var(--color-border-base, rgba(163, 156, 148, 0.3));
+  border-radius: 4px;
+}
+
+[data-component="code-diff-viewer"]
+  [data-diff-content]::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-strong, rgba(163, 156, 148, 0.5));
+}

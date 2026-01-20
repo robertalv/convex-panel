@@ -1,33 +1,53 @@
 {
-    "name": "convex-panel-monorepo",
-    "private": true,
-    "workspaces": [
-        "apps/*",
-        "packages/*"
-    ],
-    "scripts": {
-        "build": "turbo run build",
-        "dev": "turbo run dev --concurrency=11",
-        "dev:panel-only": "turbo dev --filter=web --filter=nextjs-web --filter=convex-panel --filter=@repo/backend --filter=convex-panel/api --concurrency=11",
-        "dev:vite-only": "turbo dev --filter=web --filter=convex-panel --filter=@repo/backend --filter=convex-panel/api --concurrency=11",
-        "dev:nextjs-only": "turbo dev --filter=nextjs-web --filter=convex-panel --filter=@repo/backend --filter=convex-panel/api --concurrency=11",
-        "dev:svelte-only": "turbo dev --filter=svelte-web --filter=convex-panel --filter=@repo/backend --filter=convex-panel/api --concurrency=11",
-        "dev:vue-only": "turbo dev --filter=vue-web --filter=convex-panel --filter=@repo/backend --filter=convex-panel/api --concurrency=11",
-        "lint": "turbo run lint",
-        "test": "turbo run test",
-        "clean": "turbo run clean",
-        "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-        "knip": "knip"
-    },
-    "engines": {
-        "node": ">=22.0.0"
-    },
-    "devDependencies": {
-        "@types/node": "^24.10.1",
-        "knip": "^5.71.0",
-        "prettier": "^3.5.2",
-        "turbo": "^2.4.2",
-        "typescript": "^5.9.3"
-    },
-    "packageManager": "pnpm@9.14.4"
+  "name": "convex-panel-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --concurrency=11",
+    "dev:panel-only": "turbo dev --filter=web --filter=nextjs-web --filter=convex-panel --filter=@repo/backend --filter=convex-panel/api --concurrency=11",
+    "dev:vite-only": "turbo dev --filter=web --filter=convex-panel --filter=@repo/backend --filter=convex-panel/api --concurrency=11",
+    "dev:nextjs-only": "turbo dev --filter=nextjs-web --filter=convex-panel --filter=@repo/backend --filter=convex-panel/api --concurrency=11",
+    "dev:desktop": "cd apps/desktop && pnpm tauri:dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "clean": "turbo run clean",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "knip": "knip"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260103.0",
+    "@react-native-community/cli-server-api": "^11.3.0",
+    "@types/node": "^24.10.1",
+    "debug": "^4.4.3",
+    "knip": "^5.71.0",
+    "metro": "0.80.12",
+    "metro-cache": "0.80.12",
+    "metro-cache-key": "0.80.12",
+    "metro-config": "0.80.12",
+    "metro-core": "0.80.12",
+    "metro-resolver": "0.80.12",
+    "metro-runtime": "0.80.12",
+    "metro-source-map": "0.80.12",
+    "metro-transform-plugins": "0.80.12",
+    "prettier": "^3.5.2",
+    "turbo": "^2.4.2",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.54.0"
+  },
+  "packageManager": "pnpm@9.14.4",
+  "pnpm": {
+    "catalog": {
+      "@tsconfig/bun": "1.0.9"
+    }
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.24.0"
+  }
 }

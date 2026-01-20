@@ -214,3 +214,12 @@ export const SchemaPanelContent: React.FC<SchemaPanelContentProps> = ({
     </div>
   );
 };
+
+
+
+
+
+
+
+
+

@@ -1,26 +1,51 @@
-import React, { lazy, Suspense, useEffect, useRef } from 'react';
-import type { TabId } from '../types/tabs';
-import { useSheetSafe } from '../contexts/sheet-context';
+import React, { lazy, Suspense, useEffect, useRef } from "react";
+import type { TabId } from "../types/tabs";
+import { useSheetActionsSafe } from "../contexts/sheet-context";
 
 // Lazy load all views for code splitting
-const HealthView = lazy(() => import('../views/health/health-view').then(m => ({ default: m.HealthView })));
-const DataView = lazy(() => import('../views/data/data-view').then(m => ({ default: m.DataView })));
-const FunctionsView = lazy(() => import('../views/functions').then(m => ({ default: m.FunctionsView })));
-const SchedulesView = lazy(() => import('../views/schedules').then(m => ({ default: m.SchedulesView })));
-const FilesView = lazy(() => import('../views/files').then(m => ({ default: m.FilesView })));
-const LogsView = lazy(() => import('../views/logs').then(m => ({ default: m.LogsView })));
-const ComponentsView = lazy(() => import('../views/components').then(m => ({ default: m.ComponentsView })));
-const SettingsView = lazy(() => import('../views/settings').then(m => ({ default: m.SettingsView })));
+const HealthView = lazy(() =>
+  import("../views/health/health-view").then((m) => ({
+    default: m.HealthView,
+  })),
+);
+const DataView = lazy(() =>
+  import("../views/data/data-view").then((m) => ({ default: m.DataView })),
+);
+const FunctionsView = lazy(() =>
+  import("../views/functions").then((m) => ({ default: m.FunctionsView })),
+);
+const SchedulesView = lazy(() =>
+  import("../views/schedules").then((m) => ({ default: m.SchedulesView })),
+);
+const FilesView = lazy(() =>
+  import("../views/files").then((m) => ({ default: m.FilesView })),
+);
+const LogsView = lazy(() =>
+  import("../views/logs").then((m) => ({ default: m.LogsView })),
+);
+const ComponentsView = lazy(() =>
+  import("../views/components").then((m) => ({ default: m.ComponentsView })),
+);
+const MarketplaceView = lazy(() =>
+  import("../views/marketplace").then((m) => ({ default: m.MarketplaceView })),
+);
+const SettingsView = lazy(() =>
+  import("../views/settings").then((m) => ({ default: m.SettingsView })),
+);
 
 // Loading fallback component
-const ViewLoadingFallback: React.FC<{ height?: string }> = ({ height = '400px' }) => (
-  <div style={{ 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    height,
-    color: 'var(--cp-text-secondary, #666)'
-  }}>
+const ViewLoadingFallback: React.FC<{ height?: string }> = ({
+  height = "400px",
+}) => (
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      height,
+      color: "var(--cp-text-secondary, #666)",
+    }}
+  >
     <div>Loading...</div>
   </div>
 );
@@ -39,6 +64,7 @@ interface MainViewsProps {
     theme?: any;
     mergedTheme?: any;
     settings?: any;
+    container?: HTMLElement | null;
     [key: string]: any;
   };
 }
@@ -49,14 +75,35 @@ interface MainViewsProps {
 //   (label: string) => (): React.ReactElement =>
 //     <div style={comingSoonStyle}>{`${label} View - Coming Soon`}</div>;
 
-type ContainerProps = MainViewsProps['containerProps'];
+type ContainerProps = MainViewsProps["containerProps"];
 type TabRenderer = (props: ContainerProps) => React.ReactElement;
 
 const tabRenderers: Record<TabId, TabRenderer> = {
-  health: ({ deployUrl, accessToken, useMockData }) => (
-    <HealthView deploymentUrl={deployUrl} authToken={accessToken} useMockData={useMockData} />
+  health: ({
+    deployUrl,
+    accessToken,
+    teamAccessToken,
+    useMockData,
+    adminClient,
+  }) => (
+    <HealthView
+      deploymentUrl={deployUrl}
+      authToken={accessToken}
+      teamAccessToken={teamAccessToken}
+      useMockData={useMockData}
+      adminClient={adminClient}
+    />
   ),
-  data: ({ deployUrl, baseUrl, accessToken, adminClient, useMockData, onError, teamSlug, projectSlug }) => (
+  data: ({
+    deployUrl,
+    baseUrl,
+    accessToken,
+    adminClient,
+    useMockData,
+    onError,
+    teamSlug,
+    projectSlug,
+  }) => (
     <DataView
       convexUrl={deployUrl || baseUrl}
       accessToken={accessToken}
@@ -67,7 +114,14 @@ const tabRenderers: Record<TabId, TabRenderer> = {
       projectSlug={projectSlug}
     />
   ),
-  functions: ({ adminClient, accessToken, deployUrl, baseUrl, useMockData, onError }) => (
+  functions: ({
+    adminClient,
+    accessToken,
+    deployUrl,
+    baseUrl,
+    useMockData,
+    onError,
+  }) => (
     <FunctionsView
       adminClient={adminClient}
       accessToken={accessToken}
@@ -77,7 +131,14 @@ const tabRenderers: Record<TabId, TabRenderer> = {
       onError={onError}
     />
   ),
-  files: ({ deployUrl, baseUrl, accessToken, adminClient, useMockData, onError }) => (
+  files: ({
+    deployUrl,
+    baseUrl,
+    accessToken,
+    adminClient,
+    useMockData,
+    onError,
+  }) => (
     <FilesView
       convexUrl={deployUrl || baseUrl}
       accessToken={accessToken}
@@ -87,12 +148,16 @@ const tabRenderers: Record<TabId, TabRenderer> = {
     />
   ),
   schedules: ({ adminClient, useMockData }) => (
-    <SchedulesView
-      adminClient={adminClient}
-      useMockData={useMockData}
-    />
+    <SchedulesView adminClient={adminClient} useMockData={useMockData} />
   ),
-  logs: ({ deployUrl, baseUrl, accessToken, adminClient, useMockData, onError }) => (
+  logs: ({
+    deployUrl,
+    baseUrl,
+    accessToken,
+    adminClient,
+    useMockData,
+    onError,
+  }) => (
     <LogsView
       convexUrl={deployUrl || baseUrl}
       accessToken={accessToken}
@@ -103,6 +168,13 @@ const tabRenderers: Record<TabId, TabRenderer> = {
     />
   ),
   components: () => <ComponentsView />,
+  marketplace: ({ projectPath, detectedPackageManager, onInstall }) => (
+    <MarketplaceView
+      projectPath={projectPath}
+      detectedPackageManager={detectedPackageManager}
+      onInstall={onInstall}
+    />
+  ),
   settings: ({ deployUrl, accessToken, adminClient, teamAccessToken }) => (
     <SettingsView
       adminClient={adminClient}
@@ -113,13 +185,19 @@ const tabRenderers: Record<TabId, TabRenderer> = {
   ),
 };
 
-export const MainViews: React.FC<MainViewsProps> = ({ activeTab, containerProps }) => {
-  const { closeSheet } = useSheetSafe();
+const MainViewsComponent: React.FC<MainViewsProps> = ({
+  activeTab,
+  containerProps,
+}) => {
+  const { closeSheet } = useSheetActionsSafe();
   const prevActiveTabRef = useRef<TabId | null>(null);
 
   // Close sheet when switching to a different view
   useEffect(() => {
-    if (prevActiveTabRef.current !== null && prevActiveTabRef.current !== activeTab) {
+    if (
+      prevActiveTabRef.current !== null &&
+      prevActiveTabRef.current !== activeTab
+    ) {
       closeSheet();
     }
     prevActiveTabRef.current = activeTab;
@@ -132,3 +210,7 @@ export const MainViews: React.FC<MainViewsProps> = ({ activeTab, containerProps 
     </Suspense>
   );
 };
+
+// Memoize MainViews to prevent re-renders when parent re-renders
+// but props haven't changed (e.g., when sheet state changes)
+export const MainViews = React.memo(MainViewsComponent);

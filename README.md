@@ -5,13 +5,19 @@ This repository contains the `convex-panel` project and its related packages and
 ## Structure
 
 - **apps/**
-  - `chrome-extension`: Chrome browser extension
-  - `edge-extension`: Edge browser extension
-  - `firefox-extension`: Firefox browser extension
+  - `api`: API Server
+  - `desktop`: Tauri Application (Mac / Windows)
+  - `mobile`: React Native Application
+  - `raycast`: Raycast Tool Extension
+  - `svelte-web`: Convex Panel Svelte Web Example
+  - `vue-web`: Convex Panel Vue Web Example
+  - `web`: Marketing site using Tanstack
 - **packages/**
-  - `panel`: Core Convex Panel React component (`convex-panel`)
-  - `shared`: Shared utilities and types (`convex-panel/shared`)
-  - `convex-component`: Server-side Convex component (`convex-panel/convex-component`)
+  - `panel`: Core Convex Panel React component
+  - `shared`: Shared utilities and types
+  - `convex-component`: Server-side Convex component
+  - `ai-analysis-component`: AI-powered log and error analysis component
+  - `backend`: Convex backend
 
 ## Getting Started
 
@@ -45,6 +51,7 @@ pnpm dev
 ## Commands
 
 - `pnpm build`: Build all packages
+- `pnpm tauri:dev`: Build tauri desktop application
 - `pnpm dev`: Start development server
 - `pnpm lint`: Lint all packages
 - `pnpm test`: Run tests

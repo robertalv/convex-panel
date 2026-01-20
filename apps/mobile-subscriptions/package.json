@@ -1,0 +1,16 @@
+{
+  "name": "@convex-panel/mobile-subscriptions",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy --cmd 'npm run build'"
+  },
+  "dependencies": {
+    "convex": "^1.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

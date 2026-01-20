@@ -93,8 +93,8 @@ export type ConvexPanelVitePluginConfig = {
  * });
  * ```
  */
-export function convexPanel(config?: ConvexPanelVitePluginConfig): Plugin {
-  const removeOnBuild = config?.removeOnBuild ?? true;
+export function convexPanel(config: ConvexPanelVitePluginConfig = {}): Plugin {
+  const removeOnBuild = config.removeOnBuild ?? true;
 
   return {
     name: 'convex-panel:remove-on-build',

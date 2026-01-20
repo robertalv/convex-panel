@@ -7,7 +7,7 @@
  * 
  * The modular structure is organized as:
  *   - './env/platform' for platform detection (isDevelopment, isNextJSEnv)
- *   - './env/core' for core utilities (getEnvVar, unwrapVueValue)
+ *   - './env/core' for core utilities (getEnvVar)
  *   - './env/convex-config' for Convex configuration (getConvexUrl)
  *   - './env/oauth-config' for OAuth configuration (getOAuthConfigFromEnv)
  */

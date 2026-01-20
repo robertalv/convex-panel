@@ -1,3 +1,5 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "!apps/opencode-dev"
+  - "!apps/convex-backend-main"

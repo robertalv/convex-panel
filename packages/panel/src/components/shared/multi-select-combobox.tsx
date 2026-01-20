@@ -200,25 +200,12 @@ export function MultiSelectCombobox({
                 allSelected || someSelected
                   ? 'var(--color-panel-text)'
                   : 'var(--color-panel-text-secondary)',
-              backgroundColor:
-                allSelected || someSelected
-                  ? 'var(--color-panel-bg)'
-                  : 'transparent',
+              backgroundColor: 'transparent',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
               borderBottom: '1px solid var(--color-panel-border)',
-            }}
-            onMouseEnter={(e) => {
-              if (!allSelected && !someSelected) {
-                e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!allSelected && !someSelected) {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }
             }}
           >
             {allSelected ? (
@@ -275,9 +262,7 @@ export function MultiSelectCombobox({
                       color: isSelected
                         ? 'var(--color-panel-text)'
                         : 'var(--color-panel-text-secondary)',
-                      backgroundColor: isSelected
-                        ? 'var(--color-panel-bg)'
-                        : 'transparent',
+                      backgroundColor: 'transparent',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -285,9 +270,6 @@ export function MultiSelectCombobox({
                       position: 'relative',
                     }}
                     onMouseEnter={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.backgroundColor = 'var(--color-panel-hover)';
-                      }
                       const onlyButtonWrapper = e.currentTarget.querySelector(
                         '.only-button-wrapper'
                       ) as HTMLElement;
@@ -299,15 +281,10 @@ export function MultiSelectCombobox({
                         onlyButtonWrapper.style.transform = 'translateX(0)';
                       }
                       if (onlyButtonBackdrop) {
-                        onlyButtonBackdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, ${
-                          isSelected ? 'var(--color-panel-bg)' : 'var(--color-panel-hover)'
-                        } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`;
+                        onlyButtonBackdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, transparent 15px, transparent 20px, transparent calc(100% - 30px), transparent)`;
                       }
                     }}
                     onMouseLeave={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }
                       const onlyButtonWrapper = e.currentTarget.querySelector(
                         '.only-button-wrapper'
                       ) as HTMLElement;
@@ -319,9 +296,7 @@ export function MultiSelectCombobox({
                         onlyButtonWrapper.style.transform = 'translateX(100%)';
                       }
                       if (onlyButtonBackdrop) {
-                        onlyButtonBackdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, ${
-                          isSelected ? 'var(--color-panel-bg)' : 'transparent'
-                        } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`;
+                        onlyButtonBackdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, transparent 15px, transparent 20px, transparent calc(100% - 30px), transparent)`;
                       }
                     }}
                   >
@@ -343,6 +318,8 @@ export function MultiSelectCombobox({
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         fontWeight: isSelected ? 600 : 400,
+                        minWidth: 0,
+                        transition: 'flex 0.15s ease',
                       }}
                     >
                       {optionLabel}
@@ -369,11 +346,7 @@ export function MultiSelectCombobox({
                           top: 0,
                           bottom: 0,
                           left: '-20px',
-                          background: `linear-gradient(to right, transparent, transparent 10px, ${
-                            isSelected
-                              ? 'var(--color-panel-bg)'
-                              : 'transparent'
-                          } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`,
+                      background: `linear-gradient(to right, transparent, transparent 10px, transparent 15px, transparent 20px, transparent calc(100% - 30px), transparent)`,
                           pointerEvents: 'none',
                           transition: 'background 0.15s ease',
                           zIndex: 0,
@@ -407,9 +380,7 @@ export function MultiSelectCombobox({
                             '.only-button-backdrop'
                           ) as HTMLElement;
                           if (backdrop) {
-                            backdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, ${
-                              isSelected ? 'var(--color-panel-bg)' : 'var(--color-panel-hover)'
-                            } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`;
+                        backdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, transparent 15px, transparent 20px, transparent calc(100% - 30px), transparent)`;
                           }
                         }}
                         onMouseLeave={(e) => {
@@ -419,9 +390,7 @@ export function MultiSelectCombobox({
                             '.only-button-backdrop'
                           ) as HTMLElement;
                           if (backdrop) {
-                            backdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, ${
-                              isSelected ? 'var(--color-panel-bg)' : 'transparent'
-                            } 15px, var(--color-panel-bg) 20px, var(--color-panel-bg) calc(100% - 30px), transparent)`;
+                        backdrop.style.background = `linear-gradient(to right, transparent, transparent 10px, transparent 15px, transparent 20px, transparent calc(100% - 30px), transparent)`;
                           }
                         }}
                       >

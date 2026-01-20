@@ -12,8 +12,6 @@ import {
 import type { FrameworkData, MenuCategory } from "./types";
 import ReactIcon from "@shared/frameworks/react.svg?raw";
 import NextJsIcon from "@shared/frameworks/nextjs.svg?raw";
-import VueIcon from "@shared/frameworks/vue.svg?raw";
-import SvelteIcon from "@shared/frameworks/svelte.svg?raw";
 import TanStackIcon from "@shared/frameworks/tanstack.svg?raw";
 
 export const frameworks: FrameworkData[] = [
@@ -75,63 +73,6 @@ export function ConvexClientProvider({
     </ConvexProvider>
   )
 }`,
-  },
-  {
-    id: "vue",
-    label: "Vue",
-    icon: VueIcon,
-    install: "npm install convex-panel",
-    filename: "src/App.vue",
-    description: "Import ConvexPanel and use it with convex-url prop. Also import styles in src/main.ts: import 'convex-panel/styles.css'",
-    setup: `<script setup lang="ts">
-import ConvexPanel from 'convex-panel/vue'
-
-const convexUrl = import.meta.env.VITE_CONVEX_URL || ''
-
-if (!convexUrl) {
-  console.error('VITE_CONVEX_URL is required for Convex Panel to connect.')
-}
-</script>
-
-<template>
-  <main>
-    <!-- Your app content -->
-  </main>
-
-  <ConvexPanel
-    v-if="convexUrl"
-    :convex-url="convexUrl"
-  />
-</template>
-
-<!-- Also add to src/main.ts:
-import 'convex-panel/styles.css' -->`,
-  },
-  {
-    id: "svelte",
-    label: "Svelte",
-    icon: SvelteIcon,
-    install: "npm install convex-panel",
-    filename: "src/App.svelte",
-    description: "Import ConvexPanel and use it with convexUrl prop. Also import styles in src/main.ts: import 'convex-panel/styles.css'",
-    setup: `<script lang="ts">
-  import ConvexPanel from 'convex-panel/svelte'
-  
-  const convexUrl = import.meta.env.VITE_CONVEX_URL || ''
-  
-  if (!convexUrl) {
-    console.error('VITE_CONVEX_URL is required for Convex Panel to connect.')
-  }
-</script>
-
-<main>
-  <!-- Your app content -->
-</main>
-
-{#if convexUrl}
-  <ConvexPanel {convexUrl} />
-{/if}
-`,
   },
   {
     id: "tanstack-start",

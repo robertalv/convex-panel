@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "Convex Panel",
+    "slug": "convex-panel-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.convex.panel",
+      "infoPlist": {
+        "NSUserNotificationsUsageDescription": "This app uses notifications to alert you about deployment events and errors.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "buildNumber": "3"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "dev.convex.panel",
+      "permissions": [
+        "NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ],
+      "versionCode": 3
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-notifications",
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": false
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ],
+      "expo-font",
+      "react-native-iap",
+      "expo-web-browser"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2ae2ce39-9c48-42ae-89ec-d8930ad30b0c"
+      }
+    },
+    "description": "Monitor and manage your Convex deployments on the go. Real-time metrics, logs viewer, data browser, and quick actions for your serverless backend.",
+    "primaryColor": "#EE342F"
+  }
+}

@@ -1,27 +1,37 @@
 {
-    "name": "@convex-panel/shared",
-    "version": "0.0.0",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
-    "exports": {
-        ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js",
-            "require": "./dist/index.cjs"
-        },
-        "./assets": {
-            "types": "./dist/assets/index.d.ts",
-            "import": "./dist/assets/index.js",
-            "require": "./dist/assets/index.cjs"
-        }
+  "name": "@convex-panel/shared",
+  "version": "0.0.1",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
     },
-    "scripts": {
-        "build": "tsup",
-        "dev": "tsup --watch",
-        "lint": "eslint src/**/*.ts*"
+    "./api": {
+      "types": "./dist/api/index.d.ts",
+      "import": "./dist/api/index.mjs",
+      "require": "./dist/api/index.js"
     },
-    "devDependencies": {
-        "tsup": "^8.0.2",
-        "typescript": "^5.9.3"
+    "./assets": {
+      "types": "./dist/assets/index.d.ts",
+      "import": "./dist/assets/index.mjs",
+      "require": "./dist/assets/index.js"
     }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint src/**/*.ts*"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "tsup": "^8.0.2",
+    "typescript": "^5.9.3"
+  }
 }
