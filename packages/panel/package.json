@@ -59,6 +59,7 @@
     "build:css": "node process-css.js",
     "build:styles-ts": "node scripts/generate-styles-ts.js",
     "build": "npm run clean && npm run copy-src && tsup && npm run build:css && npm run build:styles-ts && node scripts/print-build-size.cjs",
+    "build:sequential": "node scripts/build-sequential.js",
     "dev": "tsup --watch",
     "dev:live": "vite --config dev/vite.config.ts",
     "dev:server": "node dev/server.js",

@@ -58,20 +58,38 @@ jobs:
         run: pnpm --filter @convex-panel/shared build && pnpm --filter @convex-panel/registry build && pnpm --filter convex-panel build
 
       - name: Import Apple certificate
-        if: env.APPLE_CERTIFICATE != ''
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "No APPLE_CERTIFICATE secret found, skipping certificate import"
+            exit 0
+          fi
+
+          echo "Importing Apple certificate..."
           echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
+
+          # Create and configure keychain
           security create-keychain -p actions build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p actions build.keychain
-          security import certificate.p12 -k build.keychain -P $APPLE_CERTIFICATE_PASSWORD -T /usr/bin/codesign
+          security set-keychain-settings -t 3600 -u build.keychain
+
+          # Import certificate
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+
+          # Allow codesign to access the keychain without prompting
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
+
+          # Verify the certificate was imported
+          security find-identity -v build.keychain | head -5
+
           rm certificate.p12
+          echo "Certificate import complete"
 
       - name: Build Tauri app
+        timeout-minutes: 30
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -129,7 +147,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build shared packages
-        run: pnpm --filter @convex-panel/shared build && pnpm --filter @convex-panel/registry build && pnpm --filter convex-panel build
+        run: pnpm --filter @convex-panel/shared build && pnpm --filter @convex-panel/registry build
+
+      - name: Build convex-panel (sequential to avoid esbuild deadlock)
+        run: pnpm --filter convex-panel run build:sequential
+        shell: pwsh
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0

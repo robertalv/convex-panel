@@ -1,53 +1,57 @@
-import { defineConfig } from 'tsup';
+import { defineConfig } from "tsup";
 
 // ALL heavy dependencies that should NOT be bundled
 const sharedExternal = [
-  'react',
-  'react-dom',
-  'react/jsx-runtime',
-  'convex',
-  'convex/react',
-  'convex/browser',
+  "react",
+  "react-dom",
+  "react/jsx-runtime",
+  "convex",
+  "convex/react",
+  "convex/browser",
 
   // Heavy UI libraries - DON'T bundle these!
-  'monaco-editor',
-  '@monaco-editor/react',
-  'lucide-react',
-  'framer-motion',
-  'sonner',
-  'react-window',
-  'react-hotkeys-hook',
+  "monaco-editor",
+  "@monaco-editor/react",
+  "lucide-react",
+  "framer-motion",
+  "sonner",
+  "react-window",
+  "react-hotkeys-hook",
 
   // Utilities
-  'date-fns',
-  'classnames',
-  'lodash',
-  'swr',
-  'debounce',
+  "date-fns",
+  "classnames",
+  "lodash",
+  "swr",
+  "debounce",
 
   // Framework specific
-  'vite',
-  'next',
-  'next/*',
+  "vite",
+  "next",
+  "next/*",
 ];
 
 // Shared esbuild options
-const getEsbuildOptions = (useClient = false) => (options: any) => {
-  if (useClient) {
-    options.banner = { js: '"use client";' };
-  }
-  // Add CSS to external, but keep existing externals from tsup config
-  const existingExternal = Array.isArray(options.external) ? options.external : [];
-  options.external = [...existingExternal, '*.css'];
-  options.treeShaking = true;
-  options.legalComments = 'none';
-};
+const getEsbuildOptions =
+  (useClient = false) =>
+  (options: any) => {
+    if (useClient) {
+      options.banner = { js: '"use client";' };
+    }
+    // Add CSS to external, but keep existing externals from tsup config
+    const existingExternal = Array.isArray(options.external)
+      ? options.external
+      : [];
+    options.external = [...existingExternal, "*.css"];
+    options.treeShaking = true;
+    options.legalComments = "none";
+  };
 
 export default defineConfig([
   // Main entry point (core library)
   {
-    entry: ['src/index.ts'],
-    format: ['cjs', 'esm'],
+    entry: ["src/index.ts"],
+    format: ["cjs", "esm"],
     dts: true,
     splitting: true, // Enable code splitting
     treeshake: true,
@@ -56,10 +60,10 @@ export default defineConfig([
     minify: true,
     external: sharedExternal,
     injectStyle: false,
-    target: 'es2020',
+    target: "es2020",
     outExtension({ format }) {
       return {
-        js: format === 'esm' ? '.esm.js' : '.js',
+        js: format === "esm" ? ".esm.js" : ".js",
       };
     },
     esbuildOptions: getEsbuildOptions(true),
@@ -67,19 +71,19 @@ export default defineConfig([
 
   // Vite plugin (minimal bundle)
   {
-    entry: ['src/vite/index.ts'],
-    format: ['cjs', 'esm'],
+    entry: { vite: "src/vite/index.ts" },
+    format: ["cjs", "esm"],
     dts: true,
     splitting: false, // Keep as single bundle for plugin
     treeshake: true,
     sourcemap: true,
     minify: true,
-    external: [...sharedExternal, 'vite'],
-    target: 'es2020',
-    outDir: 'dist',
+    external: [...sharedExternal, "vite"],
+    target: "es2020",
+    outDir: "dist",
     outExtension({ format }) {
       return {
-        js: format === 'esm' ? '.esm.js' : '.js',
+        js: format === "esm" ? ".esm.js" : ".js",
       };
     },
     esbuildOptions: getEsbuildOptions(false),
@@ -87,20 +91,20 @@ export default defineConfig([
 
   // Next.js adapter
   {
-    entry: ['src/nextjs/index.tsx'],
-    format: ['cjs', 'esm'],
+    entry: ["src/nextjs/index.tsx"],
+    format: ["cjs", "esm"],
     dts: true,
     splitting: true, // Enable splitting for Next.js
     treeshake: true,
     sourcemap: true,
     minify: true,
-    external: [...sharedExternal, 'next', 'next/*'],
+    external: [...sharedExternal, "next", "next/*"],
     injectStyle: false,
-    target: 'es2020',
-    outDir: 'dist/nextjs',
+    target: "es2020",
+    outDir: "dist/nextjs",
     outExtension({ format }) {
       return {
-        js: format === 'esm' ? '.esm.js' : '.js',
+        js: format === "esm" ? ".esm.js" : ".js",
       };
     },
     esbuildOptions: getEsbuildOptions(true),
@@ -108,8 +112,8 @@ export default defineConfig([
 
   // React/Vite adapter
   {
-    entry: ['src/react/index.tsx'],
-    format: ['cjs', 'esm'],
+    entry: ["src/react/index.tsx"],
+    format: ["cjs", "esm"],
     dts: true,
     splitting: true, // Enable splitting
     treeshake: true,
@@ -117,14 +121,13 @@ export default defineConfig([
     minify: true,
     external: sharedExternal,
     injectStyle: false,
-    target: 'es2020',
-    outDir: 'dist/react',
+    target: "es2020",
+    outDir: "dist/react",
     outExtension({ format }) {
       return {
-        js: format === 'esm' ? '.esm.js' : '.js',
+        js: format === "esm" ? ".esm.js" : ".js",
       };
     },
     esbuildOptions: getEsbuildOptions(false),
   },
-
 ]);
