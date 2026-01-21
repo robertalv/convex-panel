@@ -1,20 +1,13 @@
-import { RefreshCw, CheckCircle2, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HealthCard } from "@/components/ui";
 import type { Insight } from "@convex-panel/shared/api";
+import { Icon } from "@/components/ui/icon";
 
 interface InsightsSummaryCardProps {
-  /** List of insights from BigBrain API */
   insights: Insight[];
-  /** Whether data is loading */
   loading?: boolean;
-  /** Error message */
   error?: string | null;
-  /** Retry callback */
-  onRetry?: () => void;
-  /** Callback when an insight is clicked */
   onInsightClick?: (insight: Insight) => void;
-  /** Additional CSS classes */
   className?: string;
 }
 
@@ -108,27 +101,6 @@ function SeverityBadge({
 }
 
 /**
- * Action button for card header
- */
-function RefreshButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      title="Refresh"
-      className={cn(
-        "p-1 rounded-md border-0",
-        "bg-transparent text-muted",
-        "hover:bg-overlay hover:text-foreground",
-        "cursor-pointer transition-all duration-150",
-        "flex items-center justify-center",
-      )}
-    >
-      <RefreshCw size={14} />
-    </button>
-  );
-}
-
-/**
  * Get time range for display (last 7 days)
  */
 function getTimeRange(): string {
@@ -150,7 +122,6 @@ export function InsightsSummaryCard({
   insights,
   loading = false,
   error = null,
-  onRetry,
   onInsightClick,
   className,
 }: InsightsSummaryCardProps) {
@@ -161,12 +132,11 @@ export function InsightsSummaryCard({
       loading={loading}
       error={error}
       className={className}
-      action={onRetry && <RefreshButton onClick={onRetry} />}
     >
       {insights.length > 0 ? (
         <div className="flex flex-col gap-1 w-full">
           {/* Table header */}
-          <div className="grid grid-cols-[60px_1fr_1.5fr] gap-2 text-[10px] text-muted border-b border-border pb-2 mb-2">
+          <div className="grid grid-cols-[60px_1fr_1.5fr] gap-2 text-[10px] text-muted border-b border-border pb-2">
             <span>Severity</span>
             <span>Function</span>
             <span>Problem</span>
@@ -212,7 +182,7 @@ export function InsightsSummaryCard({
       ) : !loading ? (
         <div className="flex flex-col items-center justify-center py-8">
           <div className="w-9 h-9 rounded-lg bg-success-bg border border-success/30 flex items-center justify-center mb-2.5">
-            <CheckCircle2 size={18} className="text-success" />
+            <Icon name="checkmark-circle" size={18} className="text-success" />
           </div>
           <h3 className="text-sm font-medium text-foreground mb-1">
             All clear!
@@ -226,7 +196,7 @@ export function InsightsSummaryCard({
             rel="noopener noreferrer"
             className="text-[11px] font-medium flex items-center gap-1 text-accent hover:text-accent/80 transition-colors"
           >
-            <ExternalLink size={12} />
+            <Icon name="external-link" size={12} />
             Learn more about Insights
           </a>
         </div>

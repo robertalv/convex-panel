@@ -67,6 +67,7 @@ const FunctionsView: React.FC = () => {
     selectedComponentId,
     selectedComponent,
     setSelectedComponent,
+    isLoading: componentsLoading,
   } = useComponents({
     adminClient,
     useMockData,
@@ -226,12 +227,87 @@ const FunctionsView: React.FC = () => {
     })),
   );
 
-  // Handle URL query parameter to select function on mount
+  // Handle URL query parameters to select component and function on mount
   useEffect(() => {
+    const componentParam = searchParams.get("component");
     const functionParam = searchParams.get("function");
-    if (functionParam && groupedFunctions.length > 0 && !selectedFunction) {
+
+    // Step 1: Handle component switching if needed
+    if (componentParam && components.length > 0 && !componentsLoading) {
+      // Find the component by path or name (with flexible matching)
+      const targetComponent = components.find((c) => {
+        // Exact matches
+        if (c.path === componentParam || c.name === componentParam) return true;
+
+        // Case-insensitive matches
+        const paramLower = componentParam.toLowerCase();
+        if (
+          c.path?.toLowerCase() === paramLower ||
+          c.name?.toLowerCase() === paramLower
+        )
+          return true;
+
+        // Try matching with kebab-case to camelCase conversion
+        // e.g., "oss-stats" -> "ossStats"
+        const camelCase = componentParam.replace(/-([a-z])/g, (_, letter) =>
+          letter.toUpperCase(),
+        );
+        if (c.path === camelCase || c.name === camelCase) return true;
+
+        // Try matching with camelCase to kebab-case conversion
+        // e.g., "ossStats" -> "oss-stats"
+        const kebabCase = componentParam
+          .replace(/([A-Z])/g, (letter) => `-${letter.toLowerCase()}`)
+          .replace(/^-/, "");
+        if (c.path === kebabCase || c.name === kebabCase) return true;
+
+        return false;
+      });
+
+      if (targetComponent) {
+        // Check if we need to switch components
+        const needsSwitch = selectedComponentId !== targetComponent.id;
+
+        if (needsSwitch) {
+          // Switch to the target component
+          setSelectedComponent(targetComponent.id);
+          // Don't clear params yet - wait for component to switch and functions to load
+          return;
+        }
+
+        // Component is already selected, clear the param now
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete("component");
+        setSearchParams(newParams);
+      } else {
+        // Component not found, clear the param
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete("component");
+        setSearchParams(newParams);
+      }
+    }
+
+    // Step 2: Handle function selection after component is correct
+    // Only proceed if there's no pending component switch (componentParam is cleared)
+    if (
+      !componentParam &&
+      functionParam &&
+      groupedFunctions.length > 0 &&
+      !selectedFunction
+    ) {
       // Normalize the function parameter by removing .js extension if present
-      const normalizedParam = functionParam.replace(/\.js$/, "");
+      let normalizedParam = functionParam.replace(/\.js$/, "");
+
+      // If the function param includes a component path prefix, strip it
+      // e.g., "ossStats/crons/public.js:del" -> "crons/public:del"
+      if (
+        selectedComponent?.name &&
+        normalizedParam.startsWith(selectedComponent.name + "/")
+      ) {
+        normalizedParam = normalizedParam.substring(
+          selectedComponent.name.length + 1,
+        );
+      }
 
       // Find the function in groupedFunctions by various matching strategies
       for (const group of groupedFunctions) {
@@ -287,7 +363,16 @@ const FunctionsView: React.FC = () => {
         }
       }
     }
-  }, [groupedFunctions, searchParams, selectedFunction, setSearchParams]);
+  }, [
+    groupedFunctions,
+    searchParams,
+    selectedFunction,
+    setSearchParams,
+    components,
+    componentsLoading,
+    selectedComponentId,
+    setSelectedComponent,
+  ]);
 
   // Fetch statistics when function is selected
   useEffect(() => {

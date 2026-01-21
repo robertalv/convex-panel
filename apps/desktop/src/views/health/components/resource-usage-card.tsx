@@ -1,24 +1,15 @@
-import { Cpu, Layers, ArrowDown, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HealthCard } from "@/components/ui";
-import { formatBytes } from "../hooks/useUsageMetrics";
+import { formatBytes } from "@/utils/udfs";
+import { Icon } from "@/components/ui/icon";
 
 interface ResourceUsageCardProps {
-  /** Total memory used in MB */
   totalMemoryUsedMb: number;
-  /** Peak memory used in MB */
   peakMemoryUsedMb: number;
-  /** Vector index read bytes */
   vectorIndexReadBytes: number;
-  /** Vector index write bytes */
   vectorIndexWriteBytes: number;
-  /** Whether data is loading */
   isLoading?: boolean;
-  /** Error message */
   error?: string | null;
-  /** Retry callback */
-  onRetry?: () => void;
-  /** Additional CSS classes */
   className?: string;
 }
 
@@ -91,7 +82,7 @@ export function ResourceUsageCard({
           {/* Memory metrics */}
           <div>
             <div className="flex items-center gap-2 mb-2 px-1">
-              <Cpu size={14} className="text-muted" />
+              <Icon name="cpu" size={14} className="text-muted" />
               <span className="text-xs font-medium text-muted">Memory</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -113,7 +104,7 @@ export function ResourceUsageCard({
           {hasVectorData && (
             <div>
               <div className="flex items-center gap-2 mb-2 px-1">
-                <Layers size={14} className="text-muted" />
+                <Icon name="layers" size={14} className="text-muted" />
                 <span className="text-xs font-medium text-muted">
                   Vector Index
                 </span>
@@ -121,7 +112,7 @@ export function ResourceUsageCard({
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex items-center justify-between p-3 rounded-lg bg-surface-alt/50">
                   <div className="flex items-center gap-2">
-                    <ArrowDown size={14} className="text-success" />
+                    <Icon name="arrow-down" size={14} className="text-success" />
                     <span className="text-xs text-muted">Read</span>
                   </div>
                   <span className="font-mono text-sm text-foreground">
@@ -130,7 +121,7 @@ export function ResourceUsageCard({
                 </div>
                 <div className="flex items-center justify-between p-3 rounded-lg bg-surface-alt/50">
                   <div className="flex items-center gap-2">
-                    <ArrowUp size={14} className="text-warning" />
+                    <Icon name="arrow-up" size={14} className="text-warning" />
                     <span className="text-xs text-muted">Write</span>
                   </div>
                   <span className="font-mono text-sm text-foreground">

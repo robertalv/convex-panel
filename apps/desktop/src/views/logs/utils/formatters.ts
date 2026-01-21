@@ -1,9 +1,4 @@
 /**
- * Log Formatting Utilities
- * Helper functions for formatting log data for display
- */
-
-/**
  * Format a timestamp for display in the log list
  * Returns format matching dashboard: "Jan 11, 16:25:41"
  */

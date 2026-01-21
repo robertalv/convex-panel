@@ -1,4 +1,4 @@
-export { HealthView } from "./HealthView";
+export { HealthView } from "./health-view";
 export {
   useHealthMetrics,
   useFunctionHealth,

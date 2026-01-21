@@ -1,36 +1,29 @@
 import { cn } from "@/lib/utils";
-import { Inbox, Search, AlertCircle, RefreshCw } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 
 interface EmptyStateProps {
-  /** Title text */
   title?: string;
-  /** Description text */
   description?: string;
-  /** Empty state variant */
   variant?: "empty" | "no-results" | "error";
-  /** Custom icon */
   icon?: React.ReactNode;
-  /** Action button callback */
   onAction?: () => void;
-  /** Action button label */
   actionLabel?: string;
-  /** Additional CSS classes */
   className?: string;
 }
 
 const variantConfig = {
   empty: {
-    icon: Inbox,
+    icon: "files",
     title: "No data available",
     description: "There's no data to display at this time.",
   },
   "no-results": {
-    icon: Search,
+    icon: "search",
     title: "No results found",
     description: "Try adjusting your filters or search criteria.",
   },
   error: {
-    icon: AlertCircle,
+    icon: "alert-circle",
     title: "Failed to load data",
     description: "An error occurred while loading. Please try again.",
   },
@@ -50,7 +43,6 @@ export function EmptyState({
   className,
 }: EmptyStateProps) {
   const config = variantConfig[variant];
-  const Icon = icon ? null : config.icon;
 
   return (
     <div
@@ -60,7 +52,9 @@ export function EmptyState({
       )}
     >
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-alt mb-4">
-        {icon ?? (Icon && <Icon size={24} className="text-subtle" />)}
+        {icon ?? (
+          <Icon name={config.icon} size={24} className="text-subtle" />
+        )}
       </div>
       <h3 className="text-sm font-medium text-foreground mb-1">
         {title ?? config.title}
@@ -79,7 +73,7 @@ export function EmptyState({
             "cursor-pointer transition-all duration-150",
           )}
         >
-          {variant === "error" && <RefreshCw size={12} />}
+          {variant === "error" && <Icon name="spinner" size={12} />}
           {actionLabel ?? (variant === "error" ? "Retry" : "Refresh")}
         </button>
       )}

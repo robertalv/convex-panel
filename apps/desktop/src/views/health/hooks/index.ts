@@ -10,7 +10,6 @@ export {
 } from "./useFunctionActivity";
 export {
   useUsageMetrics,
-  formatBytes,
   type UsageMetrics,
 } from "./useUsageMetrics";
 export { useTeamUsageSummary, teamUsageKeys } from "./useTeamUsageSummary";

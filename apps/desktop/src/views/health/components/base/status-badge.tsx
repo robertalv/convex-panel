@@ -3,13 +3,9 @@ import { cn } from "@/lib/utils";
 export type HealthStatus = "healthy" | "warning" | "error";
 
 interface StatusBadgeProps {
-  /** Status to display */
   status: HealthStatus;
-  /** Optional label text */
   label?: string;
-  /** Size variant */
   size?: "sm" | "md" | "lg";
-  /** Show pulse animation for active/running states */
   pulse?: boolean;
 }
 

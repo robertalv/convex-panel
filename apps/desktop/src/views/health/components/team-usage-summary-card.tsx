@@ -1,55 +1,20 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import {
-  Zap,
-  Database,
-  HardDrive,
-  Layers,
-  Activity,
-  Clock,
-} from "lucide-react";
 import { HealthCard } from "@/components/ui";
 import type { UsageSummary } from "@convex-panel/shared/api";
+import { formatBytes } from "@/utils/udfs";
+import { formatGBHours } from "@/utils/metrics";
+import { formatLargeNumberWithSuffix } from "@/utils/metrics";
 
 interface TeamUsageSummaryCardProps {
-  /** Usage summary data */
   data: UsageSummary | null;
-  /** Whether data is loading */
   isLoading?: boolean;
-  /** Error message */
   error?: string | null;
-  /** Additional CSS classes */
   className?: string;
 }
 
-// Format bytes to human-readable string
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-}
-
-// Format large numbers with K, M, B suffixes
-function formatNumber(num: number): string {
-  if (num === 0) return "0";
-  if (num < 1000) return num.toFixed(0);
-  if (num < 1_000_000) return `${(num / 1000).toFixed(1)}K`;
-  if (num < 1_000_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
-  return `${(num / 1_000_000_000).toFixed(1)}B`;
-}
-
-// Format GB-hours
-function formatGBHours(gbHours: number): string {
-  if (gbHours === 0) return "0";
-  if (gbHours < 0.01) return "<0.01";
-  if (gbHours < 1) return gbHours.toFixed(2);
-  return gbHours.toFixed(1);
-}
-
 interface UsageMetricProps {
-  icon: React.ReactNode;
+  icon?: string;
   label: string;
   value: string;
   subValue?: string;
@@ -58,7 +23,6 @@ interface UsageMetricProps {
 }
 
 function UsageMetric({
-  icon,
   label,
   value,
   subValue,
@@ -66,13 +30,7 @@ function UsageMetric({
   percentage,
 }: UsageMetricProps) {
   return (
-    <div className="flex items-center gap-3 p-2.5 rounded-lg bg-surface-alt/50">
-      <div
-        className="flex items-center justify-center w-8 h-8 rounded-md"
-        style={{ backgroundColor: `${color}20`, color }}
-      >
-        {icon}
-      </div>
+    <div className="flex items-center rounded-lg bg-surface-alt/50">
       <div className="flex-1 min-w-0">
         <span className="text-xs text-muted block truncate">{label}</span>
         <div className="flex items-baseline gap-1.5">
@@ -248,10 +206,9 @@ export function TeamUsageSummaryCard({
                 Total Function Calls
               </div>
               <div className="text-2xl font-bold font-mono text-foreground">
-                {formatNumber(data.functionCalls)}
+                {formatLargeNumberWithSuffix(data.functionCalls)}
               </div>
               <div className="flex items-center gap-1 mt-1">
-                <Activity size={12} className="text-muted" />
                 <span className="text-xs text-muted">
                   {formatGBHours(data.actionCompute)} GB-hours compute
                 </span>
@@ -262,13 +219,11 @@ export function TeamUsageSummaryCard({
           {/* Metrics grid */}
           <div className="grid grid-cols-2 gap-2">
             <UsageMetric
-              icon={<Zap size={14} />}
               label="Function Calls"
-              value={formatNumber(data.functionCalls)}
+              value={formatLargeNumberWithSuffix(data.functionCalls)}
               color={COLORS.functionCalls}
             />
             <UsageMetric
-              icon={<Clock size={14} />}
               label="Action Compute"
               value={formatGBHours(data.actionCompute)}
               subValue="GB-hrs"
@@ -278,21 +233,18 @@ export function TeamUsageSummaryCard({
 
           {/* Database section */}
           <div>
-            <div className="flex items-center gap-2 mb-1.5 px-1">
-              <Database size={12} className="text-muted" />
-              <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
                 Database
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <UsageMetric
-                icon={<Database size={14} />}
                 label="Storage"
                 value={formatBytes(data.databaseStorage)}
                 color={COLORS.databaseStorage}
               />
               <UsageMetric
-                icon={<Activity size={14} />}
                 label="Bandwidth"
                 value={formatBytes(data.databaseBandwidth)}
                 color={COLORS.databaseBandwidth}
@@ -302,21 +254,18 @@ export function TeamUsageSummaryCard({
 
           {/* File Storage section */}
           <div>
-            <div className="flex items-center gap-2 mb-1.5 px-1">
-              <HardDrive size={12} className="text-muted" />
-              <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
+            <div className="flex items-center mb-1">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
                 File Storage
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <UsageMetric
-                icon={<HardDrive size={14} />}
                 label="Storage"
                 value={formatBytes(data.fileStorage)}
                 color={COLORS.fileStorage}
               />
               <UsageMetric
-                icon={<Activity size={14} />}
                 label="Bandwidth"
                 value={formatBytes(data.fileBandwidth)}
                 color={COLORS.fileBandwidth}
@@ -328,20 +277,17 @@ export function TeamUsageSummaryCard({
           {(data.vectorStorage > 0 || data.vectorBandwidth > 0) && (
             <div>
               <div className="flex items-center gap-2 mb-1.5 px-1">
-                <Layers size={12} className="text-muted" />
                 <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
                   Vector Index
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <UsageMetric
-                  icon={<Layers size={14} />}
                   label="Storage"
                   value={formatBytes(data.vectorStorage)}
                   color={COLORS.vectorStorage}
                 />
                 <UsageMetric
-                  icon={<Activity size={14} />}
                   label="Bandwidth"
                   value={formatBytes(data.vectorBandwidth)}
                   color={COLORS.vectorBandwidth}
@@ -352,7 +298,6 @@ export function TeamUsageSummaryCard({
         </div>
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center px-4 py-8 text-center">
-          <Activity size={32} className="text-muted mb-2" />
           <span className="text-sm text-muted">No billing data available</span>
           <span className="text-xs text-muted mt-1">
             Team usage data may not be available for this deployment

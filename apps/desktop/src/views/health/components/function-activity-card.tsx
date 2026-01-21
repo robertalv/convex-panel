@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { BarChart3, TrendingUp, RefreshCw } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import {
   BarChart,
   Bar,
@@ -9,61 +9,23 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { format, isValid } from "date-fns";
-import { cn } from "@/lib/utils";
 import { HealthCard } from "@/components/ui";
+import { FUNCTION_ACTIVITY_COLORS } from "@/utils/colors";
 import type {
   FunctionActivityData,
   FunctionActivitySeries,
 } from "../hooks/useFunctionActivity";
+import { ActionButtonForHealthCard } from "./action-button-for-health-card";
 
 interface FunctionActivityCardProps {
-  /** Activity data */
   data: FunctionActivityData | null;
-  /** Pre-built series for charting */
   series: FunctionActivitySeries[];
-  /** Current rate (last bucket total) */
   currentRate: number;
-  /** Total invocations */
   totalInvocations: number;
-  /** Maximum value for chart scaling */
   maxValue: number;
-  /** Whether data is loading */
   loading?: boolean;
-  /** Error message */
   error?: string | null;
-  /** Retry callback */
-  onRetry?: () => void;
-  /** Additional CSS classes */
   className?: string;
-}
-
-/**
- * Action button for card header
- */
-function ActionButton({
-  onClick,
-  title,
-  children,
-}: {
-  onClick: () => void;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      className={cn(
-        "p-1 rounded-md border-0",
-        "bg-transparent text-muted",
-        "hover:bg-overlay hover:text-foreground",
-        "cursor-pointer transition-all duration-150",
-        "flex items-center justify-center",
-      )}
-    >
-      {children}
-    </button>
-  );
 }
 
 /**
@@ -78,12 +40,10 @@ export function FunctionActivityCard({
   maxValue,
   loading = false,
   error = null,
-  onRetry,
   className,
 }: FunctionActivityCardProps) {
   const [showChart, setShowChart] = useState(true);
 
-  // Transform data for Recharts stacked bar chart
   const chartData = useMemo(() => {
     if (!data || !data.timestamps || !Array.isArray(data.timestamps)) return [];
     return data.timestamps.map((timestamp, i) => ({
@@ -105,17 +65,12 @@ export function FunctionActivityCard({
       className={className}
       action={
         <div className="flex items-center gap-1">
-          <ActionButton
+          <ActionButtonForHealthCard
             onClick={() => setShowChart(!showChart)}
             title={showChart ? "Show summary" : "Show chart"}
           >
-            {showChart ? <BarChart3 size={14} /> : <TrendingUp size={14} />}
-          </ActionButton>
-          {onRetry && (
-            <ActionButton onClick={onRetry} title="Refresh">
-              <RefreshCw size={14} />
-            </ActionButton>
-          )}
+            {showChart ? <Icon name="barChart" size={14} /> : <Icon name="trendingUp" size={14} />}
+          </ActionButtonForHealthCard>
         </div>
       }
     >
@@ -184,14 +139,30 @@ export function FunctionActivityCard({
                     );
                   }}
                 />
-                <Bar dataKey="Queries" stackId="stack" fill="#3B82F6" />
-                <Bar dataKey="Mutations" stackId="stack" fill="#10B981" />
-                <Bar dataKey="Actions" stackId="stack" fill="#F59E0B" />
-                <Bar dataKey="Scheduled" stackId="stack" fill="#EF4444" />
+                <Bar
+                  dataKey="Queries"
+                  stackId="stack"
+                  fill={FUNCTION_ACTIVITY_COLORS.queries}
+                />
+                <Bar
+                  dataKey="Mutations"
+                  stackId="stack"
+                  fill={FUNCTION_ACTIVITY_COLORS.mutations}
+                />
+                <Bar
+                  dataKey="Actions"
+                  stackId="stack"
+                  fill={FUNCTION_ACTIVITY_COLORS.actions}
+                />
+                <Bar
+                  dataKey="Scheduled"
+                  stackId="stack"
+                  fill={FUNCTION_ACTIVITY_COLORS.scheduled}
+                />
                 <Bar
                   dataKey="HTTP"
                   stackId="stack"
-                  fill="#8B5CF6"
+                  fill={FUNCTION_ACTIVITY_COLORS.http}
                   radius={[2, 2, 0, 0]}
                 />
               </BarChart>

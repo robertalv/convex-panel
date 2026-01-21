@@ -1,21 +1,22 @@
 import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
 import {
   fetchFailureRate,
   fetchCacheHitRate,
   fetchSchedulerLag,
   fetchLatencyPercentiles,
   fetchUdfRate,
-  type FetchFn,
 } from "@convex-panel/shared/api";
-import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { desktopFetch } from "@/utils/desktop";
 import { useDeployment } from "@/contexts/deployment-context";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/query-context";
 import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
-import type { TimeSeriesDataPoint } from "../components/MetricChart";
-
-// Use Tauri's fetch for CORS-free HTTP requests in the desktop app
-const desktopFetch: FetchFn = (input, init) => tauriFetch(input, init);
+import {
+  functionIdentifierValue,
+  functionIdentifierFromValue,
+} from "@/views/logs/lib/filterLogs";
+import type { TimeSeriesDataPoint, MultiSeriesChartData } from "../types";
 
 interface LatencyPercentiles {
   p50: number;
@@ -24,44 +25,31 @@ interface LatencyPercentiles {
 }
 
 interface HealthMetrics {
-  // Failure rate
   failureRate: number;
   failureRateTrend: string;
-  failureRateData: TimeSeriesDataPoint[];
+  failureRateData: MultiSeriesChartData | null;
   failureRateLoading: boolean;
   failureRateError: string | null;
-
-  // Cache hit rate
   cacheHitRate: number;
   cacheHitRateTrend: string;
-  cacheHitRateData: TimeSeriesDataPoint[];
+  cacheHitRateData: MultiSeriesChartData | null;
   cacheHitRateLoading: boolean;
   cacheHitRateError: string | null;
-
-  // Scheduler lag
   schedulerLag: number;
   schedulerLagTrend: string;
   schedulerLagData: TimeSeriesDataPoint[];
   schedulerLagLoading: boolean;
   schedulerLagError: string | null;
-
-  // Latency percentiles
   latencyPercentiles: LatencyPercentiles;
   latencyLoading: boolean;
   latencyError: string | null;
-
-  // Request rate
   requestRate: number;
   requestRateTrend: string;
   requestRateData: TimeSeriesDataPoint[];
   requestRateLoading: boolean;
   requestRateError: string | null;
-
-  // Global state
   isLoading: boolean;
   hasError: boolean;
-
-  // Actions
   refetch: () => void;
   refetchFailureRate: () => void;
   refetchCacheHitRate: () => void;
@@ -70,7 +58,6 @@ interface HealthMetrics {
   refetchRequestRate: () => void;
 }
 
-// Query key factory for consistent key management
 export const healthMetricsKeys = {
   all: ["healthMetrics"] as const,
   failureRate: (deploymentUrl: string) =>
@@ -84,6 +71,162 @@ export const healthMetricsKeys = {
   requestRate: (deploymentUrl: string) =>
     [...healthMetricsKeys.all, "requestRate", deploymentUrl] as const,
 };
+
+const REST_COLOR = "var(--chart-line-1)";
+const LINE_COLORS = [
+  "var(--chart-line-2)",
+  "var(--chart-line-3)",
+  "var(--chart-line-4)",
+  "var(--chart-line-5)",
+  "var(--chart-line-6)",
+  "var(--chart-line-7)",
+];
+
+/**
+ * Get a deterministic color for a function name based on character codes
+ */
+function getColorForFunction(
+  functionName: string,
+  usedColors: Set<string>,
+): string {
+  if (functionName === "_rest") {
+    return REST_COLOR;
+  }
+
+  const colorIndex =
+    [...functionName].reduce((acc, char) => acc + char.charCodeAt(0), 0) %
+    LINE_COLORS.length;
+
+  let color = LINE_COLORS[colorIndex];
+  let attempts = 0;
+
+  while (usedColors.has(color) && attempts < LINE_COLORS.length) {
+    attempts++;
+    color = LINE_COLORS[(colorIndex + attempts) % LINE_COLORS.length];
+  }
+
+  return color;
+}
+
+/**
+ * Convert function name to identifier format
+ */
+function identifierForMetricName(metric: string): string {
+  return metric === "_rest" ? metric : functionIdentifierValue(metric);
+}
+
+/**
+ * Format function name for display in legend
+ * Parses JSON identifier and formats as "componentPath/identifier" or just "identifier"
+ */
+function formatFunctionNameForDisplay(functionName: string): string {
+  if (functionName === "_rest") {
+    return "All other functions";
+  }
+  
+  try {
+    const parsed = functionIdentifierFromValue(functionName);
+    if (parsed.componentPath) {
+      return `${parsed.componentPath}/${parsed.identifier}`;
+    }
+    return parsed.identifier;
+  } catch {
+    // Fallback: if parsing fails, try to extract identifier from JSON string
+    try {
+      const jsonMatch = functionName.match(/"identifier"\s*:\s*"([^"]+)"/);
+      if (jsonMatch) {
+        return jsonMatch[1];
+      }
+    } catch {
+      // If all else fails, return the original string
+    }
+    return functionName;
+  }
+}
+
+/**
+ * Transform API response to MultiSeriesChartData for per-function breakdown.
+ * API returns: Array<[functionName, Array<[{secs_since_epoch: number}, number | null]>]>
+ * Output: { data: [{time: "1:23 PM", func1: 10, func2: 20}], lineKeys: [...], xAxisKey: "time" }
+ */
+function transformMultiSeriesData(
+  apiData: Array<
+    [string, Array<[{ secs_since_epoch: number }, number | null]>]
+  >,
+  kind: "failurePercentage" | "cacheHitPercentage",
+): MultiSeriesChartData | null {
+  if (!apiData || apiData.length === 0) {
+    return null;
+  }
+
+  const functions: string[] = apiData.map(([functionName]) => functionName);
+  if (functions.length === 0) {
+    return null;
+  }
+
+  // Get first function's time series to determine bucket structure
+  const firstFunctionData = apiData[0][1];
+  const data: Record<string, any>[] = [];
+  const xAxisKey = "time";
+
+  // Track which index had first non-null data (for trimming)
+  let hadDataAt = -1;
+
+  // Build data points for each time bucket
+  for (let i = 0; i < firstFunctionData.length; i++) {
+    const dataPoint: Record<string, any> = {};
+    const timestamp = firstFunctionData[i][0];
+    dataPoint[xAxisKey] = format(
+      new Date(timestamp.secs_since_epoch * 1000),
+      "h:mm a",
+    );
+
+    // Add values for each function at this time point
+    for (const [functionName, timeSeries] of apiData) {
+      const { metric } = { metric: timeSeries[i][1] };
+
+      // Track first non-null data point
+      if (hadDataAt === -1 && metric !== null) {
+        hadDataAt = i;
+      }
+
+      const key = identifierForMetricName(functionName);
+
+      // Fill in null values with appropriate defaults based on metric type
+      dataPoint[key] =
+        typeof metric === "number"
+          ? metric
+          : hadDataAt > -1
+            ? kind === "cacheHitPercentage"
+              ? 100 // Cache hit defaults to 100% when no data
+              : 0 // Failure rate defaults to 0% when no data
+            : null;
+    }
+
+    data.push(dataPoint);
+  }
+
+  // Assign colors to functions
+  const usedColors = new Set<string>();
+  const lineKeys = functions.map((functionName) => {
+    const key = identifierForMetricName(functionName);
+    const color = getColorForFunction(functionName, usedColors);
+    usedColors.add(color);
+
+    return {
+      key,
+      name: formatFunctionNameForDisplay(functionName),
+      color,
+    };
+  });
+
+  return {
+    // Trim data to start from first non-null point (or show at least 2 points)
+    data: hadDataAt > -1 ? data.slice(hadDataAt === 59 ? 58 : hadDataAt) : data,
+    xAxisKey,
+    lineKeys,
+  };
+}
 
 /**
  * Transform API response to TimeSeriesDataPoint array.
@@ -137,6 +280,61 @@ function calculateTrend(data: TimeSeriesDataPoint[]): string {
 }
 
 /**
+ * Calculate trend from multi-series chart data
+ */
+function calculateTrendFromMultiSeries(
+  multiSeriesData: MultiSeriesChartData | null,
+): string {
+  if (!multiSeriesData || multiSeriesData.data.length < 2) return "";
+
+  // Aggregate all series values at each time point
+  const timeSeriesData: TimeSeriesDataPoint[] = multiSeriesData.data.map(
+    (point, index) => {
+      let total = 0;
+      let count = 0;
+
+      for (const lineKey of multiSeriesData.lineKeys) {
+        const value = point[lineKey.key];
+        if (typeof value === "number") {
+          total += value;
+          count++;
+        }
+      }
+
+      return {
+        time: index,
+        value: count > 0 ? total / count : null,
+      };
+    },
+  );
+
+  return calculateTrend(timeSeriesData);
+}
+
+/**
+ * Get the latest aggregated value from multi-series data
+ */
+function getLatestValueFromMultiSeries(
+  multiSeriesData: MultiSeriesChartData | null,
+): number {
+  if (!multiSeriesData || multiSeriesData.data.length === 0) return 0;
+
+  const lastPoint = multiSeriesData.data[multiSeriesData.data.length - 1];
+  let total = 0;
+  let count = 0;
+
+  for (const lineKey of multiSeriesData.lineKeys) {
+    const value = lastPoint[lineKey.key];
+    if (typeof value === "number") {
+      total += value;
+      count++;
+    }
+  }
+
+  return count > 0 ? total / count : 0;
+}
+
+/**
  * Get the latest value from time series data.
  */
 function getLatestValue(data: TimeSeriesDataPoint[]): number {
@@ -152,7 +350,7 @@ function getLatestValue(data: TimeSeriesDataPoint[]): number {
 export function useHealthMetrics(): HealthMetrics {
   const { deploymentUrl, authToken } = useDeployment();
   const queryClient = useQueryClient();
-  
+
   // Only refetch when tab is visible
   const refetchInterval = useVisibilityRefetch(REFETCH_INTERVAL.health);
 
@@ -167,14 +365,14 @@ export function useHealthMetrics(): HealthMetrics {
         authToken!,
         desktopFetch,
       );
-      return transformTimeSeries(data);
+      return transformMultiSeriesData(data, "failurePercentage");
     },
     enabled,
     staleTime: STALE_TIME.health,
     refetchInterval,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    placeholderData: (previousData) => previousData ?? [],
+    placeholderData: (previousData) => previousData ?? null,
   });
 
   // Cache hit rate query
@@ -186,14 +384,14 @@ export function useHealthMetrics(): HealthMetrics {
         authToken!,
         desktopFetch,
       );
-      return transformTimeSeries(data);
+      return transformMultiSeriesData(data, "cacheHitPercentage");
     },
     enabled,
     staleTime: STALE_TIME.health,
     refetchInterval,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    placeholderData: (previousData) => previousData ?? [],
+    placeholderData: (previousData) => previousData ?? null,
   });
 
   // Scheduler lag query
@@ -273,17 +471,17 @@ export function useHealthMetrics(): HealthMetrics {
   });
 
   // Compute derived values
-  const failureRateData = failureRateQuery.data ?? [];
-  const failureRate = getLatestValue(failureRateData);
+  const failureRateData = failureRateQuery.data ?? null;
+  const failureRate = getLatestValueFromMultiSeries(failureRateData);
   const failureRateTrend = useMemo(
-    () => calculateTrend(failureRateData),
+    () => calculateTrendFromMultiSeries(failureRateData),
     [failureRateData],
   );
 
-  const cacheHitRateData = cacheHitRateQuery.data ?? [];
-  const cacheHitRate = getLatestValue(cacheHitRateData);
+  const cacheHitRateData = cacheHitRateQuery.data ?? null;
+  const cacheHitRate = getLatestValueFromMultiSeries(cacheHitRateData);
   const cacheHitRateTrend = useMemo(
-    () => calculateTrend(cacheHitRateData),
+    () => calculateTrendFromMultiSeries(cacheHitRateData),
     [cacheHitRateData],
   );
 
@@ -358,10 +556,10 @@ export function useHealthMetrics(): HealthMetrics {
 
   const hasError = Boolean(
     failureRateQuery.error ||
-    cacheHitRateQuery.error ||
-    schedulerLagQuery.error ||
-    latencyQuery.error ||
-    requestRateQuery.error,
+      cacheHitRateQuery.error ||
+      schedulerLagQuery.error ||
+      latencyQuery.error ||
+      requestRateQuery.error,
   );
 
   return {

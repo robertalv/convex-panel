@@ -1,5 +1,4 @@
-// Base components for health view
-export { StatusBadge } from "./StatusBadge";
-export { EmptyState } from "./EmptyState";
-export { FunctionList } from "./FunctionList";
-export { StackedBarChart, type StackedBarDataPoint } from "./StackedBarChart";
+export { StatusBadge } from "./status-badge";
+export { EmptyState } from "./empty-state";
+export { FunctionList } from "./function-list";
+export { StackedBarChart, type StackedBarDataPoint } from "./stacked-bar-chart";

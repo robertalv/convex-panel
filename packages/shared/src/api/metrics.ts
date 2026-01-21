@@ -458,21 +458,16 @@ export async function fetchLatencyPercentiles(
     }
 
     // Get execution times from entries
+    // Note: execution_time_ms is already in milliseconds, no conversion needed
     const executionTimes: number[] = [];
     executionResponse.entries.forEach((entry: any) => {
-      let execTime =
+      const execTime =
         entry.execution_time_ms ||
         entry.executionTimeMs ||
         entry.execution_time ||
         entry.executionTime;
-      if (execTime) {
-        // Convert to milliseconds if needed
-        if (execTime < 1000 && execTime > 0) {
-          execTime = execTime * 1000;
-        }
-        if (execTime > 0) {
-          executionTimes.push(execTime);
-        }
+      if (execTime && execTime > 0) {
+        executionTimes.push(execTime);
       }
     });
 

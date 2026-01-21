@@ -1,22 +1,16 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Clock, Calendar } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import { format, isValid } from "date-fns";
 
 type TimeRange = "30m" | "1h" | "6h" | "24h" | "7d" | "30d" | "custom";
 
 interface TimeRangeDisplayProps {
-  /** Selected time range */
   range: TimeRange;
-  /** Custom start time (for custom range) */
   startTime?: Date;
-  /** Custom end time (for custom range) */
   endTime?: Date;
-  /** Whether to show the icon */
   showIcon?: boolean;
-  /** Size variant */
   size?: "sm" | "md";
-  /** Additional CSS classes */
   className?: string;
 }
 
@@ -47,7 +41,7 @@ export function TimeRangeDisplay({
       ? `${format(startTime, "MMM d, HH:mm")} - ${format(endTime, "MMM d, HH:mm")}`
       : rangeLabels[range];
 
-  const Icon = range === "custom" ? Calendar : Clock;
+  const icon = range === "custom" ? "calendar" : "clock";
   const iconSize = size === "sm" ? 12 : 14;
   const fontSize = size === "sm" ? "12px" : "13px";
 
@@ -62,20 +56,16 @@ export function TimeRangeDisplay({
         color: "var(--color-text-muted)",
       }}
     >
-      {showIcon && <Icon size={iconSize} />}
+      {showIcon && <Icon name={icon} size={iconSize} />}
       <span>{label}</span>
     </span>
   );
 }
 
 interface TimeRangeSelectorProps {
-  /** Currently selected range */
   value: TimeRange;
-  /** Callback when range changes */
   onChange: (range: TimeRange) => void;
-  /** Available ranges to show */
   availableRanges?: TimeRange[];
-  /** Additional CSS classes */
   className?: string;
 }
 

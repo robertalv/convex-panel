@@ -62,10 +62,28 @@ import {
   CheckmarkSquare02Icon,
   MoreVerticalIcon,
   ShopSignIcon,
-  Store01Icon
+  Store01Icon,
+  ArrowUp01Icon,
+  WaterfallUp01Icon,
+  TradeUpIcon,
+  Undo03Icon,
+  ChartLineData01Icon,
+  ArrowUpRight01Icon,
+  ArrowUpLeft01Icon,
+  Database02Icon,
+  CpuIcon,
+  Layers01Icon,
+  HelpCircleIcon,
+  Alert02Icon
 } from "@hugeicons/core-free-icons";
 
 const ICON_MAP: Record<string, IconSvgElement> = {
+  layers: Layers01Icon,
+  cpu: CpuIcon,
+  database2: Database02Icon,
+  "arrow-up-right": ArrowUpRight01Icon,
+  "arrow-up-left": ArrowUpLeft01Icon,
+  trendingUp: TradeUpIcon,
   "more-vertical": MoreVerticalIcon,
   "log-out": Logout01Icon,
   system: ComputerIcon,
@@ -87,6 +105,7 @@ const ICON_MAP: Record<string, IconSvgElement> = {
   book: Book02Icon,
   bookOpen: BookOpen02Icon,
   "alert-circle": AlertCircleIcon,
+  "alert-triangle": Alert02Icon,
   check: Tick02Icon,
   "external-link": LinkSquare01Icon,
   spinner: Loading03Icon,
@@ -94,7 +113,9 @@ const ICON_MAP: Record<string, IconSvgElement> = {
   activity: Activity03Icon,
   close: Cancel01Icon,
   share: Share08Icon,
+  barChart: WaterfallUp01Icon,
   "arrow-up-down": ArrowUpDownIcon,
+  "arrow-up": ArrowUp01Icon,
   clock: Clock01Icon,
   clear: CancelCircleIcon,
   list: ListViewIcon,
@@ -145,6 +166,9 @@ const ICON_MAP: Record<string, IconSvgElement> = {
   "square-check": CheckmarkSquare02Icon,
   store: ShopSignIcon,
   marketplace: Store01Icon,
+  undo: Undo03Icon,
+  lineChart: ChartLineData01Icon,
+  "help-circle": HelpCircleIcon,
 };
 
 export interface IconProps {

@@ -119,13 +119,18 @@ function DataViewContent() {
   // Get initial table from URL
   const initialTable = searchParams.get("table");
   const initialDocId = searchParams.get("doc");
+  const initialComponent = searchParams.get("component");
 
   // Components hook (for multi-component apps)
-  const { components, selectedComponentId, setSelectedComponent } =
-    useComponents({
-      adminClient,
-      useMockData,
-    });
+  const {
+    components,
+    selectedComponentId,
+    setSelectedComponent,
+    isLoading: componentsLoading,
+  } = useComponents({
+    adminClient,
+    useMockData,
+  });
 
   // Table data hook
   const {
@@ -191,6 +196,69 @@ function DataViewContent() {
   // Track if we've already synced from URL to prevent loops
   const hasInitializedFromUrl = useRef(false);
   const hasInitializedDocFilter = useRef(false);
+  const hasInitializedComponent = useRef(false);
+
+  // Set initial component from URL on first load (before table selection)
+  useEffect(() => {
+    if (
+      !hasInitializedComponent.current &&
+      initialComponent &&
+      components.length > 0 &&
+      !componentsLoading
+    ) {
+      // Find the component by path or name (with flexible matching)
+      const targetComponent = components.find((c) => {
+        // Exact matches
+        if (c.path === initialComponent || c.name === initialComponent)
+          return true;
+
+        // Case-insensitive matches
+        const paramLower = initialComponent.toLowerCase();
+        if (
+          c.path?.toLowerCase() === paramLower ||
+          c.name?.toLowerCase() === paramLower
+        )
+          return true;
+
+        // Try matching with kebab-case to camelCase conversion
+        const camelCase = initialComponent.replace(/-([a-z])/g, (_, letter) =>
+          letter.toUpperCase(),
+        );
+        if (c.path === camelCase || c.name === camelCase) return true;
+
+        // Try matching with camelCase to kebab-case conversion
+        const kebabCase = initialComponent
+          .replace(/([A-Z])/g, (letter) => `-${letter.toLowerCase()}`)
+          .replace(/^-/, "");
+        if (c.path === kebabCase || c.name === kebabCase) return true;
+
+        return false;
+      });
+
+      if (targetComponent && selectedComponentId !== targetComponent.id) {
+        hasInitializedComponent.current = true;
+        setSelectedComponent(targetComponent.id);
+        // Clear the component param from URL after switching
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete("component");
+        setSearchParams(newParams);
+      } else if (!targetComponent) {
+        // Component not found, just clear the param
+        hasInitializedComponent.current = true;
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete("component");
+        setSearchParams(newParams);
+      }
+    }
+  }, [
+    initialComponent,
+    components,
+    componentsLoading,
+    selectedComponentId,
+    setSelectedComponent,
+    searchParams,
+    setSearchParams,
+  ]);
 
   // Set initial table from URL on first load (only once when tables are available)
   useEffect(() => {

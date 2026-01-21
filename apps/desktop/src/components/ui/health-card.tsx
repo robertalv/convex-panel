@@ -41,14 +41,14 @@ export function HealthCard({
       <div
         className={cn(
           "flex items-center justify-between",
-          "px-3 py-2 min-h-[32px]",
+          "p-2 min-h-[32px]",
           "border-b border-border",
         )}
       >
         <h3 className="text-[10px] font-medium text-muted uppercase tracking-wide">
           {title}
         </h3>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center">
           {action}
           <Tooltip>
             <TooltipTrigger asChild>
