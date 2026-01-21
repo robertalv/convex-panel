@@ -54,6 +54,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build shared packages
+        run: pnpm --filter @convex-panel/shared build && pnpm --filter @convex-panel/registry build && pnpm --filter convex-panel build
+
       - name: Import Apple certificate
         if: env.APPLE_CERTIFICATE != ''
         env:
@@ -124,6 +127,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build shared packages
+        run: pnpm --filter @convex-panel/shared build && pnpm --filter @convex-panel/registry build && pnpm --filter convex-panel build
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -176,6 +182,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: pnpm --filter @convex-panel/shared build && pnpm --filter @convex-panel/registry build && pnpm --filter convex-panel build
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
