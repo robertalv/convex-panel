@@ -27,6 +27,12 @@
         },
         {
           "url": "https://*.convex.cloud/**"
+        },
+        {
+          "url": "https://api.convexpanel.dev/**"
+        },
+        {
+          "url": "https://api.github.com/**"
         }
       ],
       "deny": []
