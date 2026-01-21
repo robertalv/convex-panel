@@ -10,8 +10,14 @@ import { useComponents } from "@/views/data/hooks/useComponents";
 import { ResizableSheet } from "@/views/data/components/ResizableSheet";
 
 export function FunctionRunnerPanel() {
-  const { isOpen, layoutMode } = useFunctionRunnerState();
-  const { closeFunctionRunner, setLayoutMode } = useFunctionRunnerActions();
+  const { isOpen, layoutMode, initialFunction, shouldAutoRun } =
+    useFunctionRunnerState();
+  const {
+    closeFunctionRunner,
+    setLayoutMode,
+    setInitialFunction,
+    clearAutoRun,
+  } = useFunctionRunnerActions();
   const { adminClient, deploymentUrl, authToken, useMockData } =
     useDeployment();
 
@@ -34,6 +40,12 @@ export function FunctionRunnerPanel() {
     [setLayoutMode],
   );
 
+  const handleClose = useCallback(() => {
+    closeFunctionRunner();
+    // Clear initial function on close
+    setInitialFunction(null);
+  }, [closeFunctionRunner, setInitialFunction]);
+
   if (!isOpen || !adminClient) return null;
 
   const isBottomLayout = layoutMode === "bottom";
@@ -54,12 +66,15 @@ export function FunctionRunnerPanel() {
           deploymentUrl={deploymentUrl || undefined}
           accessToken={authToken || undefined}
           componentId={selectedComponentId}
-          onClose={closeFunctionRunner}
+          onClose={handleClose}
           availableFunctions={availableFunctions}
           availableComponents={components}
           onComponentChange={setSelectedComponent}
           layoutMode={layoutMode}
           onLayoutModeChange={handleLayoutModeChange}
+          initialSelectedFunction={initialFunction || undefined}
+          shouldAutoRun={shouldAutoRun}
+          onAutoRunComplete={clearAutoRun}
         />
       </div>
     );
@@ -77,7 +92,7 @@ export function FunctionRunnerPanel() {
       minHeight={isBottomLayout ? 200 : undefined}
       maxHeight={isBottomLayout ? 600 : undefined}
       showHeader={false}
-      onClose={closeFunctionRunner}
+      onClose={handleClose}
     >
       <CustomQuerySheet
         tableName=""
@@ -85,12 +100,15 @@ export function FunctionRunnerPanel() {
         deploymentUrl={deploymentUrl || undefined}
         accessToken={authToken || undefined}
         componentId={selectedComponentId}
-        onClose={closeFunctionRunner}
+        onClose={handleClose}
         availableFunctions={availableFunctions}
         availableComponents={components}
         onComponentChange={setSelectedComponent}
         layoutMode={layoutMode}
         onLayoutModeChange={handleLayoutModeChange}
+        initialSelectedFunction={initialFunction || undefined}
+        shouldAutoRun={shouldAutoRun}
+        onAutoRunComplete={clearAutoRun}
       />
     </ResizableSheet>
   );

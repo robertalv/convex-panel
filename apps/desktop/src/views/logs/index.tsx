@@ -8,10 +8,9 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useDeployment } from "@/contexts/deployment-context";
 import { useTheme } from "@/contexts/theme-context";
 import { AlertCircle, X, ArrowUp } from "lucide-react";
-import { fetch } from "@tauri-apps/plugin-http";
 
 // Hooks
-import { useLogs } from "./hooks/useLogs";
+import { useLogStream } from "@/contexts/log-stream-context";
 import { useComponents } from "@/hooks/useComponents";
 import { useFunctions } from "./hooks/useFunctions";
 import { useLocalLogStore } from "./hooks/useLocalLogStore";
@@ -55,10 +54,9 @@ const initialFilters: LogFilters = {
 function LogsViewContent() {
   const {
     deploymentUrl,
-    authToken,
-    accessToken,
     useMockData,
     adminClient,
+    accessToken,
     deployment,
     teamId,
   } = useDeployment();
@@ -89,11 +87,6 @@ function LogsViewContent() {
 
   // Track if we've completed initial load
   const hasCompletedInitialLoad = useRef(false);
-
-  // Stable error handler
-  const handleError = useCallback((err: string) => {
-    setDisplayError(err);
-  }, []);
 
   // Refs for scroll handling
   const logsListRef = useRef<HTMLDivElement>(null);
@@ -128,20 +121,11 @@ function LogsViewContent() {
   const isDetailOpen = selectedLog !== null;
   const effectiveIsPaused = manuallyPaused || (isScrolledAway && !isDetailOpen);
 
-  // Logs hook
-  const {
-    logs: rawLogs,
-    isLoading,
-    error,
-    clearLogs,
-  } = useLogs({
-    deploymentUrl,
-    authToken,
-    useMockData,
-    isPaused: effectiveIsPaused,
-    onError: handleError,
-    fetchFn: fetch,
-  });
+  // Logs hook - uses centralized log stream context
+  const { logs: rawLogs, isConnected, error, clearLogs } = useLogStream();
+
+  // Derive isLoading from connection state (loading until first connection)
+  const isLoading = !isConnected && rawLogs.length === 0;
 
   // Track when initial load completes
   useEffect(() => {

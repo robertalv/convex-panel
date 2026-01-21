@@ -64,11 +64,19 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
     label: "Deployment",
     items: [
       { id: "url-deploy-key", label: "URL & Deploy Key" },
-      { id: "environment-variables", label: "Environment Variables", requiresOAuth: true },
+      {
+        id: "environment-variables",
+        label: "Environment Variables",
+        requiresOAuth: true,
+      },
       { id: "authentication", label: "Authentication", requiresOAuth: true },
       { id: "components", label: "Components", requiresOAuth: true },
       { id: "backup-restore", label: "Backup & Restore", requiresOAuth: true },
-      { id: "pause-deployment", label: "Pause Deployment", requiresOAuth: true },
+      {
+        id: "pause-deployment",
+        label: "Pause Deployment",
+        requiresOAuth: true,
+      },
       { id: "ai-analysis", label: "AI Analysis", requiresOAuth: true },
     ],
   },
@@ -82,8 +90,7 @@ function getFilteredSections(isDeployKeyMode: boolean): SidebarSection[] {
     return SIDEBAR_SECTIONS;
   }
 
-  return SIDEBAR_SECTIONS
-    .filter((section) => !section.requiresOAuth)
+  return SIDEBAR_SECTIONS.filter((section) => !section.requiresOAuth)
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => !item.requiresOAuth),
@@ -215,6 +222,32 @@ export function SettingsView({
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, selectedSection);
   }, [selectedSection]);
+
+  // Listen for section changes from command palette (custom event approach)
+  useEffect(() => {
+    const handleSectionChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ section: string }>;
+      const newSection = customEvent.detail.section;
+
+      // Validate that the section is available in current mode
+      const isAvailable = filteredSections.some((section) =>
+        section.items.some((item) => item.id === newSection),
+      );
+
+      if (isAvailable && newSection !== selectedSection) {
+        setSelectedSection(newSection as SettingsSection);
+      }
+    };
+
+    window.addEventListener("settings-section-change", handleSectionChange);
+
+    return () => {
+      window.removeEventListener(
+        "settings-section-change",
+        handleSectionChange,
+      );
+    };
+  }, [selectedSection, filteredSections]);
 
   const renderSection = () => {
     switch (selectedSection) {

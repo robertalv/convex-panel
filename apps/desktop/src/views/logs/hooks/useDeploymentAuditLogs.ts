@@ -8,6 +8,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import type { ConvexReactClient } from "convex/react";
 import type { TeamMember } from "@convex-panel/shared/api";
 
+// Polling interval for audit logs (5 seconds)
+const AUDIT_LOGS_POLLING_INTERVAL = 5000;
+
 export interface DeploymentAuditLogEvent {
   _id: string;
   _creationTime: number;
@@ -166,15 +169,32 @@ export function useDeploymentAuditLogs({
     }
   }, [teamMembers.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Poll for new events every 5 seconds
+  // Poll for new events - only when tab is visible
   useEffect(() => {
     if (!enabled) return;
 
-    const interval = setInterval(() => {
-      fetchEvents();
-    }, 5000);
+    // Check if document is visible
+    const isVisible = () => document.visibilityState === "visible";
 
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      // Only fetch when tab is visible
+      if (isVisible()) {
+        fetchEvents();
+      }
+    }, AUDIT_LOGS_POLLING_INTERVAL);
+
+    // Also handle visibility change to fetch immediately when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchEvents();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [fetchEvents, enabled]);
 
   return {

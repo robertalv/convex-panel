@@ -5,7 +5,7 @@ node_modules
 
 # Folders
 apps/convex-backend-main
-# apps/opencode-dev
+apps/opencode-dev
 
 # Build
 dist
@@ -19,7 +19,6 @@ out
 
 # Turborepo
 .turbo
-
 
 # Testing
 coverage
@@ -49,7 +48,12 @@ pnpm-debug.log*
 .npmrc
 package-lock.json
 bun.lockb
-# pnpm-lock.yaml should be committed
+
 !pnpm-lock.yaml
 .vercel
 .env*.local
+
+# IDE
+.cursor
+.opencode
+.pnpm-store

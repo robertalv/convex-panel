@@ -3,11 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { desktopFetch } from "@/utils/desktop";
 import { useDeployment } from "@/contexts/deployment-context";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/query-context";
-import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
-import {
-  callConvexQuery,
-  SYSTEM_QUERIES,
-} from "@convex-panel/shared/api";
+import { useCombinedFetchingControl } from "@/hooks/useCombinedFetchingControl";
+import { callConvexQuery, SYSTEM_QUERIES } from "@convex-panel/shared/api";
 
 interface DeploymentStatus {
   state: "running" | "paused" | "unknown";
@@ -43,14 +40,21 @@ export const deploymentStatusKeys = {
  * Hook for fetching deployment status information.
  * Includes deployment state (running/paused), version, and last push event.
  * Uses React Query for caching and automatic refetching.
+ *
+ * Network calls are optimized with three-layer control:
+ * 1. Route awareness - Only fetches when on /health route
+ * 2. Idle detection - Pauses after 1 minute of user inactivity
+ * 3. Visibility - Pauses when browser tab is hidden
  */
 export function useDeploymentStatus(): DeploymentStatus {
   const { deploymentUrl, authToken } = useDeployment();
   const queryClient = useQueryClient();
-  
-  const refetchInterval = useVisibilityRefetch(REFETCH_INTERVAL.health);
 
-  const enabled = Boolean(deploymentUrl && authToken);
+  // Combined fetching control: route + idle + visibility awareness
+  const { enabled: fetchingEnabled, refetchInterval } =
+    useCombinedFetchingControl("/health", REFETCH_INTERVAL.health);
+
+  const enabled = Boolean(deploymentUrl && authToken) && fetchingEnabled;
 
   const stateQuery = useQuery({
     queryKey: deploymentStatusKeys.state(deploymentUrl ?? ""),

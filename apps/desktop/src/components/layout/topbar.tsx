@@ -32,7 +32,7 @@ interface TopBarProps {
   onSelectTeam?: (team: Team) => void;
   onSelectProject?: (project: Project) => void;
   onSelectDeployment?: (deployment: Deployment) => void;
-  onOpenPalette: () => void;
+  onOpenPalette?: () => void;
   onThemeChange: (theme: ThemeType) => void;
   onDisconnect: () => void;
   onOpenSettings?: () => void;

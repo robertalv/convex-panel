@@ -7,8 +7,6 @@ import { udfExecutionStatsKeys } from "@/views/health/hooks/useUdfExecutionStats
 import { deploymentStatusKeys } from "@/views/health/hooks/useDeploymentStatus";
 import { recentErrorsKeys } from "@/views/health/hooks/useRecentErrors";
 import {
-  fetchFailureRate,
-  fetchCacheHitRate,
   fetchSchedulerLag,
   fetchLatencyPercentiles,
   fetchUdfRate,
@@ -80,6 +78,13 @@ async function prefetchHealthData(
 
   const prefetchPromises: Promise<void>[] = [];
 
+  // NOTE: We intentionally skip prefetching failureRate and cacheHitRate here.
+  // Those metrics use complex MultiSeriesChartData transformations that are
+  // different from the simple time series format. Prefetching them with the
+  // wrong format would corrupt the React Query cache and cause display issues.
+  // The useHealthMetrics hook will fetch them with the correct transformation.
+
+  // Transform time series data for simple metrics (scheduler lag, request rate)
   const transformTimeSeries = (
     data: Array<[string, Array<[{ secs_since_epoch: number }, number | null]>]>,
   ) => {
@@ -96,36 +101,6 @@ async function prefetchHealthData(
     allPoints.sort((a, b) => a.time - b.time);
     return allPoints;
   };
-
-  prefetchPromises.push(
-    queryClient.prefetchQuery({
-      queryKey: healthMetricsKeys.failureRate(deploymentUrl),
-      queryFn: async () => {
-        const data = await fetchFailureRate(
-          deploymentUrl,
-          authToken,
-          desktopFetch,
-        );
-        return transformTimeSeries(data);
-      },
-      staleTime: STALE_TIME.health,
-    }),
-  );
-
-  prefetchPromises.push(
-    queryClient.prefetchQuery({
-      queryKey: healthMetricsKeys.cacheHitRate(deploymentUrl),
-      queryFn: async () => {
-        const data = await fetchCacheHitRate(
-          deploymentUrl,
-          authToken,
-          desktopFetch,
-        );
-        return transformTimeSeries(data);
-      },
-      staleTime: STALE_TIME.health,
-    }),
-  );
 
   prefetchPromises.push(
     queryClient.prefetchQuery({

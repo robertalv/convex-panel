@@ -41,19 +41,8 @@ export async function streamUdfExecution(
 
   const normalizedToken = normalizeToken(authToken);
 
-  // Use provided signal or create internal timeout-based abort
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-  // If external signal is provided, abort our controller when it aborts
-  if (signal) {
-    signal.addEventListener("abort", () => controller.abort());
-    // If already aborted, abort immediately
-    if (signal.aborted) {
-      controller.abort();
-    }
-  }
-
+  // Use the provided signal directly - no client-side timeout.
+  // The server holds the connection for ~60 seconds (long-poll).
   let response: Response;
   let data: any;
 
@@ -64,10 +53,8 @@ export async function streamUdfExecution(
         "Content-Type": "application/json",
         "Convex-Client": "dashboard-1.0.0",
       },
-      signal: controller.signal,
+      signal, // Pass through the external signal directly
     });
-
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const text = await response.text();
@@ -78,7 +65,6 @@ export async function streamUdfExecution(
 
     data = await response.json();
   } catch (error: any) {
-    clearTimeout(timeoutId);
     if (error.name === "AbortError") {
       // Re-throw as AbortError so callers can distinguish cancellation from timeout
       const abortError = new Error("Request aborted");
@@ -91,7 +77,7 @@ export async function streamUdfExecution(
   let entries = (data.entries || []) as FunctionExecutionJson[];
 
   // Use the new cursor from the response, falling back to the provided cursor
-  let newCursor: number | string = data.new_cursor ?? cursor;
+  let newCursor: number | string = data.newCursor ?? cursor;
 
   return {
     entries,
@@ -138,18 +124,9 @@ export async function streamFunctionLogs(
 
   const normalizedToken = normalizeToken(authToken);
 
-  // Use provided signal or create internal timeout-based abort
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-  // If external signal is provided, abort our controller when it aborts
-  if (signal) {
-    signal.addEventListener("abort", () => controller.abort());
-    if (signal.aborted) {
-      controller.abort();
-    }
-  }
-
+  // Use the provided signal directly - no client-side timeout.
+  // The server holds the connection for ~60 seconds (long-poll).
+  // We only abort when the caller explicitly aborts via the signal.
   let response: Response;
   let data: any;
 
@@ -160,10 +137,8 @@ export async function streamFunctionLogs(
         "Content-Type": "application/json",
         "Convex-Client": "dashboard-1.0.0",
       },
-      signal: controller.signal,
+      signal, // Pass through the external signal directly
     });
-
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const text = await response.text();
@@ -174,7 +149,6 @@ export async function streamFunctionLogs(
 
     data = await response.json();
   } catch (error: any) {
-    clearTimeout(timeoutId);
     if (error.name === "AbortError") {
       const abortError = new Error("Request aborted");
       abortError.name = "AbortError";
@@ -187,7 +161,7 @@ export async function streamFunctionLogs(
 
   return {
     entries,
-    newCursor: data.new_cursor ?? cursor,
+    newCursor: data.newCursor ?? cursor,
   };
 }
 

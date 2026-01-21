@@ -53,6 +53,10 @@ export interface CustomQuerySheetProps {
   layoutMode?: FunctionRunnerLayout;
   /** Called when layout mode changes */
   onLayoutModeChange?: (mode: FunctionRunnerLayout) => void;
+  /** If true, automatically run the function when opened */
+  shouldAutoRun?: boolean;
+  /** Called after auto-run is triggered (to clear the flag) */
+  onAutoRunComplete?: () => void;
 }
 
 interface QueryResult {
@@ -390,6 +394,8 @@ export function CustomQuerySheet({
   onFunctionChange,
   layoutMode: externalLayoutMode,
   onLayoutModeChange,
+  shouldAutoRun = false,
+  onAutoRunComplete,
 }: CustomQuerySheetProps) {
   // Layout mode state (internal if not controlled)
   const [internalLayoutMode, setInternalLayoutMode] =
@@ -421,6 +427,21 @@ export function CustomQuerySheet({
       componentId: initialComponentId,
     },
   );
+
+  // Match initialSelectedFunction against availableFunctions to get full details
+  useEffect(() => {
+    if (initialSelectedFunction && availableFunctions.length > 0) {
+      const identifier = (initialSelectedFunction as any).identifier;
+      if (identifier) {
+        const matchedFunction = availableFunctions.find(
+          (fn) => fn.identifier === identifier,
+        );
+        if (matchedFunction) {
+          setSelectedFunction(matchedFunction);
+        }
+      }
+    }
+  }, [initialSelectedFunction, availableFunctions]);
 
   // Custom query code state
   const [code, setCode] = useState(() => getDefaultQuery(tableName));
@@ -711,6 +732,41 @@ export function CustomQuerySheet({
     runQueryRef.current = runQuery;
   }, [runQuery]);
 
+  // Auto-run function when shouldAutoRun is true and we have a valid function selected
+  const hasAutoRunRef = useRef(false);
+  useEffect(() => {
+    if (
+      shouldAutoRun &&
+      !hasAutoRunRef.current &&
+      !isCustomQueryMode &&
+      selectedFunction &&
+      adminClient &&
+      !isRunning
+    ) {
+      // Mark that we've triggered auto-run to prevent duplicate runs
+      hasAutoRunRef.current = true;
+      // Small delay to ensure the component is fully mounted
+      const timeoutId = setTimeout(() => {
+        runQuery();
+        onAutoRunComplete?.();
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [
+    shouldAutoRun,
+    isCustomQueryMode,
+    selectedFunction,
+    adminClient,
+    isRunning,
+    runQuery,
+    onAutoRunComplete,
+  ]);
+
+  // Reset auto-run flag when function changes
+  useEffect(() => {
+    hasAutoRunRef.current = false;
+  }, [selectedFunction]);
+
   // Configure Monaco before it mounts
   const handleEditorWillMount: BeforeMount = useCallback((monaco: any) => {
     // Configure TypeScript compiler options
@@ -906,7 +962,9 @@ export function CustomQuerySheet({
           className={
             isBottomLayout
               ? "flex flex-col flex-1 min-w-[320px] max-w-[860px]"
-              : "flex flex-col flex-1"
+              : result
+                ? "flex flex-col min-h-[200px] max-h-[50%]"
+                : "flex flex-col flex-1"
           }
         >
           {/* Selectors in left panel when in bottom layout */}

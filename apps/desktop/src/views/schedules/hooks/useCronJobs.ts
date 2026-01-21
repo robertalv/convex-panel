@@ -1,6 +1,11 @@
 /**
  * useCronJobs
  * Hook for fetching cron jobs, cron job runs, and modules using React Query
+ *
+ * Network calls are optimized with three-layer control:
+ * 1. Route awareness - Only fetches when on /schedules route
+ * 2. Idle detection - Pauses after 1 minute of user inactivity
+ * 3. Visibility - Pauses when browser tab is hidden
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -16,6 +21,7 @@ import type {
 } from "@convex-panel/shared";
 import { useDeployment } from "@/contexts/deployment-context";
 import { useMemo } from "react";
+import { useCombinedFetchingControl } from "@/hooks/useCombinedFetchingControl";
 
 // Query key factory
 export const cronJobsKeys = {
@@ -27,6 +33,9 @@ export const cronJobsKeys = {
   modules: (deploymentUrl: string, componentId?: string | null) =>
     [...cronJobsKeys.all, "modules", deploymentUrl, componentId] as const,
 };
+
+// Polling interval for cron jobs (2s)
+const CRON_JOBS_REFETCH_INTERVAL = 2000;
 
 interface UseCronJobsOptions {
   componentId?: string | null;
@@ -43,9 +52,13 @@ export function useCronJobs(options: UseCronJobsOptions = {}) {
   const { deploymentUrl, authToken, adminClient } = useDeployment();
   const { componentId, enabled: enabledOption = true } = options;
 
-  const enabled = Boolean(
-    deploymentUrl && authToken && adminClient && enabledOption,
-  );
+  // Combined fetching control: route + idle + visibility awareness
+  const { enabled: fetchingEnabled, refetchInterval } =
+    useCombinedFetchingControl("/schedules", CRON_JOBS_REFETCH_INTERVAL);
+
+  const enabled =
+    Boolean(deploymentUrl && authToken && adminClient && enabledOption) &&
+    fetchingEnabled;
 
   // Fetch cron jobs
   const cronJobsQuery = useQuery({
@@ -55,7 +68,7 @@ export function useCronJobs(options: UseCronJobsOptions = {}) {
     },
     enabled,
     staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 2000, // 2s polling for real-time updates
+    refetchInterval, // Uses visibility-aware interval
     refetchOnMount: false,
     placeholderData: (previousData: any) => previousData,
   });
@@ -68,7 +81,7 @@ export function useCronJobs(options: UseCronJobsOptions = {}) {
     },
     enabled,
     staleTime: 30 * 1000,
-    refetchInterval: 2000,
+    refetchInterval, // Uses visibility-aware interval
     refetchOnMount: false,
     placeholderData: (previousData: any) => previousData,
   });
