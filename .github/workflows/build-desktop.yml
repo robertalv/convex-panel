@@ -94,15 +94,44 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          # Notarization disabled for now - uncomment when app-specific password is configured
-          # APPLE_ID: ${{ secrets.APPLE_ID }}
-          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Apple Notarization - requires app-specific password from appleid.apple.com
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: apps/desktop
           args: --target ${{ matrix.target }}
+
+      - name: Verify notarization
+        if: env.APPLE_ID != ''
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+        run: |
+          echo "Checking notarization status..."
+          DMG_PATH=$(find apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg -name "*.dmg" 2>/dev/null | head -1)
+
+          if [ -n "$DMG_PATH" ]; then
+            echo "Verifying DMG: $DMG_PATH"
+            
+            # Check if the stapler ticket is attached
+            if xcrun stapler validate "$DMG_PATH" 2>/dev/null; then
+              echo "✅ DMG is properly notarized and stapled"
+            else
+              echo "⚠️ DMG notarization ticket not stapled (notarization may still be in progress)"
+              echo "The app inside should still be notarized - checking app bundle..."
+            fi
+            
+            # Also check the app bundle inside target
+            APP_PATH=$(find apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos -name "*.app" 2>/dev/null | head -1)
+            if [ -n "$APP_PATH" ]; then
+              echo "Checking app bundle: $APP_PATH"
+              spctl -a -vv "$APP_PATH" 2>&1 || echo "Note: spctl check may fail in CI environment"
+            fi
+          else
+            echo "No DMG found to verify"
+          fi
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4

@@ -82,13 +82,13 @@ pnpm dev:panel-only
 
 ### Available Commands
 
-| Command | Description |
-|---------|-------------|
-| `pnpm build` | Build all packages |
-| `pnpm dev` | Start development server |
-| `pnpm lint` | Lint all packages |
-| `pnpm test` | Run tests |
-| `pnpm clean` | Clean build artifacts |
+| Command       | Description               |
+| ------------- | ------------------------- |
+| `pnpm build`  | Build all packages        |
+| `pnpm dev`    | Start development server  |
+| `pnpm lint`   | Lint all packages         |
+| `pnpm test`   | Run tests                 |
+| `pnpm clean`  | Clean build artifacts     |
 | `pnpm format` | Format code with Prettier |
 
 ### Working on Specific Packages
@@ -200,6 +200,7 @@ refactor(shared): improve type definitions
 ### PR Title
 
 Follow the same conventions as commit messages:
+
 ```
 feat(panel): add support for custom themes
 ```
@@ -207,6 +208,7 @@ feat(panel): add support for custom themes
 ### PR Description
 
 Please include:
+
 - A clear description of the changes
 - The motivation and context
 - Any breaking changes
@@ -225,6 +227,7 @@ Please include:
 ### Bug Reports
 
 When reporting bugs, please include:
+
 - A clear, descriptive title
 - Steps to reproduce the issue
 - Expected vs actual behavior
@@ -234,6 +237,7 @@ When reporting bugs, please include:
 ### Feature Requests
 
 When requesting features:
+
 - Describe the use case
 - Explain why this would be valuable
 - Consider if it could be implemented as a plugin/extension
@@ -244,6 +248,59 @@ When requesting features:
 - **Discussions** - For questions and general discussion
 - **Pull Requests** - For code contributions
 
+## macOS Code Signing and Notarization
+
+For maintainers releasing the desktop application, macOS builds require code signing and notarization for users to open the app without Gatekeeper warnings.
+
+### Required GitHub Secrets
+
+The following secrets must be configured in the repository for macOS builds:
+
+| Secret                       | Description                                                             |
+| ---------------------------- | ----------------------------------------------------------------------- |
+| `APPLE_CERTIFICATE`          | Base64-encoded .p12 certificate file                                    |
+| `APPLE_CERTIFICATE_PASSWORD` | Password for the .p12 certificate                                       |
+| `APPLE_SIGNING_IDENTITY`     | Certificate name (e.g., `Developer ID Application: Your Name (TEAMID)`) |
+| `APPLE_ID`                   | Your Apple ID email address                                             |
+| `APPLE_PASSWORD`             | App-specific password (NOT your Apple ID password)                      |
+| `APPLE_TEAM_ID`              | Your Apple Developer Team ID                                            |
+
+### Setting Up Apple Notarization
+
+1. **Generate an App-Specific Password**:
+   - Go to [appleid.apple.com](https://appleid.apple.com/account/manage)
+   - Sign in with your Apple ID
+   - Go to "Sign-In and Security" > "App-Specific Passwords"
+   - Click "Generate an app-specific password"
+   - Name it something like "GitHub Actions Notarization"
+   - Copy the generated password
+
+2. **Find Your Team ID**:
+   - Go to [developer.apple.com/account](https://developer.apple.com/account)
+   - Your Team ID is shown in the Membership section
+   - Or run: `security find-identity -v | grep "Developer ID"`
+
+3. **Export Your Certificate**:
+   - Open Keychain Access
+   - Find your "Developer ID Application" certificate
+   - Right-click > Export
+   - Save as .p12 with a password
+   - Base64 encode: `base64 -i certificate.p12 | pbcopy`
+
+4. **Add Secrets to GitHub**:
+   - Go to your repository Settings > Secrets and variables > Actions
+   - Add each secret listed above
+
+### Troubleshooting
+
+If users report "The application can't be opened" errors:
+
+- **Not Notarized**: The app was built without notarization credentials. Ensure all `APPLE_*` secrets are properly configured.
+- **Quarantine Attribute**: Users can bypass by right-clicking the app and selecting "Open", or running:
+  ```bash
+  sudo xattr -cr "/Applications/Convex Panel.app"
+  ```
+
 ## License
 
 By contributing to Convex Panel, you agree that your contributions will be licensed under the MIT License.
@@ -251,4 +308,3 @@ By contributing to Convex Panel, you agree that your contributions will be licen
 ---
 
 Thank you for contributing to Convex Panel! 🎉
-
