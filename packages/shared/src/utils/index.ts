@@ -5,3 +5,6 @@ export * from "./constants";
 
 // Export cron formatters
 export * from "./cronFormatters";
+
+// Export backoff utilities
+export * from "./backoff";

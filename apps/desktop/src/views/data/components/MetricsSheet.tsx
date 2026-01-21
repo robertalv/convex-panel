@@ -242,9 +242,28 @@ export const MetricsSheet: React.FC<MetricsSheetProps> = memo(
     useEffect(() => {
       fetchMetrics();
 
-      // Refresh metrics every 30 seconds
-      const interval = setInterval(fetchMetrics, 30000);
-      return () => clearInterval(interval);
+      // Refresh metrics every 30 seconds, but only when tab is visible
+      const interval = setInterval(() => {
+        if (document.visibilityState === "visible") {
+          fetchMetrics();
+        }
+      }, 30000);
+
+      // Also fetch when tab becomes visible
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === "visible") {
+          fetchMetrics();
+        }
+      };
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+
+      return () => {
+        clearInterval(interval);
+        document.removeEventListener(
+          "visibilitychange",
+          handleVisibilityChange,
+        );
+      };
     }, [tableName, deploymentUrl, accessToken]);
 
     // Format time for display

@@ -4,6 +4,7 @@ import { fetchRecentErrors } from "@convex-panel/shared/api";
 import { desktopFetch } from "@/utils/desktop";
 import { useDeployment } from "@/contexts/deployment-context";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/query-context";
+import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
 
 export interface ErrorSummary {
   message: string;
@@ -32,6 +33,9 @@ export function useRecentErrors(hoursBack: number = 1): RecentErrorsState {
   const { deploymentUrl, authToken } = useDeployment();
   const queryClient = useQueryClient();
 
+  // Only refetch when tab is visible
+  const refetchInterval = useVisibilityRefetch(REFETCH_INTERVAL.health);
+
   const enabled = Boolean(deploymentUrl && authToken);
 
   const query = useQuery({
@@ -50,8 +54,9 @@ export function useRecentErrors(hoursBack: number = 1): RecentErrorsState {
     },
     enabled,
     staleTime: STALE_TIME.health,
-    refetchInterval: REFETCH_INTERVAL.health,
+    refetchInterval, // Uses visibility-aware interval
     refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   const refetch = useCallback(() => {

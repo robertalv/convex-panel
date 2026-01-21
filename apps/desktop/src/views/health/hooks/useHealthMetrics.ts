@@ -11,7 +11,7 @@ import {
 import { desktopFetch } from "@/utils/desktop";
 import { useDeployment } from "@/contexts/deployment-context";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/query-context";
-import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
+import { useCombinedFetchingControl } from "@/hooks/useCombinedFetchingControl";
 import {
   functionIdentifierValue,
   functionIdentifierFromValue,
@@ -123,7 +123,7 @@ function formatFunctionNameForDisplay(functionName: string): string {
   if (functionName === "_rest") {
     return "All other functions";
   }
-  
+
   try {
     const parsed = functionIdentifierFromValue(functionName);
     if (parsed.componentPath) {
@@ -346,15 +346,22 @@ function getLatestValue(data: TimeSeriesDataPoint[]): number {
 /**
  * Hook for fetching and managing health metrics data.
  * Uses React Query for caching and automatic refetching.
+ *
+ * Network calls are optimized with three-layer control:
+ * 1. Route awareness - Only fetches when on /health route
+ * 2. Idle detection - Pauses after 1 minute of user inactivity
+ * 3. Visibility - Pauses when browser tab is hidden
  */
 export function useHealthMetrics(): HealthMetrics {
   const { deploymentUrl, authToken } = useDeployment();
   const queryClient = useQueryClient();
 
-  // Only refetch when tab is visible
-  const refetchInterval = useVisibilityRefetch(REFETCH_INTERVAL.health);
+  // Combined fetching control: route + idle + visibility awareness
+  const { enabled: fetchingEnabled, refetchInterval } =
+    useCombinedFetchingControl("/health", REFETCH_INTERVAL.health);
 
-  const enabled = Boolean(deploymentUrl && authToken);
+  // Only enable queries when we have credentials AND fetching is allowed
+  const enabled = Boolean(deploymentUrl && authToken) && fetchingEnabled;
 
   // Failure rate query
   const failureRateQuery = useQuery({
@@ -451,8 +458,9 @@ export function useHealthMetrics(): HealthMetrics {
     },
     enabled,
     staleTime: STALE_TIME.health,
-    refetchInterval: REFETCH_INTERVAL.health,
+    refetchInterval, // Uses visibility-aware interval
     refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   // Request rate query

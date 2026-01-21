@@ -17,7 +17,7 @@ import { useProjectPathOptional } from "@/contexts/project-path-context";
 import { openInEditor } from "@/utils/editor";
 import { useFunctions } from "./hooks/useFunctions";
 import { useLocalSourceCode } from "./hooks/useLocalSourceCode";
-import { useFunctionLogStream } from "./hooks/useFunctionLogStream";
+import { useLogStream } from "@/contexts/log-stream-context";
 import { EmptyFunctionsState } from "./components/EmptyFunctionsState";
 import { HealthCard } from "@/components/ui";
 import { FunctionsSidebar } from "./components/FunctionsSidebar";
@@ -387,6 +387,11 @@ const FunctionsView: React.FC = () => {
     }
 
     const fetchStats = async () => {
+      // Only fetch when tab is visible
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
       setStatsLoading(true);
       try {
         const now = Math.floor(Date.now() / 1000);
@@ -443,7 +448,19 @@ const FunctionsView: React.FC = () => {
 
     fetchStats();
     const interval = setInterval(fetchStats, 30000);
-    return () => clearInterval(interval);
+
+    // Also fetch when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchStats();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [selectedFunction, deploymentUrl, authToken, useMockData, activeTab]);
 
   // Compute module path for source code fetching
@@ -630,20 +647,12 @@ const FunctionsView: React.FC = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isLocalFile, hasUnsavedChanges, handleSaveFile]);
 
-  // Logs streaming
-  const isLogsTabActive = activeTab === "logs";
-  const effectiveIsPaused =
-    manuallyPaused || isScrolledAway || !isLogsTabActive;
-
-  const { logs: streamedLogs, isLoading: streamingLoading } =
-    useFunctionLogStream({
-      deploymentUrl: deploymentUrl || "",
-      authToken: authToken || "",
-      selectedFunction: selectedFunction as any,
-      isPaused: effectiveIsPaused,
-      useProgressEvents: false,
-      useMockData,
-    });
+  // Logs streaming - uses centralized log stream filtered by function
+  // Get logs from centralized stream, filtered by selected function
+  const { logs: streamedLogs, isConnected: streamConnected } = useLogStream(
+    selectedFunction?.identifier,
+  );
+  const streamingLoading = !streamConnected && streamedLogs.length === 0;
 
   useEffect(() => {
     if (activeTab === "logs") {

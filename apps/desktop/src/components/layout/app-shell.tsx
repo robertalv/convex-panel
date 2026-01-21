@@ -35,12 +35,13 @@ interface AppShellProps {
   navItems: NavItem[];
   currentPath: string;
   onNavigate: (path: string) => void;
-  onOpenPalette: () => void;
+  onOpenPalette?: () => void;
   onThemeChange: (theme: ThemeType) => void;
   onDisconnect: () => void;
   onOpenSettings?: () => void;
   onNavigateToProjectSelector?: () => void;
   onRefreshProjects?: () => void;
+  sidebarToggleRef?: React.MutableRefObject<(() => void) | null>;
   theme: "light" | "dark" | "system";
   user: User | null;
   teams: Team[];
@@ -73,6 +74,7 @@ export function AppShell({
   onOpenSettings,
   onNavigateToProjectSelector,
   onRefreshProjects,
+  sidebarToggleRef,
   theme,
   user,
   teams,
@@ -120,6 +122,13 @@ export function AppShell({
   const handleToggleCollapse = React.useCallback(() => {
     setSidebarCollapsed((prev) => !prev);
   }, []);
+
+  // Expose toggle function via ref
+  React.useEffect(() => {
+    if (sidebarToggleRef) {
+      sidebarToggleRef.current = handleToggleCollapse;
+    }
+  }, [sidebarToggleRef, handleToggleCollapse]);
 
   const { toggleTerminal } = useTerminalActions();
   const { toggleFunctionRunner } = useFunctionRunnerActions();

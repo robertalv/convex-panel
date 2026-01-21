@@ -3,9 +3,11 @@
  * Streams and manages log data from the Convex deployment
  *
  * Polling Strategy:
- * - Active streaming (logs received): 500ms between requests (2 req/sec)
- * - Idle (no logs): 2000ms between requests (0.5 req/sec)
- * - This prevents excessive polling while maintaining responsiveness
+ * - Minimum 2s between ANY requests (hard floor)
+ * - Active streaming (logs received): 2s between requests
+ * - Idle (no logs): Progressive backoff from 3s to 15s
+ * - Tab hidden: Polling is paused entirely
+ * - Errors: Exponential backoff with jitter
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -13,6 +15,7 @@ import {
   streamFunctionLogs,
   processFunctionLogs,
 } from "@convex-panel/shared/api";
+import { backoffWithJitter } from "@convex-panel/shared";
 import type { LogEntry, ModuleFunction } from "../types";
 import type { FunctionExecutionJson } from "@convex-panel/shared/api";
 
@@ -35,20 +38,13 @@ export interface UseLogsReturn {
 
 // Match dashboard-common's MAX_LOGS
 const MAX_LOGS = 10000;
-// Backoff configuration for retries
-const INITIAL_BACKOFF_MS = 500;
-const MAX_BACKOFF_MS = 30000;
-const BACKOFF_MULTIPLIER = 2;
-const JITTER_FACTOR = 0.1;
 
-function backoffWithJitter(attemptNumber: number): number {
-  const baseBackoff = Math.min(
-    INITIAL_BACKOFF_MS * Math.pow(BACKOFF_MULTIPLIER, attemptNumber),
-    MAX_BACKOFF_MS,
-  );
-  const jitter = baseBackoff * JITTER_FACTOR * (Math.random() - 0.5);
-  return Math.floor(baseBackoff + jitter);
-}
+// Polling intervals - MINIMUM 2s between ANY requests
+const MIN_REQUEST_INTERVAL = 2000; // Hard floor - never request faster than this
+const ACTIVE_POLLING_INTERVAL = 2000; // 2s when receiving logs
+const MIN_IDLE_INTERVAL = 3000; // Start at 3s when idle
+const MAX_IDLE_INTERVAL = 15000; // Max 15s when idle for extended periods
+const IDLE_BACKOFF_MULTIPLIER = 1.5; // Increase by 50% each consecutive idle response
 
 export function useLogs({
   deploymentUrl,
@@ -62,11 +58,30 @@ export function useLogs({
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [isVisible, setIsVisible] = useState(() => {
+    if (typeof document === "undefined") return true;
+    return !document.hidden;
+  });
 
   // Use refs for values that change but shouldn't trigger re-renders
   const cursorRef = useRef<number | string>(0);
   const abortControllerRef = useRef<AbortController | null>(null);
   const selectedFunctionRef = useRef(selectedFunction);
+  const lastRequestTimeRef = useRef<number>(0);
+
+  // Track document visibility
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const handleVisibilityChange = () => {
+      setIsVisible(!document.hidden);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   // Update selectedFunction ref without triggering re-render
   useEffect(() => {
@@ -120,10 +135,10 @@ export function useLogs({
     [],
   );
 
-  // Long-polling loop - matches dashboard-common implementation
+  // Long-polling loop
   useEffect(() => {
-    // Don't start streaming if paused, missing credentials, or using mock data
-    if (isPaused || !deploymentUrl || !authToken || useMockData) {
+    // Don't start streaming if paused, hidden, missing credentials, or using mock data
+    if (isPaused || !isVisible || !deploymentUrl || !authToken || useMockData) {
       // Cancel any in-flight request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -135,14 +150,33 @@ export function useLogs({
 
     let isActive = true;
     let numFailures = 0;
+    let consecutiveIdleResponses = 0;
     let isDisconnected = false;
+
+    // Helper to enforce minimum request interval
+    const waitForMinInterval = async () => {
+      const now = Date.now();
+      const timeSinceLastRequest = now - lastRequestTimeRef.current;
+      if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+        const waitTime = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+      }
+    };
 
     // Continuous async loop for long-polling
     const streamLogs = async () => {
       while (isActive) {
+        // Enforce minimum interval between requests
+        await waitForMinInterval();
+
+        if (!isActive) break;
+
         // Create new abort controller for this request
         const controller = new AbortController();
         abortControllerRef.current = controller;
+
+        // Record request time BEFORE making the request
+        lastRequestTimeRef.current = Date.now();
 
         try {
           setIsLoading(true);
@@ -171,12 +205,30 @@ export function useLogs({
             // Process logs
             receiveLogs(response.entries, response.newCursor);
 
-            // Add polling delay to prevent excessive requests
-            // Use shorter delay if logs were received (active streaming)
-            // Use longer delay if no logs (idle state)
-            if (isActive) {
-              const delayMs = response.entries.length > 0 ? 500 : 2000;
-              await new Promise((resolve) => setTimeout(resolve, delayMs));
+            // Determine additional delay based on whether we received logs
+            let additionalDelayMs: number;
+            if (response.entries.length > 0) {
+              // Got logs - use active interval and reset idle counter
+              consecutiveIdleResponses = 0;
+              additionalDelayMs = ACTIVE_POLLING_INTERVAL;
+            } else {
+              // No logs - use progressive idle backoff
+              consecutiveIdleResponses++;
+              additionalDelayMs = Math.min(
+                MIN_IDLE_INTERVAL *
+                  Math.pow(
+                    IDLE_BACKOFF_MULTIPLIER,
+                    consecutiveIdleResponses - 1,
+                  ),
+                MAX_IDLE_INTERVAL,
+              );
+            }
+
+            // Wait the additional delay (on top of the minimum interval enforced at loop start)
+            if (isActive && additionalDelayMs > 0) {
+              await new Promise((resolve) =>
+                setTimeout(resolve, additionalDelayMs),
+              );
             }
           }
         } catch (err: any) {
@@ -200,7 +252,7 @@ export function useLogs({
             );
           }
 
-          // Backoff before retry
+          // Backoff before retry (in addition to minimum interval)
           if (numFailures > 0 && isActive) {
             const backoffMs = backoffWithJitter(numFailures - 1);
             await new Promise((resolve) => setTimeout(resolve, backoffMs));
@@ -226,6 +278,7 @@ export function useLogs({
     deploymentUrl,
     authToken,
     isPaused,
+    isVisible,
     useMockData,
     fetchFn,
     receiveLogs,

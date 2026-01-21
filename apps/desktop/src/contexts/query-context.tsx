@@ -16,10 +16,15 @@ const STALE_TIME = {
 };
 
 const REFETCH_INTERVAL = {
-  // Increased intervals to reduce constant refreshing
-  // These will only refetch when tab is visible (handled by useVisibilityRefetch)
-  health: 30 * 1000, // 30 seconds instead of 5 seconds
-  functionStats: 60 * 1000, // 1 minute instead of 30 seconds
+  // Refetch intervals - only active when:
+  // 1. User is on the relevant route (via useRouteAwareFetching)
+  // 2. User is active (via useIdleAwareFetching)
+  // 3. Tab is visible (via useVisibilityRefetch)
+  health: 30 * 1000, // 30 seconds for health metrics
+  functionStats: 60 * 1000, // 1 minute for function statistics
+  schedules: 30 * 1000, // 30 seconds for scheduled/cron jobs
+  insights: 60 * 1000, // 1 minute for insights
+  deploymentStatus: 30 * 1000, // 30 seconds for deployment status
 };
 
 const GC_TIME = 10 * 60 * 1000;

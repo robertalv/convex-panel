@@ -3,10 +3,10 @@ import {
   processFunctionLogs,
   streamFunctionLogs,
   streamUdfExecution,
-  INTERVALS,
   type FunctionExecutionLog,
   type ModuleFunction,
 } from "@convex-panel/shared/api";
+import { backoffWithJitter } from "@convex-panel/shared";
 
 interface UseFunctionLogStreamOptions {
   deploymentUrl?: string;
@@ -25,6 +25,13 @@ interface UseFunctionLogStreamResult {
   reset: () => void;
 }
 
+// Polling intervals - MINIMUM 2s between ANY requests
+const MIN_REQUEST_INTERVAL = 2000; // Hard floor - never request faster than this
+const ACTIVE_POLLING_INTERVAL = 2000; // 2s when receiving logs
+const MIN_IDLE_INTERVAL = 3000; // Start at 3s when idle
+const MAX_IDLE_INTERVAL = 15000; // Max 15s when idle for extended periods
+const IDLE_BACKOFF_MULTIPLIER = 1.5; // Increase by 50% each consecutive idle response
+
 export function useFunctionLogStream({
   deploymentUrl,
   authToken,
@@ -36,11 +43,30 @@ export function useFunctionLogStream({
   const [logs, setLogs] = useState<FunctionExecutionLog[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [isVisible, setIsVisible] = useState(() => {
+    if (typeof document === "undefined") return true;
+    return !document.hidden;
+  });
 
   const abortRef = useRef<AbortController | null>(null);
   const isStreamingRef = useRef(false);
   // Use a ref for cursor so the streaming loop always has access to the latest value
   const cursorRef = useRef<number | string>(0);
+  const lastRequestTimeRef = useRef<number>(0);
+
+  // Track document visibility
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const handleVisibilityChange = () => {
+      setIsVisible(!document.hidden);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   const reset = () => {
     setLogs([]);
@@ -63,7 +89,8 @@ export function useFunctionLogStream({
       return;
     }
 
-    if (isPaused) {
+    // Pause when tab is hidden or manually paused
+    if (isPaused || !isVisible) {
       // When paused, stop any in-flight request
       abortRef.current?.abort();
       isStreamingRef.current = false;
@@ -76,10 +103,30 @@ export function useFunctionLogStream({
     abortRef.current = new AbortController();
 
     let cancelled = false;
+    let numFailures = 0;
+    let consecutiveIdleResponses = 0;
+
+    // Helper to enforce minimum request interval
+    const waitForMinInterval = async () => {
+      const now = Date.now();
+      const timeSinceLastRequest = now - lastRequestTimeRef.current;
+      if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+        const waitTime = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+      }
+    };
 
     const loop = async () => {
       setIsLoading(true);
       while (!cancelled && isStreamingRef.current) {
+        // Enforce minimum interval between requests
+        await waitForMinInterval();
+
+        if (cancelled || !isStreamingRef.current) break;
+
+        // Record request time BEFORE making the request
+        lastRequestTimeRef.current = Date.now();
+
         try {
           // Use cursorRef.current to always get the latest cursor value
           const currentCursor = cursorRef.current;
@@ -126,18 +173,41 @@ export function useFunctionLogStream({
           }
           setError(null);
 
-          await new Promise((resolve) =>
-            setTimeout(resolve, INTERVALS.POLLING_INTERVAL),
-          );
+          // Reset failure count on success
+          numFailures = 0;
+
+          // Determine additional delay based on whether we received logs
+          let additionalDelayMs: number;
+          if (processed.length > 0) {
+            // Got logs - use active interval and reset idle counter
+            consecutiveIdleResponses = 0;
+            additionalDelayMs = ACTIVE_POLLING_INTERVAL;
+          } else {
+            // No logs - use progressive idle backoff
+            consecutiveIdleResponses++;
+            additionalDelayMs = Math.min(
+              MIN_IDLE_INTERVAL *
+                Math.pow(IDLE_BACKOFF_MULTIPLIER, consecutiveIdleResponses - 1),
+              MAX_IDLE_INTERVAL,
+            );
+          }
+
+          // Wait the additional delay
+          if (!cancelled && isStreamingRef.current && additionalDelayMs > 0) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, additionalDelayMs),
+            );
+          }
         } catch (err: any) {
           if (err?.name === "AbortError") {
             break;
           }
           setError(err instanceof Error ? err : new Error(String(err)));
 
-          await new Promise((resolve) =>
-            setTimeout(resolve, INTERVALS.RETRY_DELAY),
-          );
+          // Increment failure count and use exponential backoff with jitter
+          numFailures += 1;
+          const backoffMs = backoffWithJitter(numFailures - 1);
+          await new Promise((resolve) => setTimeout(resolve, backoffMs));
         }
       }
       if (!cancelled) {
@@ -157,6 +227,7 @@ export function useFunctionLogStream({
     authToken,
     selectedFunction,
     isPaused,
+    isVisible,
     useProgressEvents,
     useMockData,
   ]);

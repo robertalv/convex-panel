@@ -215,7 +215,10 @@ export interface UseComponentsReturn {
   selectedComponent: ConvexComponent | null;
   /** Set selected component by ID (null = root app) */
   setSelectedComponent: (componentId: string | null) => void;
+  /** Loading state */
   isLoading: boolean;
+  /** Refetch components from server */
+  refetch?: () => void;
 }
 
 // ============================================

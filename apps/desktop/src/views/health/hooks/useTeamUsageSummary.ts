@@ -7,7 +7,7 @@ import {
 import { desktopFetch } from "@/utils/desktop";
 import { useDeployment } from "@/contexts/deployment-context";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/query-context";
-import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
+import { useCombinedFetchingControl } from "@/hooks/useCombinedFetchingControl";
 
 export const teamUsageKeys = {
   all: ["teamUsage"] as const,
@@ -25,15 +25,22 @@ interface TeamUsageResult {
 /**
  * Hook for fetching project usage summary from BigBrain API.
  * This provides billing-period usage data scoped to the current project.
+ *
+ * Network calls are optimized with three-layer control:
+ * 1. Route awareness - Only fetches when on /health route
+ * 2. Idle detection - Pauses after 1 minute of user inactivity
+ * 3. Visibility - Pauses when browser tab is hidden
  */
 export function useTeamUsageSummary(): TeamUsageResult {
   const { teamId, accessToken, deployment } = useDeployment();
   const projectId = deployment?.projectId ?? null;
   const queryClient = useQueryClient();
-  
-  const refetchInterval = useVisibilityRefetch(REFETCH_INTERVAL.health);
 
-  const enabled = Boolean(teamId && accessToken);
+  // Combined fetching control: route + idle + visibility awareness
+  const { enabled: fetchingEnabled, refetchInterval } =
+    useCombinedFetchingControl("/health", REFETCH_INTERVAL.health);
+
+  const enabled = Boolean(teamId && accessToken) && fetchingEnabled;
 
   const query = useQuery<UsageSummary | null>({
     queryKey: teamUsageKeys.summary(teamId ?? 0, projectId),

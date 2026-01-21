@@ -5,7 +5,7 @@ node_modules
 
 # Folders
 apps/convex-backend-main
-# apps/opencode-dev
+apps/opencode-dev
 
 # Build
 dist
