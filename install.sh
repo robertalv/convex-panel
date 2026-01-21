@@ -163,7 +163,8 @@ install_app() {
     
     # Mount DMG
     info "Mounting disk image..."
-    MOUNT_POINT=$(hdiutil attach "$DMG_PATH" -nobrowse -noautoopen | grep "/Volumes" | awk '{print $NF}')
+    # Use sed to extract the full mount point path (handles spaces in volume names)
+    MOUNT_POINT=$(hdiutil attach "$DMG_PATH" -nobrowse -noautoopen | grep "/Volumes" | sed 's/.*\(\/Volumes\/.*\)/\1/')
     
     if [[ -z "$MOUNT_POINT" ]]; then
         error "Failed to mount disk image."
