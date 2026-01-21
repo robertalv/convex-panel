@@ -106,10 +106,11 @@ fetch_latest_release() {
     info "Latest version: ${VERSION}"
     
     # Find the DMG URL for our architecture
+    # New naming convention: Convex.Panel_{version}_aarch64.dmg or Convex.Panel_{version}_x64.dmg
     if [[ "$ARCH_NAME" == "arm64" ]]; then
-        DMG_PATTERN="macos-arm64.*\.dmg"
+        DMG_PATTERN="aarch64\.dmg"
     else
-        DMG_PATTERN="macos-x64.*\.dmg"
+        DMG_PATTERN="x64\.dmg"
     fi
     
     DOWNLOAD_URL=$(echo "$RELEASE_INFO" | grep -o "https://[^\"]*${DMG_PATTERN}[^\"]*" | head -1)
