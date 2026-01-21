@@ -55,21 +55,14 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build shared packages
-        run: pnpm --filter @convex-panel/shared build && pnpm --filter @convex-panel/registry build && pnpm --filter convex-panel build
-
-      - name: Import Apple certificate
-        if: env.APPLE_CERTIFICATE != ''
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        shell: pwsh
         run: |
-          echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
-          security create-keychain -p actions build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p actions build.keychain
-          security import certificate.p12 -k build.keychain -P $APPLE_CERTIFICATE_PASSWORD -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
-          rm certificate.p12
+          pnpm --filter @convex-panel/shared build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm --filter @convex-panel/registry build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm --filter convex-panel build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -129,7 +122,6 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build shared packages
-        shell: bash
         run: pnpm --filter @convex-panel/shared build && pnpm --filter @convex-panel/registry build && pnpm --filter convex-panel build
 
       - name: Build Tauri app
