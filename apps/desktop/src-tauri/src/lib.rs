@@ -132,7 +132,7 @@ fn show_native_about_windows(window_handle: isize) {
     
     unsafe {
         MessageBoxW(
-            HWND(window_handle),
+            HWND(window_handle as *mut std::ffi::c_void),
             PCWSTR(message_wide.as_ptr()),
             PCWSTR(title_wide.as_ptr()),
             MB_OK | MB_ICONINFORMATION,
