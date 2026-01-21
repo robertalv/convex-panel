@@ -17,7 +17,8 @@ env:
 
 jobs:
   build-macos:
-    runs-on: macos-latest
+    # Use macos-15 for latest SDK compatibility (required for macOS 26/Tahoe)
+    runs-on: macos-15
     strategy:
       fail-fast: false
       matrix:
@@ -31,6 +32,19 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: |
+          # List available Xcode versions and select the latest
+          ls -la /Applications/ | grep Xcode
+          LATEST_XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$LATEST_XCODE" ]; then
+            echo "Selecting Xcode: $LATEST_XCODE"
+            sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          fi
+          xcodebuild -version
+          xcrun --show-sdk-path
+          xcrun --show-sdk-version
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
