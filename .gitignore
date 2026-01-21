@@ -57,3 +57,11 @@ bun.lockb
 .cursor
 .opencode
 .pnpm-store
+
+# Build artifacts (binaries)
+*.dmg
+*.msi
+*.exe
+*.AppImage
+*.deb
+*.rpm
