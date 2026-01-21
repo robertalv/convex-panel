@@ -11,39 +11,27 @@ import { cn } from "@/lib/utils";
 import { format, isValid } from "date-fns";
 
 export interface StackedBarDataPoint {
-  /** Timestamp in milliseconds or seconds */
   time: number;
-  /** Success count or value */
   success?: number;
-  /** Error count or value */
   errors?: number;
-  /** Total count (if not providing success/errors) */
   total?: number;
-  /** Optional label */
   label?: string;
 }
 
 interface StackedBarChartProps {
-  /** Data points */
   data: StackedBarDataPoint[];
-  /** Height of the chart */
   height?: number;
-  /** Whether to show the X axis */
   showXAxis?: boolean;
-  /** Whether to show the Y axis */
   showYAxis?: boolean;
-  /** Whether to show stacked errors */
   showErrors?: boolean;
-  /** Format function for tooltip values */
   formatTooltipValue?: (value: number, key: string) => string;
-  /** Additional CSS classes */
   className?: string;
 }
 
 const COLORS = {
-  success: "oklch(0.7 0.18 145)", // Green
-  errors: "oklch(0.65 0.22 25)", // Red
-  total: "oklch(0.65 0.2 250)", // Blue
+  success: "oklch(0.7 0.18 145)",
+  errors: "oklch(0.65 0.22 25)",
+  total: "oklch(0.65 0.2 250)",
 };
 
 /**
@@ -58,10 +46,9 @@ export function StackedBarChart({
   formatTooltipValue,
   className,
 }: StackedBarChartProps) {
-  // Transform data for Recharts
   const chartData = useMemo(() => {
     return data.map((d) => ({
-      time: d.time > 1e12 ? d.time : d.time * 1000, // Ensure milliseconds
+      time: d.time > 1e12 ? d.time : d.time * 1000,
       success: d.success ?? (d.total ?? 0) - (d.errors ?? 0),
       errors: d.errors ?? 0,
       total: d.total ?? (d.success ?? 0) + (d.errors ?? 0),

@@ -4,7 +4,7 @@
   "private": true,
   "description": "The convex backend",
   "scripts": {
-    "dev": "pnpm dlx convex dev"
+    "dev": "convex dev"
   },
   "keywords": [
     "convex",

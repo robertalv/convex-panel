@@ -1,24 +1,18 @@
 import { cn } from "@/lib/utils";
-import { Zap, Database, Play, AlertTriangle } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import type { FunctionStat } from "../../hooks/useFunctionHealth";
 
 interface FunctionListProps {
-  /** List of function stats to display */
   functions: FunctionStat[];
-  /** Maximum number of items to show */
   maxItems?: number;
-  /** Metric to highlight */
   highlightMetric?: "failureRate" | "avgExecutionTime" | "invocations";
-  /** Whether to show the function type badge */
   showType?: boolean;
-  /** Additional CSS classes */
   className?: string;
-  /** Callback when a function is clicked */
   onFunctionClick?: (fn: FunctionStat) => void;
 }
 
 interface TypeConfig {
-  icon: typeof Zap;
+  icon: string;
   label: string;
   colorClass: string;
   bgClass: string;
@@ -26,43 +20,43 @@ interface TypeConfig {
 
 const typeConfig: Record<string, TypeConfig> = {
   query: {
-    icon: Database,
+    icon: "database",
     label: "Query",
     colorClass: "text-info",
     bgClass: "bg-info-bg",
   },
   Query: {
-    icon: Database,
+    icon: "database",
     label: "Query",
     colorClass: "text-info",
     bgClass: "bg-info-bg",
   },
   mutation: {
-    icon: Play,
+    icon: "play",
     label: "Mutation",
     colorClass: "text-success",
     bgClass: "bg-success-bg",
   },
   Mutation: {
-    icon: Play,
+    icon: "play",
     label: "Mutation",
     colorClass: "text-success",
     bgClass: "bg-success-bg",
   },
   action: {
-    icon: Zap,
+    icon: "zap",
     label: "Action",
     colorClass: "text-warning",
     bgClass: "bg-warning-bg",
   },
   Action: {
-    icon: Zap,
+    icon: "zap",
     label: "Action",
     colorClass: "text-warning",
     bgClass: "bg-warning-bg",
   },
   unknown: {
-    icon: Zap,
+    icon: "zap",
     label: "Unknown",
     colorClass: "text-muted",
     bgClass: "bg-surface-alt",
@@ -96,7 +90,6 @@ function FunctionListItem({
   onClick?: () => void;
 }) {
   const typeInfo = typeConfig[fn.type] ?? typeConfig.unknown;
-  const TypeIcon = typeInfo.icon;
 
   // Determine the highlighted value based on metric
   let highlightValue: string;
@@ -141,7 +134,7 @@ function FunctionListItem({
             )}
             title={typeInfo.label}
           >
-            <TypeIcon size={12} />
+            <Icon name={typeInfo.icon} size={12} />
           </span>
         )}
         <span className="text-[13px] font-mono text-foreground truncate">
@@ -149,7 +142,7 @@ function FunctionListItem({
         </span>
         {fn.errors > 0 && highlightMetric !== "failureRate" && (
           <span className="inline-flex items-center gap-0.5 text-xs text-error">
-            <AlertTriangle size={12} />
+            <Icon name="alert-circle" size={12} />
             {fn.errors}
           </span>
         )}

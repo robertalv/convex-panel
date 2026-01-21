@@ -47,3 +47,4 @@ export { KeyboardShortcut } from "./keyboard-shortcut";
 export { Callout } from "./callout";
 export { ClosePanelButton } from "./close-panel-button";
 export { InfiniteScrollList } from "./infinite-scroll-list";
+export { BarChart, type BarDataPoint } from "./bar-chart";

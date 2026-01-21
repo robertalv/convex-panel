@@ -2,18 +2,13 @@ import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchUdfExecutionStats,
-  type FetchFn,
   type FunctionExecutionStats,
 } from "@convex-panel/shared/api";
-import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { desktopFetch } from "@/utils/desktop";
 import { useDeployment } from "@/contexts/deployment-context";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/query-context";
 import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
 
-// Use Tauri's fetch for CORS-free HTTP requests
-const desktopFetch: FetchFn = (input, init) => tauriFetch(input, init);
-
-// Query key factory for shared execution stats
 export const udfExecutionStatsKeys = {
   all: ["udfExecutionStats"] as const,
   stats: (deploymentUrl: string, cursor: number) =>
@@ -30,7 +25,6 @@ export function useUdfExecutionStats(cursor?: number) {
   const { deploymentUrl, authToken } = useDeployment();
   const queryClient = useQueryClient();
   
-  // Only refetch when tab is visible
   const refetchInterval = useVisibilityRefetch(REFETCH_INTERVAL.functionStats);
 
   const enabled = Boolean(deploymentUrl && authToken);
@@ -58,7 +52,6 @@ export function useUdfExecutionStats(cursor?: number) {
     refetchInterval,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    // Add placeholder data to prevent blocking renders - show previous data if available, otherwise empty array
     placeholderData: (previousData) => previousData ?? [],
   });
 

@@ -1,50 +1,34 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { desktopFetch } from "@/utils/desktop";
 import { useDeployment } from "@/contexts/deployment-context";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/query-context";
 import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
 import {
   callConvexQuery,
   SYSTEM_QUERIES,
-  type FetchFn,
 } from "@convex-panel/shared/api";
 
-// Use Tauri's fetch for CORS-free HTTP requests
-const desktopFetch: FetchFn = (input, init) => tauriFetch(input, init);
-
 interface DeploymentStatus {
-  // Deployment state
   state: "running" | "paused" | "unknown";
   stateLoading: boolean;
   stateError: string | null;
-
-  // Version info
   version: string | null;
   versionLoading: boolean;
   versionError: string | null;
-
-  // NPM update info
   hasUpdate: boolean;
   latestVersion: string | null;
-
-  // Last push event
   lastPush: Date | null;
   lastPushLoading: boolean;
   lastPushError: string | null;
-
-  // Global state
   isLoading: boolean;
   hasError: boolean;
-
-  // Actions
   refetch: () => void;
   refetchState: () => void;
   refetchVersion: () => void;
   refetchLastPush: () => void;
 }
 
-// Query key factory
 export const deploymentStatusKeys = {
   all: ["deploymentStatus"] as const,
   state: (deploymentUrl: string) =>
@@ -64,12 +48,10 @@ export function useDeploymentStatus(): DeploymentStatus {
   const { deploymentUrl, authToken } = useDeployment();
   const queryClient = useQueryClient();
   
-  // Only refetch when tab is visible
   const refetchInterval = useVisibilityRefetch(REFETCH_INTERVAL.health);
 
   const enabled = Boolean(deploymentUrl && authToken);
 
-  // Deployment state query
   const stateQuery = useQuery({
     queryKey: deploymentStatusKeys.state(deploymentUrl ?? ""),
     queryFn: async () => {
@@ -90,7 +72,6 @@ export function useDeploymentStatus(): DeploymentStatus {
     refetchOnWindowFocus: false,
   });
 
-  // Version query
   const versionQuery = useQuery({
     queryKey: deploymentStatusKeys.version(deploymentUrl ?? ""),
     queryFn: async () => {
@@ -109,7 +90,6 @@ export function useDeploymentStatus(): DeploymentStatus {
     refetchOnMount: false,
   });
 
-  // Last push query
   const lastPushQuery = useQuery({
     queryKey: deploymentStatusKeys.lastPush(deploymentUrl ?? ""),
     queryFn: async () => {
@@ -135,11 +115,9 @@ export function useDeploymentStatus(): DeploymentStatus {
 
   const version = versionQuery.data ?? null;
 
-  // NPM update check (local state since it's not a Convex query)
   const [hasUpdate, setHasUpdate] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
 
-  // Check for npm updates when version is available
   useEffect(() => {
     if (!version) {
       setHasUpdate(false);
@@ -187,7 +165,6 @@ export function useDeploymentStatus(): DeploymentStatus {
     };
   }, [version]);
 
-  // Refetch functions
   const refetchState = useCallback(() => {
     queryClient.invalidateQueries({
       queryKey: deploymentStatusKeys.state(deploymentUrl ?? ""),
@@ -212,7 +189,6 @@ export function useDeploymentStatus(): DeploymentStatus {
     refetchLastPush();
   }, [refetchState, refetchVersion, refetchLastPush]);
 
-  // Aggregate loading and error states
   const isLoading =
     stateQuery.isLoading || versionQuery.isLoading || lastPushQuery.isLoading;
 
@@ -224,21 +200,16 @@ export function useDeploymentStatus(): DeploymentStatus {
     state: stateQuery.data ?? "unknown",
     stateLoading: stateQuery.isLoading,
     stateError: stateQuery.error?.message ?? null,
-
     version,
     versionLoading: versionQuery.isLoading,
     versionError: versionQuery.error?.message ?? null,
-
     hasUpdate,
     latestVersion,
-
     lastPush: lastPushQuery.data ?? null,
     lastPushLoading: lastPushQuery.isLoading,
     lastPushError: lastPushQuery.error?.message ?? null,
-
     isLoading,
     hasError,
-
     refetch,
     refetchState,
     refetchVersion,

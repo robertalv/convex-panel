@@ -1,44 +1,15 @@
-import { RefreshCw } from "lucide-react";
-import { cn } from "@/lib/utils";
+
 import { HealthCard } from "@/components/ui";
-import { FunctionList } from "./base/FunctionList";
-import { EmptyState } from "./base/EmptyState";
+import { FunctionList } from "./base/function-list";
+import { EmptyState } from "./base/empty-state";
 import type { FunctionStat } from "../hooks/useFunctionHealth";
 
 interface TopFunctionsCardProps {
-  /** List of top functions by invocation count */
   functions: FunctionStat[];
-  /** Maximum number of functions to display */
   maxItems?: number;
-  /** Whether data is loading */
   isLoading?: boolean;
-  /** Error message */
   error?: string | null;
-  /** Retry callback */
-  onRetry?: () => void;
-  /** Additional CSS classes */
   className?: string;
-}
-
-/**
- * Action button for card header
- */
-function RefreshButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      title="Refresh"
-      className={cn(
-        "p-1 rounded-md border-0",
-        "bg-transparent text-muted",
-        "hover:bg-overlay hover:text-foreground",
-        "cursor-pointer transition-all duration-150",
-        "flex items-center justify-center",
-      )}
-    >
-      <RefreshCw size={14} />
-    </button>
-  );
 }
 
 /**
@@ -50,7 +21,6 @@ export function TopFunctionsCard({
   maxItems = 5,
   isLoading = false,
   error = null,
-  onRetry,
   className,
 }: TopFunctionsCardProps) {
   return (
@@ -60,7 +30,6 @@ export function TopFunctionsCard({
       loading={isLoading}
       error={error}
       className={className}
-      action={onRetry && <RefreshButton onClick={onRetry} />}
     >
       {!functions || functions.length === 0 ? (
         <EmptyState

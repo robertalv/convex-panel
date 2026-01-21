@@ -1,113 +1,16 @@
 import { useMemo } from "react";
-import { RefreshCw, Clock } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { HealthCard } from "@/components/ui";
 import type { FunctionStat } from "../hooks/useFunctionHealth";
+import { formatLatency, getBarColorClass, getFunctionTypeBadge, getFunctionTypeBadgeClasses, getLatencyColorClass } from "@/utils/metrics";
 
 interface SlowestFunctionsCardProps {
-  /** List of slowest functions */
   functions: FunctionStat[];
-  /** Maximum number of functions to display */
   maxItems?: number;
-  /** Whether data is loading */
   isLoading?: boolean;
-  /** Error message */
   error?: string | null;
-  /** Retry callback */
-  onRetry?: () => void;
-  /** Additional CSS classes */
   className?: string;
-}
-
-/**
- * Get type badge abbreviation and classes
- */
-function getTypeBadge(type: string): string {
-  const normalized = type.toLowerCase();
-  if (normalized === "query" || normalized === "q") return "Q";
-  if (normalized === "mutation" || normalized === "m") return "M";
-  if (
-    normalized === "httpaction" ||
-    normalized === "http" ||
-    normalized === "h"
-  )
-    return "HTTP";
-  return "A";
-}
-
-interface TypeBadgeConfig {
-  colorClass: string;
-  bgClass: string;
-}
-
-function getTypeBadgeClasses(type: string): TypeBadgeConfig {
-  const normalized = type.toLowerCase();
-  if (normalized === "query") {
-    return { colorClass: "text-info", bgClass: "bg-info/15" };
-  }
-  if (normalized === "mutation") {
-    return { colorClass: "text-success", bgClass: "bg-success/15" };
-  }
-  if (normalized === "action") {
-    return { colorClass: "text-warning", bgClass: "bg-warning/15" };
-  }
-  if (normalized === "httpaction") {
-    return {
-      colorClass: "text-[#8b5cf6]",
-      bgClass: "bg-[rgba(139,92,246,0.15)]",
-    };
-  }
-  return { colorClass: "text-muted", bgClass: "bg-surface-alt" };
-}
-
-/**
- * Get color class based on latency
- */
-function getLatencyColorClass(ms: number): string {
-  if (ms > 5000) return "text-error"; // Red for > 5s
-  if (ms > 1000) return "text-warning"; // Orange for > 1s
-  if (ms > 500) return "text-yellow-500"; // Yellow for > 500ms
-  return "text-foreground";
-}
-
-/**
- * Get bar color class based on latency
- */
-function getBarColorClass(ms: number): string {
-  if (ms > 5000) return "bg-error";
-  if (ms > 1000) return "bg-warning";
-  if (ms > 500) return "bg-yellow-500";
-  return "bg-success";
-}
-
-/**
- * Format latency to human readable
- */
-function formatLatency(ms: number): string {
-  if (ms < 1) return "<1ms";
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
-/**
- * Action button for card header
- */
-function RefreshButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      title="Refresh"
-      className={cn(
-        "p-1 rounded-md border-0",
-        "bg-transparent text-muted",
-        "hover:bg-overlay hover:text-foreground",
-        "cursor-pointer transition-all duration-150",
-        "flex items-center justify-center",
-      )}
-    >
-      <RefreshCw size={14} />
-    </button>
-  );
 }
 
 /**
@@ -119,7 +22,6 @@ export function SlowestFunctionsCard({
   maxItems = 5,
   isLoading = false,
   error = null,
-  onRetry,
   className,
 }: SlowestFunctionsCardProps) {
   // Sort by p95 latency and take top N
@@ -145,12 +47,11 @@ export function SlowestFunctionsCard({
       loading={isLoading}
       error={error}
       className={className}
-      action={onRetry && <RefreshButton onClick={onRetry} />}
     >
       {displayFunctions.length > 0 ? (
         <div className="flex flex-col gap-3 w-full">
           {displayFunctions.map((fn) => {
-            const typeClasses = getTypeBadgeClasses(fn.type);
+            const typeClasses = getFunctionTypeBadgeClasses(fn.type);
 
             return (
               <div key={fn.name} className="flex flex-col gap-1.5">
@@ -163,7 +64,7 @@ export function SlowestFunctionsCard({
                       typeClasses.colorClass,
                     )}
                   >
-                    {getTypeBadge(fn.type)}
+                    {getFunctionTypeBadge(fn.type)}
                   </span>
                   <span
                     className="text-xs text-foreground truncate flex-1 font-mono"
@@ -218,7 +119,7 @@ export function SlowestFunctionsCard({
         </div>
       ) : !isLoading ? (
         <div className="flex flex-col items-center justify-center h-32 text-muted">
-          <Clock size={24} className="opacity-50 mb-2" />
+          <Icon name="clock" size={24} className="opacity-50 mb-2" />
           <span className="text-xs">No latency data available</span>
         </div>
       ) : null}

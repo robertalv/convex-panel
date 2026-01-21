@@ -1,4 +1,3 @@
-// Layout components for health view
-export { HealthPageHeader } from "./HealthPageHeader";
-export { LastDeployedBadge } from "./LastDeployedBadge";
-export { TimeRangeDisplay, TimeRangeSelector } from "./TimeRangeDisplay";
+export { LastDeployedBadge } from "./last-deployed-badge";
+export { TimeRangeDisplay, TimeRangeSelector } from "./time-range-display";
+export { HealthScrollableContent } from "./health-scrollable-content";

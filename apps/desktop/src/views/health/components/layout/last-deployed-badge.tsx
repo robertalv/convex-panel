@@ -1,26 +1,17 @@
 import { cn } from "@/lib/utils";
-import { Rocket, Clock, CheckCircle2, ArrowUp } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import { formatDistanceToNow, isValid } from "date-fns";
 import { useState, useEffect } from "react";
 
 interface LastDeployedBadgeProps {
-  /** Last deployment date */
   lastDeployed: Date | null;
-  /** Whether deployment data is loading */
   isLoading?: boolean;
-  /** Convex server version */
   version?: string | null;
-  /** Whether version data is loading */
   versionLoading?: boolean;
-  /** Whether an update is available */
   hasUpdate?: boolean;
-  /** Latest available version */
   latestVersion?: string;
-  /** Whether to show the icon */
   showIcon?: boolean;
-  /** Size variant */
   size?: "sm" | "md";
-  /** Additional CSS classes */
   className?: string;
 }
 
@@ -42,16 +33,13 @@ export function LastDeployedBadge({
   const iconSize = size === "sm" ? 12 : 14;
   const fontSize = size === "sm" ? "12px" : "13px";
 
-  // Desktop app version state
   const [desktopVersion, setDesktopVersion] = useState<string | null>(null);
   const [desktopHasUpdate, setDesktopHasUpdate] = useState(false);
   const [desktopLatestVersion, setDesktopLatestVersion] = useState<string>();
 
-  // Get current desktop app version
   const currentDesktopVersion =
     typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : null;
 
-  // Check for desktop app version updates
   useEffect(() => {
     if (!currentDesktopVersion) return;
 
@@ -61,7 +49,6 @@ export function LastDeployedBadge({
 
     async function checkDesktopVersion() {
       try {
-        // Fetch latest release from GitHub
         const REPO_OWNER = "robertalv";
         const REPO_NAME = "convex-panel";
         const response = await fetch(
@@ -72,7 +59,6 @@ export function LastDeployedBadge({
         const data = await response.json();
         if (!isMounted) return;
 
-        // Extract version from tag_name (e.g., "v0.1.0" -> "0.1.0")
         const latestTag = data.tag_name || data.name || "";
         const latestVersion = latestTag.replace(/^v/, "");
 
@@ -94,7 +80,7 @@ export function LastDeployedBadge({
           }
         }
       } catch {
-        // Swallow errors
+        // Silently fail errors
       }
     }
 
@@ -129,14 +115,11 @@ export function LastDeployedBadge({
     return "patch";
   };
 
-  // Normalize lastDeployed into a safe Date instance (or null)
   const normalizedLastDeployed: Date | null = (() => {
     if (!lastDeployed) return null;
-    // Already a Date and valid
     if (lastDeployed instanceof Date) {
       return isValid(lastDeployed) ? lastDeployed : null;
     }
-    // Handle unexpected runtime types (e.g. string or number)
     const candidate = new Date(lastDeployed as any);
     return isValid(candidate) ? candidate : null;
   })();
@@ -153,7 +136,7 @@ export function LastDeployedBadge({
           color: "var(--color-text-muted)",
         }}
       >
-        <Clock size={iconSize} style={{ opacity: 0.6 }} />
+        <Icon name="clock" size={iconSize} style={{ opacity: 0.6 }} />
         <span style={{ opacity: 0.6 }}>Loading...</span>
       </span>
     );
@@ -194,9 +177,9 @@ export function LastDeployedBadge({
       >
         {showIcon &&
           (isRecent ? (
-            <CheckCircle2 size={iconSize} />
+            <Icon name="checkmark-circle" size={iconSize} />
           ) : (
-            <Rocket size={iconSize} />
+            <Icon name="rocket" size={iconSize} />
           ))}
         {normalizedLastDeployed ? (
           <span>Deployed {timeAgo}</span>
@@ -258,7 +241,7 @@ export function LastDeployedBadge({
                   }}
                   title={`A ${getUpdateType()} update is available (${version} → ${latestVersion})`}
                 >
-                  <ArrowUp size={12} />
+                  <Icon name="arrow-up" size={12} />
                 </a>
               )}
             </>
@@ -307,7 +290,7 @@ export function LastDeployedBadge({
               }}
               title={`A ${getDesktopUpdateType()} update is available (${desktopVersion} → ${desktopLatestVersion})`}
             >
-              <ArrowUp size={12} />
+              <Icon name="arrow-up" size={12} />
             </a>
           )}
         </div>

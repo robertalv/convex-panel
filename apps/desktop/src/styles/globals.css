@@ -110,6 +110,19 @@
   --color-diff-delete-bg: rgba(252, 83, 58, 0.25);
   --color-diff-delete-line-bg: rgba(252, 83, 58, 0.16);
 
+  /* Chart colors for multi-line charts - matching dashboard palette */
+  --chart-line-1: rgb(
+    99,
+    168,
+    248
+  ); /* Blue - for "_rest" (all other functions) */
+  --chart-line-2: rgb(180, 236, 146); /* Green */
+  --chart-line-3: rgb(230, 226, 168); /* Yellow */
+  --chart-line-4: rgb(255, 202, 193); /* Coral/Pink */
+  --chart-line-5: rgb(7, 191, 232); /* Cyan */
+  --chart-line-6: rgb(200, 180, 255); /* Purple */
+  --chart-line-7: rgb(255, 180, 120); /* Orange */
+
   /* ========================================
    * TYPOGRAPHY
    * ========================================*/

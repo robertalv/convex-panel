@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { X, AlertTriangle, ExternalLink, Code, HelpCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import type {
   Insight,
   OccRecentEvent,
@@ -7,17 +7,23 @@ import type {
 } from "@convex-panel/shared/api";
 import { cn } from "@/lib/utils";
 import { IconButton } from "@/components/ui/button";
-import { MetricChart, TimeSeriesDataPoint } from "./MetricChart";
+import { Toolbar } from "@/components/ui/toolbar";
+import { MetricChart, TimeSeriesDataPoint } from "./metric-chart";
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
+import { Icon } from "@/components/ui/icon";
 
 interface InsightBreakdownSheetProps {
   insight: Insight;
   onClose: () => void;
-  onNavigateToDocument?: (documentId: string, tableName: string) => void;
+  onNavigateToDocument?: (
+    documentId: string,
+    tableName: string,
+    componentPath?: string | null,
+  ) => void;
 }
 
 const severityForInsightKind: Record<Insight["kind"], "error" | "warning"> = {
@@ -38,7 +44,6 @@ const titleForInsightKind: Record<Insight["kind"], string> = {
   documentsReadThreshold: "Approaching Documents Read Limit",
 };
 
-// Helper to format function identifier
 function functionIdentifierValue(
   functionId: string,
   componentPath?: string | null,
@@ -68,7 +73,6 @@ function getProblemDescription(insight: Insight): string {
   }
 }
 
-// Table header cell style
 const thStyle: React.CSSProperties = {
   padding: "8px 12px",
   textAlign: "left",
@@ -78,7 +82,6 @@ const thStyle: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-// Table data cell style
 const tdStyle: React.CSSProperties = {
   padding: "8px 12px",
   color: "var(--color-text-secondary)",
@@ -90,11 +93,17 @@ const tdStyle: React.CSSProperties = {
 function OccEventsTable({
   events,
   tableName,
+  componentPath,
   onNavigateToDocument,
 }: {
   events: OccRecentEvent[];
   tableName?: string;
-  onNavigateToDocument?: (documentId: string, tableName: string) => void;
+  componentPath?: string | null;
+  onNavigateToDocument?: (
+    documentId: string,
+    tableName: string,
+    componentPath?: string | null,
+  ) => void;
 }) {
   return (
     <table
@@ -112,7 +121,7 @@ function OccEventsTable({
               Request ID
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <HelpCircle size={12} className="text-muted cursor-help" />
+                  <Icon name="help-circle" size={12} className="text-muted cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
                   Unique identifier for the request
@@ -125,7 +134,7 @@ function OccEventsTable({
               Function Call ID
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <HelpCircle size={12} className="text-muted cursor-help" />
+                  <Icon name="help-circle" size={12} className="text-muted cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
                   Unique identifier for this function execution
@@ -139,7 +148,7 @@ function OccEventsTable({
               Conflicting Document ID
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <HelpCircle size={12} className="text-muted cursor-help" />
+                  <Icon name="help-circle" size={12} className="text-muted cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
                   The document that caused the write conflict
@@ -152,7 +161,7 @@ function OccEventsTable({
               Conflicting Function
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <HelpCircle size={12} className="text-muted cursor-help" />
+                  <Icon name="help-circle" size={12} className="text-muted cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
                   The function that wrote to the conflicting document
@@ -172,7 +181,7 @@ function OccEventsTable({
               Retry #
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <HelpCircle size={12} className="text-muted cursor-help" />
+                  <Icon name="help-circle" size={12} className="text-muted cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
                   Number of times this execution was retried
@@ -203,12 +212,16 @@ function OccEventsTable({
                 onNavigateToDocument && tableName ? (
                   <button
                     onClick={() =>
-                      onNavigateToDocument(event.occ_document_id!, tableName)
+                      onNavigateToDocument(
+                        event.occ_document_id!,
+                        tableName,
+                        componentPath,
+                      )
                     }
                     className="text-accent hover:underline cursor-pointer bg-transparent border-none p-0 font-mono text-[11px]"
                   >
                     {event.occ_document_id}
-                    <ExternalLink size={10} className="inline ml-1" />
+                    <Icon name="external-link" size={10} className="inline ml-1" />
                   </button>
                 ) : (
                   <span>{event.occ_document_id}</span>
@@ -333,6 +346,7 @@ export function InsightBreakdownSheet({
   onClose,
   onNavigateToDocument,
 }: InsightBreakdownSheetProps) {
+  const navigate = useNavigate();
   const severity = severityForInsightKind[insight.kind];
   const title = titleForInsightKind[insight.kind];
   const functionName = functionIdentifierValue(
@@ -363,61 +377,31 @@ export function InsightBreakdownSheet({
       }}
     >
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0px 16px",
-          borderBottom: "1px solid var(--color-border-base)",
-          backgroundColor: "var(--color-surface-base)",
-          height: "40px",
-          flexShrink: 0,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            flex: 1,
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
+      <Toolbar
+        left={
+          <div className="flex items-center gap-2">
             {severity === "error" ? (
-              <X size={16} className="shrink-0 text-error" />
+              <Icon name="close" size={16} className="shrink-0 text-error" />
             ) : (
-              <AlertTriangle size={16} className="shrink-0 text-warning" />
+              <Icon name="alert-triangle" size={16} className="shrink-0 text-warning" />
             )}
-            <span
-              style={{
-                fontSize: "14px",
-                fontWeight: 600,
-                color: "var(--color-text)",
-              }}
-            >
+            <span className="text-sm font-semibold text-foreground">
               {title}
             </span>
           </div>
-        </div>
-
-        <IconButton
-          onClick={onClose}
-          variant="ghost"
-          size="md"
-          tooltip="Close sheet"
-          aria-label="Close sheet"
-        >
-          <X size={16} />
-        </IconButton>
-      </div>
+        }
+        right={
+          <IconButton
+            onClick={onClose}
+            variant="ghost"
+            size="md"
+            tooltip="Close sheet"
+            aria-label="Close sheet"
+          >
+            <Icon name="close" size={16} />
+          </IconButton>
+        }
+      />
 
       {/* Scrollable Content */}
       <div
@@ -467,7 +451,20 @@ export function InsightBreakdownSheet({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              // TODO: Navigate to function code
+              const functionIdentifier = functionIdentifierValue(
+                insight.functionId,
+                insight.componentPath,
+              );
+              const params = new URLSearchParams();
+              params.set("function", functionIdentifier);
+              if (insight.componentPath) {
+                // Extract just the component name (first part before '/')
+                // e.g., "ossStats/crons" -> "ossStats"
+                const componentName = insight.componentPath.split("/")[0];
+                params.set("component", componentName);
+              }
+              navigate(`/functions?${params.toString()}`);
+              onClose();
             }}
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5",
@@ -477,7 +474,7 @@ export function InsightBreakdownSheet({
               "hover:bg-accent/10",
             )}
           >
-            <Code size={14} />
+            <Icon name="code" size={14} />
             View Code
           </button>
         </div>
@@ -626,10 +623,7 @@ export function InsightBreakdownSheet({
                   </h3>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <HelpCircle
-                        size={14}
-                        className="text-muted cursor-help"
-                      />
+                      <Icon name="help-circle" size={14} className="text-muted cursor-help" />
                     </TooltipTrigger>
                     <TooltipContent>
                       Recent function executions that triggered this insight
@@ -656,6 +650,7 @@ export function InsightBreakdownSheet({
                   <OccEventsTable
                     events={insight.details.recentEvents as OccRecentEvent[]}
                     tableName={insight.details.occTableName}
+                    componentPath={insight.componentPath}
                     onNavigateToDocument={onNavigateToDocument}
                   />
                 )}
@@ -693,7 +688,7 @@ export function InsightBreakdownSheet({
             className="flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent/80 transition-colors"
           >
             View Documentation
-            <ExternalLink size={12} />
+            <Icon name="external-link" size={12} />
           </a>
         </div>
       </div>

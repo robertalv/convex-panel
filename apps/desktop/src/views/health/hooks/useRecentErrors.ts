@@ -1,34 +1,23 @@
 import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchRecentErrors, type FetchFn } from "@convex-panel/shared/api";
-import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { fetchRecentErrors } from "@convex-panel/shared/api";
+import { desktopFetch } from "@/utils/desktop";
 import { useDeployment } from "@/contexts/deployment-context";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/query-context";
 
-// Use Tauri's fetch for CORS-free HTTP requests
-const desktopFetch: FetchFn = (input, init) => tauriFetch(input, init);
-
 export interface ErrorSummary {
-  /** Error message */
   message: string;
-  /** Number of occurrences */
   count: number;
 }
 
 interface RecentErrorsState {
-  /** Total number of errors in the time window */
   errorCount: number;
-  /** Top error messages by frequency */
   topErrors: ErrorSummary[];
-  /** Whether data is loading */
   isLoading: boolean;
-  /** Error message if fetch failed */
   error: string | null;
-  /** Refetch data */
   refetch: () => void;
 }
 
-// Query key factory for consistent key management
 export const recentErrorsKeys = {
   all: ["recentErrors"] as const,
   byHours: (deploymentUrl: string, hoursBack: number) =>

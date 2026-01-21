@@ -2,49 +2,30 @@ import { useMemo } from "react";
 import { useUdfExecutionStats } from "./useUdfExecutionStats";
 
 export interface FunctionStat {
-  /** Function identifier (e.g., "messages:list") */
   name: string;
-  /** Number of invocations */
   invocations: number;
-  /** Number of errors */
   errors: number;
-  /** Failure rate percentage */
   failureRate: number;
-  /** Average execution time in ms */
   avgExecutionTime: number;
-  /** p50 latency in ms */
   p50Latency: number;
-  /** p95 latency in ms */
   p95Latency: number;
-  /** p99 latency in ms */
   p99Latency: number;
-  /** Function type (query, mutation, action) */
   type: string;
-  /** Last error message (if any) */
   lastError?: string;
 }
 
 interface FunctionHealthData {
-  /** Top functions by failure rate */
   topFailing: FunctionStat[];
-  /** Top functions by execution time */
   slowest: FunctionStat[];
-  /** Top functions by invocation count */
   mostCalled: FunctionStat[];
-  /** Total function invocations in the time window */
   totalInvocations: number;
-  /** Total errors in the time window */
   totalErrors: number;
-  /** Overall failure rate */
   overallFailureRate: number;
 }
 
 interface FunctionHealth extends FunctionHealthData {
-  // State
   isLoading: boolean;
   error: string | null;
-
-  // Actions
   refetch: () => void;
 }
 
