@@ -194,10 +194,69 @@ cleanup() {
     fi
 }
 
-# Remove quarantine attribute
-remove_quarantine() {
-    info "Removing quarantine attribute..."
-    xattr -rd com.apple.quarantine "${INSTALL_DIR}/${APP_NAME}.app" 2>/dev/null || true
+# Remove quarantine attribute and handle Gatekeeper
+remove_quarantine_and_verify() {
+    info "Removing quarantine attributes..."
+    
+    # Method 1: Remove all extended attributes (including quarantine)
+    xattr -cr "${INSTALL_DIR}/${APP_NAME}.app" 2>/dev/null || true
+    
+    # Check if the app passes Gatekeeper assessment
+    SPCTL_OUTPUT=$(spctl -a -vv "${INSTALL_DIR}/${APP_NAME}.app" 2>&1)
+    
+    if echo "$SPCTL_OUTPUT" | grep -q "rejected"; then
+        # App is blocked - this means it's not notarized
+        warn "App is signed but not notarized by Apple."
+        info "This is expected for developer builds."
+        echo ""
+        
+        # Check if it's specifically an "Unnotarized Developer ID" issue
+        if echo "$SPCTL_OUTPUT" | grep -q "Unnotarized"; then
+            info "Attempting to register app with Gatekeeper..."
+            
+            # Try to add an exception (may require sudo)
+            if sudo -n true 2>/dev/null; then
+                # We have sudo access without password
+                sudo spctl --add --label "Convex Panel" "${INSTALL_DIR}/${APP_NAME}.app" 2>/dev/null || true
+                sudo xattr -dr com.apple.quarantine "${INSTALL_DIR}/${APP_NAME}.app" 2>/dev/null || true
+            fi
+        fi
+        
+        # Final check - see if we can actually launch the app
+        return 1
+    else
+        success "App passed Gatekeeper security assessment!"
+        return 0
+    fi
+}
+
+# Show manual bypass instructions when automatic methods fail
+show_bypass_instructions() {
+    echo ""
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}First-Time Launch Instructions${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo "  The app is code-signed but not yet notarized by Apple."
+    echo "  macOS Gatekeeper blocks unnotarized apps for security."
+    echo ""
+    echo -e "  ${BOLD}Option 1: Right-Click Method (Recommended)${NC}"
+    echo "    1. Open Finder and go to /Applications"
+    echo "    2. Right-click (or Control-click) on '${APP_NAME}'"
+    echo "    3. Select 'Open' from the context menu"
+    echo "    4. Click 'Open' in the dialog that appears"
+    echo ""
+    echo -e "  ${BOLD}Option 2: System Settings${NC}"
+    echo "    1. Try to open ${APP_NAME} normally"
+    echo "    2. Go to: System Settings > Privacy & Security"
+    echo "    3. Scroll down to the Security section"
+    echo "    4. Click 'Open Anyway' next to the ${APP_NAME} message"
+    echo ""
+    echo -e "  ${BOLD}Option 3: Terminal Command${NC}"
+    echo -e "    Run: ${CYAN}sudo xattr -cr \"${INSTALL_DIR}/${APP_NAME}.app\"${NC}"
+    echo ""
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
 }
 
 # Print success message
@@ -214,12 +273,51 @@ print_success() {
     echo ""
 }
 
+# Print success message with Gatekeeper warning
+print_success_with_warning() {
+    echo ""
+    success "${APP_NAME} has been installed successfully!"
+    echo ""
+    echo -e "  ${BOLD}Location:${NC} ${INSTALL_DIR}/${APP_NAME}.app"
+    echo -e "  ${BOLD}Version:${NC}  ${VERSION}"
+    echo ""
+    show_bypass_instructions
+}
+
 # Ask to open app
 ask_to_open() {
     echo -n "Would you like to open ${APP_NAME} now? [Y/n] "
     read -r response
     if [[ ! "$response" =~ ^[Nn]$ ]]; then
-        open "${INSTALL_DIR}/${APP_NAME}.app"
+        info "Opening ${APP_NAME}..."
+        if ! open "${INSTALL_DIR}/${APP_NAME}.app" 2>/dev/null; then
+            warn "Could not open automatically. Please use one of the methods above."
+        fi
+    fi
+}
+
+# Ask to open app (with Gatekeeper bypass attempt)
+ask_to_open_with_bypass() {
+    echo -n "Would you like to attempt to open ${APP_NAME} now? [Y/n] "
+    read -r response
+    if [[ ! "$response" =~ ^[Nn]$ ]]; then
+        info "Attempting to open ${APP_NAME}..."
+        echo ""
+        echo -e "  ${YELLOW}If a security dialog appears, click 'Open' to proceed.${NC}"
+        echo ""
+        
+        # First try: open normally
+        if open "${INSTALL_DIR}/${APP_NAME}.app" 2>/dev/null; then
+            # Give it a moment to potentially fail
+            sleep 2
+            success "App launch initiated!"
+            echo ""
+            echo "  If the app didn't open, use Option 1 (Right-Click Method) above."
+        else
+            warn "Could not open automatically."
+            echo ""
+            echo "  Please use Option 1 (Right-Click Method) described above."
+        fi
     fi
 }
 
@@ -233,9 +331,17 @@ main() {
     download_dmg
     install_app
     cleanup
-    remove_quarantine
-    print_success
-    ask_to_open
+    
+    # Check if the app passes Gatekeeper
+    if remove_quarantine_and_verify; then
+        # App is properly notarized and verified
+        print_success
+        ask_to_open
+    else
+        # App needs Gatekeeper bypass
+        print_success_with_warning
+        ask_to_open_with_bypass
+    fi
 }
 
 # Run main
