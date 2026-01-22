@@ -17,7 +17,7 @@ env:
 
 jobs:
   build-macos:
-    # Use macos-15 for latest SDK compatibility (required for macOS 26/Tahoe)
+    # Use macos-15 for latest SDK compatibility
     runs-on: macos-15
     strategy:
       fail-fast: false

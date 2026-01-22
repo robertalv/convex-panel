@@ -180,7 +180,12 @@ install_app() {
     
     # Copy to Applications
     info "Copying to ${INSTALL_DIR}..."
-    cp -R "$APP_PATH" "$INSTALL_DIR/"
+    # Use ditto to preserve resource forks and permissions
+    if ditto "$APP_PATH" "${INSTALL_DIR}/${APP_NAME}.app"; then
+        success "Copied successfully!"
+    else
+        error "Failed to copy ${APP_NAME}.app to ${INSTALL_DIR}."
+    fi
     
     # Unmount DMG
     info "Cleaning up..."
@@ -196,33 +201,30 @@ cleanup() {
 
 # Remove quarantine attribute and handle Gatekeeper
 remove_quarantine_and_verify() {
-    info "Removing quarantine attributes..."
+    info "Verifying app signature..."
     
-    # Method 1: Remove all extended attributes (including quarantine)
-    xattr -cr "${INSTALL_DIR}/${APP_NAME}.app" 2>/dev/null || true
+    # Method 1: Force remove quarantine attribute (essential for Sequoia)
+    if [[ -d "${INSTALL_DIR}/${APP_NAME}.app" ]]; then
+        info "Removing quarantine attributes..."
+        xattr -rd com.apple.quarantine "${INSTALL_DIR}/${APP_NAME}.app" 2>/dev/null || true
+    fi
     
     # Check if the app passes Gatekeeper assessment
     SPCTL_OUTPUT=$(spctl -a -vv "${INSTALL_DIR}/${APP_NAME}.app" 2>&1)
     
     if echo "$SPCTL_OUTPUT" | grep -q "rejected"; then
-        # App is blocked - this means it's not notarized
-        warn "App is signed but not notarized by Apple."
-        info "This is expected for developer builds."
+        # App is blocked - this means it's not notarized or the staple is missing
+        warn "App is signed but macOS Gatekeeper rejected it."
+        info "This often happens on Sequoia if notarization stapling isn't detected immediately."
         echo ""
         
-        # Check if it's specifically an "Unnotarized Developer ID" issue
-        if echo "$SPCTL_OUTPUT" | grep -q "Unnotarized"; then
-            info "Attempting to register app with Gatekeeper..."
-            
-            # Try to add an exception (may require sudo)
-            if sudo -n true 2>/dev/null; then
-                # We have sudo access without password
-                sudo spctl --add --label "Convex Panel" "${INSTALL_DIR}/${APP_NAME}.app" 2>/dev/null || true
-                sudo xattr -dr com.apple.quarantine "${INSTALL_DIR}/${APP_NAME}.app" 2>/dev/null || true
-            fi
+        # Try to add an exception (may require sudo)
+        if sudo -n true 2>/dev/null; then
+            # We have sudo access without password
+            info "Attempting to register app with Gatekeeper via sudo..."
+            sudo spctl --add --label "Convex Panel" "${INSTALL_DIR}/${APP_NAME}.app" 2>/dev/null || true
         fi
         
-        # Final check - see if we can actually launch the app
         return 1
     else
         success "App passed Gatekeeper security assessment!"
