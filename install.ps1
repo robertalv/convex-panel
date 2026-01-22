@@ -164,6 +164,7 @@ function Request-OpenApp {
     if ($Response -ne "n" -and $Response -ne "N") {
         # Try to find and open the app
         $Paths = @(
+            "$env:LOCALAPPDATA\dev.convexpanel.desktop\Convex Panel.exe",
             "$env:LOCALAPPDATA\Programs\Convex Panel\Convex Panel.exe",
             "$env:ProgramFiles\Convex Panel\Convex Panel.exe",
             "${env:ProgramFiles(x86)}\Convex Panel\Convex Panel.exe"
