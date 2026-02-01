@@ -40,9 +40,38 @@ export interface DashboardAdapter {
 
 const isTauri = () => typeof window !== 'undefined' && Boolean((window as any).__TAURI_INTERNALS__);
 
-export const dashboardFetch: DashboardFetch = (input, init) => {
-    if (isTauri()) return tauriFetch(input, init);
-    return fetch(input, init);
+export const dashboardFetch: DashboardFetch = async (input, init) => {
+    const url = input instanceof Request ? input.url : input.toString();
+    console.log(`[DashboardAdapter] Fetching ${url}`);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+        console.error(`Request to ${url} timed out after 15s`);
+        controller.abort();
+    }, 15000);
+
+    const newInit = {
+        ...init,
+        signal: (init?.signal || controller.signal) as AbortSignal,
+    };
+
+    try {
+        let response;
+        if (isTauri()) {
+            console.log(`Using tauriFetch for ${url}`);
+            response = await tauriFetch(input, newInit);
+        } else {
+            console.log(`Using native fetch for ${url}`);
+            response = await fetch(input, newInit);
+        }
+        console.log(`Response for ${url}: ${response.status}`);
+        return response;
+    } catch (error) {
+        console.error(`Error fetching ${url}:`, error);
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
+    }
 };
 
 async function discoverAuthEndpoints(fetcher: DashboardFetch) {
