@@ -857,6 +857,13 @@ export default function App({ convex: _initialConvex }: AppProps) {
     </ProjectPathProvider>
   ) : null;
 
+  // Show window on app startup
+  useEffect(() => {
+    invoke("show_window").catch((err) => {
+      console.error("Failed to show window:", err);
+    });
+  }, []);
+
   // Set window size to 960x600 with min/max constraints when showing welcome screen
   useEffect(() => {
     if (!isConnected && !isRestoring) {

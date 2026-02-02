@@ -10,6 +10,7 @@
  */
 
 import { isTauri } from "@/utils/desktop";
+import { invoke } from "@tauri-apps/api/core";
 
 /**
  * Extended RequestInit with Tauri-specific options
@@ -76,9 +77,25 @@ class RequestQueue {
 const tauriRequestQueue = new RequestQueue();
 
 /**
+ * Check if a URL is a self-hosted deployment that's been allowlisted
+ */
+async function isSelfHostedDeployment(url: string): Promise<boolean> {
+  if (!isTauri()) {
+    return false;
+  }
+  
+  try {
+    return await invoke("is_self_hosted_url_allowed", { url });
+  } catch (error) {
+    console.warn("[smartFetch] Failed to check self-hosted URL:", error);
+    return false;
+  }
+}
+
+/**
  * Determines if a URL should use native fetch or Tauri HTTP plugin
  */
-function shouldUseNativeFetch(url: string): boolean {
+async function shouldUseNativeFetch(url: string): Promise<boolean> {
   // Always use native fetch for:
   // 1. Convex Cloud URLs (they have proper CORS headers)
   // 2. Convex Site URLs (they have proper CORS headers)
@@ -116,6 +133,11 @@ function shouldUseNativeFetch(url: string): boolean {
       } catch {
         // Ignore window errors
       }
+    }
+
+    // Check if this is a self-hosted deployment that's been allowlisted
+    if (await isSelfHostedDeployment(url)) {
+      return true;
     }
   } catch {
     // If URL parsing fails, default to native fetch
@@ -156,7 +178,7 @@ export async function smartFetch(
 
   // Determine if we should use Tauri HTTP plugin
   const shouldUseTauri =
-    isTauri() && (init?.forceTauri || !shouldUseNativeFetch(url));
+    isTauri() && (init?.forceTauri || !(await shouldUseNativeFetch(url)));
 
   if (shouldUseTauri) {
     // Use Tauri HTTP plugin with request queuing to limit concurrent channels
@@ -184,6 +206,60 @@ export async function smartFetch(
  * Utility to check if a request would use Tauri HTTP plugin
  * Useful for debugging and testing
  */
-export function willUseTauriHttp(url: string, forceTauri = false): boolean {
-  return isTauri() && (forceTauri || !shouldUseNativeFetch(url));
+export async function willUseTauriHttp(url: string, forceTauri = false): Promise<boolean> {
+  return isTauri() && (forceTauri || !(await shouldUseNativeFetch(url)));
+}
+
+/**
+ * Test function to verify self-hosted deployment functionality
+ * This can be called from the browser console or in development
+ */
+export async function testSelfHostedMode(): Promise<void> {
+  if (!isTauri()) {
+    console.log("[testSelfHostedMode] Not running in Tauri, skipping test");
+    return;
+  }
+
+  console.log("[testSelfHostedMode] Starting self-hosted mode test...");
+
+  // Test 1: Check if we can add a self-hosted URL
+  const testUrl = "https://my-convex-instance.example.com";
+  console.log(`[testSelfHostedMode] Testing URL: ${testUrl}`);
+
+  try {
+    // Add the URL to allowlist
+    await invoke("add_self_hosted_url", { url: testUrl });
+    console.log(`[testSelfHostedMode] Successfully added URL to allowlist`);
+
+    // Check if it's recognized as self-hosted
+    const isSelfHosted = await isSelfHostedDeployment(testUrl);
+    console.log(`[testSelfHostedMode] isSelfHostedDeployment: ${isSelfHosted}`);
+
+    // Check if it would use native fetch
+    const willUseNative = !(await willUseTauriHttp(testUrl));
+    console.log(`[testSelfHostedMode] willUseNativeFetch: ${willUseNative}`);
+
+    // Test 2: Test a Convex Cloud URL (should always use native fetch)
+    const convexUrl = "https://api.convex.cloud";
+    const isConvexSelfHosted = await isSelfHostedDeployment(convexUrl);
+    const convexWillUseNative = !(await willUseTauriHttp(convexUrl));
+    console.log(`[testSelfHostedMode] Convex URL self-hosted check: ${isConvexSelfHosted}`);
+    console.log(`[testSelfHostedMode] Convex URL native fetch: ${convexWillUseNative}`);
+
+    // Test 3: Test an external URL (should use Tauri HTTP)
+    const externalUrl = "https://api.github.com";
+    const isExternalSelfHosted = await isSelfHostedDeployment(externalUrl);
+    const externalWillUseNative = !(await willUseTauriHttp(externalUrl));
+    console.log(`[testSelfHostedMode] External URL self-hosted check: ${isExternalSelfHosted}`);
+    console.log(`[testSelfHostedMode] External URL native fetch: ${externalWillUseNative}`);
+
+    // Clean up
+    await invoke("remove_self_hosted_url", { url: testUrl });
+    console.log(`[testSelfHostedMode] Cleaned up test URL`);
+
+    console.log("[testSelfHostedMode] Test completed successfully!");
+
+  } catch (error) {
+    console.error("[testSelfHostedMode] Test failed:", error);
+  }
 }

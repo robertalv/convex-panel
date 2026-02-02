@@ -333,7 +333,7 @@ export function getOAuthTokenMetadata(): {
 const DEPLOY_KEY_AUTH_CONFIG = `${NAMESPACE}.deployKeyAuthConfig`;
 const AUTH_MODE_KEY = `${NAMESPACE}.authMode`;
 
-export type AuthMode = "oauth" | "deployKey";
+export type AuthMode = "oauth" | "deployKey" | "selfHosted";
 
 /**
  * Deploy key auth configuration for direct login mode
@@ -342,6 +342,15 @@ export interface DeployKeyAuthConfig {
   deployKey: string;
   deploymentUrl: string;
   deploymentName: string;
+}
+
+/**
+ * Self-hosted auth configuration
+ */
+export interface SelfHostedAuthConfig {
+  deploymentUrl: string;
+  deploymentName: string;
+  isSelfHosted: true;
 }
 
 /**
@@ -418,6 +427,50 @@ export async function clearDeployKeyAuthConfig(): Promise<void> {
 }
 
 /**
+ * Save self-hosted auth configuration
+ */
+export async function saveSelfHostedAuthConfig(
+  config: SelfHostedAuthConfig | null,
+): Promise<void> {
+  if (!config) {
+    await clearSelfHostedAuthConfig();
+    return;
+  }
+
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem(`${NAMESPACE}.selfHostedAuthConfig`, JSON.stringify(config));
+    console.log(
+      `[secureStorage] Saved self-hosted auth config for ${config.deploymentName}`,
+    );
+  }
+}
+
+/**
+ * Load self-hosted auth configuration
+ */
+export async function loadSelfHostedAuthConfig(): Promise<SelfHostedAuthConfig | null> {
+  if (typeof localStorage === "undefined") return null;
+  const data = localStorage.getItem(`${NAMESPACE}.selfHostedAuthConfig`);
+  if (!data) return null;
+
+  try {
+    return JSON.parse(data) as SelfHostedAuthConfig;
+  } catch {
+    console.warn("[secureStorage] Failed to parse self-hosted auth config");
+    return null;
+  }
+}
+
+/**
+ * Clear self-hosted auth configuration
+ */
+export async function clearSelfHostedAuthConfig(): Promise<void> {
+  if (typeof localStorage !== "undefined") {
+    localStorage.removeItem(`${NAMESPACE}.selfHostedAuthConfig`);
+  }
+}
+
+/**
  * Clear all auth data (for full logout)
  */
 export async function clearAllAuthData(): Promise<void> {
@@ -425,4 +478,5 @@ export async function clearAllAuthData(): Promise<void> {
   await clearDeployKey();
   await clearDeployKeyAuthConfig();
   await clearAuthMode();
+  await clearSelfHostedAuthConfig();
 }

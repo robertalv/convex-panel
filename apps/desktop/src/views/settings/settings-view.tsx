@@ -13,6 +13,7 @@ import { AuthenticationSettings } from "./components/authentication-settings";
 import { EnvironmentVariables } from "./components/environment-variables";
 import { ComponentsSettings } from "./components/components-settings";
 import { BackupRestore } from "./components/backup-restore";
+import { SelfHostedTest } from "./components/self-hosted-test";
 
 // Combined section types from panel and desktop
 export type SettingsSection =
@@ -29,7 +30,9 @@ export type SettingsSection =
   | "components"
   | "backup-restore"
   | "pause-deployment"
-  | "ai-analysis";
+  | "ai-analysis"
+  // Self-hosted deployment testing
+  | "self-hosted-test";
 
 interface SidebarSection {
   id: string;
@@ -78,6 +81,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         requiresOAuth: true,
       },
       { id: "ai-analysis", label: "AI Analysis", requiresOAuth: true },
+      { id: "self-hosted-test", label: "Self-Hosted Test", requiresOAuth: true },
     ],
   },
 ];
@@ -324,6 +328,9 @@ export function SettingsView({
             deploymentUrl={deployment.deploymentUrl ?? undefined}
           />
         );
+      case "self-hosted-test":
+        if (isDeployKeyMode) return null;
+        return <SelfHostedTest />;
       default:
         return null;
     }
