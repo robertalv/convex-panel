@@ -330,6 +330,8 @@ jobs:
       version: ${{ steps.get_version.outputs.version }}
       arm64_sha: ${{ steps.checksums.outputs.arm64_sha }}
       x64_sha: ${{ steps.checksums.outputs.x64_sha }}
+      arm64_dmg_name: ${{ steps.checksums.outputs.arm64_dmg_name }}
+      x64_dmg_name: ${{ steps.checksums.outputs.x64_dmg_name }}
     steps:
       - name: Get version from tag
         id: get_version
@@ -343,7 +345,7 @@ jobs:
       - name: List artifacts
         run: find artifacts -type f -name "*" | head -50
 
-      - name: Calculate SHA256 checksums
+      - name: Calculate SHA256 checksums and get filenames
         id: checksums
         run: |
           ARM64_DMG=$(find artifacts -name "*aarch64*.dmg" -o -name "*arm64*.dmg" | head -1)
@@ -351,14 +353,20 @@ jobs:
 
           if [ -n "$ARM64_DMG" ]; then
             ARM64_SHA=$(shasum -a 256 "$ARM64_DMG" | awk '{print $1}')
+            ARM64_NAME=$(basename "$ARM64_DMG")
             echo "arm64_sha=$ARM64_SHA" >> $GITHUB_OUTPUT
+            echo "arm64_dmg_name=$ARM64_NAME" >> $GITHUB_OUTPUT
             echo "ARM64 SHA256: $ARM64_SHA"
+            echo "ARM64 Filename: $ARM64_NAME"
           fi
 
           if [ -n "$X64_DMG" ]; then
             X64_SHA=$(shasum -a 256 "$X64_DMG" | awk '{print $1}')
+            X64_NAME=$(basename "$X64_DMG")
             echo "x64_sha=$X64_SHA" >> $GITHUB_OUTPUT
+            echo "x64_dmg_name=$X64_NAME" >> $GITHUB_OUTPUT
             echo "x64 SHA256: $X64_SHA"
+            echo "x64 Filename: $X64_NAME"
           fi
 
       - name: Create Release
@@ -387,22 +395,26 @@ jobs:
           VERSION="${{ needs.create-release.outputs.version }}"
           ARM64_SHA="${{ needs.create-release.outputs.arm64_sha }}"
           X64_SHA="${{ needs.create-release.outputs.x64_sha }}"
+          ARM64_DMG_NAME="${{ needs.create-release.outputs.arm64_dmg_name }}"
+          X64_DMG_NAME="${{ needs.create-release.outputs.x64_dmg_name }}"
 
           echo "Updating Homebrew cask to version $VERSION"
           echo "ARM64 SHA: $ARM64_SHA"
+          echo "ARM64 DMG: $ARM64_DMG_NAME"
           echo "x64 SHA: $X64_SHA"
+          echo "x64 DMG: $X64_DMG_NAME"
 
-          # Generate the new cask content
+          # Generate the new cask content with actual DMG filenames
           CASK_CONTENT=$(cat <<EOF
           cask "convex-panel" do
             version "$VERSION"
 
             if Hardware::CPU.arm?
               sha256 "$ARM64_SHA"
-              url "https://github.com/robertalv/convex-panel/releases/download/v#{version}/Convex.Panel_#{version}_aarch64.dmg"
+              url "https://github.com/robertalv/convex-panel/releases/download/v#{version}/$ARM64_DMG_NAME"
             else
               sha256 "$X64_SHA"
-              url "https://github.com/robertalv/convex-panel/releases/download/v#{version}/Convex.Panel_#{version}_x64.dmg"
+              url "https://github.com/robertalv/convex-panel/releases/download/v#{version}/$X64_DMG_NAME"
             end
 
             name "Convex Panel"
