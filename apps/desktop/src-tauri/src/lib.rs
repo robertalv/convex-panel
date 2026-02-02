@@ -10,7 +10,6 @@ use tauri_plugin_notification::NotificationExt;
 use std::sync::Mutex;
 use std::collections::VecDeque;
 use once_cell::sync::Lazy;
-use std::sync::RwLock;
 
 // Network test status stored globally for tray updates
 #[derive(Clone, serde::Serialize, serde::Deserialize, Default)]
@@ -332,19 +331,6 @@ fn center_window(window: tauri::Window) -> Result<(), String> {
     window.center().map_err(|e| e.to_string())
 }
 
-/// Command to show and focus the window
-#[tauri::command]
-fn show_window(window: tauri::Window) -> Result<(), String> {
-    window.show().map_err(|e| e.to_string())?;
-    window.set_focus().map_err(|e| e.to_string())
-}
-
-/// Command to hide the window to system tray
-#[tauri::command]
-fn hide_window(window: tauri::Window) -> Result<(), String> {
-    window.hide().map_err(|e| e.to_string())
-}
-
 /// Command to set window to fixed size with min/max constraints (for welcome screen)
 #[tauri::command]
 fn set_window_fixed_size(window: tauri::Window, width: f64, height: f64) -> Result<(), String> {
@@ -600,73 +586,6 @@ async fn check_editor_available(editor: String) -> Result<bool, String> {
     }
 }
 
-// ============================================================================
-// Self-hosted URL Management
-// ============================================================================
-
-use std::collections::HashSet;
-
-static SELF_HOSTED_URLS: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| {
-    RwLock::new(HashSet::new())
-});
-
-/// Add a self-hosted deployment URL to the allowlist
-#[tauri::command]
-async fn add_self_hosted_url(url: String) -> Result<(), String> {
-    // Normalize the URL and extract the base domain
-    let normalized_url = normalize_self_hosted_url(&url)?;
-    
-    let mut urls = SELF_HOSTED_URLS.write().map_err(|e| format!("Failed to acquire write lock: {}", e))?;
-    urls.insert(normalized_url.clone());
-    
-    println!("[self-hosted] Added URL to allowlist: {}", normalized_url);
-    Ok(())
-}
-
-/// Remove a self-hosted deployment URL from the allowlist
-#[tauri::command]
-async fn remove_self_hosted_url(url: String) -> Result<(), String> {
-    let normalized_url = normalize_self_hosted_url(&url)?;
-    
-    let mut urls = SELF_HOSTED_URLS.write().map_err(|e| format!("Failed to acquire write lock: {}", e))?;
-    urls.remove(&normalized_url);
-    
-    println!("[self-hosted] Removed URL from allowlist: {}", normalized_url);
-    Ok(())
-}
-
-/// Check if a URL is in the self-hosted allowlist
-#[tauri::command]
-async fn is_self_hosted_url_allowed(url: String) -> Result<bool, String> {
-    let normalized_url = normalize_self_hosted_url(&url)?;
-    
-    let urls = SELF_HOSTED_URLS.read().map_err(|e| format!("Failed to acquire read lock: {}", e))?;
-    Ok(urls.contains(&normalized_url))
-}
-
-/// Get all self-hosted URLs in the allowlist
-#[tauri::command]
-async fn get_self_hosted_urls() -> Result<Vec<String>, String> {
-    let urls = SELF_HOSTED_URLS.read().map_err(|e| format!("Failed to acquire read lock: {}", e))?;
-    Ok(urls.iter().cloned().collect())
-}
-
-/// Normalize a self-hosted URL to ensure consistency
-fn normalize_self_hosted_url(url: &str) -> Result<String, String> {
-    // Parse the URL
-    let parsed_url = url::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
-    
-    // Extract the base URL (protocol + host + port)
-    let base_url = format!("{}://{}", parsed_url.scheme(), parsed_url.host_str().unwrap_or(""));
-    
-    // Ensure HTTPS for security
-    if parsed_url.scheme() != "https" {
-        return Err("Self-hosted deployments must use HTTPS".to_string());
-    }
-    
-    Ok(base_url)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -680,8 +599,6 @@ pub fn run() {
             set_window_size,
             set_window_size_centered,
             center_window,
-            show_window,
-            hide_window,
             set_window_fixed_size,
             remove_window_constraints,
             secure_store::set_secret,
@@ -723,12 +640,7 @@ pub fn run() {
             log_store::get_log_store_settings,
             log_store::set_log_store_settings,
             log_store::clear_all_logs,
-            log_store::optimize_log_db,
-            // Self-hosted URL management commands
-            add_self_hosted_url,
-            remove_self_hosted_url,
-            is_self_hosted_url_allowed,
-            get_self_hosted_urls
+            log_store::optimize_log_db
         ])
         .setup(|app| {
             // Initialize log store database
@@ -859,20 +771,6 @@ pub fn run() {
                 }
             });
 
-            // Handle window close event to minimize to tray instead of closing
-            let window_for_close = window.clone();
-            window.on_window_event(move |event| {
-                match event {
-                    tauri::WindowEvent::CloseRequested { api, .. } => {
-                        // Prevent the window from closing
-                        api.prevent_close();
-                        // Hide the window instead
-                        let _ = window_for_close.hide();
-                    }
-                    _ => {}
-                }
-            });
-
             // Create system tray with network status menu
             // Status items are initially "Pending" and will be updated by frontend via update_network_status
             let ws_status_item = MenuItem::with_id(app, "ws_status", "WebSocket: Pending", false, None::<&str>)?;
@@ -961,22 +859,6 @@ pub fn run() {
 
             Ok(())
         })
-        .build(tauri::generate_context!())
-        .expect("error while building tauri application")
-        .run(|app_handle, event| {
-            // Handle dock icon click on macOS to show window when all windows are hidden
-            #[cfg(target_os = "macos")]
-            if let tauri::RunEvent::Reopen { has_visible_windows, .. } = event {
-                if !has_visible_windows {
-                    if let Some(window) = app_handle.get_webview_window("main") {
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    }
-                }
-            }
-            
-            // Suppress unused variable warnings on non-macOS platforms
-            #[cfg(not(target_os = "macos"))]
-            let _ = (app_handle, event);
-        });
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }

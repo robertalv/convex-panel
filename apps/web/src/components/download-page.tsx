@@ -37,7 +37,7 @@ const features = [
 ];
 
 export function DownloadPage() {
-  const version = "0.3.19";
+  const version = "0.3.20";
   const macDownloadUrl = `https://github.com/robertalv/convex-panel/releases/download/v${version}/Convex.Panel_${version}_aarch64.dmg`;
   const windowsDownloadUrl = `https://github.com/robertalv/convex-panel/releases/download/v${version}/Convex.Panel_${version}_x64-setup.exe`;
   const androidDownloadUrl = `https://github.com/robertalv/convex-panel/releases/download/v${version}/convex-panel-mobile-${version}.apk`;
