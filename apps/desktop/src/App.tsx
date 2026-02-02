@@ -544,21 +544,17 @@ export default function App({ convex: _initialConvex }: AppProps) {
     pollAbortRef.current = false;
 
     try {
-      console.log("[Auth] Starting device authorization...");
       const deviceAuth = await startDeviceAuthorization();
-      console.log("[Auth] Got device auth response:", deviceAuth.user_code);
       setUserCode(deviceAuth.user_code);
       const url = deviceAuth.verification_uri_complete;
 
       if (isTauri()) {
-        console.log("[Auth] Opening URL in browser:", url);
         const { open } = await import("@tauri-apps/plugin-shell");
         open(url);
       } else {
         window.open(url, "_blank", "noopener,noreferrer");
       }
 
-      console.log("[Auth] Polling for device token...");
       const tokens = await pollForDeviceToken(
         deviceAuth,
         undefined,
@@ -566,20 +562,16 @@ export default function App({ convex: _initialConvex }: AppProps) {
       );
       if (!tokens) throw new Error("Authentication expired or cancelled");
 
-      console.log("[Auth] Got tokens, exchanging for dashboard session...");
       const dashboardSession = await exchangeForDashboardToken(
         tokens.access_token,
       );
-      console.log("[Auth] Got dashboard session, saving...");
       setSession(dashboardSession);
       await saveAccessToken(dashboardSession.accessToken);
       await saveAuthMode("oauth");
       setAuthModeState("oauth");
       setUserCode(null);
       setIsTransitioning(true);
-      console.log("[Auth] Authentication complete!");
     } catch (err) {
-      console.error("[Auth] Authentication failed:", err);
       setAuthError(
         err instanceof Error ? err.message : "Authentication failed",
       );
