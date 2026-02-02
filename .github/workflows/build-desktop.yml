@@ -121,12 +121,17 @@ jobs:
           args: --target ${{ matrix.target }}
 
       - name: Staple and verify notarization
-        if: ${{ secrets.APPLE_ID != '' }}
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          # Skip if no Apple credentials are configured
+          if [ -z "$APPLE_ID" ] || [ -z "$APPLE_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
+            echo "⚠️ Apple notarization credentials not configured, skipping notarization"
+            exit 0
+          fi
+
           set -e
 
           APP_PATH=$(find apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos -name "*.app" 2>/dev/null | head -1)
