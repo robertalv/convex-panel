@@ -162,17 +162,52 @@ function Request-OpenApp {
     $Response = Read-Host "Would you like to open $AppName now? [Y/n]"
     
     if ($Response -ne "n" -and $Response -ne "N") {
-        # Try to find and open the app
+        # Try to find and open the app - check common installation paths
         $Paths = @(
+            # NSIS default install location (Tauri uses bundle identifier)
             "$env:LOCALAPPDATA\dev.convexpanel.desktop\Convex Panel.exe",
+            "$env:LOCALAPPDATA\Convex Panel\Convex Panel.exe",
             "$env:LOCALAPPDATA\Programs\Convex Panel\Convex Panel.exe",
+            # MSI install locations
             "$env:ProgramFiles\Convex Panel\Convex Panel.exe",
             "${env:ProgramFiles(x86)}\Convex Panel\Convex Panel.exe"
         )
         
         foreach ($Path in $Paths) {
             if (Test-Path $Path) {
+                Write-Info "Found app at: $Path"
                 Start-Process $Path
+                return
+            }
+        }
+        
+        # Try to find it by searching common locations
+        Write-Info "Searching for installation..."
+        $SearchPaths = @(
+            "$env:LOCALAPPDATA",
+            "$env:ProgramFiles",
+            "${env:ProgramFiles(x86)}"
+        )
+        
+        foreach ($SearchPath in $SearchPaths) {
+            $Found = Get-ChildItem -Path $SearchPath -Filter "Convex Panel.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($Found) {
+                Write-Info "Found app at: $($Found.FullName)"
+                Start-Process $Found.FullName
+                return
+            }
+        }
+        
+        # Last resort - try Start Menu shortcut
+        $StartMenuPaths = @(
+            "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Convex Panel.lnk",
+            "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Convex Panel.lnk"
+        )
+        
+        foreach ($ShortcutPath in $StartMenuPaths) {
+            if (Test-Path $ShortcutPath) {
+                Write-Info "Launching from Start Menu shortcut..."
+                Start-Process $ShortcutPath
                 return
             }
         }

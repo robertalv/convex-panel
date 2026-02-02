@@ -33,7 +33,7 @@
         "hiddenTitle": true,
         "center": true,
         "devtools": true,
-        "visible": false
+        "visible": true
       }
     ]
   },

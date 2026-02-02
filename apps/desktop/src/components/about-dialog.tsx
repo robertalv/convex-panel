@@ -148,7 +148,9 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
           <ConvexLogo size={50} />
           <ConvexLettering className="mt-4 mb-2" />
 
-          <p className="text-sm text-text-muted">Version 0.1.0 (0.1.0)</p>
+          <p className="text-sm text-text-muted">
+            Version {typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0"} ({typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0"})
+          </p>
 
           {commitHash && commitHash !== "unknown" && (
             <div className="mb-4 -mt-1">

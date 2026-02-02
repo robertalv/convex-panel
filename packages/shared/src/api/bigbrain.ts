@@ -57,7 +57,7 @@ export interface Deployment {
   name: string;
   projectId: number;
   deploymentType: "dev" | "prod" | "preview";
-  kind: "cloud" | "local";
+  kind?: "cloud" | "local";
   creator?: number;
   previewIdentifier?: string | null;
   url?: string;

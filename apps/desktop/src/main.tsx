@@ -10,7 +10,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import App from "./App";
 
-// Import new Tailwind-based styles
+// Import Tailwind-based styles
 import "./styles/globals.css";
 
 // Keep panel styles for components we reuse from convex-panel
