@@ -1,6 +1,6 @@
 [package]
 name = "convex-panel-desktop"
-version = "0.3.16"
+version = "0.3.17"
 description = "Desktop application for Convex Panel"
 authors = ["Robert Alvarez"]
 edition = "2021"
