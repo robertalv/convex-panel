@@ -965,6 +965,7 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app_handle, event| {
             // Handle dock icon click on macOS to show window when all windows are hidden
+            #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { has_visible_windows, .. } = event {
                 if !has_visible_windows {
                     if let Some(window) = app_handle.get_webview_window("main") {
@@ -973,5 +974,9 @@ pub fn run() {
                     }
                 }
             }
+            
+            // Suppress unused variable warnings on non-macOS platforms
+            #[cfg(not(target_os = "macos"))]
+            let _ = (app_handle, event);
         });
 }
