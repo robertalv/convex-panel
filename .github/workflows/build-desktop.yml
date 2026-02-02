@@ -312,7 +312,15 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      arm64_sha: ${{ steps.checksums.outputs.arm64_sha }}
+      x64_sha: ${{ steps.checksums.outputs.x64_sha }}
     steps:
+      - name: Get version from tag
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -320,6 +328,24 @@ jobs:
 
       - name: List artifacts
         run: find artifacts -type f -name "*" | head -50
+
+      - name: Calculate SHA256 checksums
+        id: checksums
+        run: |
+          ARM64_DMG=$(find artifacts -name "*aarch64*.dmg" -o -name "*arm64*.dmg" | head -1)
+          X64_DMG=$(find artifacts -name "*x64*.dmg" -o -name "*x86_64*.dmg" | head -1)
+
+          if [ -n "$ARM64_DMG" ]; then
+            ARM64_SHA=$(shasum -a 256 "$ARM64_DMG" | awk '{print $1}')
+            echo "arm64_sha=$ARM64_SHA" >> $GITHUB_OUTPUT
+            echo "ARM64 SHA256: $ARM64_SHA"
+          fi
+
+          if [ -n "$X64_DMG" ]; then
+            X64_SHA=$(shasum -a 256 "$X64_DMG" | awk '{print $1}')
+            echo "x64_sha=$X64_SHA" >> $GITHUB_OUTPUT
+            echo "x64 SHA256: $X64_SHA"
+          fi
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -334,3 +360,72 @@ jobs:
             artifacts/**/*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-homebrew:
+    needs: [create-release]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Update Homebrew Cask
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          VERSION="${{ needs.create-release.outputs.version }}"
+          ARM64_SHA="${{ needs.create-release.outputs.arm64_sha }}"
+          X64_SHA="${{ needs.create-release.outputs.x64_sha }}"
+
+          echo "Updating Homebrew cask to version $VERSION"
+          echo "ARM64 SHA: $ARM64_SHA"
+          echo "x64 SHA: $X64_SHA"
+
+          # Generate the new cask content
+          CASK_CONTENT=$(cat <<EOF
+          cask "convex-panel" do
+            version "$VERSION"
+
+            if Hardware::CPU.arm?
+              sha256 "$ARM64_SHA"
+              url "https://github.com/robertalv/convex-panel/releases/download/v#{version}/Convex.Panel_#{version}_aarch64.dmg"
+            else
+              sha256 "$X64_SHA"
+              url "https://github.com/robertalv/convex-panel/releases/download/v#{version}/Convex.Panel_#{version}_x64.dmg"
+            end
+
+            name "Convex Panel"
+            desc "Debugging and monitoring tool for Convex applications"
+            homepage "https://convexpanel.dev"
+
+            livecheck do
+              url :url
+              strategy :github_latest
+            end
+
+            app "Convex Panel.app"
+
+            zap trash: [
+              "~/Library/Application Support/dev.convexpanel.desktop",
+              "~/Library/Caches/dev.convexpanel.desktop",
+              "~/Library/Preferences/dev.convexpanel.desktop.plist",
+              "~/Library/Saved Application State/dev.convexpanel.desktop.savedState",
+            ]
+          end
+          EOF
+          )
+
+          # Get current file SHA
+          CURRENT_SHA=$(curl -s -H "Authorization: token $HOMEBREW_TAP_TOKEN" \
+            "https://api.github.com/repos/robertalv/homebrew-tap/contents/Casks/convex-panel.rb" | \
+            jq -r '.sha')
+
+          # Update the file via GitHub API
+          curl -X PUT \
+            -H "Authorization: token $HOMEBREW_TAP_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/robertalv/homebrew-tap/contents/Casks/convex-panel.rb" \
+            -d "$(jq -n \
+              --arg message "Update convex-panel to v$VERSION" \
+              --arg content "$(echo "$CASK_CONTENT" | base64 -w 0)" \
+              --arg sha "$CURRENT_SHA" \
+              '{message: $message, content: $content, sha: $sha}')"
+
+          echo "✅ Homebrew cask updated to v$VERSION"
