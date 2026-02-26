@@ -8,7 +8,8 @@ use tauri::menu::{Menu, MenuItem, IconMenuItem, Submenu, PredefinedMenuItem};
 use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent};
 use tauri_plugin_notification::NotificationExt;
 use std::sync::Mutex;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
+use std::time::Duration;
 use once_cell::sync::Lazy;
 
 // Network test status stored globally for tray updates
@@ -57,6 +58,287 @@ struct TrayMenuItems {
     http_status: MenuItem<tauri::Wry>,
     sse_status: MenuItem<tauri::Wry>,
     proxy_status: MenuItem<tauri::Wry>,
+}
+
+const AUTH_ISSUER: &str = "https://auth.convex.dev";
+const BIG_BRAIN_URL: &str = "https://api.convex.dev";
+
+#[derive(serde::Deserialize)]
+struct OidcDiscoveryResponse {
+    device_authorization_endpoint: Option<String>,
+    token_endpoint: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+struct TauriDeviceAuthResponse {
+    device_code: String,
+    user_code: String,
+    verification_uri: String,
+    verification_uri_complete: String,
+    expires_in: u64,
+    interval: u64,
+    token_endpoint: String,
+}
+
+#[derive(serde::Serialize)]
+struct TauriTokenPollResponse {
+    status: u16,
+    body: serde_json::Value,
+}
+
+#[derive(serde::Deserialize)]
+struct TauriHttpRequest {
+    url: String,
+    method: String,
+    headers: Option<HashMap<String, String>>,
+    body: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+struct TauriHttpResponse {
+    status: u16,
+    status_text: String,
+    headers: HashMap<String, String>,
+    body: String,
+}
+
+fn auth_http_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(15))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {e}"))
+}
+
+async fn discover_auth_endpoints(client: &reqwest::Client) -> Result<(String, String), String> {
+    let response = client
+        .get(format!("{AUTH_ISSUER}/.well-known/openid-configuration"))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to discover auth configuration: {e}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status().as_u16();
+        let text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(format!(
+            "Failed to discover auth configuration: {} {}",
+            status, text
+        ));
+    }
+
+    let discovery = response
+        .json::<OidcDiscoveryResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse auth configuration JSON: {e}"))?;
+
+    let device_endpoint = discovery
+        .device_authorization_endpoint
+        .ok_or_else(|| "Auth discovery missing device_authorization_endpoint".to_string())?;
+    let token_endpoint = discovery
+        .token_endpoint
+        .ok_or_else(|| "Auth discovery missing token_endpoint".to_string())?;
+
+    Ok((device_endpoint, token_endpoint))
+}
+
+#[tauri::command]
+async fn auth_start_device_authorization(client_id: String, scope: String) -> Result<TauriDeviceAuthResponse, String> {
+    let client = auth_http_client()?;
+    let (device_authorization_endpoint, token_endpoint) = discover_auth_endpoints(&client).await?;
+
+    let form = [("client_id", client_id), ("scope", scope)];
+    let response = client
+        .post(&device_authorization_endpoint)
+        .form(&form)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to start device authorization: {e}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status().as_u16();
+        let text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(format!(
+            "Failed to start device authorization: {} {}",
+            status, text
+        ));
+    }
+
+    let payload = response
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| format!("Failed to parse device authorization response: {e}"))?;
+
+    let device_code = payload
+        .get("device_code")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "Device authorization response missing device_code".to_string())?
+        .to_string();
+    let user_code = payload
+        .get("user_code")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "Device authorization response missing user_code".to_string())?
+        .to_string();
+    let verification_uri_complete = payload
+        .get("verification_uri_complete")
+        .and_then(|v| v.as_str())
+        .or_else(|| payload.get("verification_uri").and_then(|v| v.as_str()))
+        .ok_or_else(|| {
+            "Device authorization response missing verification URI".to_string()
+        })?
+        .to_string();
+    let verification_uri = payload
+        .get("verification_uri")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&verification_uri_complete)
+        .to_string();
+    let expires_in = payload
+        .get("expires_in")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| "Device authorization response missing expires_in".to_string())?;
+    let interval = payload
+        .get("interval")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(5);
+
+    Ok(TauriDeviceAuthResponse {
+        device_code,
+        user_code,
+        verification_uri,
+        verification_uri_complete,
+        expires_in,
+        interval,
+        token_endpoint,
+    })
+}
+
+#[tauri::command]
+async fn auth_poll_device_token(
+    token_endpoint: String,
+    client_id: String,
+    device_code: String,
+) -> Result<TauriTokenPollResponse, String> {
+    let client = auth_http_client()?;
+    let form = [
+        ("grant_type", "urn:ietf:params:oauth:grant-type:device_code".to_string()),
+        ("client_id", client_id),
+        ("device_code", device_code),
+    ];
+
+    let response = client
+        .post(&token_endpoint)
+        .form(&form)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to poll for device token: {e}"))?;
+
+    let status = response.status().as_u16();
+    let text = response
+        .text()
+        .await
+        .unwrap_or_else(|_| "".to_string());
+    let body = serde_json::from_str::<serde_json::Value>(&text)
+        .unwrap_or_else(|_| serde_json::json!({ "raw": text }));
+
+    Ok(TauriTokenPollResponse { status, body })
+}
+
+#[tauri::command]
+async fn auth_exchange_dashboard_token(
+    authn_token: String,
+    device_name: String,
+) -> Result<serde_json::Value, String> {
+    let client = auth_http_client()?;
+    let response = client
+        .post(format!("{BIG_BRAIN_URL}/api/authorize"))
+        .json(&serde_json::json!({
+            "authnToken": authn_token,
+            "deviceName": device_name,
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to authorize with Convex: {e}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status().as_u16();
+        let text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(format!("Failed to authorize with Convex: {} {}", status, text));
+    }
+
+    response
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| format!("Failed to parse dashboard authorize response: {e}"))
+}
+
+#[tauri::command]
+async fn http_fetch(request: TauriHttpRequest) -> Result<TauriHttpResponse, String> {
+    let parsed_url = url::Url::parse(&request.url)
+        .map_err(|e| format!("Invalid URL: {e}"))?;
+
+    let host = parsed_url
+        .host_str()
+        .ok_or_else(|| "URL is missing host".to_string())?;
+    let is_allowed_host = matches!(
+        host,
+        "api.convex.dev" | "auth.convex.dev" | "bigbrain.convex.dev"
+    );
+    if !is_allowed_host {
+        return Err(format!("Host is not allowed: {host}"));
+    }
+
+    let method = request
+        .method
+        .parse::<reqwest::Method>()
+        .map_err(|e| format!("Invalid HTTP method: {e}"))?;
+
+    let client = auth_http_client()?;
+    let mut builder = client.request(method, request.url);
+
+    if let Some(headers) = request.headers {
+        for (key, value) in headers {
+            builder = builder.header(&key, value);
+        }
+    }
+
+    if let Some(body) = request.body {
+        builder = builder.body(body);
+    }
+
+    let response = builder
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {e}"))?;
+
+    let status = response.status();
+    let status_text = status.canonical_reason().unwrap_or("").to_string();
+
+    let mut headers = HashMap::new();
+    for (name, value) in response.headers().iter() {
+        if let Ok(value_str) = value.to_str() {
+            headers.insert(name.as_str().to_string(), value_str.to_string());
+        }
+    }
+
+    let body = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read response body: {e}"))?;
+
+    Ok(TauriHttpResponse {
+        status: status.as_u16(),
+        status_text,
+        headers,
+        body,
+    })
 }
 
 // ============================================================================
@@ -623,6 +905,12 @@ pub fn run() {
             // Network status commands
             update_network_status,
             get_network_status,
+            // Generic HTTP bridge command
+            http_fetch,
+            // OAuth auth commands
+            auth_start_device_authorization,
+            auth_poll_device_token,
+            auth_exchange_dashboard_token,
             // Deployment notification commands
             notify_deployment_push,
             get_recent_deployments,

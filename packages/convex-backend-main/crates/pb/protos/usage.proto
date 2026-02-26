@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package usage;
+
+message FunctionUsageStats {
+  repeated CounterWithTag storage_calls = 1;
+  reserved 2;
+  repeated CounterWithComponent storage_ingress_by_component = 8;
+  reserved 3;
+  repeated CounterWithComponent storage_egress_by_component = 9;
+  repeated CounterWithTag database_ingress = 4;
+  repeated CounterWithTag database_ingress_v2 = 11;
+  repeated CounterWithTag database_egress = 5;
+  repeated CounterWithTag database_egress_v2 = 16;
+  repeated CounterWithTag vector_ingress = 6;
+  repeated CounterWithTag vector_ingress_v2 = 14;
+  repeated CounterWithTag vector_egress = 7;
+  repeated CounterWithTag database_egress_rows = 10;
+  repeated CounterWithTag text_ingress = 12;
+  reserved 13;
+  repeated TextQueryUsage text_query_usage = 17;
+  repeated VectorQueryUsage vector_query_usage = 18;
+  repeated CounterWithUrl fetch_egress = 15;
+}
+
+message CounterWithTag {
+  optional string component_path = 3;
+  optional string table_name = 1;
+  optional uint64 count = 2;
+}
+
+message CounterWithComponent {
+  optional string component_path = 1;
+  optional uint64 count = 2;
+}
+
+message CounterWithUrl {
+  optional string url = 1;
+  optional uint64 count = 2;
+}
+
+message TextQueryUsage {
+    optional string component_path = 1;
+    optional string table_name = 2;
+    optional string index_name = 3;
+    optional uint64 num_searches = 4;
+    optional uint64 bytes_searched = 5;
+}
+
+message VectorQueryUsage {
+    optional string component_path = 1;
+    optional string table_name = 2;
+    optional string index_name = 3;
+    optional uint64 num_searches = 4;
+    optional uint64 bytes_searched = 5;
+    optional uint64 dimensions = 6;
+}

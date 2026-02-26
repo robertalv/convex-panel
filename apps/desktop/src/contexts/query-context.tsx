@@ -21,6 +21,10 @@ const REFETCH_INTERVAL = {
   // 2. User is active (via useIdleAwareFetching)
   // 3. Tab is visible (via useVisibilityRefetch)
   health: 30 * 1000, // 30 seconds for health metrics
+  // Top-K metrics (failure rate, cache hit rate) - match official dashboard at 2.5s
+  healthTopK: 2.5 * 1000, // 2.5 seconds for real-time top-K metrics
+  // Scheduler lag - match official dashboard at 60s (minute-level granularity)
+  schedulerLag: 60 * 1000, // 60 seconds for scheduler lag
   functionStats: 60 * 1000, // 1 minute for function statistics
   schedules: 30 * 1000, // 30 seconds for scheduled/cron jobs
   insights: 60 * 1000, // 1 minute for insights

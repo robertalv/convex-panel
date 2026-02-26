@@ -102,6 +102,36 @@ async function prefetchHealthData(
     return allPoints;
   };
 
+  // Fetch UDF execution stats ONCE and share with latency + request rate prefetches.
+  // This prevents 3 parallel calls to the stream endpoint (which can long-poll/hang)
+  // and ensures React Query deduplication doesn't block health hooks.
+  const oneHourAgo = Date.now() - 60 * 60 * 1000;
+  const stableCursor = Math.floor(oneHourAgo / 60000) * 60000;
+  let sharedEntries: Awaited<
+    ReturnType<typeof fetchUdfExecutionStats>
+  >["entries"] = [];
+
+  try {
+    const response = await fetchUdfExecutionStats(
+      deploymentUrl,
+      authToken,
+      stableCursor,
+      desktopFetch,
+    );
+    sharedEntries = response?.entries || [];
+
+    // Cache the entries in React Query so hooks don't re-fetch
+    queryClient.setQueryData(
+      udfExecutionStatsKeys.stats(deploymentUrl),
+      sharedEntries,
+    );
+  } catch (err) {
+    console.warn(
+      "[BackgroundPrefetch] Failed to fetch UDF execution stats:",
+      err,
+    );
+  }
+
   prefetchPromises.push(
     queryClient.prefetchQuery({
       queryKey: healthMetricsKeys.schedulerLag(deploymentUrl),
@@ -127,6 +157,7 @@ async function prefetchHealthData(
     }),
   );
 
+  // Use sharedEntries so these don't call fetchUdfExecutionStats again
   prefetchPromises.push(
     queryClient.prefetchQuery({
       queryKey: healthMetricsKeys.latency(deploymentUrl),
@@ -135,7 +166,11 @@ async function prefetchHealthData(
           deploymentUrl,
           authToken,
           desktopFetch,
+          sharedEntries,
         );
+        if (!data || data.length === 0) {
+          return { p50: 0, p95: 0, p99: 0 };
+        }
         const percentiles = { p50: 0, p95: 0, p99: 0 };
         for (const [percentile, timeSeries] of data) {
           const latestValue =
@@ -152,32 +187,20 @@ async function prefetchHealthData(
     }),
   );
 
+  // Use sharedEntries so these don't call fetchUdfExecutionStats again
   prefetchPromises.push(
     queryClient.prefetchQuery({
       queryKey: healthMetricsKeys.requestRate(deploymentUrl),
       queryFn: async () => {
-        const data = await fetchUdfRate(deploymentUrl, authToken, desktopFetch);
+        const data = await fetchUdfRate(
+          deploymentUrl,
+          authToken,
+          desktopFetch,
+          sharedEntries,
+        );
         return transformTimeSeries(data);
       },
       staleTime: STALE_TIME.health,
-    }),
-  );
-
-  const oneHourAgo = Date.now() - 60 * 60 * 1000;
-  const cursor = Math.floor(oneHourAgo / 1000) * 1000;
-  prefetchPromises.push(
-    queryClient.prefetchQuery({
-      queryKey: udfExecutionStatsKeys.stats(deploymentUrl, cursor),
-      queryFn: async () => {
-        const response = await fetchUdfExecutionStats(
-          deploymentUrl,
-          authToken,
-          cursor,
-          desktopFetch,
-        );
-        return response?.entries || [];
-      },
-      staleTime: STALE_TIME.functionStats,
     }),
   );
 

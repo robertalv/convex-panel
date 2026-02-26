@@ -1,0 +1,28 @@
+{
+  "compileOnSave": true,
+  "compilerOptions": {
+    "target": "es5",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "downlevelIteration": true,
+    "jsx": "preserve",
+    "baseUrl": "src",
+    "customConditions": ["convex-internal-types"],
+    "isolatedModules": true,
+    "noEmit": true,
+    "outDir": "./dist",
+    "paths": {
+      "@common/*": ["*"],
+      "@ui/*": ["../../@convex-dev/design-system/src/*"]
+    }
+  },
+  "include": ["src/**/*", "src/*", "next-env.d.ts"],
+  "exclude": ["node_modules"]
+}

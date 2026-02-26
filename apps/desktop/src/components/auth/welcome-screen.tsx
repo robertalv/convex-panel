@@ -12,6 +12,7 @@ type AuthView = "choice" | "oauth" | "deployKey";
 interface WelcomeScreenProps {
   isAuthenticating: boolean;
   userCode: string | null;
+  verificationUrl?: string | null;
   onStartDeviceAuth: () => void;
   onCancelDeviceAuth: () => void;
   authError: string | null;
@@ -21,6 +22,7 @@ interface WelcomeScreenProps {
 export function WelcomeScreen({
   isAuthenticating,
   userCode,
+  verificationUrl,
   onStartDeviceAuth,
   onCancelDeviceAuth,
   authError,
@@ -49,6 +51,7 @@ export function WelcomeScreen({
         <AuthCard
           isAuthenticating={isAuthenticating}
           userCode={userCode}
+          verificationUrl={verificationUrl}
           onStartDeviceAuth={onStartDeviceAuth}
           onCancelDeviceAuth={() => {
             onCancelDeviceAuth();
@@ -163,8 +166,9 @@ export function WelcomeScreen({
                   Use Deploy Key
                 </h3>
                 <p className="text-xs text-text-muted leading-relaxed">
-                  Connect directly to a single deployment. Useful for third-party
-                  apps or when you only need access to one deployment.
+                  Connect directly to a single deployment. Useful for
+                  third-party apps or when you only need access to one
+                  deployment.
                 </p>
               </div>
             </div>

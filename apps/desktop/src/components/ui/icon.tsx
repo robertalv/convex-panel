@@ -74,7 +74,8 @@ import {
   CpuIcon,
   Layers01Icon,
   HelpCircleIcon,
-  Alert02Icon
+  Alert02Icon,
+  InformationCircleIcon,
 } from "@hugeicons/core-free-icons";
 
 const ICON_MAP: Record<string, IconSvgElement> = {
@@ -169,6 +170,7 @@ const ICON_MAP: Record<string, IconSvgElement> = {
   undo: Undo03Icon,
   lineChart: ChartLineData01Icon,
   "help-circle": HelpCircleIcon,
+  info: InformationCircleIcon,
 };
 
 export interface IconProps {

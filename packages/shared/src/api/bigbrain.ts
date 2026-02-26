@@ -29,6 +29,7 @@ export const BIG_BRAIN_DASHBOARD_PATH = "/api/dashboard";
  * Client identifier header value
  */
 export const CONVEX_CLIENT_ID = "convex-panel-1.0.0";
+const BIG_BRAIN_RESPONSE_TIMEOUT_MS = 15000;
 
 // ============================================================================
 // Types
@@ -132,6 +133,44 @@ export interface InsightsPeriod {
 // Core API Functions
 // ============================================================================
 
+async function readTextWithTimeout(
+  response: Response,
+  context: string,
+  timeoutMs = BIG_BRAIN_RESPONSE_TIMEOUT_MS,
+): Promise<string> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      response.text(),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(
+            new Error(
+              `[BigBrain] Timed out reading ${context} response after ${timeoutMs / 1000}s`,
+            ),
+          );
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
+function parseJsonOrThrow<T>(text: string, context: string): T {
+  try {
+    return JSON.parse(text) as T;
+  } catch (err) {
+    throw new Error(
+      `[BigBrain] Failed to parse ${context} response JSON: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+}
+
 /**
  * Make a request to the BigBrain Dashboard API
  *
@@ -191,8 +230,14 @@ export async function callBigBrainAPI<T = unknown>(
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
 
+  console.log(`[BigBrain] Response ${response.status} ${response.statusText} ${url}`);
+
   if (!response.ok) {
-    const errorText = await response.text().catch(() => "Unknown error");
+    const errorText = await readTextWithTimeout(
+      response,
+      "error",
+      5000,
+    ).catch(() => "Unknown error");
     console.error(`[BigBrain] Request failed:`, {
       status: response.status,
       statusText: response.statusText,
@@ -203,8 +248,8 @@ export async function callBigBrainAPI<T = unknown>(
     );
   }
 
-  const data = await response.json();
-  return data as T;
+  const rawText = await readTextWithTimeout(response, "success");
+  return parseJsonOrThrow<T>(rawText, "success");
 }
 
 /**
@@ -267,8 +312,16 @@ export async function callBigBrainManagementAPI<T = unknown>(
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
 
+  console.log(
+    `[BigBrain Management] Response ${response.status} ${response.statusText} ${url}`,
+  );
+
   if (!response.ok) {
-    const errorText = await response.text().catch(() => "Unknown error");
+    const errorText = await readTextWithTimeout(
+      response,
+      "management error",
+      5000,
+    ).catch(() => "Unknown error");
     console.error(`[BigBrain Management] Request failed:`, {
       status: response.status,
       statusText: response.statusText,
@@ -279,8 +332,8 @@ export async function callBigBrainManagementAPI<T = unknown>(
     );
   }
 
-  const data = await response.json();
-  return data as T;
+  const rawText = await readTextWithTimeout(response, "management success");
+  return parseJsonOrThrow<T>(rawText, "management success");
 }
 
 // ============================================================================

@@ -4,6 +4,7 @@
  */
 
 import { ROUTES, CONVEX_DASHBOARD_DOMAIN } from "./constants";
+import { CONVEX_CLIENT_ID } from "./bigbrain";
 import type {
   FetchFn,
   FunctionExecutionStats,
@@ -36,19 +37,20 @@ export const fetchFailureRate = async (
     throw new Error("Auth token is required");
   }
 
+  // Official Convex dashboard uses 1 hour window with 60 buckets for all health metrics
   const now = Math.floor(Date.now() / 1000);
-  const twentySixMinutesAgo = now - 26 * 60; // 26 minutes = 1560 seconds
+  const oneHourAgo = now - 60 * 60; // 60 minutes = 3600 seconds
 
   const window = {
     start: {
-      secs_since_epoch: twentySixMinutesAgo,
+      secs_since_epoch: oneHourAgo,
       nanos_since_epoch: 0,
     },
     end: {
       secs_since_epoch: now,
       nanos_since_epoch: 0,
     },
-    num_buckets: 26,
+    num_buckets: 60,
   };
 
   const params = new URLSearchParams({
@@ -58,24 +60,40 @@ export const fetchFailureRate = async (
 
   const normalizedToken = normalizeToken(authToken);
 
-  const response = await fetchFn(
-    `${deploymentUrl}${ROUTES.FAILURE_RATE}?${params}`,
-    {
-      headers: {
-        Authorization: normalizedToken,
-        "Content-Type": "application/json",
-        "Convex-Client": "dashboard-0.0.0",
-        Origin: `https://${CONVEX_DASHBOARD_DOMAIN}`,
-        Referer: `https://${CONVEX_DASHBOARD_DOMAIN}/`,
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetchFn(
+      `${deploymentUrl}${ROUTES.FAILURE_RATE}?${params}`,
+      {
+        headers: {
+          Authorization: normalizedToken,
+          "Content-Type": "application/json",
+          "Convex-Client": CONVEX_CLIENT_ID,
+          Origin: `https://${CONVEX_DASHBOARD_DOMAIN}`,
+          Referer: `https://${CONVEX_DASHBOARD_DOMAIN}/`,
+        },
+        signal: controller.signal,
       },
-    },
-  );
+    );
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch failure rate: ${response.statusText}`);
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch failure rate: ${response.statusText}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof DOMException && error.name === "AbortError") {
+      const timeoutError = new Error("Fetch failure rate timed out after 15s");
+      timeoutError.name = "TimeoutError";
+      throw timeoutError;
+    }
+    throw error;
   }
-
-  return response.json();
 };
 
 /**
@@ -97,19 +115,20 @@ export const fetchCacheHitRate = async (
     throw new Error("Auth token is required");
   }
 
+  // Official Convex dashboard uses 1 hour window with 60 buckets for all health metrics
   const now = Math.floor(Date.now() / 1000);
-  const twentySixMinutesAgo = now - 26 * 60; // 26 minutes = 1560 seconds
+  const oneHourAgo = now - 60 * 60; // 60 minutes = 3600 seconds
 
   const window = {
     start: {
-      secs_since_epoch: twentySixMinutesAgo,
+      secs_since_epoch: oneHourAgo,
       nanos_since_epoch: 0,
     },
     end: {
       secs_since_epoch: now,
       nanos_since_epoch: 0,
     },
-    num_buckets: 26,
+    num_buckets: 60,
   };
 
   const params = new URLSearchParams({
@@ -119,26 +138,44 @@ export const fetchCacheHitRate = async (
 
   const normalizedToken = normalizeToken(authToken);
 
-  const response = await fetchFn(
-    `${deploymentUrl}${ROUTES.CACHE_HIT_RATE}?${params}`,
-    {
-      headers: {
-        Authorization: normalizedToken,
-        "Content-Type": "application/json",
-        "Convex-Client": "dashboard-0.0.0",
-        Origin: `https://${CONVEX_DASHBOARD_DOMAIN}`,
-        Referer: `https://${CONVEX_DASHBOARD_DOMAIN}/`,
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetchFn(
+      `${deploymentUrl}${ROUTES.CACHE_HIT_RATE}?${params}`,
+      {
+        headers: {
+          Authorization: normalizedToken,
+          "Content-Type": "application/json",
+          "Convex-Client": CONVEX_CLIENT_ID,
+          Origin: `https://${CONVEX_DASHBOARD_DOMAIN}`,
+          Referer: `https://${CONVEX_DASHBOARD_DOMAIN}/`,
+        },
+        signal: controller.signal,
       },
-    },
-  );
+    );
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch cache hit rate: ${response.statusText}`);
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch cache hit rate: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    return data;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof DOMException && error.name === "AbortError") {
+      const timeoutError = new Error(
+        "Fetch cache hit rate timed out after 15s",
+      );
+      timeoutError.name = "TimeoutError";
+      throw timeoutError;
+    }
+    throw error;
   }
-
-  const data = await response.json();
-
-  return data;
 };
 
 /**
@@ -160,8 +197,9 @@ export async function fetchSchedulerLag(
     throw new Error("Auth token is required");
   }
 
+  // Official Convex dashboard uses 1 hour window with 60 buckets for scheduler lag
   const end = new Date();
-  const start = new Date(end.getTime() - 26 * 60 * 1000); // 26 minutes
+  const start = new Date(end.getTime() - 60 * 60 * 1000); // 60 minutes
 
   const window = {
     start: {
@@ -172,28 +210,46 @@ export async function fetchSchedulerLag(
       secs_since_epoch: Math.floor(end.getTime() / 1000),
       nanos_since_epoch: (end.getTime() % 1000) * 1000000,
     },
-    num_buckets: 26,
+    num_buckets: 60,
   };
 
   try {
-    const response = await fetchFn(
-      `${deploymentUrl}${ROUTES.SCHEDULED_JOB_LAG}?window=${encodeURIComponent(JSON.stringify(window))}`,
-      {
-        headers: {
-          Authorization: normalizeToken(authToken),
-          "Content-Type": "application/json",
-          "Convex-Client": "dashboard-0.0.0",
-          Origin: `https://${CONVEX_DASHBOARD_DOMAIN}`,
-          Referer: `https://${CONVEX_DASHBOARD_DOMAIN}/`,
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      const response = await fetchFn(
+        `${deploymentUrl}${ROUTES.SCHEDULED_JOB_LAG}?window=${encodeURIComponent(JSON.stringify(window))}`,
+        {
+          headers: {
+            Authorization: normalizeToken(authToken),
+            "Content-Type": "application/json",
+            "Convex-Client": CONVEX_CLIENT_ID,
+            Origin: `https://${CONVEX_DASHBOARD_DOMAIN}`,
+            Referer: `https://${CONVEX_DASHBOARD_DOMAIN}/`,
+          },
+          signal: controller.signal,
         },
-      },
-    );
+      );
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof DOMException && error.name === "AbortError") {
+        const timeoutError = new Error(
+          "Fetch scheduler lag timed out after 15s",
+        );
+        timeoutError.name = "TimeoutError";
+        throw timeoutError;
+      }
+      throw error;
     }
-
-    return await response.json();
   } catch (error) {
     throw error;
   }
@@ -233,25 +289,41 @@ export async function fetchTableRate(
 
   const normalizedToken = normalizeToken(authToken);
 
-  const response = await fetchFn(url, {
-    headers: {
-      Authorization: normalizedToken,
-      "Convex-Client": "dashboard-0.0.0",
-    },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch table rate: ${response.statusText}`);
+  try {
+    const response = await fetchFn(url, {
+      headers: {
+        Authorization: normalizedToken,
+        "Convex-Client": CONVEX_CLIENT_ID,
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch table rate: ${response.statusText}`);
+    }
+
+    const respJSON: Array<
+      [{ secs_since_epoch: number; nanos_since_epoch: number }, number | null]
+    > = await response.json();
+
+    return respJSON.map(([time, metricValue]) => ({
+      time: parseDate(time),
+      metric: metricValue,
+    }));
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof DOMException && error.name === "AbortError") {
+      const timeoutError = new Error("Fetch table rate timed out after 15s");
+      timeoutError.name = "TimeoutError";
+      throw timeoutError;
+    }
+    throw error;
   }
-
-  const respJSON: Array<
-    [{ secs_since_epoch: number; nanos_since_epoch: number }, number | null]
-  > = await response.json();
-
-  return respJSON.map(([time, metricValue]) => ({
-    time: parseDate(time),
-    metric: metricValue,
-  }));
 }
 
 /**
@@ -279,7 +351,7 @@ export async function fetchUdfExecutionStats(
       headers: {
         Authorization: normalizeToken(authToken),
         "Content-Type": "application/json",
-        "Convex-Client": "dashboard-1.0.0",
+        "Convex-Client": CONVEX_CLIENT_ID,
       },
       signal: controller.signal,
     });
@@ -302,11 +374,12 @@ export async function fetchUdfExecutionStats(
   } catch (error: any) {
     clearTimeout(timeoutId);
     if (error.name === "AbortError") {
-      // Return empty response on timeout instead of hanging indefinitely
-      console.warn(
-        "[fetchUdfExecutionStats] Request timed out, returning empty response",
+      // Throw a typed error so callers can distinguish timeout from other failures
+      const timeoutError = new Error(
+        "[fetchUdfExecutionStats] Request timed out after 30s",
       );
-      return { entries: [], new_cursor: cursor };
+      timeoutError.name = "TimeoutError";
+      throw timeoutError;
     }
     throw error;
   }
@@ -419,15 +492,21 @@ export function aggregateFunctionStats(
  * Fetch latency percentiles from the Convex API
  * Note: The latency_percentiles endpoint requires a specific UDF identifier.
  * For aggregate metrics, we calculate percentiles from execution stats.
+ *
+ * Accepts optional pre-fetched entries to avoid duplicate API calls.
+ * If entries are provided, skips the network request entirely.
+ *
  * @param deploymentUrl - The URL of the Convex deployment
  * @param authToken - The authentication token for the Convex deployment
  * @param fetchFn - Optional custom fetch function (for Tauri/CORS-free environments)
+ * @param prefetchedEntries - Optional pre-fetched execution stats to avoid duplicate API call
  * @returns The latency percentiles (p50, p95, p99) as array of [percentile, timeseries]
  */
 export async function fetchLatencyPercentiles(
   deploymentUrl: string,
   authToken: string,
   fetchFn: FetchFn = defaultFetch,
+  prefetchedEntries?: FunctionExecutionStats[],
 ): Promise<any> {
   if (!deploymentUrl || !deploymentUrl.trim()) {
     throw new Error("Deployment URL is required");
@@ -436,83 +515,82 @@ export async function fetchLatencyPercentiles(
     throw new Error("Auth token is required");
   }
 
-  // Since latency_percentiles requires a specific function path,
-  // we'll calculate aggregate latency from execution stats
-  const oneHourAgo = Date.now() - 60 * 60 * 1000;
-  const cursor = Math.floor(oneHourAgo / 1000) * 1000; // Convert to milliseconds
-
-  try {
+  // Use pre-fetched entries if available, otherwise fetch from API
+  let entries: FunctionExecutionStats[];
+  if (prefetchedEntries !== undefined) {
+    entries = prefetchedEntries;
+  } else {
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    const cursor = Math.floor(oneHourAgo / 1000) * 1000;
     const executionResponse = await fetchUdfExecutionStats(
       deploymentUrl,
       authToken,
       cursor,
       fetchFn,
     );
+    entries = executionResponse?.entries || [];
+  }
 
-    if (
-      !executionResponse ||
-      !executionResponse.entries ||
-      executionResponse.entries.length === 0
-    ) {
-      return [];
-    }
-
-    // Get execution times from entries
-    // Note: execution_time_ms is already in milliseconds, no conversion needed
-    const executionTimes: number[] = [];
-    executionResponse.entries.forEach((entry: any) => {
-      const execTime =
-        entry.execution_time_ms ||
-        entry.executionTimeMs ||
-        entry.execution_time ||
-        entry.executionTime;
-      if (execTime && execTime > 0) {
-        executionTimes.push(execTime);
-      }
-    });
-
-    if (executionTimes.length === 0) {
-      return [];
-    }
-
-    // Calculate percentiles
-    const sorted = executionTimes.sort((a, b) => a - b);
-    const p50 = sorted[Math.floor(sorted.length * 0.5)];
-    const p95 = sorted[Math.floor(sorted.length * 0.95)];
-    const p99 = sorted[Math.floor(sorted.length * 0.99)];
-
-    // Return in the format expected by the component: [percentile, timeseries]
-    // For now, return current values (not time series)
-    const now = Math.floor(Date.now() / 1000);
-    const timestamp = {
-      secs_since_epoch: now,
-      nanos_since_epoch: 0,
-    };
-
-    return [
-      [50, [[timestamp, p50]]],
-      [95, [[timestamp, p95]]],
-      [99, [[timestamp, p99]]],
-    ];
-  } catch (error) {
-    // Return empty array on error
+  if (entries.length === 0) {
     return [];
   }
+
+  // Get execution times from entries
+  const executionTimes: number[] = [];
+  entries.forEach((entry: any) => {
+    const execTime =
+      entry.execution_time_ms ||
+      entry.executionTimeMs ||
+      entry.execution_time ||
+      entry.executionTime;
+    if (execTime && execTime > 0) {
+      executionTimes.push(execTime);
+    }
+  });
+
+  if (executionTimes.length === 0) {
+    return [];
+  }
+
+  // Calculate percentiles
+  const sorted = executionTimes.sort((a, b) => a - b);
+  const p50 = sorted[Math.floor(sorted.length * 0.5)];
+  const p95 = sorted[Math.floor(sorted.length * 0.95)];
+  const p99 = sorted[Math.floor(sorted.length * 0.99)];
+
+  // Return in the format expected by the component: [percentile, timeseries]
+  const now = Math.floor(Date.now() / 1000);
+  const timestamp = {
+    secs_since_epoch: now,
+    nanos_since_epoch: 0,
+  };
+
+  return [
+    [50, [[timestamp, p50]]],
+    [95, [[timestamp, p95]]],
+    [99, [[timestamp, p99]]],
+  ];
 }
 
 /**
  * Fetch aggregate UDF invocation rate from the Convex API
  * Since udf_rate requires a specific function path, we'll use stream_udf_execution
  * to get aggregate invocation data and calculate rates ourselves.
+ *
+ * Accepts optional pre-fetched entries to avoid duplicate API calls.
+ * If entries are provided, skips the network request entirely.
+ *
  * @param deploymentUrl - The URL of the Convex deployment
  * @param authToken - The authentication token for the Convex deployment
  * @param fetchFn - Optional custom fetch function (for Tauri/CORS-free environments)
+ * @param prefetchedEntries - Optional pre-fetched execution stats to avoid duplicate API call
  * @returns The UDF invocation rate time series data
  */
 export async function fetchUdfRate(
   deploymentUrl: string,
   authToken: string,
   fetchFn: FetchFn = defaultFetch,
+  prefetchedEntries?: FunctionExecutionStats[],
 ): Promise<any> {
   if (!deploymentUrl || !deploymentUrl.trim()) {
     throw new Error("Deployment URL is required");
@@ -521,73 +599,68 @@ export async function fetchUdfRate(
     throw new Error("Auth token is required");
   }
 
-  // Since udf_rate requires a specific function path, we'll aggregate
-  // from stream_udf_execution instead
-  const oneHourAgo = Date.now() - 60 * 60 * 1000;
-  const cursor = Math.floor(oneHourAgo / 1000) * 1000; // Convert to milliseconds
-
-  try {
+  // Use pre-fetched entries if available, otherwise fetch from API
+  let entries: FunctionExecutionStats[];
+  if (prefetchedEntries !== undefined) {
+    entries = prefetchedEntries;
+  } else {
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    const cursor = Math.floor(oneHourAgo / 1000) * 1000;
     const executionResponse = await fetchUdfExecutionStats(
       deploymentUrl,
       authToken,
       cursor,
       fetchFn,
     );
-
-    if (!executionResponse || !executionResponse.entries) {
-      return [];
-    }
-
-    // Aggregate invocations by minute
-    const now = Math.floor(Date.now() / 1000);
-    const twentySixMinutesAgo = now - 26 * 60;
-    const numBuckets = 26;
-    const bucketSizeSeconds = (26 * 60) / numBuckets;
-
-    // Initialize buckets
-    const buckets: number[] = Array(numBuckets).fill(0);
-    const timestamps: Array<{
-      secs_since_epoch: number;
-      nanos_since_epoch: number;
-    }> = [];
-
-    // Generate timestamps for each bucket
-    for (let i = 0; i < numBuckets; i++) {
-      const bucketTime = twentySixMinutesAgo + i * bucketSizeSeconds;
-      timestamps.push({
-        secs_since_epoch: bucketTime,
-        nanos_since_epoch: 0,
-      });
-    }
-
-    // Count invocations per bucket
-    executionResponse.entries.forEach((entry: any) => {
-      let entryTime =
-        entry.timestamp || entry.execution_timestamp || entry.unix_timestamp;
-      if (entryTime > 1e12) {
-        entryTime = Math.floor(entryTime / 1000);
-      }
-
-      if (entryTime >= twentySixMinutesAgo && entryTime <= now) {
-        const bucketIndex = Math.floor(
-          (entryTime - twentySixMinutesAgo) / bucketSizeSeconds,
-        );
-        const clampedIndex = Math.max(0, Math.min(numBuckets - 1, bucketIndex));
-        buckets[clampedIndex]++;
-      }
-    });
-
-    // Convert to expected format: Array<[timestamp, value]>
-    const timeSeriesData = timestamps.map((timestamp, i) => [
-      timestamp,
-      buckets[i],
-    ]);
-
-    return [["total", timeSeriesData]];
-  } catch (error) {
-    // Return empty array on error
-    return [];
+    entries = executionResponse?.entries || [];
   }
+
+  // Aggregate invocations by minute — match official 1 hour / 60 buckets
+  const now = Math.floor(Date.now() / 1000);
+  const oneHourAgo = now - 60 * 60;
+  const numBuckets = 60;
+  const bucketSizeSeconds = (60 * 60) / numBuckets;
+
+  // Initialize buckets
+  const buckets: number[] = Array(numBuckets).fill(0);
+  const timestamps: Array<{
+    secs_since_epoch: number;
+    nanos_since_epoch: number;
+  }> = [];
+
+  // Generate timestamps for each bucket
+  for (let i = 0; i < numBuckets; i++) {
+    const bucketTime = oneHourAgo + i * bucketSizeSeconds;
+    timestamps.push({
+      secs_since_epoch: bucketTime,
+      nanos_since_epoch: 0,
+    });
+  }
+
+  // Count invocations per bucket
+  entries.forEach((entry: any) => {
+    let entryTime =
+      entry.timestamp || entry.execution_timestamp || entry.unix_timestamp;
+    if (entryTime > 1e12) {
+      entryTime = Math.floor(entryTime / 1000);
+    }
+
+    if (entryTime >= oneHourAgo && entryTime <= now) {
+      const bucketIndex = Math.floor(
+        (entryTime - oneHourAgo) / bucketSizeSeconds,
+      );
+      const clampedIndex = Math.max(0, Math.min(numBuckets - 1, bucketIndex));
+      buckets[clampedIndex]++;
+    }
+  });
+
+  // Convert to expected format: Array<[timestamp, value]>
+  const timeSeriesData = timestamps.map((timestamp, i) => [
+    timestamp,
+    buckets[i],
+  ]);
+
+  return [["total", timeSeriesData]];
 }
 
 /**
@@ -614,6 +687,9 @@ export async function fetchRecentErrors(
     throw new Error("Auth token is required");
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
   try {
     // Calculate cursor for last hour (approximate)
     const hoursAgo = Date.now() - hoursBack * 60 * 60 * 1000;
@@ -626,10 +702,13 @@ export async function fetchRecentErrors(
         headers: {
           Authorization: normalizeToken(authToken),
           "Content-Type": "application/json",
-          "Convex-Client": "dashboard-1.0.0",
+          "Convex-Client": CONVEX_CLIENT_ID,
         },
+        signal: controller.signal,
       },
     );
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       return { count: 0, topErrors: [] };
@@ -665,10 +744,13 @@ export async function fetchRecentErrors(
       topErrors,
     };
   } catch (error) {
-    // Return empty result on error rather than throwing
-    return {
-      count: 0,
-      topErrors: [],
-    };
+    clearTimeout(timeoutId);
+    if (error instanceof DOMException && error.name === "AbortError") {
+      const timeoutError = new Error("Fetch recent errors timed out after 15s");
+      timeoutError.name = "TimeoutError";
+      throw timeoutError;
+    }
+    console.error("[fetchRecentErrors] Error:", error);
+    throw error;
   }
 }

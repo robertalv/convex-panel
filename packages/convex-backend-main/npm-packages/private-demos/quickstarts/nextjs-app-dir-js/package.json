@@ -1,0 +1,22 @@
+{
+  "name": "my-next-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@tailwindcss/postcss": "4.1.18",
+    "convex": "^1.27.4",
+    "eslint": "8.57.1",
+    "eslint-config-next": "14.2.25",
+    "next": "^16.0.0",
+    "postcss": "^8.4.19",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "tailwindcss": "4.1.18"
+  }
+}

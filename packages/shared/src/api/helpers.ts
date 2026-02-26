@@ -41,6 +41,9 @@ export async function callConvexQuery(
   args: any = {},
   fetchFn: FetchFn = defaultFetch,
 ): Promise<any> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
   try {
     let requestBody = {
       path: functionPath,
@@ -55,6 +58,7 @@ export async function callConvexQuery(
         "Convex-Client": "dashboard-0.0.0",
       },
       body: JSON.stringify(requestBody),
+      signal: controller.signal,
     });
 
     if (!response.ok && response.status !== 404) {
@@ -71,8 +75,11 @@ export async function callConvexQuery(
           "Convex-Client": "dashboard-0.0.0",
         },
         body: JSON.stringify(requestBody),
+        signal: controller.signal,
       });
     }
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -93,6 +100,14 @@ export async function callConvexQuery(
     }
     return result;
   } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof DOMException && error.name === "AbortError") {
+      const timeoutError = new Error(
+        `Convex query "${functionPath}" timed out after 15s`,
+      );
+      timeoutError.name = "TimeoutError";
+      throw timeoutError;
+    }
     throw error;
   }
 }

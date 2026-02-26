@@ -163,6 +163,7 @@ export default function App({ convex: _initialConvex }: AppProps) {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [userCode, setUserCode] = useState<string | null>(null);
+  const [verificationUrl, setVerificationUrl] = useState<string | null>(null);
   const pollAbortRef = useRef(false);
 
   // Deploy key auth mode state
@@ -214,6 +215,69 @@ export default function App({ convex: _initialConvex }: AppProps) {
   // Check for application updates
   useApplicationVersion();
 
+  const bigBrainFetch = useCallback(
+    async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      if (!isTauri()) {
+        return fetch(input, init);
+      }
+
+      const inputUrl =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+
+      const method =
+        init?.method || (input instanceof Request ? input.method : "GET");
+
+      const headers = new Headers(
+        init?.headers || (input instanceof Request ? input.headers : undefined),
+      );
+      const headersObj: Record<string, string> = {};
+      headers.forEach((value, key) => {
+        headersObj[key] = value;
+      });
+
+      let body: string | undefined;
+      if (typeof init?.body === "string") {
+        body = init.body;
+      } else if (
+        !init?.body &&
+        input instanceof Request &&
+        method !== "GET" &&
+        method !== "HEAD"
+      ) {
+        body = await input.clone().text();
+      }
+
+      console.log(`[BigBrainBridge] ${method} ${inputUrl}`);
+      const response = await invoke<{
+        status: number;
+        status_text: string;
+        headers: Record<string, string>;
+        body: string;
+      }>("http_fetch", {
+        request: {
+          url: inputUrl,
+          method,
+          headers: headersObj,
+          body,
+        },
+      });
+      console.log(
+        `[BigBrainBridge] Response ${response.status} ${response.status_text} ${inputUrl}`,
+      );
+
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.status_text,
+        headers: response.headers,
+      });
+    },
+    [],
+  );
+
   const {
     teams,
     projects,
@@ -230,7 +294,7 @@ export default function App({ convex: _initialConvex }: AppProps) {
   } = useBigBrain(
     // Don't call BigBrain in deploy key mode
     isDeployKeyMode ? null : (session?.accessToken ?? null),
-    smartFetch,
+    bigBrainFetch,
   );
 
   // Create a stable fetch function for DeploymentProvider
@@ -541,20 +605,69 @@ export default function App({ convex: _initialConvex }: AppProps) {
   const startDeviceAuth = useCallback(async () => {
     setIsAuthenticating(true);
     setAuthError(null);
+    setUserCode(null);
+    setVerificationUrl(null);
     pollAbortRef.current = false;
 
-    try {
-      const deviceAuth = await startDeviceAuthorization();
-      setUserCode(deviceAuth.user_code);
-      const url = deviceAuth.verification_uri_complete;
+    console.log("[Auth] Starting device authorization flow...");
 
+    try {
+      // Wrap in a timeout so the UI never hangs indefinitely if the
+      // Rust invoke (or network call) never resolves.
+      const AUTH_TIMEOUT_MS = 30_000;
+      console.log("[Auth] Calling startDeviceAuthorization()...");
+
+      const deviceAuth = await Promise.race([
+        startDeviceAuthorization(),
+        new Promise<never>((_, reject) => {
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  "Could not reach the Convex auth server — the request timed out after 30 s. " +
+                    "Check your network connection or firewall and try again.",
+                ),
+              ),
+            AUTH_TIMEOUT_MS,
+          );
+        }),
+      ]);
+
+      console.log(
+        "[Auth] Device authorization received, user code:",
+        deviceAuth.user_code,
+      );
+      setUserCode(deviceAuth.user_code);
+      const url =
+        deviceAuth.verification_uri_complete || deviceAuth.verification_uri;
+      console.log("[Auth] Verification URL:", url);
+
+      let browserOpened = false;
       if (isTauri()) {
         const { open } = await import("@tauri-apps/plugin-shell");
-        open(url);
+        try {
+          await open(url);
+          browserOpened = true;
+          console.log("[Auth] Browser opened successfully");
+        } catch (openError) {
+          console.warn(
+            "[Auth] Failed to open browser for device auth:",
+            openError,
+          );
+        }
       } else {
-        window.open(url, "_blank", "noopener,noreferrer");
+        const win = window.open(url, "_blank", "noopener,noreferrer");
+        browserOpened = !!win;
       }
 
+      if (!browserOpened) {
+        console.warn(
+          "[Auth] Browser did not open — user will need to navigate manually",
+        );
+        setVerificationUrl(url);
+      }
+
+      console.log("[Auth] Polling for device token...");
       const tokens = await pollForDeviceToken(
         deviceAuth,
         undefined,
@@ -562,19 +675,51 @@ export default function App({ convex: _initialConvex }: AppProps) {
       );
       if (!tokens) throw new Error("Authentication expired or cancelled");
 
+      console.log("[Auth] Token received, exchanging for dashboard token...");
       const dashboardSession = await exchangeForDashboardToken(
         tokens.access_token,
       );
+      console.log("[Auth] Dashboard token obtained, authentication complete");
       setSession(dashboardSession);
       await saveAccessToken(dashboardSession.accessToken);
       await saveAuthMode("oauth");
       setAuthModeState("oauth");
       setUserCode(null);
+      setVerificationUrl(null);
       setIsTransitioning(true);
     } catch (err) {
-      setAuthError(
-        err instanceof Error ? err.message : "Authentication failed",
-      );
+      console.error("[Auth] Authentication error:", err);
+      const message =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+            ? err
+            : (() => {
+                try {
+                  return JSON.stringify(err);
+                } catch {
+                  return "Authentication failed";
+                }
+              })();
+
+      // Provide actionable messages for common failure modes
+      let normalizedMessage = message;
+      if (
+        message.includes("timed out") ||
+        message.includes("timeout") ||
+        message.includes("Timed out")
+      ) {
+        normalizedMessage = `${message}. Check your network connection or firewall and try again.`;
+      } else if (
+        message.includes("Failed to discover") ||
+        message.includes("Failed to start device")
+      ) {
+        normalizedMessage = `${message}. Make sure you can reach auth.convex.dev and try again.`;
+      }
+
+      setUserCode(null);
+      setVerificationUrl(null);
+      setAuthError(normalizedMessage);
     } finally {
       setIsAuthenticating(false);
     }
@@ -888,6 +1033,7 @@ export default function App({ convex: _initialConvex }: AppProps) {
         <WelcomeScreen
           isAuthenticating={isAuthenticating}
           userCode={userCode}
+          verificationUrl={verificationUrl}
           onStartDeviceAuth={startDeviceAuth}
           onCancelDeviceAuth={cancelDeviceAuth}
           authError={authError}

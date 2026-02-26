@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast as sonnerToast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const STORAGE_KEY = "convex-panel-notified-sha";
@@ -18,18 +19,20 @@ interface VersionResponse {
 
 async function fetchLatestVersion(): Promise<VersionResponse> {
   const url = `${API_BASE_URL}/v1/version`;
-  const res = await fetch(url);
-  
+  const res = await tauriFetch(url);
+
   if (!res.ok) {
     try {
       const { error } = await res.json();
       console.error("[useApplicationVersion] Failed to fetch version:", error);
     } catch (e) {
-      console.error("[useApplicationVersion] Failed to fetch version information.");
+      console.error(
+        "[useApplicationVersion] Failed to fetch version information.",
+      );
     }
     throw new Error("Failed to fetch version information.");
   }
-  
+
   return res.json();
 }
 
@@ -50,10 +53,9 @@ function setNotifiedSha(sha: string): void {
 }
 
 export function useApplicationVersion() {
-  const currentSha = typeof __GIT_COMMIT_HASH__ !== "undefined" 
-    ? __GIT_COMMIT_HASH__ 
-    : null;
-  
+  const currentSha =
+    typeof __GIT_COMMIT_HASH__ !== "undefined" ? __GIT_COMMIT_HASH__ : null;
+
   const hasShownToastRef = useRef(false);
   const lastCheckedShaRef = useRef<string | null>(null);
 
@@ -89,22 +91,22 @@ export function useApplicationVersion() {
       // Check if we've already notified about this specific SHA
       const notifiedSha = getNotifiedSha();
       const hasAlreadyNotified = notifiedSha === data.sha;
-      
+
       // Only show if this is a new SHA we haven't notified about
       if (!hasAlreadyNotified && !hasShownToastRef.current) {
         // Mark that we've shown the toast for this SHA
         hasShownToastRef.current = true;
         lastCheckedShaRef.current = data.sha;
         setNotifiedSha(data.sha);
-        
+
         // Use a unique toast ID to prevent duplicates
         const toastId = "applicationVersion";
-        
+
         sonnerToast.info(
           <div className="flex flex-col gap-3">
             <div className="font-medium">
-              A new version of Convex Panel is available! Refresh the application to
-              update.
+              A new version of Convex Panel is available! Refresh the
+              application to update.
             </div>
             <Button
               variant="default"
@@ -123,18 +125,18 @@ export function useApplicationVersion() {
             id: toastId,
             duration: Infinity, // Don't auto-dismiss
             dismissible: false,
-          }
+          },
         );
       }
     }
-    
+
     // Reset the toast flag if versions match (app was updated)
     if (data?.sha && currentSha && data.sha === currentSha) {
       hasShownToastRef.current = false;
       // Clear the notified SHA so we can notify about future updates
       setNotifiedSha(currentSha);
     }
-    
+
     // Reset ref if the SHA we're checking changed
     if (lastCheckedShaRef.current !== data?.sha) {
       hasShownToastRef.current = false;

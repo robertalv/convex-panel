@@ -1,10 +1,12 @@
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+import { invoke } from '@tauri-apps/api/core';
 import type { Deployment, Project, Team } from 'convex-panel';
 import { getDeployments, getProfile, getProjects, getTeams, type UserProfile } from '@convex-panel/shared/api';
 
 const AUTH_ISSUER = 'https://auth.convex.dev';
 const AUTH_CLIENT_ID = 'HFtA247jp9iNs08NTLIB7JsNPMmRIyfi';
 const BIG_BRAIN_URL = 'https://api.convex.dev';
+const REQUEST_TIMEOUT_MS = 15000;
 
 export type DashboardFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -15,6 +17,7 @@ export interface DeviceAuthResponse {
     verification_uri_complete: string;
     expires_in: number;
     interval: number;
+    token_endpoint?: string;
 }
 
 export interface TokenResponse {
@@ -38,53 +41,195 @@ export interface DashboardAdapter {
     listDeployments(accessToken: string, projectId: number): Promise<Deployment[]>;
 }
 
+interface AuthEndpoints {
+    device_authorization_endpoint: string;
+    token_endpoint: string;
+}
+
+interface TokenErrorResponse {
+    error?: string;
+    error_description?: string;
+    interval?: number;
+}
+
+interface TauriTokenPollResponse {
+    status: number;
+    body: TokenResponse & TokenErrorResponse & { [key: string]: unknown };
+}
+
 const isTauri = () => typeof window !== 'undefined' && Boolean((window as any).__TAURI_INTERNALS__);
+
+async function readJsonWithTimeout<T>(
+    response: Response,
+    context: string,
+    timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<T> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        const rawText = await Promise.race([
+            response.text(),
+            new Promise<never>((_, reject) => {
+                timeoutId = setTimeout(() => {
+                    reject(new Error(`Timed out reading ${context} response body after ${timeoutMs / 1000}s`));
+                }, timeoutMs);
+            }),
+        ]);
+
+        try {
+            return JSON.parse(rawText) as T;
+        } catch (parseError) {
+            throw new Error(
+                `Failed to parse ${context} response as JSON: ${
+                    parseError instanceof Error ? parseError.message : String(parseError)
+                }`,
+            );
+        }
+    } finally {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+    }
+}
+
+async function readTextWithTimeout(
+    response: Response,
+    context: string,
+    timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<string> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        return await Promise.race([
+            response.text(),
+            new Promise<never>((_, reject) => {
+                timeoutId = setTimeout(() => {
+                    reject(new Error(`Timed out reading ${context} response text after ${timeoutMs / 1000}s`));
+                }, timeoutMs);
+            }),
+        ]);
+    } finally {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+    }
+}
 
 export const dashboardFetch: DashboardFetch = async (input, init) => {
     const url = input instanceof Request ? input.url : input.toString();
     console.log(`[DashboardAdapter] Fetching ${url}`);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-        console.error(`Request to ${url} timed out after 15s`);
-        controller.abort();
-    }, 15000);
+
+    const externalSignal = init?.signal;
+    const onExternalAbort = () => controller.abort();
+    if (externalSignal) {
+        if (externalSignal.aborted) {
+            controller.abort();
+        } else {
+            externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+        }
+    }
 
     const newInit = {
         ...init,
-        signal: (init?.signal || controller.signal) as AbortSignal,
+        signal: controller.signal as AbortSignal,
     };
 
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
-        let response;
-        if (isTauri()) {
-            console.log(`Using tauriFetch for ${url}`);
-            response = await tauriFetch(input, newInit);
-        } else {
+        const requestPromise = (async () => {
+            if (isTauri()) {
+                console.log(`Using tauriFetch for ${url}`);
+                return tauriFetch(input, newInit);
+            }
+
             console.log(`Using native fetch for ${url}`);
-            response = await fetch(input, newInit);
+            return fetch(input, newInit);
+        })();
+
+        const timeoutPromise = new Promise<Response>((_, reject) => {
+            timeoutId = setTimeout(() => {
+                console.error(`Request to ${url} timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
+                controller.abort();
+                reject(new Error(`Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`));
+            }, REQUEST_TIMEOUT_MS);
+        });
+
+        const response = await Promise.race([requestPromise, timeoutPromise]);
+        if (isTauri()) {
+            console.log(`Response for ${url}: ${response.status}`);
         }
-        console.log(`Response for ${url}: ${response.status}`);
         return response;
     } catch (error) {
         console.error(`Error fetching ${url}:`, error);
         throw error;
     } finally {
-        clearTimeout(timeoutId);
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+        if (externalSignal) {
+            externalSignal.removeEventListener('abort', onExternalAbort);
+        }
     }
 };
 
-async function discoverAuthEndpoints(fetcher: DashboardFetch) {
+async function discoverAuthEndpoints(fetcher: DashboardFetch): Promise<AuthEndpoints> {
     const response = await fetcher(`${AUTH_ISSUER}/.well-known/openid-configuration`, { method: 'GET' });
     if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
+        const errorText = await readTextWithTimeout(response, 'OIDC discovery error', 5000).catch(() => 'Unknown error');
         throw new Error(`Failed to discover auth configuration: ${response.status} ${errorText}`);
     }
-    return response.json() as Promise<{ device_authorization_endpoint: string; token_endpoint: string }>;
+
+    console.log('[DashboardAdapter] Parsing OIDC discovery response');
+    const data = await readJsonWithTimeout<Partial<AuthEndpoints>>(
+        response,
+        'OIDC discovery',
+    );
+    if (!data.device_authorization_endpoint || !data.token_endpoint) {
+        throw new Error('Failed to discover auth configuration: missing OAuth endpoints');
+    }
+
+    console.log(
+        '[DashboardAdapter] Discovered auth endpoints:',
+        data.device_authorization_endpoint,
+        data.token_endpoint,
+    );
+
+    return {
+        device_authorization_endpoint: data.device_authorization_endpoint,
+        token_endpoint: data.token_endpoint,
+    };
 }
 
 export async function startDeviceAuthorization(fetcher: DashboardFetch = dashboardFetch): Promise<DeviceAuthResponse> {
+    if (isTauri()) {
+        const tauriResponse = await invoke<DeviceAuthResponse>(
+            'auth_start_device_authorization',
+            {
+                clientId: AUTH_CLIENT_ID,
+                scope: 'openid profile email',
+            },
+        );
+
+        const verificationUrl = tauriResponse.verification_uri_complete || tauriResponse.verification_uri;
+        if (!tauriResponse.device_code || !tauriResponse.user_code || !verificationUrl || !tauriResponse.expires_in) {
+            throw new Error('Auth server returned an invalid device authorization response');
+        }
+
+        return {
+            device_code: tauriResponse.device_code,
+            user_code: tauriResponse.user_code,
+            verification_uri: tauriResponse.verification_uri || verificationUrl,
+            verification_uri_complete: verificationUrl,
+            expires_in: tauriResponse.expires_in,
+            interval: tauriResponse.interval || 5,
+            token_endpoint: tauriResponse.token_endpoint,
+        };
+    }
+
     const config = await discoverAuthEndpoints(fetcher);
+    console.log('[DashboardAdapter] Starting device authorization request', config.device_authorization_endpoint);
     const deviceResponse = await fetcher(config.device_authorization_endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -95,11 +240,33 @@ export async function startDeviceAuthorization(fetcher: DashboardFetch = dashboa
     });
 
     if (!deviceResponse.ok) {
-        const errorText = await deviceResponse.text().catch(() => 'Unknown error');
+        const errorText = await readTextWithTimeout(
+            deviceResponse,
+            'device authorization error',
+            5000,
+        ).catch(() => 'Unknown error');
         throw new Error(`Failed to start device authorization: ${deviceResponse.status} ${errorText}`);
     }
 
-    return deviceResponse.json();
+    const data = await readJsonWithTimeout<Partial<DeviceAuthResponse>>(
+        deviceResponse,
+        'device authorization',
+    );
+    const verificationUrl = data.verification_uri_complete || data.verification_uri;
+
+    if (!data.device_code || !data.user_code || !verificationUrl || !data.expires_in) {
+        throw new Error('Auth server returned an invalid device authorization response');
+    }
+
+    return {
+        device_code: data.device_code,
+        user_code: data.user_code,
+        verification_uri: data.verification_uri || verificationUrl,
+        verification_uri_complete: verificationUrl,
+        expires_in: data.expires_in,
+        interval: data.interval || 5,
+        token_endpoint: config.token_endpoint,
+    };
 }
 
 export async function pollForDeviceToken(
@@ -107,7 +274,10 @@ export async function pollForDeviceToken(
     fetcher: DashboardFetch = dashboardFetch,
     shouldStop?: () => boolean,
 ): Promise<TokenResponse | null> {
-    const { token_endpoint } = await discoverAuthEndpoints(fetcher);
+    const discoveredEndpoints = auth.token_endpoint
+        ? { token_endpoint: auth.token_endpoint }
+        : await discoverAuthEndpoints(fetcher);
+    const tokenEndpoint = discoveredEndpoints.token_endpoint;
     const pollInterval = (auth.interval || 5) * 1000;
     const expiresAt = Date.now() + auth.expires_in * 1000;
 
@@ -115,7 +285,62 @@ export async function pollForDeviceToken(
         if (shouldStop?.()) {
             return null;
         }
-        const tokenResponse = await fetcher(token_endpoint, {
+        if (isTauri()) {
+            const tokenPollResponse = await invoke<TauriTokenPollResponse>(
+                'auth_poll_device_token',
+                {
+                    tokenEndpoint,
+                    clientId: AUTH_CLIENT_ID,
+                    deviceCode: auth.device_code,
+                },
+            );
+
+            const body = tokenPollResponse.body;
+
+            if (tokenPollResponse.status >= 200 && tokenPollResponse.status < 300) {
+                if (!body.access_token || typeof body.access_token !== 'string') {
+                    throw new Error('Token response missing access_token');
+                }
+                return {
+                    access_token: body.access_token,
+                    token_type: typeof body.token_type === 'string' ? body.token_type : 'Bearer',
+                    expires_in: typeof body.expires_in === 'number' ? body.expires_in : undefined,
+                    refresh_token: typeof body.refresh_token === 'string' ? body.refresh_token : undefined,
+                };
+            }
+
+            const errorCode = body.error;
+
+            if (errorCode === 'authorization_pending') {
+                await new Promise((resolve) => setTimeout(resolve, pollInterval));
+                continue;
+            }
+
+            if (errorCode === 'slow_down') {
+                const nextPollInterval = Math.max(
+                    (typeof body.interval === 'number' ? body.interval : auth.interval || 5) * 1000,
+                    pollInterval + 5000,
+                );
+                await new Promise((resolve) => setTimeout(resolve, nextPollInterval));
+                continue;
+            }
+
+            if (errorCode === 'expired_token') {
+                throw new Error('Authentication expired. Please try again.');
+            }
+
+            if (errorCode === 'access_denied') {
+                throw new Error('Authentication was denied.');
+            }
+
+            if (errorCode) {
+                throw new Error(`Authentication failed: ${body.error_description || errorCode}`);
+            }
+
+            throw new Error(`Authentication failed while polling token: HTTP ${tokenPollResponse.status}`);
+        }
+
+        const tokenResponse = await fetcher(tokenEndpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({
@@ -126,10 +351,40 @@ export async function pollForDeviceToken(
         });
 
         if (tokenResponse.ok) {
-            return tokenResponse.json();
+            return readJsonWithTimeout<TokenResponse>(tokenResponse, 'token');
         }
 
-        await new Promise((resolve) => setTimeout(resolve, pollInterval));
+        const errorBody = await readJsonWithTimeout<TokenErrorResponse>(
+            tokenResponse,
+            'token error',
+            5000,
+        ).catch(() => ({} as TokenErrorResponse));
+        const errorCode = errorBody.error;
+
+        if (errorCode === 'authorization_pending') {
+            await new Promise((resolve) => setTimeout(resolve, pollInterval));
+            continue;
+        }
+
+        if (errorCode === 'slow_down') {
+            const nextPollInterval = Math.max((errorBody.interval || auth.interval || 5) * 1000, pollInterval + 5000);
+            await new Promise((resolve) => setTimeout(resolve, nextPollInterval));
+            continue;
+        }
+
+        if (errorCode === 'expired_token') {
+            throw new Error('Authentication expired. Please try again.');
+        }
+
+        if (errorCode === 'access_denied') {
+            throw new Error('Authentication was denied.');
+        }
+
+        if (errorCode) {
+            throw new Error(`Authentication failed: ${errorBody.error_description || errorCode}`);
+        }
+
+        throw new Error(`Authentication failed while polling token: HTTP ${tokenResponse.status}`);
     }
 
     return null;
@@ -143,6 +398,25 @@ export async function exchangeForDashboardToken(
         ? 'Convex Panel Desktop'
         : 'convex-panel';
 
+    if (isTauri()) {
+        const data = await invoke<{
+            accessToken: string;
+            tokenType?: string;
+            expiresAt?: number;
+            refreshToken?: string;
+        }>('auth_exchange_dashboard_token', {
+            authnToken: oidcToken,
+            deviceName: hostname,
+        });
+
+        return {
+            accessToken: data.accessToken,
+            tokenType: data.tokenType ?? 'Bearer',
+            expiresAt: data.expiresAt ? Date.now() + data.expiresAt * 1000 : undefined,
+            refreshToken: data.refreshToken,
+        };
+    }
+
     const response = await fetcher(`${BIG_BRAIN_URL}/api/authorize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -154,7 +428,12 @@ export async function exchangeForDashboardToken(
         throw new Error(`Failed to authorize with Convex: ${response.status} ${errorText}`);
     }
 
-    const data = await response.json();
+    const data = await readJsonWithTimeout<{
+        accessToken: string;
+        tokenType?: string;
+        expiresAt?: number;
+        refreshToken?: string;
+    }>(response, 'dashboard authorize');
     return {
         accessToken: data.accessToken,
         tokenType: data.tokenType ?? 'Bearer',

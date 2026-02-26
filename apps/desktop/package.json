@@ -1,6 +1,6 @@
 {
   "name": "@convex-panel/desktop",
-  "version": "0.3.20",
+  "version": "0.3.21",
   "private": true,
   "type": "module",
   "scripts": {
@@ -98,9 +98,9 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@tauri-apps/api": "^2.0.0",
-    "@tauri-apps/cli": "^2.0.0",
-    "@tauri-apps/plugin-dialog": "^2.4.2",
+    "@tauri-apps/api": "^2.10.0",
+    "@tauri-apps/cli": "^2.10.0",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-fs": "^2.2.0",
     "@tauri-apps/plugin-shell": "^2.2.0",
     "@types/react": "^19.2.7",

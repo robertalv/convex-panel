@@ -12,6 +12,7 @@ import { desktopFetch } from "@/utils/desktop";
 import { useDeployment } from "@/contexts/deployment-context";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/contexts/query-context";
 import { useCombinedFetchingControl } from "@/hooks/useCombinedFetchingControl";
+import { useUdfExecutionStats } from "./useUdfExecutionStats";
 import {
   functionIdentifierValue,
   functionIdentifierFromValue,
@@ -351,19 +352,42 @@ function getLatestValue(data: TimeSeriesDataPoint[]): number {
  * 1. Route awareness - Only fetches when on /health route
  * 2. Idle detection - Pauses after 1 minute of user inactivity
  * 3. Visibility - Pauses when browser tab is hidden
+ *
+ * Refresh intervals are aligned with the official Convex dashboard:
+ * - Failure rate, Cache hit rate: 2.5s (real-time top-K metrics)
+ * - Scheduler lag: 60s (minute-level granularity)
+ * - Latency, Request rate: 30s (computed from stream data)
  */
 export function useHealthMetrics(): HealthMetrics {
   const { deploymentUrl, authToken } = useDeployment();
   const queryClient = useQueryClient();
 
-  // Combined fetching control: route + idle + visibility awareness
-  const { enabled: fetchingEnabled, refetchInterval } =
+  // Per-metric fetching control with different intervals matching official dashboard
+  // Top-K metrics (failure rate, cache hit rate) - 2.5s
+  const { enabled: topKEnabled, refetchInterval: topKRefetchInterval } =
+    useCombinedFetchingControl("/health", REFETCH_INTERVAL.healthTopK);
+
+  // Scheduler lag - 60s (official dashboard uses 60s)
+  const {
+    enabled: schedulerEnabled,
+    refetchInterval: schedulerRefetchInterval,
+  } = useCombinedFetchingControl("/health", REFETCH_INTERVAL.schedulerLag);
+
+  // Other metrics (latency, request rate) - 30s
+  const { enabled: otherEnabled, refetchInterval: otherRefetchInterval } =
     useCombinedFetchingControl("/health", REFETCH_INTERVAL.health);
 
   // Only enable queries when we have credentials AND fetching is allowed
-  const enabled = Boolean(deploymentUrl && authToken) && fetchingEnabled;
+  const enabledTopK = Boolean(deploymentUrl && authToken) && topKEnabled;
+  const enabledScheduler =
+    Boolean(deploymentUrl && authToken) && schedulerEnabled;
+  const enabledOther = Boolean(deploymentUrl && authToken) && otherEnabled;
 
-  // Failure rate query
+  // Shared UDF execution stats — reuse for latency and request rate
+  // to avoid 3x redundant API calls to /api/stream_udf_execution (Bug 5 fix)
+  const { entries: udfEntries } = useUdfExecutionStats();
+
+  // Failure rate query — top-K metric, 2.5s refresh
   const failureRateQuery = useQuery({
     queryKey: healthMetricsKeys.failureRate(deploymentUrl ?? ""),
     queryFn: async () => {
@@ -374,15 +398,14 @@ export function useHealthMetrics(): HealthMetrics {
       );
       return transformMultiSeriesData(data, "failurePercentage");
     },
-    enabled,
+    enabled: enabledTopK,
     staleTime: STALE_TIME.health,
-    refetchInterval,
+    refetchInterval: topKRefetchInterval,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    placeholderData: (previousData) => previousData ?? null,
   });
 
-  // Cache hit rate query
+  // Cache hit rate query — top-K metric, 2.5s refresh
   const cacheHitRateQuery = useQuery({
     queryKey: healthMetricsKeys.cacheHitRate(deploymentUrl ?? ""),
     queryFn: async () => {
@@ -393,15 +416,14 @@ export function useHealthMetrics(): HealthMetrics {
       );
       return transformMultiSeriesData(data, "cacheHitPercentage");
     },
-    enabled,
+    enabled: enabledTopK,
     staleTime: STALE_TIME.health,
-    refetchInterval,
+    refetchInterval: topKRefetchInterval,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    placeholderData: (previousData) => previousData ?? null,
   });
 
-  // Scheduler lag query
+  // Scheduler lag query — 60s refresh (official dashboard uses 60s)
   const schedulerLagQuery = useQuery({
     queryKey: healthMetricsKeys.schedulerLag(deploymentUrl ?? ""),
     queryFn: async () => {
@@ -424,15 +446,15 @@ export function useHealthMetrics(): HealthMetrics {
         : [];
       return transformed;
     },
-    enabled,
+    enabled: enabledScheduler,
     staleTime: STALE_TIME.health,
-    refetchInterval,
+    refetchInterval: schedulerRefetchInterval,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    placeholderData: (previousData) => previousData ?? [],
   });
 
-  // Latency percentiles query
+  // Latency percentiles query — uses shared UDF entries to avoid duplicate fetch
+  // 30s refresh (computed from stream data, not direct API)
   const latencyQuery = useQuery({
     queryKey: healthMetricsKeys.latency(deploymentUrl ?? ""),
     queryFn: async () => {
@@ -440,9 +462,14 @@ export function useHealthMetrics(): HealthMetrics {
         deploymentUrl!,
         authToken!,
         desktopFetch,
+        udfEntries.length > 0 ? udfEntries : undefined,
       );
       // Data format: [[50, [[timestamp, value]]], [95, [...]], [99, [...]]]
       const percentiles: LatencyPercentiles = { p50: 0, p95: 0, p99: 0 };
+
+      if (!data || data.length === 0) {
+        return percentiles;
+      }
 
       for (const [percentile, timeSeries] of data) {
         const latestValue =
@@ -456,26 +483,44 @@ export function useHealthMetrics(): HealthMetrics {
 
       return percentiles;
     },
-    enabled,
+    enabled: enabledOther,
     staleTime: STALE_TIME.health,
-    refetchInterval, // Uses visibility-aware interval
+    refetchInterval: otherRefetchInterval,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
+    retry: (failureCount, error) => {
+      // Don't retry timeouts — the underlying stream endpoint is just slow
+      if (error instanceof Error && error.name === "TimeoutError") {
+        return false;
+      }
+      return failureCount < 2;
+    },
   });
 
-  // Request rate query
+  // Request rate query — uses shared UDF entries to avoid duplicate fetch
+  // 30s refresh (computed from stream data, not direct API)
   const requestRateQuery = useQuery({
     queryKey: healthMetricsKeys.requestRate(deploymentUrl ?? ""),
     queryFn: async () => {
-      const data = await fetchUdfRate(deploymentUrl!, authToken!, desktopFetch);
+      const data = await fetchUdfRate(
+        deploymentUrl!,
+        authToken!,
+        desktopFetch,
+        udfEntries.length > 0 ? udfEntries : undefined,
+      );
       return transformTimeSeries(data);
     },
-    enabled,
+    enabled: enabledOther,
     staleTime: STALE_TIME.health,
-    refetchInterval,
+    refetchInterval: otherRefetchInterval,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    placeholderData: (previousData) => previousData ?? [],
+    retry: (failureCount, error) => {
+      if (error instanceof Error && error.name === "TimeoutError") {
+        return false;
+      }
+      return failureCount < 2;
+    },
   });
 
   // Compute derived values

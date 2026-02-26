@@ -62,7 +62,6 @@ export const ROUTES = {
   CACHE_HIT_PERCENTAGE: "/api/cache_hit_percentage",
   FAILURE_RATE: "/api/app_metrics/failure_percentage_top_k",
   LIST_FUNCTION_LOGS: "/api/list_function_logs",
-  SCHEDULER_LAG: "/api/app_metrics/scheduler_lag_top_k",
   GET_SOURCE_CODE: "/api/get_source_code",
   NPM_CONVEX: "https://registry.npmjs.org/convex/latest",
   CONVEX_CHANGELOG:

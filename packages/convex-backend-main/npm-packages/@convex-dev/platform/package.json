@@ -1,0 +1,71 @@
+{
+  "name": "@convex-dev/platform",
+  "version": "0.1.3",
+  "description": "A client for the Convex Platform APIs",
+  "type": "module",
+  "scripts": {
+    "build": "npm run generateApiSpec && node version-check.mjs && zshy",
+    "prepare": "npm run build",
+    "prepack": "node src/scripts/dont-publish-alpha-as-latest.mjs",
+    "test": "echo 0",
+    "typecheck": "tsc --noEmit",
+    "generateApiSpec": "npm run generateManagementApiSpec && npm run generateDeploymentApiSpec && npm run generateLogStreamApiSpec",
+    "generateManagementApiSpec": "openapi-typescript ./management-openapi.json --output ./src/generatedManagementApi.ts --root-types --root-types-no-schema-prefix",
+    "generateDeploymentApiSpec": "openapi-typescript ./deployment-openapi.json --output ./src/generatedDeploymentApi.ts --root-types --root-types-no-schema-prefix",
+    "generateLogStreamApiSpec": "openapi-typescript ./log-stream-openapi.json --output ./src/generatedLogStreamApi.ts --root-types --root-types-no-schema-prefix",
+    "checkApiSpec": "npm run checkManagementApiSpec && npm run checkDeploymentApiSpec && npm run checkLogStreamApiSpec",
+    "checkManagementApiSpec": "openapi-typescript ./management-openapi.json --output ./src/generatedManagementApi.ts --root-types --root-types-no-schema-prefix --check || (echo 'Platform management API spec check failed. Run `npm run generateApiSpec` to fix.'; false)",
+    "checkDeploymentApiSpec": "openapi-typescript ./deployment-openapi.json --output ./src/generatedDeploymentApi.ts --root-types --root-types-no-schema-prefix --check || (echo 'Platform deployment API spec check failed. Run `npm run generateApiSpec` to fix.'; false)",
+    "checkLogStreamApiSpec": "openapi-typescript ./log-stream-openapi.json --output ./src/generatedLogStreamApi.ts --root-types --root-types-no-schema-prefix --check || (echo 'Platform log stream API spec check failed. Run `npm run generateApiSpec` to fix.'; false)"
+  },
+  "keywords": [],
+  "author": "Convex, Inc. <no-reply@convex.dev>",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^18.17.0",
+    "typescript": "^5.9.2",
+    "openapi-typescript": "~7.8.0",
+    "openapi-typescript-helpers": "~0.0.15",
+    "tsx": "^4.19.4",
+    "zshy": "0.7.0"
+  },
+  "dependencies": {
+    "openapi-fetch": "~0.15.0"
+  },
+  "zshy": {
+    "exports": {
+      ".": "./src/index.ts",
+      "./deploymentApi": "./src/generatedDeploymentApi.ts",
+      "./logStreamApi": "./src/generatedLogStreamApi.ts",
+      "./managementApi": "./src/generatedManagementApi.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.cts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./deploymentApi": {
+      "types": "./dist/generatedDeploymentApi.d.cts",
+      "import": "./dist/generatedDeploymentApi.js",
+      "require": "./dist/generatedDeploymentApi.cjs"
+    },
+    "./logStreamApi": {
+      "types": "./dist/generatedLogStreamApi.d.cts",
+      "import": "./dist/generatedLogStreamApi.js",
+      "require": "./dist/generatedLogStreamApi.cjs"
+    },
+    "./managementApi": {
+      "types": "./dist/generatedManagementApi.d.cts",
+      "import": "./dist/generatedManagementApi.js",
+      "require": "./dist/generatedManagementApi.cjs"
+    }
+  }
+}

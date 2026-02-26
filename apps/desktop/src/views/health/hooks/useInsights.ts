@@ -21,6 +21,8 @@ export const insightsKeys = {
 
 /**
  * Hook for fetching insights from the Convex BigBrain API.
+ * Requires accessToken (OAuth bearer token) for BigBrain API access.
+ * Falls back gracefully when only authToken (deploy key) is available.
  *
  * Network calls are optimized with three-layer control:
  * 1. Route awareness - Only fetches when on /health route
@@ -28,7 +30,7 @@ export const insightsKeys = {
  * 3. Visibility - Pauses when browser tab is hidden
  */
 export function useInsights(): InsightsState {
-  const { deploymentUrl, authToken } = useDeployment();
+  const { deploymentUrl, accessToken } = useDeployment();
   const queryClient = useQueryClient();
 
   // Combined fetching control with 5 minute interval for insights
@@ -38,14 +40,15 @@ export function useInsights(): InsightsState {
       5 * 60 * 1000, // 5 minutes - insights don't change frequently
     );
 
-  const enabled = Boolean(deploymentUrl && authToken) && fetchingEnabled;
+  // Insights require accessToken (OAuth) for BigBrain API, not just authToken (deploy key)
+  const enabled = Boolean(deploymentUrl && accessToken) && fetchingEnabled;
 
   const query = useQuery({
     queryKey: insightsKeys.list(deploymentUrl ?? ""),
     queryFn: async () => {
       const result = await fetchInsights(
         deploymentUrl!,
-        authToken!,
+        accessToken!,
         desktopFetch,
       );
       return result;
@@ -55,7 +58,6 @@ export function useInsights(): InsightsState {
     refetchInterval,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    placeholderData: (previousData) => previousData ?? [],
   });
 
   const refetch = useCallback(() => {

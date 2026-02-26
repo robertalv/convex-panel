@@ -1,0 +1,146 @@
+@import "../../node_modules/@convex-dev/design-system/src/styles/shared.css";
+@source "../../../@convex-dev/design-system/src/";
+@source "../../../dashboard/src/";
+@source "../"; /* dashboard-common/src */
+
+@font-face {
+  font-family: "GT America";
+  font-weight: 400;
+  font-display: swap;
+  src: url(https://docs.convex.dev/fonts/GT-America-Standard-Regular.woff2);
+}
+
+@font-face {
+  font-family: "GT America";
+  font-weight: 500;
+  font-display: swap;
+  src: url(https://docs.convex.dev/fonts/GT-America-Standard-Medium.woff2);
+}
+
+@font-face {
+  font-family: "GT America";
+  font-weight: 700;
+  font-display: swap;
+  src: url(https://docs.convex.dev/fonts/GT-America-Standard-Bold.woff2);
+}
+
+@font-face {
+  font-family: "GT America";
+  font-weight: 900;
+  font-display: swap;
+  src: url(https://docs.convex.dev/fonts/GT-America-Standard-Black.woff2);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family:
+    "Inter Variable",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    "Noto Sans",
+    sans-serif,
+    "Apple Color Emoji",
+    "Segoe UI Emoji",
+    "Segoe UI Symbol",
+    "Noto Color Emoji";
+  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* readOnlyEditor styles */
+.readonlyEditor .monaco-editor .cursors-layer .cursor {
+  display: none !important;
+}
+.readonlyEditor .monacoLineHighlight {
+  background-color: rgb(243, 176, 28, 0.3);
+  padding: 2px 0px;
+}
+
+.monaco-editor .monaco-editor-background,
+.margin {
+  @apply bg-background-secondary!;
+}
+
+.disabled .monaco-editor .monaco-editor-background,
+.disabled .margin {
+  @apply bg-background-tertiary!;
+}
+
+.monaco-editor .hover-row.status-bar {
+  display: none;
+}
+
+.monaco-editor,
+.margin,
+.monaco-scrollable-element {
+  @apply bg-background-secondary!;
+}
+
+/* Makes spans in hovers not take up too much vertical space */
+.monaco-hover-content span {
+  margin-bottom: 0px !important;
+}
+
+/* Makes icon rendering in monaco work */
+[class^="codicon-"],
+[class*="codicon-"] {
+  font-family: "codicon" !important;
+}
+[class^="codicon-"].hover-decoration,
+[class*="codicon-"].hover-decoration {
+  position: relative;
+  top: 0.125rem;
+  /* This is important to ensure the icon does not push the text out of the line */
+  line-height: 9px;
+}
+
+/* Recharts style */
+.recharts-tooltip-cursor {
+  @apply fill-background-tertiary;
+}
+
+.recharts-tooltip-wrapper {
+  outline: none;
+}
+
+/* Data page: row's edit button hovered or used in the context menu */
+@layer components {
+  .DataRow {
+    @apply border-t border-x border-x-transparent;
+  }
+
+  /* Apply a border on the last row */
+  .DataRow:last-child {
+    @apply border-b;
+  }
+}
+
+@layer utilities {
+  /* Alias for .bottom-4 to avoid false positives with easylist_cookie */
+  .bottom-four {
+    @apply bottom-4;
+  }
+
+  /* Subtle diagonal stripes background utility */
+  .bg-stripes {
+    background-image: repeating-linear-gradient(
+      45deg,
+      theme(colors.background.primary) 0px,
+      theme(colors.background.primary) 10px,
+      transparent 10px,
+      transparent 20px
+    );
+  }
+}

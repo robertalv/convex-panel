@@ -1,0 +1,154 @@
+import { useBBMutation } from "api/api";
+import { useProfile } from "api/profile";
+import { useCurrentProject } from "api/projects";
+import { useTeams, useCurrentTeam, useTeamMembers } from "api/teams";
+import { Sheet } from "@ui/Sheet";
+import { Combobox } from "@ui/Combobox";
+import { Button } from "@ui/Button";
+import { ConfirmationDialog } from "@ui/ConfirmationDialog";
+import { useRouter } from "next/router";
+import { useState } from "react";
+
+function useTransferProject(projectId?: number, destinationTeamId?: number) {
+  return useBBMutation({
+    path: "/projects/{project_id}/transfer",
+    pathParams: {
+      project_id: projectId?.toString() || "",
+    },
+    mutateKey: "/teams/{team_id}/projects",
+    mutatePathParams: {
+      team_id: destinationTeamId?.toString() || "",
+    },
+    successToast: "Project transferred.",
+  });
+}
+
+export function TransferProject() {
+  const project = useCurrentProject();
+  const { selectedTeamSlug, teams } = useTeams();
+  const originTeam = useCurrentTeam();
+  const [destinationTeamId, setDestinationTeamId] = useState<number | null>(
+    null,
+  );
+  const transferProject = useTransferProject(
+    project?.id,
+    destinationTeamId ?? undefined,
+  );
+  const destinationTeam = teams?.find((t) => t.id === destinationTeamId);
+
+  const me = useProfile();
+  const originTeamMembers = useTeamMembers(originTeam?.id);
+  const destinationTeamMembers = useTeamMembers(destinationTeamId ?? undefined);
+  const isAdminOfOldTeam =
+    originTeamMembers?.find((member) => member.id === me?.id)?.role === "admin";
+  const isAdminOfNewTeam =
+    destinationTeamMembers?.find((member) => member.id === me?.id)?.role ===
+    "admin";
+
+  const loading = destinationTeamId
+    ? !originTeamMembers || !destinationTeamMembers
+    : false;
+  const canTransfer = isAdminOfOldTeam && isAdminOfNewTeam;
+
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const validationError = !destinationTeamId
+    ? undefined
+    : teams && teams.length === 1
+      ? "You must be a member of another team to transfer a project."
+      : !canTransfer
+        ? `You must be an admin of ${originTeam?.name} and ${destinationTeam?.name} to transfer this project to ${destinationTeam?.name}.`
+        : undefined;
+  const router = useRouter();
+
+  return (
+    <Sheet>
+      <h3 className="mb-4">Transfer Project</h3>
+      <p className="mb-5 max-w-prose text-sm text-content-primary">
+        Transfer this project to another team.
+      </p>
+      {teams && teams.length > 1 && (
+        <div className="mb-4 flex flex-col gap-1">
+          <Combobox
+            label={
+              <div className="flex items-center gap-2">Destination Team</div>
+            }
+            labelHidden={false}
+            placeholder="Select a team"
+            buttonProps={{
+              loading,
+              tip:
+                validationError ||
+                (!isAdminOfOldTeam &&
+                  "You must be an admin of this team to transfer a project."),
+            }}
+            options={
+              teams
+                ?.filter((t) => t.slug !== selectedTeamSlug)
+                .map((team) => ({
+                  label: team.name,
+                  value: team.id,
+                })) || []
+            }
+            selectedOption={destinationTeamId}
+            setSelectedOption={setDestinationTeamId}
+            disabled={!isAdminOfOldTeam || !teams || teams.length === 1}
+          />
+          {!loading && validationError && (
+            <p
+              className="max-w-prose animate-fadeInFromLoading text-xs text-content-errorSecondary"
+              role="alert"
+            >
+              {validationError}
+            </p>
+          )}
+        </div>
+      )}
+      <Button
+        variant="primary"
+        disabled={
+          loading ||
+          !destinationTeamId ||
+          !canTransfer ||
+          (teams && teams.length === 1)
+        }
+        tip={
+          teams && teams.length === 1
+            ? "You must be a member of another team to transfer a project."
+            : !destinationTeamId
+              ? "Select a team to transfer this project to."
+              : undefined
+        }
+        onClick={() => setShowConfirmation(true)}
+      >
+        Transfer
+      </Button>
+      {project &&
+        originTeam &&
+        destinationTeam &&
+        project &&
+        showConfirmation && (
+          <ConfirmationDialog
+            confirmText="Transfer"
+            validationText={`Transfer ${project.slug} from ${originTeam.slug} to ${destinationTeam.slug}`}
+            dialogTitle={`Transfer Project to ${destinationTeam.name}?`}
+            dialogBody={
+              <div className="flex flex-col gap-2">
+                Are you sure you want to transfer this project?
+              </div>
+            }
+            onConfirm={async () => {
+              await transferProject({
+                destinationTeamId: destinationTeam.id,
+              });
+              setShowConfirmation(false);
+              await router.replace(
+                `/t/${destinationTeam.slug}/${project.slug}/settings`,
+              );
+            }}
+            variant="primary"
+            onClose={() => setShowConfirmation(false)}
+          />
+        )}
+    </Sheet>
+  );
+}

@@ -5,10 +5,15 @@ import { Icon } from "../ui/icon";
 
 interface DeviceAuthFlowProps {
   userCode: string;
+  verificationUrl?: string | null;
   onCancel: () => void;
 }
 
-export function DeviceAuthFlow({ userCode, onCancel }: DeviceAuthFlowProps) {
+export function DeviceAuthFlow({
+  userCode,
+  verificationUrl,
+  onCancel,
+}: DeviceAuthFlowProps) {
   const codeChars = userCode.split("");
 
   return (
@@ -66,6 +71,21 @@ export function DeviceAuthFlow({ userCode, onCancel }: DeviceAuthFlowProps) {
           <span className="text-sm">Waiting for authentication...</span>
         </div>
       </div>
+
+      {verificationUrl && (
+        <div className="text-center space-y-1">
+          <p className="text-xs text-text-muted">Browser didn't open? Go to:</p>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(verificationUrl);
+            }}
+            className="text-xs text-brand-base hover:underline cursor-pointer break-all"
+            title="Click to copy URL"
+          >
+            {verificationUrl}
+          </button>
+        </div>
+      )}
 
       <div className="flex justify-center">
         <Button

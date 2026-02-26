@@ -59,7 +59,6 @@ export function useTeamUsageSummary(): TeamUsageResult {
     refetchInterval,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    placeholderData: (previousData) => previousData ?? null,
   });
 
   const refetch = useCallback(() => {

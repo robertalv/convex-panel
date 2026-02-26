@@ -1,0 +1,55 @@
+[package]
+name = "migrations_model"
+version = "0.1.0"
+authors = ["Convex, Inc. <no-reply@convex.dev>"]
+edition = "2024"
+license = "LicenseRef-FSL-1.1-Apache-2.0"
+
+[features]
+testing = [
+    "common/testing",
+    "database/testing",
+    "errors/testing",
+    "proptest",
+    "proptest-derive",
+    "proptest-http",
+    "value/testing",
+]
+
+[dependencies]
+anyhow = { workspace = true }
+chrono = { workspace = true }
+cmd_util = { workspace = true }
+common = { workspace = true }
+database = { workspace = true }
+derive_more = { workspace = true }
+errors = { workspace = true }
+futures-async-stream = { workspace = true }
+proptest = { workspace = true, optional = true }
+proptest-derive = { workspace = true, optional = true }
+proptest-http = { workspace = true, optional = true }
+reqwest = { workspace = true }
+saffron = { workspace = true }
+sentry = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+serde_json = { workspace = true }
+sync_types = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+value = { workspace = true }
+
+[dev-dependencies]
+common = { workspace = true, features = ["testing"] }
+database = { workspace = true, features = ["testing"] }
+errors = { workspace = true, features = ["testing"] }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
+proptest-http = { workspace = true }
+sync_types = { workspace = true, features = [
+    "testing",
+] }
+value = { workspace = true, features = ["testing"] }
+
+[lints]
+workspace = true

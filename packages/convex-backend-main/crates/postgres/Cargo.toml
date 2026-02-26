@@ -1,0 +1,53 @@
+[package]
+name = "postgres"
+version = "0.1.0"
+authors = ["Convex, Inc. <no-reply@convex.dev>"]
+edition = "2024"
+license = "LicenseRef-FSL-1.1-Apache-2.0"
+
+[package.metadata.cargo-machete]
+ignored = ["proptest"]
+
+[features]
+testing = ["common/testing", "errors/testing", "metrics/testing"]
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+bytes = { workspace = true }
+cmd_util = { workspace = true }
+common = { workspace = true }
+const_format = { workspace = true }
+errors = { workspace = true }
+fastrace = { workspace = true }
+futures = { workspace = true }
+futures-async-stream = { workspace = true }
+hex = { workspace = true }
+itertools = { workspace = true }
+lru = { workspace = true }
+metrics = { workspace = true }
+parking_lot = { workspace = true }
+postgres-protocol = { workspace = true }
+prometheus = { workspace = true }
+rand = { workspace = true }
+rustls = { workspace = true }
+rustls-native-certs = { workspace = true }
+rustls-pki-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-postgres = { workspace = true }
+tokio-postgres-rustls = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+common = { workspace = true, features = ["testing"] }
+errors = { workspace = true, features = ["testing"] }
+metrics = { workspace = true, features = ["testing"] }
+proptest = { workspace = true }
+tokio = { workspace = true }
+
+[lints]
+workspace = true

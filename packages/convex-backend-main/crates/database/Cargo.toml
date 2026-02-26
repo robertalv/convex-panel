@@ -1,0 +1,120 @@
+[package]
+name = "database"
+version = "0.1.0"
+authors = ["Convex, Inc. <no-reply@convex.dev>"]
+edition = "2024"
+license = "LicenseRef-FSL-1.1-Apache-2.0"
+
+[package.metadata.cargo-udeps.ignore]
+development = ["criterion"] # udeps can't tell this is used by benchmarks
+
+[lib]
+doctest = false
+
+[features]
+bench = ["testing"]
+testing = [
+    "common/testing",
+    "errors/testing",
+    "events/testing",
+    "indexing/testing",
+    "keybroker/testing",
+    "metrics/testing",
+    "proptest",
+    "proptest-derive",
+    "runtime/testing",
+    "search/testing",
+    "storage/testing",
+    "shape_inference/testing",
+    "usage_tracking/testing",
+    "value/testing",
+    "vector/testing",
+]
+
+[dependencies]
+ahash = { workspace = true }
+anyhow = { workspace = true }
+async-broadcast = { workspace = true }
+async-recursion = { workspace = true }
+async-trait = { workspace = true }
+async_lru = { workspace = true }
+cmd_util = { workspace = true }
+common = { workspace = true }
+convex_macro = { workspace = true }
+derive_more = { workspace = true }
+errors = { workspace = true }
+events = { workspace = true }
+fastrace = { workspace = true }
+fivetran_source = { workspace = true }
+futures = { workspace = true }
+futures-async-stream = { workspace = true }
+governor = { workspace = true }
+hashlink = { workspace = true }
+imbl = { workspace = true }
+indexing = { workspace = true }
+interval_map = { workspace = true }
+itertools = { workspace = true }
+keybroker = { workspace = true }
+maplit = { workspace = true }
+metrics = { workspace = true }
+parking_lot = { workspace = true, features = ["hardware-lock-elision"] }
+pb = { workspace = true }
+prometheus = { workspace = true }
+proptest = { workspace = true, optional = true }
+proptest-derive = { workspace = true, optional = true }
+qdrant_segment = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+runtime = { workspace = true }
+search = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+shape_inference = { workspace = true }
+short_future = { workspace = true }
+slab = { workspace = true }
+storage = { workspace = true }
+sync_types = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+usage_tracking = { workspace = true }
+value = { workspace = true }
+vector = { workspace = true }
+
+[dev-dependencies]
+async-channel = { workspace = true }
+common = { workspace = true, features = ["testing"] }
+compact_str = { workspace = true }
+criterion = { workspace = true, features = ["async_tokio"] }
+errors = { workspace = true, features = ["testing"] }
+events = { workspace = true, features = ["testing"] }
+humansize = { workspace = true }
+indexing = { workspace = true, features = ["testing"] }
+keybroker = { workspace = true, features = ["testing"] }
+metrics = { workspace = true, features = ["testing"] }
+must-let = { workspace = true }
+pretty_assertions = { workspace = true }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
+runtime = { workspace = true, features = ["testing"] }
+search = { workspace = true, features = ["testing"] }
+shape_inference = { workspace = true, features = ["testing"] }
+storage = { workspace = true, features = ["testing"] }
+usage_tracking = { workspace = true, features = ["testing"] }
+value = { workspace = true, features = ["testing"] }
+vector = { workspace = true, features = ["testing"] }
+
+[[bench]]
+name = "subscriptions"
+harness = false
+required-features = ["testing"]
+
+[[bench]]
+name = "is_stale"
+harness = false
+required-features = ["testing"]
+
+[lints]
+workspace = true

@@ -1,0 +1,1203 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Convex CLI API",
+    "description": "CLI-specific endpoints for Convex development tools.",
+    "license": {
+      "name": "LicenseRef-Convex",
+      "identifier": "LicenseRef-Convex"
+    },
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/teams": {
+      "get": {
+        "operationId": "get_teams_for_member",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TeamResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/{team_slug}/projects": {
+      "get": {
+        "operationId": "get_cli_projects_for_team",
+        "parameters": [
+          {
+            "name": "team_slug",
+            "in": "path",
+            "description": "Team slug identifier",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectDetails"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workos/delete_environment": {
+      "post": {
+        "description": "Delete a WorkOS environment. This removes the environment from both WorkOS and the Convex database.",
+        "operationId": "delete_workos_environment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteWorkOSEnvironmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteWorkOSEnvironmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workos/disconnect_workos_team": {
+      "post": {
+        "description": "Disconnect a WorkOS team from a Convex team. This is a destructive action that will prevent new WorkOS environments from being provisioned, though existing environments will continue to work.",
+        "operationId": "disconnect_workos_team",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisconnectWorkOSTeamRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisconnectWorkOSTeamResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workos/available_workos_team_emails": {
+      "get": {
+        "description": "Get candidate email addresses to be WorkOS admins.",
+        "operationId": "get_available_workos_team_emails",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailableWorkOSTeamEmailsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deployments/{deployment_name}/has_associated_workos_team": {
+      "get": {
+        "description": "Check if a deployment has an associated WorkOS team",
+        "operationId": "get_has_associated_workos_team",
+        "parameters": [
+          {
+            "name": "deployment_name",
+            "in": "path",
+            "description": "Deployment name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HasAssociatedWorkOSTeamResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workos/get_or_provision_workos_environment": {
+      "post": {
+        "description": "Get or provision a WorkOS environment for a deployment",
+        "operationId": "get_or_provision_workos_environment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetOrProvisionEnvironmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisionEnvironmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deployments/{deployment_name}/workos_environment_health": {
+      "get": {
+        "description": "Check if the WorkOS environment associated with this deployment is still accessible",
+        "operationId": "get_workos_environment_health",
+        "parameters": [
+          {
+            "name": "deployment_name",
+            "in": "path",
+            "description": "Deployment name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOSEnvironmentHealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/{team_id}/workos_invitation_eligible_emails": {
+      "get": {
+        "description": "Get emails eligible for WorkOS team invitation (all verified emails except those that are admin of a different WorkOS team)",
+        "operationId": "get_workos_invitation_eligible_emails",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Convex team ID",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationEligibleEmailsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/{team_id}/workos_team_health": {
+      "get": {
+        "description": "Check if the WorkOS team associated with this Convex team is still accessible",
+        "operationId": "get_workos_team_health",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Convex team ID",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOSTeamHealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workos/invite_team_member": {
+      "post": {
+        "description": "Invite a member to the WorkOS team associated with a Convex team",
+        "operationId": "invite_workos_team_member",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteWorkOSTeamMemberRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteWorkOSTeamMemberResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workos/has_associated_workos_team": {
+      "post": {
+        "description": "Check if a deployment has an associated WorkOS team",
+        "operationId": "has_associated_workos_team",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HasAssociatedWorkOSTeamRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HasAssociatedWorkOSTeamResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workos/provision_associated_workos_team": {
+      "post": {
+        "description": "Provision a WorkOS team for a Convex team",
+        "operationId": "provision_associated_workos_team",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProvisionWorkOSTeamRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisionWorkOSTeamResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/workos_environments": {
+      "get": {
+        "description": "List all WorkOS environments for a project",
+        "operationId": "get_project_workos_environments",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetProjectEnvironmentsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Create a new WorkOS environment for a project",
+        "operationId": "provision_project_workos_environment",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProvisionProjectEnvironmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisionProjectEnvironmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/workos_environments/{client_id}": {
+      "get": {
+        "description": "Get a specific WorkOS environment for a project including credentials. This action is audited.",
+        "operationId": "get_project_workos_environment",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetProjectEnvironmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workos/delete_project_environment": {
+      "post": {
+        "description": "Delete a WorkOS environment from a project",
+        "operationId": "delete_project_environment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteProjectEnvironmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteProjectEnvironmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workos/check_project_environment_health": {
+      "post": {
+        "description": "Check the health of a project WorkOS environment. Returns HTTP error on failure.",
+        "operationId": "check_project_environment_health",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckProjectEnvironmentHealthRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOSEnvironmentHealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AvailableWorkOSTeamEmailsResponse": {
+        "type": "object",
+        "required": [
+          "availableEmails",
+          "usedEmails"
+        ],
+        "properties": {
+          "availableEmails": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "usedEmails": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CheckProjectEnvironmentHealthRequest": {
+        "type": "object",
+        "required": [
+          "projectId",
+          "clientId"
+        ],
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "description": "WorkOS client ID"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Project ID",
+            "minimum": 0
+          }
+        }
+      },
+      "DeleteProjectEnvironmentRequest": {
+        "type": "object",
+        "required": [
+          "projectId",
+          "clientId"
+        ],
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "description": "WorkOS client ID of the environment to delete"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Project ID for the environment to delete",
+            "minimum": 0
+          }
+        }
+      },
+      "DeleteProjectEnvironmentResponse": {
+        "type": "object",
+        "description": "Response for deleting a project environment - matches\nDeleteWorkOSEnvironmentResponse",
+        "required": [
+          "workosEnvironmentId",
+          "workosEnvironmentName",
+          "workosTeamId"
+        ],
+        "properties": {
+          "workosEnvironmentId": {
+            "type": "string"
+          },
+          "workosEnvironmentName": {
+            "type": "string"
+          },
+          "workosTeamId": {
+            "type": "string"
+          }
+        }
+      },
+      "DeleteWorkOSEnvironmentRequest": {
+        "type": "object",
+        "required": [
+          "deploymentName"
+        ],
+        "properties": {
+          "deploymentName": {
+            "type": "string",
+            "description": "Deployment name for the environment to delete"
+          }
+        }
+      },
+      "DeleteWorkOSEnvironmentResponse": {
+        "type": "object",
+        "required": [
+          "workosEnvironmentId",
+          "workosEnvironmentName",
+          "workosTeamId"
+        ],
+        "properties": {
+          "workosEnvironmentId": {
+            "type": "string"
+          },
+          "workosEnvironmentName": {
+            "type": "string"
+          },
+          "workosTeamId": {
+            "type": "string"
+          }
+        }
+      },
+      "DisconnectWorkOSTeamRequest": {
+        "type": "object",
+        "required": [
+          "teamId"
+        ],
+        "properties": {
+          "teamId": {
+            "$ref": "#/components/schemas/TeamId",
+            "description": "Convex team ID to disconnect from WorkOS"
+          }
+        }
+      },
+      "DisconnectWorkOSTeamResponse": {
+        "type": "object",
+        "required": [
+          "workosTeamId",
+          "workosTeamName"
+        ],
+        "properties": {
+          "workosTeamId": {
+            "type": "string"
+          },
+          "workosTeamName": {
+            "type": "string"
+          }
+        }
+      },
+      "GetOrProvisionEnvironmentRequest": {
+        "type": "object",
+        "required": [
+          "deploymentName"
+        ],
+        "properties": {
+          "deploymentName": {
+            "type": "string"
+          },
+          "environmentName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isProduction": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      },
+      "GetProjectEnvironmentResponse": {
+        "type": "object",
+        "description": "Response for getting a project WorkOS environment with credentials - matches\nProvisionProjectEnvironmentResponse pattern with workos_ prefix",
+        "required": [
+          "workosEnvironmentId",
+          "workosEnvironmentName",
+          "workosClientId",
+          "workosApiKey",
+          "userEnvironmentName",
+          "isProduction"
+        ],
+        "properties": {
+          "isProduction": {
+            "type": "boolean"
+          },
+          "userEnvironmentName": {
+            "type": "string",
+            "description": "The user-provided environment name (e.g., \"staging\", \"development\")"
+          },
+          "workosApiKey": {
+            "type": "string"
+          },
+          "workosClientId": {
+            "type": "string"
+          },
+          "workosEnvironmentId": {
+            "type": "string"
+          },
+          "workosEnvironmentName": {
+            "type": "string"
+          }
+        }
+      },
+      "GetProjectEnvironmentsResponse": {
+        "type": "object",
+        "required": [
+          "environments"
+        ],
+        "properties": {
+          "environments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectEnvironmentSummary"
+            }
+          }
+        }
+      },
+      "HasAssociatedWorkOSTeamRequest": {
+        "type": "object",
+        "required": [
+          "deploymentName"
+        ],
+        "properties": {
+          "deploymentName": {
+            "type": "string"
+          }
+        }
+      },
+      "HasAssociatedWorkOSTeamResponse": {
+        "type": "object",
+        "required": [
+          "hasAssociatedWorkosTeam",
+          "teamId"
+        ],
+        "properties": {
+          "adminConvexEmail": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Email of Convex team member who created the WorkOS account.\nThis field should always be present when has_associated_workos_team is\ntrue."
+          },
+          "adminEmail": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Email address used to provision the WorkOS account. This field should\nalways be present if has_associated_workos_team is true."
+          },
+          "adminName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name of Convex team member who created the WorkOS account.\nThis field is optional even when has_associated_workos_team is true."
+          },
+          "hasAssociatedWorkosTeam": {
+            "type": "boolean"
+          },
+          "teamId": {
+            "$ref": "#/components/schemas/TeamId"
+          }
+        }
+      },
+      "InvitationEligibleEmailsResponse": {
+        "type": "object",
+        "required": [
+          "eligibleEmails"
+        ],
+        "properties": {
+          "adminEmail": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The admin email used to create this team's WorkOS account (always\neligible for re-invitation)"
+          },
+          "eligibleEmails": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "InviteWorkOSTeamMemberRequest": {
+        "type": "object",
+        "required": [
+          "teamId",
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address to invite to the WorkOS team,\nmust be a verified email address associated with the user's account"
+          },
+          "teamId": {
+            "$ref": "#/components/schemas/TeamId",
+            "description": "Convex team ID that has an associated WorkOS team"
+          }
+        }
+      },
+      "InviteWorkOSTeamMemberResponse": {
+        "type": "object",
+        "required": [
+          "email",
+          "roleSlug"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "roleSlug": {
+            "type": "string"
+          }
+        }
+      },
+      "ManagedBy": {
+        "type": "string",
+        "enum": [
+          "vercel"
+        ]
+      },
+      "MemberId": {
+        "type": "integer",
+        "format": "int64",
+        "minimum": 0
+      },
+      "ProjectDetails": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "isDemo",
+          "teamId",
+          "createTime"
+        ],
+        "properties": {
+          "createTime": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "devDeploymentName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "isDemo": {
+            "type": "boolean"
+          },
+          "name": {
+            "$ref": "#/components/schemas/ProjectName"
+          },
+          "prodDeploymentName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "$ref": "#/components/schemas/ProjectSlug"
+          },
+          "teamId": {
+            "$ref": "#/components/schemas/TeamId"
+          }
+        }
+      },
+      "ProjectEnvironmentSummary": {
+        "type": "object",
+        "description": "Summary of a project WorkOS environment for list responses - slimmer than\nfull environment details, uses workos_ prefix for consistency with\ndeployment",
+        "required": [
+          "workosEnvironmentId",
+          "workosEnvironmentName",
+          "workosClientId",
+          "userEnvironmentName",
+          "isProduction"
+        ],
+        "properties": {
+          "isProduction": {
+            "type": "boolean"
+          },
+          "userEnvironmentName": {
+            "type": "string",
+            "description": "The user-provided environment name (e.g., \"staging\", \"development\")"
+          },
+          "workosClientId": {
+            "type": "string"
+          },
+          "workosEnvironmentId": {
+            "type": "string"
+          },
+          "workosEnvironmentName": {
+            "type": "string"
+          }
+        }
+      },
+      "ProjectId": {
+        "type": "integer",
+        "format": "int64",
+        "minimum": 0
+      },
+      "ProjectName": {
+        "type": "string"
+      },
+      "ProjectSlug": {
+        "type": "string"
+      },
+      "ProvisionEnvironmentResponse": {
+        "type": "object",
+        "required": [
+          "environmentId",
+          "environmentName",
+          "clientId",
+          "apiKey",
+          "newlyProvisioned"
+        ],
+        "properties": {
+          "apiKey": {
+            "type": "string"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "environmentId": {
+            "type": "string"
+          },
+          "environmentName": {
+            "type": "string"
+          },
+          "newlyProvisioned": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProvisionProjectEnvironmentRequest": {
+        "type": "object",
+        "required": [
+          "environmentName"
+        ],
+        "properties": {
+          "environmentName": {
+            "type": "string"
+          },
+          "isProduction": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      },
+      "ProvisionProjectEnvironmentResponse": {
+        "type": "object",
+        "description": "Response for provisioning a project WorkOS environment - matches\nProvisionEnvironmentResponse pattern with workos_ prefix for consistency",
+        "required": [
+          "workosEnvironmentId",
+          "workosEnvironmentName",
+          "workosClientId",
+          "workosApiKey",
+          "newlyProvisioned",
+          "userEnvironmentName"
+        ],
+        "properties": {
+          "newlyProvisioned": {
+            "type": "boolean"
+          },
+          "userEnvironmentName": {
+            "type": "string",
+            "description": "The user-provided environment name (e.g., \"staging\", \"development\")"
+          },
+          "workosApiKey": {
+            "type": "string"
+          },
+          "workosClientId": {
+            "type": "string"
+          },
+          "workosEnvironmentId": {
+            "type": "string"
+          },
+          "workosEnvironmentName": {
+            "type": "string"
+          }
+        }
+      },
+      "ProvisionWorkOSTeamRequest": {
+        "type": "object",
+        "required": [
+          "teamId",
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address to use for the WorkOS team admin,\nmust be a verified email address associated with the user's account"
+          },
+          "teamId": {
+            "$ref": "#/components/schemas/TeamId",
+            "description": "Convex team ID, no WorkOS team exists at this point"
+          }
+        }
+      },
+      "ProvisionWorkOSTeamResponse": {
+        "type": "object",
+        "required": [
+          "workosTeamId",
+          "workosTeamName",
+          "adminEmail"
+        ],
+        "properties": {
+          "adminEmail": {
+            "type": "string"
+          },
+          "workosTeamId": {
+            "type": "string"
+          },
+          "workosTeamName": {
+            "type": "string"
+          }
+        }
+      },
+      "ReferralCode": {
+        "type": "string"
+      },
+      "RegionName": {
+        "type": "string"
+      },
+      "TeamId": {
+        "type": "integer",
+        "format": "int64",
+        "minimum": 0
+      },
+      "TeamName": {
+        "type": "string"
+      },
+      "TeamResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "suspended",
+          "referralCode"
+        ],
+        "properties": {
+          "creator": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MemberId"
+              }
+            ]
+          },
+          "defaultRegion": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RegionName"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/TeamId"
+          },
+          "managedBy": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ManagedBy"
+              }
+            ]
+          },
+          "managedByUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "$ref": "#/components/schemas/TeamName"
+          },
+          "referralCode": {
+            "$ref": "#/components/schemas/ReferralCode"
+          },
+          "referredBy": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TeamId"
+              }
+            ]
+          },
+          "slug": {
+            "$ref": "#/components/schemas/TeamSlug"
+          },
+          "ssoLoginId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "suspended": {
+            "type": "boolean"
+          }
+        }
+      },
+      "TeamSlug": {
+        "type": "string"
+      },
+      "WorkOSEnvironmentHealthResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "clientId"
+        ],
+        "properties": {
+          "clientId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "WorkOSProductionState": {
+        "type": "string",
+        "enum": [
+          "active",
+          "inactive"
+        ]
+      },
+      "WorkOSTeamHealthResponse": {
+        "type": "object",
+        "required": [
+          "teamProvisioned"
+        ],
+        "properties": {
+          "teamInfo": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOSTeamInfo",
+                "description": "WorkOS team details, present only when team_provisioned is true"
+              }
+            ]
+          },
+          "teamProvisioned": {
+            "type": "boolean",
+            "description": "Whether a WorkOS team has been provisioned for this Convex team"
+          }
+        }
+      },
+      "WorkOSTeamInfo": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "productionState"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "productionState": {
+            "$ref": "#/components/schemas/WorkOSProductionState"
+          }
+        }
+      }
+    }
+  }
+}

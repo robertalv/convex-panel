@@ -1,0 +1,6 @@
+{
+  "$schema": "../../convex/schemas/convex.schema.json",
+  "node": {
+    "externalPackages": ["*"]
+  }
+}

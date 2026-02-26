@@ -1,0 +1,148 @@
+[package]
+name = "local_backend"
+version = "0.1.0"
+edition = "2024"
+license = "LicenseRef-FSL-1.1-Apache-2.0"
+
+[[bin]]
+name = "convex-local-backend"
+path = "src/main.rs"
+
+[features]
+testing = [
+    "common/testing",
+    "clusters/testing",
+    "database/testing",
+    "errors/testing",
+    "function_runner/testing",
+    "isolate/testing",
+    "keybroker/testing",
+    "metrics/testing",
+    "model/testing",
+    "mysql/testing",
+    "postgres/testing",
+    "runtime/testing",
+    "search/testing",
+    "storage/testing",
+    "udf/testing",
+    "usage_tracking/testing",
+    "value/testing",
+    "vector/testing",
+    "application/testing",
+    "authentication/testing",
+    "events/testing",
+    "node_executor/testing",
+    "sync/testing",
+    "db_connection/testing",
+    "exports/testing",
+]
+
+[dependencies]
+anyhow = { workspace = true }
+application = { workspace = true }
+async-broadcast = { workspace = true }
+async-trait = { workspace = true }
+authentication = { workspace = true }
+axum = { workspace = true }
+axum-extra = { workspace = true }
+base64 = { workspace = true }
+clap = { workspace = true }
+clusters = { workspace = true }
+cmd_util = { workspace = true }
+common = { workspace = true }
+database = { workspace = true }
+db_connection = { workspace = true }
+either = { workspace = true }
+errors = { workspace = true }
+events = { workspace = true }
+exports = { workspace = true }
+fastrace = { workspace = true }
+file_storage = { workspace = true }
+fivetran_destination = { workspace = true }
+fivetran_source = { workspace = true }
+function_runner = { workspace = true }
+futures = { workspace = true }
+futures-async-stream = { workspace = true }
+governor = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+http_client = { workspace = true }
+hyper-util = { workspace = true }
+isolate = { workspace = true }
+keybroker = { workspace = true }
+maplit = { workspace = true }
+metrics = { workspace = true }
+model = { workspace = true }
+mysql = { workspace = true }
+node_executor = { workspace = true }
+parking_lot = { workspace = true }
+postgres = { workspace = true }
+rand = { workspace = true }
+reqwest = { workspace = true }
+runtime = { workspace = true }
+search = { workspace = true }
+sentry = { workspace = true }
+sentry-tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_with = { workspace = true }
+sqlite = { workspace = true }
+storage = { workspace = true }
+sync = { workspace = true }
+sync_types = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+tungstenite = { workspace = true }
+udf = { workspace = true }
+url = { workspace = true }
+urlencoding = { workspace = true }
+usage_tracking = { path = "../usage_tracking" }
+utoipa = { workspace = true }
+utoipa-axum = { workspace = true }
+value = { workspace = true }
+vector = { workspace = true }
+
+[build-dependencies]
+anyhow = { workspace = true }
+vergen = { workspace = true, features = ["git", "gitcl"] }
+
+[dev-dependencies]
+application = { workspace = true, features = ["testing"] }
+authentication = { workspace = true, features = ["testing"] }
+clusters = { workspace = true, features = ["testing"] }
+common = { workspace = true, features = ["testing"] }
+convex_macro = { workspace = true }
+database = { workspace = true, features = ["testing"] }
+db_connection = { workspace = true, features = ["testing"] }
+errors = { workspace = true, features = ["testing"] }
+events = { workspace = true, features = ["testing"] }
+exports = { workspace = true, features = ["testing"] }
+function_runner = { workspace = true, features = ["testing"] }
+isolate = { workspace = true, features = ["testing"] }
+jsonschema = { workspace = true }
+keybroker = { workspace = true, features = ["testing"] }
+metrics = { workspace = true, features = ["testing"] }
+model = { workspace = true, features = ["testing"] }
+mysql = { workspace = true, features = ["testing"] }
+node_executor = { workspace = true, features = ["testing"] }
+portpicker = { workspace = true }
+postgres = { workspace = true, features = ["testing"] }
+proptest = { workspace = true }
+runtime = { workspace = true, features = ["testing"] }
+search = { workspace = true, features = ["testing"] }
+shape_inference = { workspace = true, features = ["testing"] }
+storage = { workspace = true, features = ["testing"] }
+sync = { workspace = true, features = ["testing"] }
+tokio-tungstenite = { workspace = true }
+udf = { workspace = true, features = ["testing"] }
+usage_tracking = { workspace = true, features = ["testing"] }
+value = { workspace = true, features = ["testing"] }
+vector = { workspace = true, features = ["testing"] }
+
+[lints]
+workspace = true

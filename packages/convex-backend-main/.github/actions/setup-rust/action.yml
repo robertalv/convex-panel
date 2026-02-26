@@ -1,0 +1,74 @@
+name: Setup Rust
+description: Common setup for Rust builds
+inputs:
+  github-token:
+    required: true
+    description: "pass secrets.GITHUB_TOKEN"
+  r2-access-key:
+    required: true
+    description: "pass secrets.R2_ACCESS_KEY_ID"
+  r2-secret-key:
+    required: true
+    description: "pass secrets.R2_SECRET_ACCESS_KEY"
+
+runs:
+  using: composite
+  steps:
+    - name: Install libsodium and libssl
+      shell: bash
+      if: runner.os == 'Linux'
+      run: sudo apt-get install pkg-config libsodium-dev libssl-dev
+
+    - name: Install Just
+      uses: extractions/setup-just@v3
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+
+    - name: Install Rust
+      uses: dsherret/rust-toolchain-file@v1
+
+    - name: Install Mold
+      uses: rui314/setup-mold@v1
+
+    - name: Export environment variables
+      shell: bash
+      run: |
+        echo "CARGO_TERM_COLOR=always" >> $GITHUB_ENV
+        echo "CARGO_INCREMENTAL=0" >> $GITHUB_ENV
+        echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          echo "SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu" >> $GITHUB_ENV
+          echo "SODIUM_USE_PKG_CONFIG=1" >> $GITHUB_ENV
+          echo "ROCKSDB_LIB_DIR=/usr/lib" >> $GITHUB_ENV
+        fi
+        echo "CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse" >> $GITHUB_ENV
+        echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> $GITHUB_ENV
+
+    - name: Install sccache
+      uses: mozilla-actions/sccache-action@v0.0.9
+      with:
+        version: "v0.12.0"
+
+    - name: Start sccache
+      shell: bash
+      env:
+        SCCACHE_ENDPOINT: https://a4aa0fffebef8bc497f64875c40ee6fb.r2.cloudflarestorage.com
+        SCCACHE_BUCKET: cvx-actions-cache
+        SCCACHE_REGION: auto
+        AWS_ACCESS_KEY_ID: ${{ inputs.r2-access-key }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.r2-secret-key }}
+      run: |
+        # Try to start sccache up to 3 times. Sometimes it times out for unknown reasons.
+        (r=3;while ! sccache --start-server ; do ((--r))||exit;sleep 5;done)
+
+    # n.b. this action inspects the environment and variables starting with
+    # `CARGO_` are used as part of the cache key.
+    # If users of this composite action add additional `CARGO_*` variables after
+    # this step runs, the cache key used for storing the job outputs will not
+    # match the cache key used for restoring.
+    - name: Cached load of cargo registry
+      uses: Swatinem/rust-cache@v2.8.1
+      with:
+        # Only cache the `.cargo` directory; not build artifacts.
+        cache-targets: "false"
+        cache-provider: "buildjet"

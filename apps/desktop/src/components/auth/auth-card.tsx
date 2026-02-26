@@ -7,6 +7,7 @@ import { DeviceAuthFlow } from "./device-auth-flow";
 interface AuthCardProps {
   isAuthenticating: boolean;
   userCode: string | null;
+  verificationUrl?: string | null;
   onStartDeviceAuth: () => void;
   onCancelDeviceAuth: () => void;
   authError: string | null;
@@ -15,6 +16,7 @@ interface AuthCardProps {
 export function AuthCard({
   isAuthenticating,
   userCode,
+  verificationUrl,
   onStartDeviceAuth,
   onCancelDeviceAuth,
   authError,
@@ -31,22 +33,38 @@ export function AuthCard({
       )}
 
       {isDeviceAuthPending ? (
-        <DeviceAuthFlow userCode={userCode} onCancel={onCancelDeviceAuth} />
+        <DeviceAuthFlow
+          userCode={userCode}
+          verificationUrl={verificationUrl}
+          onCancel={onCancelDeviceAuth}
+        />
       ) : (
-        <Button
-          onClick={onStartDeviceAuth}
-          disabled={isAuthenticating}
-          className="w-full cursor-pointer"
-          size="lg"
-          variant="secondary"
-        >
-          {isAuthenticating ? (
-            <Spinner size="sm" className="text-white" />
-          ) : (
-            <ConvexLogo className="h-5 w-5" />
+        <div className="space-y-3">
+          <Button
+            onClick={onStartDeviceAuth}
+            disabled={isAuthenticating}
+            className="w-full cursor-pointer"
+            size="lg"
+            variant="secondary"
+          >
+            {isAuthenticating ? (
+              <Spinner size="sm" className="text-white" />
+            ) : (
+              <ConvexLogo className="h-5 w-5" />
+            )}
+            {isAuthenticating ? "Starting..." : "Sign in with Convex"}
+          </Button>
+          {isAuthenticating && (
+            <div className="flex justify-center">
+              <button
+                onClick={onCancelDeviceAuth}
+                className="text-xs text-text-muted hover:text-text-base transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
           )}
-          {isAuthenticating ? "Starting..." : "Sign in with Convex"}
-        </Button>
+        </div>
       )}
     </>
   );

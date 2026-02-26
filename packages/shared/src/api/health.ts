@@ -89,7 +89,8 @@ export async function fetchLastPushEvent(
 
     return null;
   } catch (error) {
-    return null;
+    console.error("[fetchLastPushEvent] Error:", error);
+    throw error;
   }
 }
 
@@ -148,8 +149,8 @@ export async function fetchServerVersion(
 
     return null;
   } catch (error) {
-    // Return null on error
-    return null;
+    console.error("[fetchServerVersion] Error:", error);
+    throw error;
   }
 }
 
@@ -431,6 +432,6 @@ export async function fetchInsights(
     return sortInsights(transformed);
   } catch (error) {
     console.error("[Insights] Unexpected error:", error);
-    return [];
+    throw error;
   }
 }
